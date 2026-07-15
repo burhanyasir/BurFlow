@@ -4,7 +4,25 @@ const demoData = {
     address: "123 Wellness Ave, Suite 200",
     phone: "(555) 234-5678",
     email: "hello@brightsmile.demo",
-    hours: "Mon-Fri 8:00 AM - 6:00 PM, Sat 9:00 AM - 2:00 PM"
+    hours: "Monday through Friday 8:00 AM - 6:00 PM, Saturday 9:00 AM - 2:00 PM",
+    rating: "4.8",
+    paymentProvider: "CareCredit",
+    assistantName: "BrightSmile AI",
+    pediatricServiceLabel: "pediatric dentistry",
+    customerLabel: "Patient",
+    clientNoun: "patients",
+    staff: [
+      { name: "Dr. Patel", experience: "15+ years experience" },
+      { name: "Dr. Lee", specialty: "pediatric specialist" },
+      { name: "Dr. Garcia", specialty: "cosmetic dentistry" }
+    ],
+    patientTypes: ["new patient", "existing patient"],
+    patientTypeQuestion: "Are you a new patient or an existing patient?",
+    serviceAliases: {
+      "child|kid|children|pediatric": "Pediatric Dentistry",
+      "existing|returning": "Follow-up Visit",
+      "new|first[. -]?time": "New Patient Exam"
+    }
   },
   services: [
     { name: "General Checkup & Cleaning", price: "$150", duration: "45 min" },
