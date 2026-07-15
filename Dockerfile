@@ -8,7 +8,6 @@ RUN npm ci --only=production
 COPY . .
 
 ENV NODE_ENV=production
-ENV PORT=3456
 
 EXPOSE 3456
 
