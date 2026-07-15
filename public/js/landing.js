@@ -37,6 +37,23 @@
     return false;
   };
 
+  // Navigation handling
+  window.__navigate = function (path) {
+    window.location.href = path;
+  };
+
+  // Smooth scroll for anchor links
+  document.addEventListener("click", function (e) {
+    if (e.target.tagName === "A" && e.target.getAttribute("href") && e.target.getAttribute("href").startsWith("#")) {
+      e.preventDefault();
+      var targetId = e.target.getAttribute("href");
+      var targetElement = document.querySelector(targetId);
+      if (targetElement) {
+        targetElement.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  });
+
   function roiCalc() {
     var v = +document.getElementById("roi-visitors").value || 0;
     var c = (+document.getElementById("roi-conv").value || 0) / 100;
@@ -44,9 +61,12 @@
     var u = (+document.getElementById("roi-uplift").value || 0) / 100;
     var bookings = v * c * u;
     var monthly = bookings * val;
-    document.getElementById("roi-bookings").textContent = Math.round(bookings).toLocaleString();
-    document.getElementById("roi-monthly").textContent = "$" + Math.round(monthly).toLocaleString();
-    document.getElementById("roi-annual").textContent = "$" + Math.round(monthly * 12).toLocaleString();
+    var bookingsEl = document.getElementById("roi-bookings");
+    var monthlyEl = document.getElementById("roi-monthly");
+    var annualEl = document.getElementById("roi-annual");
+    if (bookingsEl) bookingsEl.textContent = Math.round(bookings).toLocaleString();
+    if (monthlyEl) monthlyEl.textContent = "$" + Math.round(monthly).toLocaleString();
+    if (annualEl) annualEl.textContent = "$" + Math.round(monthly * 12).toLocaleString();
   }
   ["roi-visitors", "roi-conv", "roi-value", "roi-uplift"].forEach(function (id) {
     var el = document.getElementById(id);
