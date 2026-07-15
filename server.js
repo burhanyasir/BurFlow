@@ -480,7 +480,7 @@ app.get("/api/agency/widget/:subdomain", (req, res) => {
   res.json(widget);
 });
 
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
 
 app.get("/landing", (req, res) => {
   res.sendFile(path.join(__dirname, "public", "landing.html"));
@@ -508,7 +508,7 @@ app.get("/admin", (req, res) => {
 });
 
 app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.status(404).sendFile(path.join(__dirname, "public", "landing.html"));
 });
 
 app.listen(PORT, () => {
