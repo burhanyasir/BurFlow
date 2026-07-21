@@ -78,7 +78,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
           <ul className="space-y-3 mb-8 flex-1" role="list">
             {tier.features.map((f, i) => (
               <li key={i} className="flex items-start gap-3 text-sm">
-                <svg className={cn('h-4 w-4 mt-0.5 shrink-0', isEnterprise ? 'text-[#5865F2]' : 'text-[#5865F2]')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="h-4 w-4 mt-0.5 shrink-0 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
                 <span className={cn(isEnterprise && 'text-[#D0D5DD]')}>{f}</span>

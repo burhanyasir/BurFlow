@@ -1,42 +1,64 @@
+import { motion } from 'framer-motion';
 import { PageSection } from '../../components/ui/PageSection';
+import { ParticleField } from '../../components/effects/ParticleField';
+import '../../styles/effects.css';
 
 const principles = [
-  {
-    title: 'Factual Integrity',
-    description: 'Answers grounded solely in verified knowledge sources.'
-  },
-  {
-    title: 'Total Sovereignty',
-    description: 'Your brand, your domain, and your customer data remain yours.'
-  },
-  {
-    title: 'Operational Clarity',
-    description: 'Simple onboarding, transparent pricing, and predictable scaling.'
-  }
+  { title: 'Factual Integrity', description: 'Answers grounded solely in verified knowledge sources.', icon: 'check' },
+  { title: 'Total Sovereignty', description: 'Your brand, your domain, and your customer data remain yours.', icon: 'shield' },
+  { title: 'Operational Clarity', description: 'Simple onboarding, transparent pricing, and predictable scaling.', icon: 'zap' }
 ];
+
+const icons: Record<string, JSX.Element> = {
+  check: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+  shield: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
+  zap: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" /></svg>
+};
 
 export default function AboutPage() {
   return (
-    <PageSection
-      title="Democratizing Precision AI Support for Modern Businesses."
-      size="lg"
-      className="pt-20 md:pt-28"
-    >
-      <div className="max-w-3xl mx-auto">
-        <p className="text-lg text-[#5F6570] leading-relaxed mb-12">
-          Conversation Engine provides organizations with immediate, automated customer assistance powered exclusively by their proprietary knowledge. We believe customer service automation should be trustworthy, accurate, and completely aligned with your brand identity.
-        </p>
+    <div className="page-content">
+      <div className="ambient-gradient" aria-hidden="true" />
+      <ParticleField />
+      <PageSection
+        title="Democratizing Precision AI Support for Modern Businesses."
+        size="lg"
+        className="pt-20 md:pt-28"
+        containerClassName="max-w-4xl"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+        >
+          <div className="glass-card rounded-2xl p-8 md:p-12 mb-12 shadow-sm hover:shadow-md transition-shadow duration-300">
+            <p className="text-lg md:text-xl text-[#5F6570] leading-relaxed">
+              Conversation Engine provides organizations with immediate, automated customer assistance powered exclusively by their proprietary knowledge. We believe customer service automation should be trustworthy, accurate, and completely aligned with your brand identity.
+            </p>
+          </div>
 
-        <h3 className="text-xl font-semibold text-[#0B0C10] mb-6">Core Principles</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {principles.map(p => (
-            <div key={p.title} className="p-6 rounded-xl border border-[#D0D5DD] bg-[#F8F9FA]">
-              <h4 className="font-semibold text-[#0B0C10] mb-2">{p.title}</h4>
-              <p className="text-sm text-[#5F6570] leading-relaxed">{p.description}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </PageSection>
+          <h3 className="text-xl font-semibold text-[#0B0C10] mb-6 text-center">Core Principles</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {principles.map((p, i) => (
+              <motion.div
+                key={p.title}
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.1 }}
+                className="glass-card rounded-xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#E8EAFF] to-[#D0D5FF] flex items-center justify-center mb-4 shadow-sm">
+                  {icons[p.icon]}
+                </div>
+                <h4 className="font-semibold text-[#0B0C10] mb-2">{p.title}</h4>
+                <p className="text-sm text-[#5F6570] leading-relaxed">{p.description}</p>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      </PageSection>
+    </div>
   );
 }

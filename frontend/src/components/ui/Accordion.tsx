@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState, useRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
 
@@ -12,6 +12,31 @@ export interface AccordionProps {
   items: AccordionItem[];
   className?: string;
   allowMultiple?: boolean;
+}
+
+function AccordionPanel({ isOpen, content, id }: { isOpen: boolean; content: ReactNode; id: string }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <AnimatePresence initial={false}>
+      {isOpen && (
+        <motion.div
+          id={`accordion-panel-${id}`}
+          role="region"
+          key="panel"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: contentRef.current?.scrollHeight || 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.2, ease: 'easeInOut' }}
+          className="overflow-hidden"
+        >
+          <div ref={contentRef} className="px-5 pb-4 text-sm text-[#5F6570] leading-relaxed">
+            {content}
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 export function Accordion({ items, className, allowMultiple = false }: AccordionProps) {
@@ -47,24 +72,7 @@ export function Accordion({ items, className, allowMultiple = false }: Accordion
                 <polyline points="6 9 12 15 18 9" />
               </svg>
             </button>
-            <AnimatePresence initial={false}>
-              {isOpen && (
-                <motion.div
-                  id={`accordion-panel-${item.id}`}
-                  role="region"
-                  key="panel"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  className="overflow-hidden"
-                >
-                  <div className="px-5 pb-4 text-sm text-[#5F6570] leading-relaxed">
-                    {item.content}
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+            <AccordionPanel isOpen={isOpen} content={item.content} id={item.id} />
           </div>
         );
       })}
