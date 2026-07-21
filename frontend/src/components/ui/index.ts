@@ -23,3 +23,7 @@ export { ErrorState, type ErrorStateProps } from './ErrorState';
 export { Tabs, type TabsProps, type Tab } from './Tabs';
 export { Table, type TableProps, type Column } from './Table';
 export { Dropdown, type DropdownProps, type DropdownItem } from './Dropdown';
+export { Accordion, type AccordionProps, type AccordionItem } from './Accordion';
+export { PageSection, type PageSectionProps } from './PageSection';
+export { PricingCard, type PricingCardProps, type PricingTier } from './PricingCard';
+export { ContactForm, type ContactFormProps } from './ContactForm';
