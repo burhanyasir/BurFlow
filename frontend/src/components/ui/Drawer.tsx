@@ -16,8 +16,8 @@ export interface DrawerProps {
 
 const sizeStyles = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg' };
 const sideVariants = {
-  left: { hidden: { x: '-100%' }, visible: { x: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } }, exit: { x: '-100%', transition: { duration: 0.2 } } },
-  right: { hidden: { x: '100%' }, visible: { x: 0, transition: { type: 'spring', damping: 25, stiffness: 300 } }, exit: { x: '100%', transition: { duration: 0.2 } } }
+  left: { hidden: { x: '-100%' }, visible: { x: 0, transition: { type: 'spring' as const, damping: 25, stiffness: 300 } }, exit: { x: '-100%', transition: { duration: 0.2 } } },
+  right: { hidden: { x: '100%' }, visible: { x: 0, transition: { type: 'spring' as const, damping: 25, stiffness: 300 } }, exit: { x: '100%', transition: { duration: 0.2 } } }
 };
 
 export function Drawer({ open, onClose, title, children, side = 'right', size = 'md', className }: DrawerProps) {

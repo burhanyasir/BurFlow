@@ -18,7 +18,7 @@ const features = [
   { title: 'Pure White-Label Architecture', description: 'Maintain total brand integrity. Customize colors, logos, typography, widget positioning, and custom domain endpoints effortlessly.', icon: 'eye' }
 ];
 
-const trustItems = [
+const trustFeatures = [
   { title: 'Enterprise Security', description: 'Your data remains entirely yours. Enterprise-grade isolation ensures customer information is never trained into public models.', icon: 'shield' },
   { title: 'White-Label', description: 'Maintain total brand integrity with custom colors, logos, typography, and custom domain endpoints.', icon: 'eye' },
   { title: 'Multi-Tenant', description: 'Manage multiple client environments or brand portfolios from a unified dashboard with granular team roles.', icon: 'layers' },
@@ -26,7 +26,7 @@ const trustItems = [
   { title: 'Knowledge Accuracy', description: 'Answers are ground-referenced strictly against your verified documentation. Zero guesswork, zero off-topic responses.', icon: 'brain' }
 ];
 
-const featureIcons: Record<string, JSX.Element> = {
+const featureIcons: Record<string, React.ReactNode> = {
   brain: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 014 4v2a4 4 0 01-8 0V6a4 4 0 014-4z" /><path d="M20 12a8 8 0 01-16 0" /><path d="M12 22v-4" /><path d="M8 14h8" /></svg>,
   zap: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" /></svg>,
   eye: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
@@ -35,6 +35,36 @@ const featureIcons: Record<string, JSX.Element> = {
   chart: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="20" x2="18" y2="10" /><line x1="12" y1="20" x2="12" y2="4" /><line x1="6" y1="20" x2="6" y2="14" /></svg>
 };
 
+function ScrollIndicator() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 1.2, duration: 0.6 }}
+      className="hidden lg:flex flex-col items-center gap-2 mt-8"
+    >
+      <span className="text-xs text-[#A0A5B0] tracking-widest uppercase">Scroll</span>
+      <motion.div
+        animate={{ y: [0, 6, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+        className="w-5 h-8 rounded-full border border-[#D0D5DD] flex items-start justify-center p-1"
+      >
+        <motion.div className="w-1 h-2 rounded-full bg-[#5865F2]" />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function SectionDivider() {
+  return (
+    <div className="flex items-center justify-center gap-4 py-2" aria-hidden="true">
+      <div className="h-px flex-1 max-w-[120px] bg-gradient-to-r from-transparent via-[#D0D5DD]/40 to-transparent" />
+      <div className="w-1.5 h-1.5 rounded-full bg-[#5865F2]/30" />
+      <div className="h-px flex-1 max-w-[120px] bg-gradient-to-r from-transparent via-[#D0D5DD]/40 to-transparent" />
+    </div>
+  );
+}
+
 export default function LandingPage() {
   return (
     <div className="page-content">
@@ -42,7 +72,7 @@ export default function LandingPage() {
       <div className="noise-overlay" aria-hidden="true" />
       <ParticleField />
 
-      <section className="relative overflow-hidden pt-16 pb-12 md:pt-24 md:pb-20">
+      <section className="relative overflow-hidden pt-16 pb-8 md:pt-24 md:pb-12">
         <div className="hero-glow" style={{ top: '10%', left: '50%', transform: 'translateX(-50%)' }} aria-hidden="true" />
         <Container>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center min-h-[50vh] lg:min-h-[70vh]">
@@ -69,14 +99,15 @@ export default function LandingPage() {
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-start gap-4">
                 <Link to="/signup">
-                  <Button size="lg" className="shadow-xl shadow-[#5865F2]/20 hover:shadow-[#5865F2]/30 transition-shadow">
+                  <Button size="lg" glow arrow>
                     Start Free Trial
                   </Button>
                 </Link>
                 <Link to="/features">
-                  <Button variant="secondary" size="lg">Explore Capabilities</Button>
+                  <Button variant="secondary" size="lg" arrow>Explore Capabilities</Button>
                 </Link>
               </div>
+              <ScrollIndicator />
             </motion.div>
 
             <motion.div
@@ -93,6 +124,24 @@ export default function LandingPage() {
                 <KnowledgeCore className="absolute inset-0" />
               </Suspense>
             </motion.div>
+          </div>
+        </Container>
+      </section>
+
+      <SectionDivider />
+
+      <section className="py-8 md:py-6 overflow-hidden">
+        <Container>
+          <motion.div {...fadeUp} transition={{ duration: 0.5 }} className="text-center mb-8">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#A0A5B0] font-medium">Trusted by innovative teams</p>
+          </motion.div>
+          <div className="flex items-center justify-center gap-8 md:gap-14 flex-wrap opacity-40">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-[#5865F2]/20 to-[#00F0FF]/10" />
+                <div className="w-16 h-3 rounded bg-gradient-to-r from-[#D0D5DD]/50 to-transparent" />
+              </div>
+            ))}
           </div>
         </Container>
       </section>
@@ -116,10 +165,9 @@ export default function LandingPage() {
         </div>
       </PageSection>
 
-      <PageSection
-        title="Enterprise AI Infrastructure Built for Uncompromising Brands."
-        size="lg"
-      >
+      <SectionDivider />
+
+      <PageSection title="Enterprise AI Infrastructure Built for Uncompromising Brands." size="lg">
         <div className="max-w-3xl mx-auto">
           <WidgetPreview />
         </div>
@@ -135,6 +183,8 @@ export default function LandingPage() {
         </div>
       </PageSection>
 
+      <SectionDivider />
+
       <section className="py-16 md:py-24 overflow-hidden">
         <Container>
           <motion.div {...fadeUp} transition={{ duration: 0.5 }} className="text-center mb-12">
@@ -146,7 +196,7 @@ export default function LandingPage() {
             </p>
           </motion.div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-            {trustItems.map((item, i) => (
+            {trustFeatures.map((item, i) => (
               <motion.div
                 key={item.title}
                 {...fadeUp}
@@ -173,11 +223,14 @@ export default function LandingPage() {
             <p className="mt-4 text-lg text-[#5F6570] max-w-xl mx-auto">
               Join teams that trust Conversation Engine for precise, brand-aligned customer assistance.
             </p>
-            <div className="mt-8">
+            <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link to="/signup">
-                <Button size="lg" className="shadow-xl shadow-[#5865F2]/20 hover:shadow-[#5865F2]/30 transition-shadow">
+                <Button size="lg" glow arrow>
                   Start Free Trial
                 </Button>
+              </Link>
+              <Link to="/contact">
+                <Button variant="secondary" size="lg" arrow>Contact Sales</Button>
               </Link>
             </div>
           </motion.div>

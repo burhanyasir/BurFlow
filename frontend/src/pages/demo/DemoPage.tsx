@@ -8,7 +8,6 @@ import {
   Textarea,
   Select,
   Checkbox,
-  Radio,
   RadioGroup,
   Switch,
   Card,
@@ -91,7 +90,7 @@ export default function DemoPage() {
               <div key={s} className="flex items-baseline gap-4">
                 <span className="text-xs text-[#A0A5B0] w-16 shrink-0 font-mono">{s}</span>
                 <span className="text-xs text-[#A0A5B0] font-mono">{tokens.font.size[sizeKey]}</span>
-                <p style={{ fontSize: tokens.font.size[sizeKey], fontWeight: tokens.font.weight[weightKey as keyof typeof tokens.font.weight], lineHeight: tokens.font.lineHeight.normal }} className="text-[#0B0C10]">
+                <p style={{ fontSize: tokens.font.size[sizeKey], fontWeight: tokens.font.weight[weightKey as keyof typeof tokens.font.weight], lineHeight: '1.5' }} className="text-[#0B0C10]">
                   The quick brown fox jumps over the lazy dog.
                 </p>
               </div>
@@ -134,8 +133,8 @@ export default function DemoPage() {
           {spacingScale.map(s => (
             <div key={s} className="flex items-center gap-4">
               <span className="text-xs text-[#A0A5B0] font-mono w-16 shrink-0">{s}</span>
-              <span className="text-xs text-[#A0A5B0] font-mono w-16 shrink-0">{tokens.spacing[s as keyof typeof tokens.spacing]}</span>
-              <div className="bg-[#5865F2] rounded shrink-0" style={{ width: tokens.spacing[s as keyof typeof tokens.spacing], height: '16px' }} />
+              <span className="text-xs text-[#A0A5B0] font-mono w-16 shrink-0">{tokens.spacing[String(s) as keyof typeof tokens.spacing]}</span>
+              <div className="bg-[#5865F2] rounded shrink-0" style={{ width: tokens.spacing[String(s) as keyof typeof tokens.spacing], height: '16px' }} />
             </div>
           ))}
         </CardContent>
@@ -207,7 +206,7 @@ export default function DemoPage() {
           <SubHeading>Radio & Switch</SubHeading>
           <RadioGroup name="demo-radio" value={radioValue} onChange={setRadioValue} label="Choose option" options={[{ value: 'option-1', label: 'Option 1' }, { value: 'option-2', label: 'Option 2' }, { value: 'option-3', label: 'Option 3' }]} />
           <Switch checked={switchOn} onChange={setSwitchOn} label="Toggle me" />
-          <Switch checked disabled label="Disabled" />
+          <Switch checked onChange={() => {}} disabled label="Disabled" />
         </div>
       </Grid>
 

@@ -52,7 +52,7 @@ export function ContactForm({ className }: ContactFormProps) {
     setSubmitting(true);
     await new Promise(r => setTimeout(r, 1500));
     setSubmitting(false);
-    addToast({ variant: 'success', title: 'Inquiry sent', description: 'Our team will get back to you shortly.' });
+    addToast('Message sent successfully!', 'success');
     setForm({ name: '', email: '', company: '', volume: '', message: '' });
   };
 

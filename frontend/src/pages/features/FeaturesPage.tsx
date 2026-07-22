@@ -12,7 +12,7 @@ const features = [
   { title: 'Data Sovereignty & Security', description: 'Your data remains entirely yours. Enterprise-grade isolation ensures customer information is never trained into public models.', icon: 'shield' }
 ];
 
-const icons: Record<string, JSX.Element> = {
+const icons: Record<string, React.ReactNode> = {
   brain: <svg className="h-8 w-8 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2a4 4 0 014 4v2a4 4 0 01-8 0V6a4 4 0 014-4z" /><path d="M20 12a8 8 0 01-16 0" /><path d="M12 22v-4" /><path d="M8 14h8" /></svg>,
   zap: <svg className="h-8 w-8 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" /></svg>,
   eye: <svg className="h-8 w-8 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
@@ -39,12 +39,12 @@ export default function FeaturesPage() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: '-50px' }}
               transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="glass-card rounded-xl p-6 md:p-8 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+              className="glass-card rounded-xl p-6 md:p-8 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 group"
             >
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E8EAFF] to-[#D0D5FF] flex items-center justify-center mb-5 shadow-sm">
+              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#E8EAFF] to-[#D0D5FF] flex items-center justify-center mb-5 shadow-sm group-hover:shadow-md group-hover:from-[#D0D5FF] group-hover:to-[#E8EAFF] transition-all duration-300">
                 {icons[f.icon]}
               </div>
-              <h3 className="text-lg font-semibold text-[#0B0C10] mb-3">{f.title}</h3>
+              <h3 className="text-lg font-semibold text-[#0B0C10] mb-3 group-hover:text-[#5865F2] transition-colors duration-300">{f.title}</h3>
               <p className="text-sm text-[#5F6570] leading-relaxed">{f.description}</p>
             </motion.div>
           ))}

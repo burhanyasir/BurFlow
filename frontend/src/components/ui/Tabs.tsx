@@ -24,8 +24,6 @@ export function Tabs({ tabs, defaultTab, onChange, className }: TabsProps) {
     onChange?.(tabId);
   };
 
-  const activeContent = tabs.find(t => t.id === activeTab)?.content;
-
   return (
     <div className={className}>
       <div role="tablist" aria-orientation="horizontal" className="flex border-b border-[#D0D5DD] gap-0">

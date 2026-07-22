@@ -18,10 +18,10 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-family: var(--font-sans);
-  font-size: var(--font-size-base);
-  color: var(--color-neutral-text-primary);
-  background-color: var(--color-neutral-background);
+  font-family: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-size: 1rem;
+  color: #151518;
+  background-color: #FAFAFB;
 }
 
 img,
@@ -59,7 +59,7 @@ h4,
 h5,
 h6 {
   overflow-wrap: break-word;
-  font-family: var(--font-sans);
+  font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
 }
 
 p {
