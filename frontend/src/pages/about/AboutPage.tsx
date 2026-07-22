@@ -1,7 +1,5 @@
 import { motion } from 'framer-motion';
 import { PageSection } from '../../components/ui/PageSection';
-import { ParticleField } from '../../components/effects/ParticleField';
-import '../../styles/effects.css';
 
 const principles = [
   { title: 'Factual Integrity', description: 'Answers grounded solely in verified knowledge sources.', icon: 'check' },
@@ -10,16 +8,14 @@ const principles = [
 ];
 
 const icons: Record<string, React.ReactNode> = {
-  check: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
-  shield: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
-  zap: <svg className="h-6 w-6 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" /></svg>
+  check: <svg className="h-6 w-6 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>,
+  shield: <svg className="h-6 w-6 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
+  zap: <svg className="h-6 w-6 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 4 14 12 14 11 22 20 10 12 10 13 2" /></svg>
 };
 
 export default function AboutPage() {
   return (
-    <div className="page-content">
-      <div className="ambient-gradient" aria-hidden="true" />
-      <ParticleField />
+    <div>
       <PageSection
         title="Democratizing Precision AI Support for Modern Businesses."
         size="lg"
@@ -32,13 +28,13 @@ export default function AboutPage() {
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
         >
-          <div className="glass-card rounded-2xl p-8 md:p-12 mb-12 shadow-sm hover:shadow-md transition-shadow duration-300">
-            <p className="text-lg md:text-xl text-[#5F6570] leading-relaxed">
+          <div className="bg-[var(--color-neutral-0)] shadow-sm border border-[var(--color-neutral-200)] rounded-2xl p-8 md:p-12 mb-12 shadow-sm hover:shadow-md transition-shadow duration-300">
+            <p className="text-lg md:text-xl text-[var(--color-neutral-500)] leading-relaxed">
               Conversation Engine provides organizations with immediate, automated customer assistance powered exclusively by their proprietary knowledge. We believe customer service automation should be trustworthy, accurate, and completely aligned with your brand identity.
             </p>
           </div>
 
-          <h3 className="text-xl font-semibold text-[#0B0C10] mb-6 text-center">Core Principles</h3>
+          <h3 className="text-xl font-semibold text-[var(--color-neutral-900)] mb-6 text-center">Core Principles</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {principles.map((p, i) => (
               <motion.div
@@ -47,13 +43,13 @@ export default function AboutPage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.4, delay: i * 0.1 }}
-                className="glass-card rounded-xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
+                className="bg-[var(--color-neutral-0)] shadow-sm border border-[var(--color-neutral-200)] rounded-xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300"
               >
-                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#E8EAFF] to-[#D0D5FF] flex items-center justify-center mb-4 shadow-sm">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[var(--color-accent-200)] to-[var(--color-accent-200)] flex items-center justify-center mb-4 shadow-sm">
                   {icons[p.icon]}
                 </div>
-                <h4 className="font-semibold text-[#0B0C10] mb-2">{p.title}</h4>
-                <p className="text-sm text-[#5F6570] leading-relaxed">{p.description}</p>
+                <h4 className="font-semibold text-[var(--color-neutral-900)] mb-2">{p.title}</h4>
+                <p className="text-sm text-[var(--color-neutral-500)] leading-relaxed">{p.description}</p>
               </motion.div>
             ))}
           </div>

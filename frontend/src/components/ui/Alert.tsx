@@ -11,10 +11,10 @@ export interface AlertProps {
 }
 
 const alertVariants: Record<FeedbackVariant, string> = {
-  success: 'bg-[#D1FAE5] border-[#A7F3D0] text-[#065F46]',
-  warning: 'bg-[#FFF8E0] border-[#FFE580] text-[#92400E]',
-  error: 'bg-[#FEE2E2] border-[#FECACA] text-[#991B1B]',
-  info: 'bg-[#DBEAFE] border-[#93C5FD] text-[#1E40AF]'
+  success: 'bg-[var(--color-success-500)] border-[var(--color-success-500)] text-[white]',
+  warning: 'bg-[var(--color-warning-500)] border-[var(--color-warning-500)] text-[white]',
+  error: 'bg-[var(--color-error-500)] border-[var(--color-error-500)] text-[white]',
+  info: 'bg-[var(--color-accent-600)] border-[var(--color-accent-600)] text-[white]'
 };
 
 const icons: Record<FeedbackVariant, string> = {

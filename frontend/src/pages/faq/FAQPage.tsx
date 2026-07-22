@@ -2,8 +2,6 @@ import { motion } from 'framer-motion';
 import { PageSection } from '../../components/ui/PageSection';
 import { Accordion } from '../../components/ui/Accordion';
 import type { AccordionItem } from '../../components/ui/Accordion';
-import { ParticleField } from '../../components/effects/ParticleField';
-import '../../styles/effects.css';
 
 const faqItems: AccordionItem[] = [
   { id: 'hallucination', trigger: 'How does Conversation Engine prevent incorrect or hallucinated answers?', content: 'Conversation Engine restricts responses strictly to the contents of your published Knowledge Bases. If a visitor inquiry falls outside your source material, the widget returns a custom offline fallback response rather than generating speculative answers.' },
@@ -14,9 +12,7 @@ const faqItems: AccordionItem[] = [
 
 export default function FAQPage() {
   return (
-    <div className="page-content">
-      <div className="ambient-gradient" aria-hidden="true" />
-      <ParticleField />
+    <>
       <PageSection
         title="Frequently Asked Questions"
         size="md"
@@ -32,6 +28,6 @@ export default function FAQPage() {
           <Accordion items={faqItems} />
         </motion.div>
       </PageSection>
-    </div>
+    </>
   );
 }

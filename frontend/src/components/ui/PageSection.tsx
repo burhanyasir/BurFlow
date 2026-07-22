@@ -45,7 +45,7 @@ export function PageSection({
           )}>
             {title && (
               <h2 className={cn(
-                'font-bold text-[#0B0C10] tracking-tight',
+                'font-bold text-[var(--color-neutral-900)] tracking-tight',
                 titleSizeStyles[size]
               )}>
                 {title}
@@ -53,7 +53,7 @@ export function PageSection({
             )}
             {description && (
               <p className={cn(
-                'mt-4 text-[#5F6570] leading-relaxed',
+                'mt-4 text-[var(--color-neutral-500)] leading-relaxed',
                 descriptionSizeStyles[size]
               )}>
                 {description}

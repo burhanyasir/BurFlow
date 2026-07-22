@@ -3,9 +3,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../../utils/cn';
 
 const THEMES = [
-  { name: 'Indigo', primary: '#5865F2', bg: '#0B0C10', card: '#1A1B26', text: '#FFFFFF' },
-  { name: 'Cyan', primary: '#00F0FF', bg: '#0B0C10', card: '#1A1B26', text: '#FFFFFF' },
-  { name: 'Amber', primary: '#FFB800', bg: '#FAFAFA', card: '#FFFFFF', text: '#0B0C10' }
+  { name: 'Oxblood', primary: 'var(--color-accent-600)', bg: 'var(--color-neutral-900)', card: 'var(--color-neutral-800)', text: '#FFFFFF' },
+  { name: 'Cyan', primary: 'var(--color-accent-600)', bg: 'var(--color-neutral-900)', card: 'var(--color-neutral-800)', text: '#FFFFFF' },
+  { name: 'Amber', primary: 'var(--color-accent-600)', bg: 'var(--color-neutral-0)', card: '#FFFFFF', text: 'var(--color-neutral-900)' }
 ];
 
 export function WidgetPreview() {
@@ -23,14 +23,14 @@ export function WidgetPreview() {
             type="button"
             onClick={() => setThemeIdx(i)}
             className={cn(
-              'w-8 h-8 rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2',
-              i === themeIdx ? 'border-[#5865F2] scale-110 ring-2 ring-[#5865F2]/30' : 'border-[#D0D5DD]'
+              'w-8 h-8 rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-offset-2',
+              i === themeIdx ? 'border-[var(--color-accent-600)] scale-110 ring-2 ring-[var(--color-accent-600)]/30' : 'border-[var(--color-neutral-200)]'
             )}
             style={{ backgroundColor: t.primary }}
             aria-label={`${t.name} theme`}
           />
         ))}
-        <span className="text-xs text-[#5F6570] ml-1">Theme</span>
+        <span className="text-xs text-[var(--color-neutral-500)] ml-1">Theme</span>
       </div>
 
       <div
@@ -46,7 +46,7 @@ export function WidgetPreview() {
             <button
               type="button"
               onClick={() => setShowChat(p => !p)}
-              className="text-xs px-2 py-1 rounded-md transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2"
+              className="text-xs px-2 py-1 rounded-md transition-colors hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-offset-2"
               style={{ backgroundColor: theme.primary, color: '#FFFFFF' }}
             >
               {showChat ? 'Close' : 'Open'}
@@ -131,8 +131,8 @@ export function WidgetPreview() {
           className={cn(
             'text-xs px-3 py-1.5 rounded-lg border transition-colors',
             simulateFallback
-              ? 'border-[#FFB800] text-[#92400E] bg-[#FFF8E0]'
-              : 'border-[#D0D5DD] text-[#5F6570] hover:border-[#A0A5B0]'
+              ? 'border-[var(--color-accent-600)] text-[white] bg-[var(--color-accent-600)]'
+              : 'border-[var(--color-neutral-200)] text-[var(--color-neutral-500)] hover:border-[var(--color-neutral-300)]'
           )}
         >
           {simulateFallback ? '✓ Simulating Fallback' : 'Simulate Out-of-Scope Query'}

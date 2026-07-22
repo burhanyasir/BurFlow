@@ -44,7 +44,7 @@ export function Popover({ trigger, children, position = 'bottom', className, con
           <motion.div
             id={id}
             role="menu"
-            className={cn('absolute z-40 min-w-[12rem] bg-white rounded-lg shadow-lg border border-[#D0D5DD] p-1', positionStyles[position], contentClassName)}
+            className={cn('absolute z-40 min-w-[12rem] bg-white rounded-lg shadow-lg border border-[var(--color-neutral-200)] p-1', positionStyles[position], contentClassName)}
             variants={scaleIn}
             initial="hidden"
             animate="visible"
@@ -64,7 +64,7 @@ export function PopoverItem({ children, onClick, className }: { children: ReactN
       type="button"
       role="menuitem"
       onClick={onClick}
-      className={cn('w-full text-left px-3 py-2 text-sm text-[#0B0C10] rounded-md hover:bg-[#F0F1F3] transition-colors', className)}
+      className={cn('w-full text-left px-3 py-2 text-sm text-[var(--color-neutral-900)] rounded-md hover:bg-[var(--color-neutral-50)] transition-colors', className)}
     >
       {children}
     </button>

@@ -22,8 +22,8 @@ export function Switch({ checked, onChange, label, disabled, className }: Switch
         onClick={() => onChange(!checked)}
         className={cn(
           'relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2',
-          checked ? 'bg-[#5865F2]' : 'bg-[#D0D5DD]'
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-offset-2',
+          checked ? 'bg-[var(--color-accent-600)]' : 'bg-[var(--color-neutral-200)]'
         )}
       >
         <span className={cn(
@@ -31,7 +31,7 @@ export function Switch({ checked, onChange, label, disabled, className }: Switch
           checked ? 'translate-x-5' : 'translate-x-0'
         )} />
       </button>
-      {label && <span className="text-sm text-[#0B0C10] select-none">{label}</span>}
+      {label && <span className="text-sm text-[var(--color-neutral-900)] select-none">{label}</span>}
     </label>
   );
 }

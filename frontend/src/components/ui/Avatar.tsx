@@ -19,7 +19,7 @@ const sizeMap: Record<ComponentSize, string> = {
 export function Avatar({ src, alt = '', name, size = 'md', className }: AvatarProps) {
   const fallback = name ? getInitials(name) : '?';
   return (
-    <div className={cn('relative shrink-0 rounded-full overflow-hidden bg-[#E8EAFF] flex items-center justify-center font-medium text-[#5865F2]', sizeMap[size], className)}>
+    <div className={cn('relative shrink-0 rounded-full overflow-hidden bg-[var(--color-accent-200)] flex items-center justify-center font-medium text-[var(--color-accent-600)]', sizeMap[size], className)}>
       {src ? (
         <img src={src} alt={alt} className="h-full w-full object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
       ) : (

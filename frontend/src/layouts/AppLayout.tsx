@@ -19,7 +19,7 @@ export function AppLayout({ children, sidebarItems, onNavigate, breadcrumb, user
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen flex bg-[#F8F9FA]">
+    <div className="min-h-screen flex bg-[var(--color-neutral-0)]">
       <Sidebar
         items={sidebarItems}
         onNavigate={onNavigate}
@@ -29,7 +29,7 @@ export function AppLayout({ children, sidebarItems, onNavigate, breadcrumb, user
         upgradeBanner={upgradeBanner}
       />
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-20 h-16 border-b border-[#D0D5DD] bg-white flex items-center justify-between px-4 lg:px-6">
+        <header className="sticky top-0 z-20 h-16 border-b border-[var(--color-neutral-200)] bg-white flex items-center justify-between px-4 lg:px-6">
           <div className="flex items-center gap-4">{breadcrumb}</div>
           <div className="flex items-center gap-3">{userMenu}</div>
         </header>

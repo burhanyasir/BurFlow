@@ -30,7 +30,7 @@ function AccordionPanel({ isOpen, content, id }: { isOpen: boolean; content: Rea
           transition={{ duration: 0.2, ease: 'easeInOut' }}
           className="overflow-hidden"
         >
-          <div ref={contentRef} className="px-5 pb-4 text-sm text-[#5F6570] leading-relaxed">
+          <div ref={contentRef} className="px-5 pb-4 text-sm text-[var(--color-neutral-500)] leading-relaxed">
             {content}
           </div>
         </motion.div>
@@ -52,7 +52,7 @@ export function Accordion({ items, className, allowMultiple = false }: Accordion
   };
 
   return (
-    <div className={cn('divide-y divide-[#D0D5DD] border border-[#D0D5DD] rounded-xl overflow-hidden', className)}>
+    <div className={cn('divide-y divide-[var(--color-neutral-200)] border border-[var(--color-neutral-200)] rounded-xl overflow-hidden', className)}>
       {items.map(item => {
         const isOpen = openIds.has(item.id);
         return (
@@ -60,13 +60,13 @@ export function Accordion({ items, className, allowMultiple = false }: Accordion
             <button
               type="button"
               onClick={() => toggle(item.id)}
-              className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-medium text-[#0B0C10] hover:bg-[#F8F9FA] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-inset"
+              className="flex w-full items-center justify-between px-5 py-4 text-left text-sm font-medium text-[var(--color-neutral-900)] hover:bg-[var(--color-neutral-0)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-inset"
               aria-expanded={isOpen}
               aria-controls={`accordion-panel-${item.id}`}
             >
               {item.trigger}
               <svg
-                className={cn('h-4 w-4 shrink-0 text-[#5F6570] transition-transform duration-200', isOpen && 'rotate-180')}
+                className={cn('h-4 w-4 shrink-0 text-[var(--color-neutral-500)] transition-transform duration-200', isOpen && 'rotate-180')}
                 viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
               >
                 <polyline points="6 9 12 15 18 9" />

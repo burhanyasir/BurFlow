@@ -62,12 +62,12 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
             exit="exit"
           >
             {title && (
-              <div className="flex items-center justify-between px-6 py-4 border-b border-[#D0D5DD]">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--color-neutral-200)]">
                 <div>
-                  <h2 className="text-lg font-semibold text-[#0B0C10]">{title}</h2>
-                  {description && <p className="text-sm text-[#5F6570] mt-0.5">{description}</p>}
+                  <h2 className="text-lg font-semibold text-[var(--color-neutral-900)]">{title}</h2>
+                  {description && <p className="text-sm text-[var(--color-neutral-500)] mt-0.5">{description}</p>}
                 </div>
-                <button onClick={onClose} className="p-1 rounded-md text-[#5F6570] hover:text-[#0B0C10] hover:bg-[#F0F1F3] transition-colors" aria-label="Close modal">
+                <button onClick={onClose} className="p-1 rounded-md text-[var(--color-neutral-500)] hover:text-[var(--color-neutral-900)] hover:bg-[var(--color-neutral-50)] transition-colors" aria-label="Close modal">
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>

@@ -3,8 +3,6 @@ import { motion } from 'framer-motion';
 import { PageSection } from '../../components/ui/PageSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
-import { ParticleField } from '../../components/effects/ParticleField';
-import '../../styles/effects.css';
 
 const monthlyTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
@@ -25,8 +23,6 @@ export default function PricingPage() {
 
   return (
     <>
-      <div className="ambient-gradient" aria-hidden="true" />
-      <ParticleField />
       <PageSection
         title="Transparent Plans for Growing Operations."
         description="Scale seamlessly from your first website visitor to millions of monthly conversations."
@@ -34,7 +30,7 @@ export default function PricingPage() {
         className="pt-20 md:pt-28 relative z-10"
       >
         <div className="flex items-center justify-center gap-3 mb-12">
-          <span id="billing-label-monthly" className={cn('text-sm font-medium transition-colors select-none', !annual ? 'text-[#0B0C10]' : 'text-[#5F6570]')}>Monthly Billing</span>
+          <span id="billing-label-monthly" className={cn('text-sm font-medium transition-colors select-none', !annual ? 'text-[var(--color-neutral-900)]' : 'text-[var(--color-neutral-500)]')}>Monthly Billing</span>
           <button
             type="button"
             role="switch"
@@ -43,16 +39,16 @@ export default function PricingPage() {
             aria-labelledby="billing-label-monthly billing-label-annual"
             onClick={() => setAnnual(p => !p)}
             className={cn(
-              'relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2',
-              annual ? 'bg-[#5865F2] shadow-md' : 'bg-[#D0D5DD]'
+              'relative inline-flex h-7 w-12 items-center rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-offset-2',
+              annual ? 'bg-[var(--color-accent-600)] shadow-md' : 'bg-[var(--color-neutral-200)]'
             )}
           >
             <span className={cn('inline-block h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300', annual ? 'translate-x-6' : 'translate-x-1')} />
           </button>
-          <span id="billing-label-annual" className={cn('text-sm font-medium transition-colors select-none', annual ? 'text-[#0B0C10]' : 'text-[#5F6570]')}>
-            Annual Billing <span className="text-[#5865F2] font-semibold relative">
+          <span id="billing-label-annual" className={cn('text-sm font-medium transition-colors select-none', annual ? 'text-[var(--color-neutral-900)]' : 'text-[var(--color-neutral-500)]')}>
+            Annual Billing <span className="text-[var(--color-accent-600)] font-semibold relative">
               (Save 20%)
-              <span className="absolute -inset-0.5 rounded bg-[#E8EAFF]/60 -z-10" aria-hidden="true" />
+              <span className="absolute -inset-0.5 rounded bg-[var(--color-accent-200)]/60 -z-10" aria-hidden="true" />
             </span>
           </span>
         </div>
@@ -68,7 +64,7 @@ export default function PricingPage() {
               className={tier.popular ? 'relative lg:-translate-y-2' : ''}
             >
               {tier.popular && (
-                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[#5865F2]/20 via-transparent to-transparent pointer-events-none" aria-hidden="true" />
+                <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[var(--color-accent-600)]/20 via-transparent to-transparent pointer-events-none" aria-hidden="true" />
               )}
               <PricingCard tier={tier} />
             </motion.div>

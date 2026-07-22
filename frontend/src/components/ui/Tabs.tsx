@@ -26,7 +26,7 @@ export function Tabs({ tabs, defaultTab, onChange, className }: TabsProps) {
 
   return (
     <div className={className}>
-      <div role="tablist" aria-orientation="horizontal" className="flex border-b border-[#D0D5DD] gap-0">
+      <div role="tablist" aria-orientation="horizontal" className="flex border-b border-[var(--color-neutral-200)] gap-0">
         {tabs.map(tab => (
           <button
             key={tab.id}
@@ -38,13 +38,13 @@ export function Tabs({ tabs, defaultTab, onChange, className }: TabsProps) {
             onClick={() => handleTabClick(tab.id)}
             className={cn(
               'px-4 py-2.5 text-sm font-medium transition-colors relative',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-inset',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-inset',
               'disabled:opacity-50 disabled:cursor-not-allowed',
-              activeTab === tab.id ? 'text-[#5865F2]' : 'text-[#5F6570] hover:text-[#0B0C10]'
+              activeTab === tab.id ? 'text-[var(--color-accent-600)]' : 'text-[var(--color-neutral-500)] hover:text-[var(--color-neutral-900)]'
             )}
           >
             {tab.label}
-            {activeTab === tab.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#5865F2]" />}
+            {activeTab === tab.id && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[var(--color-accent-600)]" />}
           </button>
         ))}
       </div>

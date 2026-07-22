@@ -23,10 +23,10 @@ export function useToast() {
 }
 
 const toastVariants: Record<FeedbackVariant, string> = {
-  success: 'bg-[#D1FAE5] border-[#A7F3D0] text-[#065F46]',
-  warning: 'bg-[#FFF8E0] border-[#FFE580] text-[#92400E]',
-  error: 'bg-[#FEE2E2] border-[#FECACA] text-[#991B1B]',
-  info: 'bg-white border-[#D0D5DD] text-[#0B0C10] shadow-lg'
+  success: 'bg-[var(--color-success-500)] border-[var(--color-success-500)] text-[white]',
+  warning: 'bg-[var(--color-warning-500)] border-[var(--color-warning-500)] text-[white]',
+  error: 'bg-[var(--color-error-500)] border-[var(--color-error-500)] text-[white]',
+  info: 'bg-white border-[var(--color-neutral-200)] text-[var(--color-neutral-900)] shadow-lg'
 };
 
 const icons: Record<FeedbackVariant, string> = {

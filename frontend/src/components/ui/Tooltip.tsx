@@ -22,7 +22,7 @@ export function Tooltip({ content, children, position = 'top', className }: Tool
     <div className={cn('relative inline-flex', className)} onMouseEnter={() => setVisible(true)} onMouseLeave={() => setVisible(false)} onFocus={() => setVisible(true)} onBlur={() => setVisible(false)}>
       <div aria-describedby={id}>{children}</div>
       {visible && (
-        <div id={id} role="tooltip" className={cn('absolute z-50 px-2 py-1 text-xs font-medium text-white bg-[#0B0C10] rounded-md shadow-sm whitespace-nowrap pointer-events-none', positions[position])}>
+        <div id={id} role="tooltip" className={cn('absolute z-50 px-2 py-1 text-xs font-medium text-white bg-[var(--color-neutral-900)] rounded-md shadow-sm whitespace-nowrap pointer-events-none', positions[position])}>
           {content}
         </div>
       )}

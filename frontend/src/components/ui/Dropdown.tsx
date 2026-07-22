@@ -31,7 +31,7 @@ export function Dropdown({ trigger, items, align = 'start', className }: Dropdow
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="true" aria-controls={id} className="inline-flex">{trigger}</button>
       <AnimatePresence>
         {open && (
-          <motion.div id={id} role="menu" className={cn('absolute z-40 top-full mt-1 min-w-[12rem] bg-white rounded-lg shadow-lg border border-[#D0D5DD] p-1', align === 'end' ? 'right-0' : 'left-0')} variants={scaleIn} initial="hidden" animate="visible" exit="hidden">
+          <motion.div id={id} role="menu" className={cn('absolute z-40 top-full mt-1 min-w-[12rem] bg-white rounded-lg shadow-lg border border-[var(--color-neutral-200)] p-1', align === 'end' ? 'right-0' : 'left-0')} variants={scaleIn} initial="hidden" animate="visible" exit="hidden">
             {items.map((item, i) => (
               <button
                 key={i}
@@ -41,7 +41,7 @@ export function Dropdown({ trigger, items, align = 'start', className }: Dropdow
                 onClick={() => { item.onClick?.(); setOpen(false); }}
                 className={cn(
                   'w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors',
-                  item.variant === 'danger' ? 'text-[#EF4444] hover:bg-[#FEE2E2]' : 'text-[#0B0C10] hover:bg-[#F0F1F3]',
+                  item.variant === 'danger' ? 'text-[var(--color-error-500)] hover:bg-[var(--color-neutral-50)]' : 'text-[var(--color-neutral-900)] hover:bg-[var(--color-neutral-50)]',
                   item.disabled && 'opacity-50 cursor-not-allowed'
                 )}
               >

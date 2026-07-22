@@ -53,15 +53,15 @@ const tableData = [
 const spacingScale = [0, 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24];
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h2 className="text-2xl font-bold text-[#0B0C10] mb-6 mt-16 first:mt-0">{children}</h2>;
+  return <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-6 mt-16 first:mt-0">{children}</h2>;
 }
 
 function SubHeading({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-lg font-semibold text-[#0B0C10] mb-4 mt-8">{children}</h3>;
+  return <h3 className="text-lg font-semibold text-[var(--color-neutral-900)] mb-4 mt-8">{children}</h3>;
 }
 
 function Divider() {
-  return <hr className="border-t border-[#D0D5DD] my-12" />;
+  return <hr className="border-t border-[var(--color-neutral-200)] my-12" />;
 }
 
 export default function DemoPage() {
@@ -76,8 +76,8 @@ export default function DemoPage() {
   return (
     <Container className="py-8">
       <header className="mb-8">
-        <h1 className="text-4xl font-bold text-[#0B0C10] mb-2">Conversation Engine</h1>
-        <p className="text-lg text-[#5F6570]">Component Library Demo</p>
+        <h1 className="text-4xl font-bold text-[var(--color-neutral-900)] mb-2">Conversation Engine</h1>
+        <p className="text-lg text-[var(--color-neutral-500)]">Component Library Demo</p>
       </header>
 
       <SectionHeading>1. Typography</SectionHeading>
@@ -88,9 +88,9 @@ export default function DemoPage() {
             const weightKey = s === 'xs' || s === 'sm' ? 'medium' as const : 'normal' as const;
             return (
               <div key={s} className="flex items-baseline gap-4">
-                <span className="text-xs text-[#A0A5B0] w-16 shrink-0 font-mono">{s}</span>
-                <span className="text-xs text-[#A0A5B0] font-mono">{tokens.font.size[sizeKey]}</span>
-                <p style={{ fontSize: tokens.font.size[sizeKey], fontWeight: tokens.font.weight[weightKey as keyof typeof tokens.font.weight], lineHeight: '1.5' }} className="text-[#0B0C10]">
+                <span className="text-xs text-[var(--color-neutral-300)] w-16 shrink-0 font-mono">{s}</span>
+                <span className="text-xs text-[var(--color-neutral-300)] font-mono">{tokens.font.size[sizeKey]}</span>
+                <p style={{ fontSize: tokens.font.size[sizeKey], fontWeight: tokens.font.weight[weightKey as keyof typeof tokens.font.weight], lineHeight: '1.5' }} className="text-[var(--color-neutral-900)]">
                   The quick brown fox jumps over the lazy dog.
                 </p>
               </div>
@@ -101,29 +101,29 @@ export default function DemoPage() {
 
       <SectionHeading>2. Colors</SectionHeading>
       <Grid cols={4} gap="md">
-        <Card variant="bordered" className="bg-[#5865F2] text-white">
-          <CardContent><p className="font-medium">Primary</p><code className="text-xs opacity-80">#5865F2</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-accent-600)] text-white">
+          <CardContent><p className="font-medium">Primary</p><code className="text-xs opacity-80">var(--color-accent-600)</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#00F0FF] text-[#0B0C10]">
-          <CardContent><p className="font-medium">Cyan</p><code className="text-xs opacity-80">#00F0FF</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-accent-600)] text-[var(--color-neutral-900)]">
+          <CardContent><p className="font-medium">Cyan</p><code className="text-xs opacity-80">var(--color-accent-600)</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#FFB800] text-[#0B0C10]">
-          <CardContent><p className="font-medium">Amber</p><code className="text-xs opacity-80">#FFB800</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-accent-600)] text-[var(--color-neutral-900)]">
+          <CardContent><p className="font-medium">Amber</p><code className="text-xs opacity-80">var(--color-accent-600)</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#0B0C10] text-white">
-          <CardContent><p className="font-medium">Obsidian</p><code className="text-xs opacity-80">#0B0C10</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-neutral-900)] text-white">
+          <CardContent><p className="font-medium">Obsidian</p><code className="text-xs opacity-80">var(--color-neutral-900)</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#10B981] text-white">
-          <CardContent><p className="font-medium">Success</p><code className="text-xs opacity-80">#10B981</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-success-500)] text-white">
+          <CardContent><p className="font-medium">Success</p><code className="text-xs opacity-80">var(--color-success-500)</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#EF4444] text-white">
-          <CardContent><p className="font-medium">Error</p><code className="text-xs opacity-80">#EF4444</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-error-500)] text-white">
+          <CardContent><p className="font-medium">Error</p><code className="text-xs opacity-80">var(--color-error-500)</code></CardContent>
         </Card>
         <Card variant="bordered" className="bg-[#3B82F6] text-white">
           <CardContent><p className="font-medium">Info</p><code className="text-xs opacity-80">#3B82F6</code></CardContent>
         </Card>
-        <Card variant="bordered" className="bg-[#F0F1F3] text-[#0B0C10]">
-          <CardContent><p className="font-medium">Surface</p><code className="text-xs opacity-80">#F0F1F3</code></CardContent>
+        <Card variant="bordered" className="bg-[var(--color-neutral-50)] text-[var(--color-neutral-900)]">
+          <CardContent><p className="font-medium">Surface</p><code className="text-xs opacity-80">var(--color-neutral-50)</code></CardContent>
         </Card>
       </Grid>
 
@@ -132,9 +132,9 @@ export default function DemoPage() {
         <CardContent className="space-y-3">
           {spacingScale.map(s => (
             <div key={s} className="flex items-center gap-4">
-              <span className="text-xs text-[#A0A5B0] font-mono w-16 shrink-0">{s}</span>
-              <span className="text-xs text-[#A0A5B0] font-mono w-16 shrink-0">{tokens.spacing[String(s) as keyof typeof tokens.spacing]}</span>
-              <div className="bg-[#5865F2] rounded shrink-0" style={{ width: tokens.spacing[String(s) as keyof typeof tokens.spacing], height: '16px' }} />
+              <span className="text-xs text-[var(--color-neutral-300)] font-mono w-16 shrink-0">{s}</span>
+              <span className="text-xs text-[var(--color-neutral-300)] font-mono w-16 shrink-0">{tokens.spacing[String(s) as keyof typeof tokens.spacing]}</span>
+              <div className="bg-[var(--color-accent-600)] rounded shrink-0" style={{ width: tokens.spacing[String(s) as keyof typeof tokens.spacing], height: '16px' }} />
             </div>
           ))}
         </CardContent>
@@ -215,7 +215,7 @@ export default function DemoPage() {
       <SectionHeading>6. Cards</SectionHeading>
       <Grid cols={4} gap="md">
         <Card variant="default"><CardContent>Default</CardContent></Card>
-        <Card variant="glass"><CardContent>Glass</CardContent></Card>
+        <Card variant="default"><CardContent>Glass (removed)</CardContent></Card>
         <Card variant="bordered"><CardContent>Bordered</CardContent></Card>
         <Card variant="flat"><CardContent>Flat</CardContent></Card>
       </Grid>
@@ -225,7 +225,7 @@ export default function DemoPage() {
           <Badge>New</Badge>
         </CardHeader>
         <CardDescription>This card has a header, title, description, and footer.</CardDescription>
-        <CardContent className="mt-4 text-sm text-[#5F6570]">
+        <CardContent className="mt-4 text-sm text-[var(--color-neutral-500)]">
           Hover over this card to see the lift effect.
         </CardContent>
         <CardFooter>
@@ -277,10 +277,10 @@ export default function DemoPage() {
       <SectionHeading>10. Tabs</SectionHeading>
       <Tabs
         tabs={[
-          { id: 'tab1', label: 'Account', content: <p className="text-[#5F6570]">Account settings and preferences.</p> },
-          { id: 'tab2', label: 'Security', content: <p className="text-[#5F6570]">Security settings and authentication.</p> },
-          { id: 'tab3', label: 'Notifications', content: <p className="text-[#5F6570]">Notification preferences.</p> },
-          { id: 'tab4', label: 'Billing', disabled: true, content: <p className="text-[#5F6570]">Billing (disabled).</p> },
+          { id: 'tab1', label: 'Account', content: <p className="text-[var(--color-neutral-500)]">Account settings and preferences.</p> },
+          { id: 'tab2', label: 'Security', content: <p className="text-[var(--color-neutral-500)]">Security settings and authentication.</p> },
+          { id: 'tab3', label: 'Notifications', content: <p className="text-[var(--color-neutral-500)]">Notification preferences.</p> },
+          { id: 'tab4', label: 'Billing', disabled: true, content: <p className="text-[var(--color-neutral-500)]">Billing (disabled).</p> },
         ]}
       />
 
@@ -292,11 +292,11 @@ export default function DemoPage() {
         <Button onClick={() => setDrawerOpen(true)} variant="secondary">Open Drawer</Button>
       </div>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Modal Title" description="This is a modal dialog example.">
-        <p className="text-sm text-[#5F6570] mb-4">Modal content goes here. You can put any React components inside.</p>
+        <p className="text-sm text-[var(--color-neutral-500)] mb-4">Modal content goes here. You can put any React components inside.</p>
         <Button onClick={() => setModalOpen(false)}>Close</Button>
       </Modal>
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="Drawer Title" side="right">
-        <p className="text-sm text-[#5F6570] mb-4">Drawer content slides in from the side.</p>
+        <p className="text-sm text-[var(--color-neutral-500)] mb-4">Drawer content slides in from the side.</p>
         <Button onClick={() => setDrawerOpen(false)}>Close</Button>
       </Drawer>
 
@@ -428,19 +428,19 @@ export default function DemoPage() {
 
       <SectionHeading>22. Layout</SectionHeading>
       <SubHeading>Container</SubHeading>
-      <Card variant="flat" className="text-sm text-[#5F6570] mb-6">
-        <CardContent>The entire demo page is wrapped in a <code className="text-[#5865F2]">Container</code> component with max width and responsive padding.</CardContent>
+      <Card variant="flat" className="text-sm text-[var(--color-neutral-500)] mb-6">
+        <CardContent>The entire demo page is wrapped in a <code className="text-[var(--color-accent-600)]">Container</code> component with max width and responsive padding.</CardContent>
       </Card>
       <SubHeading>Grid</SubHeading>
       <Grid cols={3} gap="md">
         {[1, 2, 3, 4, 5, 6].map(i => (
           <Card key={i} variant="bordered" className="text-center">
-            <CardContent className="py-6 text-[#5F6570]">Grid Item {i}</CardContent>
+            <CardContent className="py-6 text-[var(--color-neutral-500)]">Grid Item {i}</CardContent>
           </Card>
         ))}
       </Grid>
 
-      <footer className="mt-16 pt-8 border-t border-[#D0D5DD] text-center text-sm text-[#A0A5B0]">
+      <footer className="mt-16 pt-8 border-t border-[var(--color-neutral-200)] text-center text-sm text-[var(--color-neutral-300)]">
         Conversation Engine &copy; {new Date().getFullYear()} &mdash; Component Library Demo
       </footer>
     </Container>

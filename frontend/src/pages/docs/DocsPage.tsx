@@ -1,14 +1,10 @@
 import { motion } from 'framer-motion';
 import { PageSection } from '../../components/ui/PageSection';
 import { EmptyState } from '../../components/ui/EmptyState';
-import { ParticleField } from '../../components/effects/ParticleField';
-import '../../styles/effects.css';
 
 export default function DocsPage() {
   return (
-    <div className="page-content">
-      <div className="ambient-gradient" aria-hidden="true" />
-      <ParticleField />
+    <>
       <PageSection className="pt-20 md:pt-28" containerClassName="max-w-lg">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -17,7 +13,7 @@ export default function DocsPage() {
         >
           <EmptyState
             icon={
-              <svg className="h-12 w-12 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg className="h-12 w-12 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
               </svg>
             }
@@ -27,6 +23,6 @@ export default function DocsPage() {
           />
         </motion.div>
       </PageSection>
-    </div>
+    </>
   );
 }

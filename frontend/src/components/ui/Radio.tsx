@@ -16,13 +16,13 @@ export const Radio = forwardRef<HTMLInputElement, RadioProps>(
           type="radio"
           id={id}
           className={cn(
-            'h-4 w-4 border-[#D0D5DD] text-[#5865F2] focus:ring-2 focus:ring-[#5865F2] focus:ring-offset-1 cursor-pointer',
+            'h-4 w-4 border-[var(--color-neutral-200)] text-[var(--color-accent-600)] focus:ring-2 focus:ring-[var(--color-accent-600)] focus:ring-offset-1 cursor-pointer',
             'disabled:opacity-50 disabled:cursor-not-allowed',
             className
           )}
           {...props}
         />
-        {label && <span className="text-sm text-[#0B0C10] select-none">{label}</span>}
+        {label && <span className="text-sm text-[var(--color-neutral-900)] select-none">{label}</span>}
       </label>
     );
   }
@@ -42,7 +42,7 @@ export interface RadioGroupProps {
 export function RadioGroup({ name, value, onChange, options, label, error, className }: RadioGroupProps) {
   return (
     <fieldset className={cn('flex flex-col gap-2', className)}>
-      {label && <legend className="text-sm font-medium text-[#0B0C10] mb-1">{label}</legend>}
+      {label && <legend className="text-sm font-medium text-[var(--color-neutral-900)] mb-1">{label}</legend>}
       {options.map(opt => (
         <Radio
           key={opt.value}
@@ -54,7 +54,7 @@ export function RadioGroup({ name, value, onChange, options, label, error, class
           disabled={opt.disabled}
         />
       ))}
-      {error && <p className="text-sm text-[#EF4444]" role="alert">{error}</p>}
+      {error && <p className="text-sm text-[var(--color-error-500)]" role="alert">{error}</p>}
     </fieldset>
   );
 }

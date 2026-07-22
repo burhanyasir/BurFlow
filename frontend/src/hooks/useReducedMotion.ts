@@ -1,3 +1,1 @@
-import { usePrefersReducedMotion } from 'framer-motion';
-
-export { usePrefersReducedMotion as useReducedMotion };
+export { useReducedMotion } from 'framer-motion';

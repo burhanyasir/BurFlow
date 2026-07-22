@@ -9,12 +9,12 @@ export interface BadgeProps {
 }
 
 const badgeVariants: Record<string, string> = {
-  success: 'bg-[#D1FAE5] text-[#065F46]',
-  warning: 'bg-[#FFF8E0] text-[#92400E]',
-  error: 'bg-[#FEE2E2] text-[#991B1B]',
-  info: 'bg-[#DBEAFE] text-[#1E40AF]',
-  neutral: 'bg-[#F0F1F3] text-[#5F6570]',
-  primary: 'bg-[#E8EAFF] text-[#3B45A0]'
+  success: 'bg-[var(--color-success-500)] text-white',
+  warning: 'bg-[var(--color-warning-500)] text-white',
+  error: 'bg-[var(--color-error-500)] text-white',
+  info: 'bg-[var(--color-accent-600)] text-white',
+  neutral: 'bg-[var(--color-neutral-200)] text-[var(--color-neutral-700)]',
+  primary: 'bg-[var(--color-accent-600)] text-white'
 };
 
 const badgeSizes: Record<ComponentSize, string> = {

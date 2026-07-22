@@ -7,13 +7,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: ComponentSize;
   loading?: boolean;
   fullWidth?: boolean;
+  arrow?: boolean;
+  glow?: boolean;
 }
 
 const variantStyles: Record<Variant, string> = {
-  primary: 'bg-[#5865F2] text-white hover:bg-[#4752C4] active:bg-[#3B45A0] shadow-sm',
-  secondary: 'bg-[#F0F1F3] text-[#0B0C10] hover:bg-[#E0E2E6] active:bg-[#D0D5DD] border border-[#D0D5DD]',
-  ghost: 'text-[#5F6570] hover:bg-[#F0F1F3] active:bg-[#E0E2E6]',
-  danger: 'bg-[#EF4444] text-white hover:bg-[#DC2626] active:bg-[#B91C1C] shadow-sm'
+  primary: 'bg-[var(--color-accent-600)] text-white hover:bg-[var(--color-accent-700)] active:bg-[var(--color-accent-700)] active:scale-[0.98] shadow-sm',
+  secondary: 'bg-transparent text-[var(--color-accent-600)] border border-[var(--color-accent-600)] hover:bg-[var(--color-accent-200)] active:bg-[var(--color-accent-200)] active:scale-[0.98]',
+  ghost: 'text-[var(--color-neutral-500)] hover:bg-[var(--color-neutral-100)] active:bg-[var(--color-neutral-200)] active:scale-[0.98]',
+  danger: 'bg-[var(--color-error-500)] text-white hover:bg-[var(--color-error-500)] active:bg-[var(--color-error-500)] active:scale-[0.98] shadow-sm'
 };
 
 const sizeStyles: Record<ComponentSize, string> = {
@@ -23,15 +25,17 @@ const sizeStyles: Record<ComponentSize, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'primary', size = 'md', loading = false, fullWidth = false, disabled, children, ...props }, ref) => (
+  ({ className, variant = 'primary', size = 'md', loading = false, fullWidth = false, disabled, children, arrow = false, glow = false, ...props }, ref) => (
     <button
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#5865F2] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none select-none',
+        'inline-flex items-center justify-center font-medium transition-all duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent-600)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none select-none group',
         variantStyles[variant],
         sizeStyles[size],
         fullWidth && 'w-full',
+        glow && variant === 'primary' && 'shadow-[0_0_20px_-5px_rgba(122,32,56,0.35)] hover:shadow-[0_0_25px_-3px_rgba(122,32,56,0.5)]',
+        glow && variant === 'secondary' && 'shadow-[0_0_20px_-5px_rgba(122,32,56,0.15)] hover:shadow-[0_0_25px_-3px_rgba(122,32,56,0.25)]',
         className
       )}
       {...props}
@@ -43,6 +47,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         </svg>
       )}
       {children}
+      {arrow && !loading && (
+        <svg className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+        </svg>
+      )}
     </button>
   )
 );

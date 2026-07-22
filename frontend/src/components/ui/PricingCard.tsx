@@ -21,10 +21,10 @@ export interface PricingCardProps {
 }
 
 const variantCardStyles: Record<string, string> = {
-  free: 'bg-white/80 backdrop-blur-sm border border-[#D0D5DD]',
-  starter: 'bg-white shadow-md border border-[#5865F2]/20',
-  professional: 'bg-white shadow-xl border-2 border-[#5865F2] ring-1 ring-[#5865F2]/20 relative',
-  enterprise: 'bg-[#0B0C10] text-white border border-[#2A2B35]'
+  free: 'bg-white/80 backdrop-blur-sm border border-[var(--color-neutral-200)]',
+  starter: 'bg-white shadow-md border border-[var(--color-accent-600)]/20',
+  professional: 'bg-white shadow-xl border-2 border-[var(--color-accent-600)] ring-1 ring-[var(--color-accent-600)]/20 relative',
+  enterprise: 'bg-[var(--color-neutral-900)] text-white border border-[var(--color-neutral-700)]'
 };
 
 const variantTextStyles: Record<string, string> = {
@@ -49,7 +49,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
         className={cn(
           'h-full flex flex-col',
           variantCardStyles[tier.variant || 'free'],
-          tier.popular && 'shadow-[0_0_30px_-5px_rgba(88,101,242,0.3)]'
+          tier.popular && 'shadow-[0_0_30px_-5px_rgba(122,32,56,0.3)]'
         )}
       >
         <CardContent className="flex-1 flex flex-col">
@@ -58,7 +58,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
               {tier.name}
             </h3>
             {tier.description && (
-              <p className={cn('mt-1 text-sm', isEnterprise ? 'text-[#A0A5B0]' : 'text-[#5F6570]')}>
+              <p className={cn('mt-1 text-sm', isEnterprise ? 'text-[var(--color-neutral-300)]' : 'text-[var(--color-neutral-500)]')}>
                 {tier.description}
               </p>
             )}
@@ -69,7 +69,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
               {tier.price}
             </span>
             {tier.period && (
-              <span className={cn('text-sm ml-1', isEnterprise ? 'text-[#A0A5B0]' : 'text-[#5F6570]')}>
+              <span className={cn('text-sm ml-1', isEnterprise ? 'text-[var(--color-neutral-300)]' : 'text-[var(--color-neutral-500)]')}>
                 {tier.period}
               </span>
             )}
@@ -78,10 +78,10 @@ export function PricingCard({ tier, className }: PricingCardProps) {
           <ul className="space-y-3 mb-8 flex-1" role="list">
             {tier.features.map((f, i) => (
               <li key={i} className="flex items-start gap-3 text-sm">
-                <svg className="h-4 w-4 mt-0.5 shrink-0 text-[#5865F2]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <svg className="h-4 w-4 mt-0.5 shrink-0 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
-                <span className={cn(isEnterprise && 'text-[#D0D5DD]')}>{f}</span>
+                <span className={cn(isEnterprise && 'text-[var(--color-neutral-200)]')}>{f}</span>
               </li>
             ))}
           </ul>
@@ -90,7 +90,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
             variant={tier.ctaVariant || (tier.popular ? 'primary' : 'secondary')}
             fullWidth
             size="lg"
-            className={isEnterprise ? 'bg-[#5865F2] hover:bg-[#4752C4] text-white border-none' : undefined}
+            className={isEnterprise ? 'bg-[var(--color-accent-600)] hover:bg-[var(--color-accent-700)] text-white border-none' : undefined}
           >
             {tier.cta}
           </Button>

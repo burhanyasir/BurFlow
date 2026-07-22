@@ -26,13 +26,13 @@ export function Table<T>({ data, columns, keyExtractor, onRowClick, loading, emp
       <div className={cn('overflow-x-auto', className)}>
         <table className="w-full">
           <thead>
-            <tr>{columns.map(col => <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-medium text-[#5F6570] uppercase tracking-wider', col.headerClassName)}>{col.header}</th>)}</tr>
+            <tr>{columns.map(col => <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-medium text-[var(--color-neutral-500)] uppercase tracking-wider', col.headerClassName)}>{col.header}</th>)}</tr>
           </thead>
           <tbody>
             {Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
                 {columns.map(col => (
-                  <td key={col.key} className="px-4 py-3"><div className="h-4 bg-[#F0F1F3] rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} /></td>
+                  <td key={col.key} className="px-4 py-3"><div className="h-4 bg-[var(--color-neutral-50)] rounded animate-pulse" style={{ width: `${60 + Math.random() * 40}%` }} /></td>
                 ))}
               </tr>
             ))}
@@ -50,23 +50,23 @@ export function Table<T>({ data, columns, keyExtractor, onRowClick, loading, emp
     <div className={cn('overflow-x-auto', className)}>
       <table className="w-full">
         <thead>
-          <tr className="border-b border-[#D0D5DD]">
+          <tr className="border-b border-[var(--color-neutral-200)]">
             {columns.map(col => (
-              <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-medium text-[#5F6570] uppercase tracking-wider', col.headerClassName)}>
+              <th key={col.key} className={cn('px-4 py-3 text-left text-xs font-medium text-[var(--color-neutral-500)] uppercase tracking-wider', col.headerClassName)}>
                 {col.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#D0D5DD]">
+        <tbody className="divide-y divide-[var(--color-neutral-200)]">
           {data.map(item => (
             <tr
               key={keyExtractor(item)}
               onClick={() => onRowClick?.(item)}
-              className={cn('transition-colors', onRowClick && 'cursor-pointer hover:bg-[#F8F9FA]')}
+              className={cn('transition-colors', onRowClick && 'cursor-pointer hover:bg-[var(--color-neutral-0)]')}
             >
               {columns.map(col => (
-                <td key={col.key} className={cn('px-4 py-3 text-sm text-[#0B0C10]', col.className)}>
+                <td key={col.key} className={cn('px-4 py-3 text-sm text-[var(--color-neutral-900)]', col.className)}>
                   {col.render ? col.render(item) : (item as any)[col.key]}
                 </td>
               ))}
