@@ -150,7 +150,16 @@ Two possibilities — triage on pickup:
 
 - [x] 1. Consolidation decision made (merge `BUYING_PATTERNS` into `SIGNAL_REGEXES` or document intentional separation) — **Done:** `BUYING_PATTERNS` aligned to match `BUYING_SIGNAL_REGEX` minus `try it`; `detectBuyingIntent()` with negation awareness added. Committed `84b9e7e`.
 - [x] 2. Per-tenant `KnowledgeBaseProvider` designed and wired into brain — **Done:** `KnowledgeBaseProvider` interface + `DefaultKnowledgeBaseProvider` in orchestrator, `DbKnowledgeBaseProvider` in saas-api, wired through `BrainInput` pipeline. Committed `47791e2` + `8a6baac`. 491/491 regression passing.
-- [x] 3. Fuzzy/stem matching evaluated and implemented (or deferred until item 2 is done) — **Done:** Inline `simpleStem()` function (no deps) handles English plurals, -ing, -ed, -tion, -ment, -ness, -ly, -er/or. Added stem-aware token overlap as 4th matching strategy in `orchestrator.ts`. Routing guard prevents false positives (e.g., "support" in query not matching "support sso" when routing is customization domain). 13 new tests. 1559/1571 passing (+13), zero regressions.
+- [x] 3. Fuzzy/stem matching evaluated and implemented (or deferred until item 2 is done) — **Done in two passes:**
+  - **Pass 1 (commit `a805c26`):** `simpleStem()` function added to `orchestrator.ts` with stem-aware token overlap as 4th matching strategy for `DOCUMENTED_KNOWLEDGE`. Routing guard prevents false positives. 13 new tests.
+  - **Pass 2 (this commit):** Architecture audit revealed `orchestrator.ts`'s `DOCUMENTED_KNOWLEDGE` path is **dead output** — its `sources`/`isFallback` values run but are never read downstream (see item 9). The live path uses `TOPIC_RESPONSE_TEMPLATES` via `buildTopicResponse()` → `KnowledgeBaseProvider`. Stemmer and fuzzy matching were **ported to the live path**:
+    - `simpleStem()` moved to `knowledge-base-provider.ts` (shared, exported).
+    - `DefaultKnowledgeBaseProvider.resolveTopic()` and `DbKnowledgeBaseProvider.resolveTopic()` implemented using `fuzzyResolveTopic()` helper with `TOPIC_KEYWORDS` map (14 topic categories).
+    - `buildTopicResponse()` in `conversation-brain.ts` calls `resolveTopic()` when exact `getTopicResponse()` returns null.
+    - `processConversationDirector()` calls `resolveTopic()` when `discernTopics()` regex returns empty, so fuzzy-matched topics propagate into `strategy.topicToAnswer`.
+    - Multi-word keyword matching (e.g., "active directory" → sso) and ≥3 char substring guard to prevent short-token false positives.
+    - 19 new live-path tests prove `processConversationBrain()` returns topic-relevant responses for regex-miss queries like "data protection" → security, "single sign on" → sso, "webhook endpoint" → api, "embed code" → integrations.
+    - 1578/1590 passing (+19), same 12 pre-existing failures, zero regressions.
 - [ ] 4. `LEARNING_PATTERNS` collision resolved; downstream `customerIntent` consumers audited
 - [ ] 5. GROWTH/VALUE false-positive source tightened or documented
 - [ ] 6. Long-distance negation gap documented in known-limitations

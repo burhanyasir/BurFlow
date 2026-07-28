@@ -13,6 +13,7 @@ import { handleObjection } from './objection-engine';
 import { processQualification } from './qualification-engine';
 import { selectCTA } from './cta-engine';
 import { generateConversationUI } from './conversation-ui-engine';
+import { simpleStem } from './knowledge-base-provider';
 
 // Documented Knowledge Base (Strict Grounding Repository)
 const DOCUMENTED_KNOWLEDGE: Record<string, { answer: string; sources: string[] }> = {
@@ -47,29 +48,6 @@ const DOCUMENTED_KNOWLEDGE: Record<string, { answer: string; sources: string[] }
 };
 
 const FALLBACK_TEXT = "I couldn't find this in the documentation, so I won't guess. If you'd like, I can connect you with our team.";
-
-function simpleStem(word: string): string {
-  const w = word.toLowerCase();
-  if (w.length < 4) return w;
-  if (w.endsWith('ies')) return w.slice(0, -3) + 'y';
-  if (w.endsWith('ves')) return w.slice(0, -3) + 'f';
-  if (/[^aeiou](ss|sh|ch|x|z)es$/.test(w) && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
-  if (w.endsWith('ing')) {
-    const base = w.slice(0, -3);
-    if (base.length >= 3) return base;
-    return base + 'e';
-  }
-  if (w.endsWith('ied') && w.length > 4) return w.slice(0, -3) + 'y';
-  if (w.endsWith('ed') && !w.endsWith('eed') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('tion')) return w.slice(0, -4) + 'te';
-  if (w.endsWith('ment')) return w.slice(0, -4);
-  if (w.endsWith('ness')) return w.slice(0, -4);
-  if (w.endsWith('ly')) return w.slice(0, -2);
-  if (w.endsWith('er') && w.length > 4) return w.slice(0, -2);
-  if (w.endsWith('or') && w.length > 4) return w.slice(0, -2);
-  return w;
-}
 
 export interface OrchestratorInput {
   message: string;

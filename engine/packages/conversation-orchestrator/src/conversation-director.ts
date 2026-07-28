@@ -3,6 +3,7 @@ import {
   DiscernedTopic, isTopicExplained, discernTopics,
 } from './conversation-memory';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
+import { KnowledgeBaseProvider } from './knowledge-base-provider';
 import { SmartButton, CTAType, PersonaType } from './types';
 import { ConversationPlan } from './conversation-planner';
 
@@ -282,9 +283,15 @@ export function processConversationDirector(
   memory: ConversationMemoryData,
   ciResult: ConversationIntelligenceResult,
   plan: ConversationPlan,
+  kbProvider?: KnowledgeBaseProvider,
+  tenantId?: string,
 ): ConversationStrategy {
   const reasoning: string[] = [];
   const newTopics = discernTopics(message);
+  if (newTopics.length === 0 && kbProvider?.resolveTopic && tenantId) {
+    const resolved = kbProvider.resolveTopic(message, tenantId);
+    if (resolved) newTopics.push(resolved);
+  }
 
   const agenda = buildAgenda(memory, newTopics);
 

@@ -11,6 +11,46 @@ export interface KnowledgeBaseProvider {
   resolveTopic?(rawQuery: string, tenantId: string): DiscernedTopic | null;
 }
 
+export function simpleStem(word: string): string {
+  const w = word.toLowerCase();
+  if (w.length < 4) return w;
+  if (w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.endsWith('ves')) return w.slice(0, -3) + 'f';
+  if (/[^aeiou](ss|sh|ch|x|z)es$/.test(w) && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  if (w.endsWith('ing')) {
+    const base = w.slice(0, -3);
+    if (base.length >= 3) return base;
+    return base + 'e';
+  }
+  if (w.endsWith('ied') && w.length > 4) return w.slice(0, -3) + 'y';
+  if (w.endsWith('ed') && !w.endsWith('eed') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('tion')) return w.slice(0, -4) + 'te';
+  if (w.endsWith('ment')) return w.slice(0, -4);
+  if (w.endsWith('ness')) return w.slice(0, -4);
+  if (w.endsWith('ly')) return w.slice(0, -2);
+  if (w.endsWith('er') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('or') && w.length > 4) return w.slice(0, -2);
+  return w;
+}
+
+const TOPIC_KEYWORDS: Record<DiscernedTopic, string[]> = {
+  features: ['feature', 'capabilit', 'product', 'platform', 'what do you do', 'functionality'],
+  pricing: ['price', 'pricing', 'cost', 'plan', 'tier', 'how much', 'subscription', 'overage'],
+  integrations: ['integrat', 'zendesk', 'intercom', 'slack', 'widget', 'embed', 'plugin'],
+  security: ['security', 'compliance', 'soc2', 'gdpr', 'hipaa', 'encrypt', 'privacy', 'data'],
+  api: ['api', 'sdk', 'developer', 'code', 'webhook', 'rest', 'endpoint'],
+  trial: ['trial', 'free', 'sandbox', 'get started'],
+  comparison: ['compare', 'versus', 'competitor', 'alternative', 'difference'],
+  walkthrough: ['walkthrough', 'how it work', 'pipeline', 'architecture', 'technical overview'],
+  roi: ['roi', 'revenue', 'save money', 'payback', 'deflection'],
+  soc2: ['soc', 'soc2', 'audit'],
+  sso: ['sso', 'saml', 'okta', 'active directory', 'azure ad', 'sign on', 'single sign'],
+  onboarding: ['setup', 'onboard', 'deploy', 'install', 'getting started', '10 minute'],
+  developer: ['developer', 'dev', 'engineering', 'code', 'build'],
+  demo: ['demo', 'schedule', 'see it'],
+};
+
 const DEFAULT_TEMPLATES: Record<DiscernedTopic, string[]> = {
   features: [
     'The core of it is workflow automation — routing tickets, triggering actions, and keeping everything in one place. Most teams get their first automation running in about 10 minutes.',
@@ -107,6 +147,35 @@ const DEFAULT_TEMPLATES: Record<DiscernedTopic, string[]> = {
   ],
 };
 
+export function fuzzyResolveTopic(rawQuery: string, availableTopics: DiscernedTopic[]): DiscernedTopic | null {
+  const lower = rawQuery.toLowerCase();
+  const queryTokens = lower.split(/\s+/).filter(t => t.length > 0);
+  const stemmedTokens = queryTokens.map(simpleStem);
+
+  let bestTopic: DiscernedTopic | null = null;
+  let bestScore = 0;
+
+  for (const topic of availableTopics) {
+    const keywords = TOPIC_KEYWORDS[topic];
+    if (!keywords) continue;
+      const score = keywords.filter(kw => {
+        if (kw.includes(' ')) return lower.includes(kw);
+        const stemKw = simpleStem(kw);
+        return stemmedTokens.some(st =>
+          st.length >= 3 && stemKw.length >= 3
+            ? st.includes(stemKw) || stemKw.includes(st)
+            : st === stemKw
+        );
+      }).length;
+    if (score > bestScore) {
+      bestScore = score;
+      bestTopic = topic;
+    }
+  }
+
+  return bestScore > 0 ? bestTopic : null;
+}
+
 export class DefaultKnowledgeBaseProvider implements KnowledgeBaseProvider {
   getTopicResponse(topic: DiscernedTopic, _tenantId: string, depth: number): KnowledgeEntry | null {
     const templates = DEFAULT_TEMPLATES[topic];
@@ -116,5 +185,9 @@ export class DefaultKnowledgeBaseProvider implements KnowledgeBaseProvider {
 
   getAvailableTopics(_tenantId: string): DiscernedTopic[] {
     return Object.keys(DEFAULT_TEMPLATES) as DiscernedTopic[];
+  }
+
+  resolveTopic(rawQuery: string, _tenantId: string): DiscernedTopic | null {
+    return fuzzyResolveTopic(rawQuery, this.getAvailableTopics(_tenantId));
   }
 }

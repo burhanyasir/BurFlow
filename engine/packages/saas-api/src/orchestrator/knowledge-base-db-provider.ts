@@ -3,6 +3,7 @@ import {
   KnowledgeEntry,
   DefaultKnowledgeBaseProvider,
   DiscernedTopic,
+  fuzzyResolveTopic,
 } from '@conversation-engine/conversation-orchestrator';
 import { TopicResponseTemplateRepository } from '@conversation-engine/saas-core';
 
@@ -29,5 +30,10 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
     const dbTopics = this.repo.findByTenant(tenantId).map(r => r.topic);
     const defaultTopics = this.fallback.getAvailableTopics(tenantId);
     return [...new Set([...dbTopics, ...defaultTopics])];
+  }
+
+  resolveTopic(rawQuery: string, tenantId: string): DiscernedTopic | null {
+    const available = this.getAvailableTopics(tenantId);
+    return fuzzyResolveTopic(rawQuery, available);
   }
 }

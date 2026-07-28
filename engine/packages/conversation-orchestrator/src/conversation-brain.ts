@@ -402,7 +402,7 @@ function buildStrategyResponse(
 
   // 1. Topic-specific core content (only if topicToAnswer is set)
   if (strategy.topicToAnswer) {
-    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult, tenantId, kbProvider);
+    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult, tenantId, kbProvider, message);
     if (topicContent) parts.push(topicContent);
   }
 
@@ -677,7 +677,7 @@ const TOPIC_RESPONSE_TEMPLATES: Record<DiscernedTopic, string[]> = {
 };
 
 // Helper: Build topic-specific response using memory + intelligence
-function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult, tenantId?: string, kbProvider?: KnowledgeBaseProvider): string | null {
+function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult, tenantId?: string, kbProvider?: KnowledgeBaseProvider, rawQuery?: string): string | null {
   const record = memory.topicsExplained.find(t => t.topic === topic);
   const isCompleted = record && record.phase === 'completed';
 
@@ -687,6 +687,17 @@ function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryDat
     const kbEntry = kbProvider.getTopicResponse(topic, tenantId, isCompleted ? 0 : depth);
     if (kbEntry) {
       return kbEntry.answer;
+    }
+
+    // If exact topic match failed, try fuzzy resolveTopic on the raw query
+    if (kbProvider.resolveTopic && rawQuery) {
+      const resolvedTopic = kbProvider.resolveTopic(rawQuery, tenantId);
+      if (resolvedTopic && resolvedTopic !== topic) {
+        const resolvedEntry = kbProvider.getTopicResponse(resolvedTopic, tenantId, isCompleted ? 0 : depth);
+        if (resolvedEntry) {
+          return resolvedEntry.answer;
+        }
+      }
     }
   }
 
@@ -1036,7 +1047,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
   if (!shortReply && /^tell me more/i.test(message.trim()) && memory.currentTopic) {
     markTopicExplained(memory, memory.currentTopic);
     const ciResult = buildMinimalCIResult(memory, message);
-    const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider);
+    const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider, message);
     if (deepResponse) {
       const newTopics = discernTopics(message);
       updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
@@ -1109,7 +1120,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     const wantsDeepDive = /^really\??$/i.test(message.trim());
     if (wantsDeepDive && memory.currentTopic) {
       markTopicExplained(memory, memory.currentTopic);
-      const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider);
+      const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider, message);
       finalResponse = deepResponse || shortReply;
     } else {
       const contextualResponse = contextualizeShortReply(message, memory);
@@ -1250,7 +1261,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
 
   const plan = planConversation(message, memory, ciResult);
 
-  const strategy = processConversationDirector(message, memory, ciResult, plan);
+  const strategy = processConversationDirector(message, memory, ciResult, plan, kbProvider, tenantId);
 
   const relevantFacts = computeRelevantKnownFacts(memory, strategy, message);
   const newTopics = discernTopics(message);
