@@ -1,0 +1,14 @@
+# ─── Mock LLM Service (Development) ─────────────────────────────
+FROM node:20-alpine
+WORKDIR /app
+RUN apk add --no-cache tini curl
+COPY package.json package-lock.json ./
+RUN npm ci --production
+COPY mock-llm-server.js .
+ENV PORT=3458
+EXPOSE 3458
+HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
+  CMD curl -f http://localhost:3458/health || exit 1
+ENTRYPOINT ["/sbin/tini", "--"]
+USER node
+CMD ["node", "mock-llm-server.js"]

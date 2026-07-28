@@ -1,0 +1,15 @@
+{
+  "name": "@conversation-engine/admin-portal",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "dev": "vite",
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "vitest": "^2.0.0"
+  }
+}

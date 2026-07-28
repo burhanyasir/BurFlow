@@ -1,0 +1,17 @@
+# ─── Widget Bundle ──────────────────────────────────────────────
+FROM node:20-alpine AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+COPY packages packages/
+RUN npm ci && npm run build
+RUN cp -r packages/widget/dist /widget-dist
+
+FROM nginx:1.25-alpine
+RUN apk add --no-cache tini
+COPY --from=build /widget-dist /usr/share/nginx/html/widget
+COPY nginx/widget.conf /etc/nginx/conf.d/default.conf
+RUN chown -R nginx:nginx /usr/share/nginx/html && chmod -R 755 /usr/share/nginx/html
+USER nginx
+EXPOSE 80
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["nginx", "-g", "daemon off;"]

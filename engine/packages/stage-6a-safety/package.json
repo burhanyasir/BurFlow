@@ -1,0 +1,14 @@
+{
+  "name": "@conversation-engine/stage-6a-safety",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc", "test": "vitest run" },
+  "dependencies": {
+    "@conversation-engine/core-types": "*",
+    "@conversation-engine/output-guardrail": "*",
+    "@conversation-engine/grounding-verifier": "*",
+    "@conversation-engine/pii-detector": "*"
+  }
+}

@@ -1,0 +1,42 @@
+# ─── Conversation Engine — Logrotate Configuration ─────────────────
+# Installed at: /etc/logrotate.d/ce-saas-api
+#
+# Rotates PM2 logs for both SaaS API and Pipeline services.
+# Also rotates Nginx access/error logs from the reverse proxy.
+#
+# To verify: sudo logrotate -d /etc/logrotate.d/ce-saas-api
+# To force:  sudo logrotate -f /etc/logrotate.d/ce-saas-api
+
+/opt/conversation-engine/engine/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    copytruncate
+    dateext
+    dateformat -%Y-%m-%d
+    maxage 30
+    maxsize 100M
+    postrotate
+        # PM2 will continue writing to the truncated file
+        # Restart PM2 if you want it to open new file handles
+        # pm2 reloadLogs 2>/dev/null || true
+    endscript
+}
+
+/var/log/nginx/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    sharedscripts
+    postrotate
+        if [ -f /var/run/nginx.pid ]; then
+            kill -USR1 $(cat /var/run/nginx.pid)
+        fi
+    endscript
+}

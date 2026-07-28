@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "patterns": [
+    {
+      "category": "self_harm",
+      "patterns": [
+        "self-harm",
+        "self harm",
+        "hurt myself",
+        "cutting myself",
+        "self-injury",
+        "self injury",
+        "harming myself",
+        "biting myself",
+        "burning myself",
+        "self-mutilat",
+        "self mutilat",
+        "cut myself"
+      ]
+    },
+    {
+      "category": "suicide",
+      "patterns": [
+        "suicide",
+        "kill myself",
+        "end my life",
+        "want to die",
+        "take my own life",
+        "suicidal",
+        "end it all",
+        "better off dead",
+        "988"
+      ]
+    },
+    {
+      "category": "mental_health_crisis",
+      "patterns": [
+        "panic attack",
+        "psychotic",
+        "hallucinating",
+        "mental health crisis",
+        "nervous breakdown",
+        "having a breakdown",
+        "paranoid",
+        "can't stop crying",
+        "severe anxiety attack"
+      ]
+    },
+    {
+      "category": "medical_emergency",
+      "patterns": [
+        "heart attack",
+        "chest pain",
+        "can't breathe",
+        "having a stroke",
+        "severe bleeding",
+        "unconscious",
+        "overdose",
+        "medical emergency",
+        "can't stop bleeding",
+        "difficulty breathing"
+      ]
+    },
+    {
+      "category": "violence_emergency",
+      "patterns": [
+        "shooting",
+        "bomb",
+        "kill everyone",
+        "armed",
+        "violent attack",
+        "massacre",
+        "hostage",
+        "gun",
+        "weapon"
+      ]
+    },
+    {
+      "category": "emergency_override",
+      "patterns": [
+        "emergency override",
+        "crisis escalation",
+        "bypass safety"
+      ]
+    }
+  ]
+}

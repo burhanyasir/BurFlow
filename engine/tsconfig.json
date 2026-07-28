@@ -1,0 +1,26 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/core-types" },
+    { "path": "packages/tenant-registry" },
+    { "path": "packages/session-store" },
+    { "path": "packages/config-store" },
+    { "path": "packages/dedup-store" },
+    { "path": "packages/trip-wire" },
+    { "path": "packages/input-guardrail" },
+    { "path": "packages/pii-detector" },
+    { "path": "packages/output-guardrail" },
+    { "path": "packages/grounding-verifier" },
+    { "path": "packages/stage-1-ingestion" },
+    { "path": "packages/stage-2-tenant-context" },
+    { "path": "packages/stage-4-context" },
+    { "path": "packages/stage-5-response-generation" },
+    { "path": "packages/stage-6a-safety" },
+    { "path": "packages/stage-7-persistence" },
+    { "path": "packages/stage-8-dispatch" },
+    { "path": "packages/response-generator" },
+    { "path": "packages/knowledge-pipeline" },
+    { "path": "packages/logger" },
+    { "path": "packages/pipeline-orchestrator" }
+  ]
+}

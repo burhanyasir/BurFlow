@@ -1,0 +1,1613 @@
+import {
+  ConversationMemoryData,
+  ConversationGoal,
+  CustomerIntent,
+  FunnelStageExtended,
+  DiscernedTopic,
+  TurnRecord,
+  createMemory,
+  fromLegacyMemory,
+  discernTopics,
+  markTopicExplained,
+  markTopicCompleted,
+  markCTARejected,
+  isTopicExplained,
+  isCTARejected,
+  isGoalAchieved,
+} from './conversation-memory';
+import { planConversation } from './conversation-planner';
+import { validateResponse } from './conversation-validator';
+import { processConversationIntelligence, IntelligenceInput } from './conversation-intelligence-service';
+import {
+  ConversationIntelligenceMemory,
+  ConversationIntelligenceResult,
+  SentimentSnapshot,
+  AbandonmentRisk,
+  RepetitionStatus,
+  EscalationRecommendation,
+  RoutingDecision,
+  TrustSignal,
+} from './conversation-intelligence-types';
+import {
+  OrchestratedTurnResult,
+  CTASelectionResult,
+  CTAType,
+  ConversationUIState,
+  PersonaType,
+  SmartButton,
+  FunnelStage,
+  BuyingIntentResult,
+  ObjectionResult,
+  QualificationState,
+  PersonaDetectionResult,
+} from './types';
+
+function detectSentimentPolarity(message: string): number {
+  const lower = message.toLowerCase();
+  let polarity = 0;
+  const positive = /great|awesome|amazing|perfect|excellent|love|wonderful|fantastic|good|nice|helpful|thank|thanks|works|solved|impressed/i;
+  const negative = /bad|terrible|awful|horrible|hate|disappointed|frustrated|angry|wrong|error|issue|problem|broken|not.working|poor/i;
+  if (positive.test(lower)) polarity += 0.15;
+  if (negative.test(lower)) polarity -= 0.15;
+  if (lower.includes('?')) polarity -= 0.05;
+  return Math.max(-1, Math.min(1, polarity));
+}
+
+function buildMinimalCIResult(memory: ConversationMemoryData, message: string): ConversationIntelligenceResult {
+  const polarity = detectSentimentPolarity(message);
+  const sentiment: SentimentSnapshot = {
+    polarity,
+    frustration: 'low',
+    urgency: 'low',
+    trend: memory.turnCount > 0 ? 'stable' : 'stable',
+  };
+  const objection: ObjectionResult = { isObjection: false, category: 'none', groundedAnswer: '', sources: [] };
+  return {
+    responseText: '',
+    leadScore: { overallScore: memory.leadScore || 0 },
+    conversationScore: { overallScore: memory.conversationScore || 0 },
+    sentiment,
+    abandonmentRisk: { level: 'low', score: 10 } as AbandonmentRisk,
+    repetition: { hasRepetition: false, count: 0, topics: [] } as RepetitionStatus,
+    escalation: { shouldEscalate: false, urgency: 'low' } as EscalationRecommendation,
+    routingDecision: { decision: 'assistant', confidence: 0.95, label: 'Handled by AI assistant' } as RoutingDecision,
+    trustSignal: { shouldInject: false } as TrustSignal,
+    buyingIntent: { hasBuyingIntent: memory.buyingIntentDetected, confidence: 0 } as BuyingIntentResult,
+    objection,
+    qualification: { ...memory.qualificationCollected },
+    qualificationProgress: memory.qualificationCollected.completed ? 100 : 0,
+    persona: { persona: memory.persona || 'unknown', confidence: 0, reasoning: '' } as PersonaDetectionResult,
+    funnelStage: (memory.funnelStage === 'greeting' ? 'greeting' : memory.funnelStage === 'awareness' ? 'discovery' : memory.funnelStage === 'interest' ? 'interest' : memory.funnelStage === 'evaluation' || memory.funnelStage === 'consideration' ? 'evaluation' : memory.funnelStage === 'purchase_intent' ? 'purchase_intent' : memory.funnelStage === 'decision' ? 'purchase_intent' : 'discovery') as FunnelStage,
+    cta: { primaryCTA: 'none' as CTAType, label: '', link: '' },
+    quickReplies: [],
+    uiState: { buttons: [], suggestedActions: [] },
+    sources: [],
+    isFallback: false,
+    turnCount: memory.turnCount,
+  };
+}
+
+function updateTrustFromSentiment(memory: ConversationMemoryData, polarity: number): void {
+  if (polarity > 0.2) memory.trustLevel = 'high';
+  else if (polarity > 0) memory.trustLevel = 'medium';
+  else if (polarity < -0.3) memory.trustLevel = 'low';
+  else if (memory.turnCount > 4 && memory.trustLevel === 'medium') memory.trustLevel = 'high';
+  else if (memory.turnCount > 1 && memory.trustLevel === 'low') memory.trustLevel = 'medium';
+}
+
+function checkQualificationCompletion(memory: ConversationMemoryData): void {
+  if (memory.qualificationCollected.completed) return;
+  const required = [memory.companySize, memory.industry].filter(Boolean);
+  const optional = [memory.useCase, memory.monthlyConversations, memory.currentHelpdesk, memory.budget].filter(Boolean);
+  if (required.length >= 2 && optional.length >= 1) {
+    memory.qualificationCollected.completed = true;
+  }
+}
+
+import {
+  getOpening,
+  detectEmotionalCue,
+  handleShortReply,
+  isOffTopic,
+  handleBetterEnding,
+  getSmartFollowUp,
+  buildContextSummary,
+  recommendPlan,
+  enforceContinuity,
+  generateContextReference,
+  detectIndustry,
+  adaptResponseToContext,
+  contextualizeShortReply,
+  handleMidConversationGreeting,
+} from './conversation-personality';
+import { processConversationDirector, ConversationStrategy } from './conversation-director';
+
+export interface BrainInput {
+  message: string;
+  responseText: string;
+  legacyMemory: ConversationIntelligenceMemory;
+  rejectedCTAs?: string[];
+}
+
+export interface BrainOutput {
+  responseText: string;
+  cta: CTASelectionResult;
+  quickReplies: SmartButton[];
+  uiState: ConversationUIState;
+  memory: ConversationMemoryData;
+  legacyMemory: ConversationIntelligenceMemory;
+  plan: {
+    customerIntent: CustomerIntent;
+    funnelStage: FunnelStageExtended;
+    goal: ConversationGoal;
+    topicsToDiscuss: DiscernedTopic[];
+    missingQualification: string[];
+  };
+  validation: { valid: boolean; issues: string[] };
+  ciResult: ConversationIntelligenceResult;
+  orchestratorResult: OrchestratedTurnResult;
+  planRecommendation?: { plan: string; explanation: string };
+  contextReference?: string | null;
+  acknowledgment?: string | null;
+  strategy?: ConversationStrategy;
+  momentum?: MomentumResult;
+  qualityMetrics?: QualityMetrics;
+}
+
+const FOLLOW_UP_BY_GOAL: Record<ConversationGoal, string[]> = {
+  build_trust: [
+    "Would you like me to walk you through how it works?",
+    "Curious what other teams in your industry are doing?",
+    "I'd love to show you how we help teams like yours.",
+  ],
+  answer_question: [
+    "Does that answer your question?",
+    "Would you like more detail on any part?",
+    "Happy to go deeper into any of those points.",
+  ],
+  handle_objection: [
+    "Would a quick demo help put your mind at ease?",
+    "Want me to walk you through how that works step by step?",
+    "I can connect you with our team if you'd like to discuss further.",
+  ],
+  qualify: [
+    "To make sure I recommend the right plan,",
+    "To help narrow down the best option for you,",
+  ],
+  advance_funnel: [
+    "Want to see how it compares with your current setup?",
+    "Would it help to walk through the next steps?",
+    "Ready to explore what this would look like for your team?",
+  ],
+  recommend_plan: [
+    "Want to get started with that plan?",
+    "Should we set up a trial so you can test it out?",
+    "Would you like me to walk through what's included?",
+  ],
+  close_trial: [
+    "Ready to start your free trial?",
+    "Want to get signed up and explore on your own?",
+  ],
+  schedule_demo: [
+    "When works best for a quick walkthrough?",
+    "Want to book a demo to see it in action?",
+  ],
+  recover_abandonment: [
+    "What would make this the right time to revisit?",
+    "Can I share a quick overview that might change your mind?",
+  ],
+  finish_conversation: [
+    "Come back anytime.",
+    "I am here when you need me.",
+  ],
+  none: [],
+};
+
+interface QRDef {
+  id: string; label: string; payload: string; variant: 'primary' | 'secondary' | 'outline'; action?: 'send_text' | 'navigate';
+}
+
+const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
+  build_trust: [
+    { id: 'qr_how_works', label: 'How It Works', payload: 'How does the grounding engine work?', variant: 'secondary' },
+    { id: 'qr_customers', label: 'Customer Stories', payload: 'Tell me about your customers', variant: 'outline' },
+    { id: 'qr_security', label: 'Security & Trust', payload: 'Tell me about security', variant: 'outline' },
+  ],
+  answer_question: [
+    { id: 'qr_deeper', label: 'Tell Me More', payload: 'Can you elaborate on that?', variant: 'secondary' },
+    { id: 'qr_related', label: 'Related Features', payload: 'What related features do you have?', variant: 'outline' },
+  ],
+  handle_objection: [
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/demo', variant: 'primary', action: 'navigate' },
+    { id: 'qr_case_study', label: 'See Case Studies', payload: 'Show me customer success stories', variant: 'secondary' },
+  ],
+  qualify: [
+    { id: 'qr_help_choose', label: 'Help Me Choose', payload: 'Help me find the right plan', variant: 'primary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+  ],
+  advance_funnel: [
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_demo', label: 'Watch Demo', payload: '/demo', variant: 'primary', action: 'navigate' },
+  ],
+  recommend_plan: [
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_compare', label: 'Compare Plans', payload: 'Compare all plan features', variant: 'secondary' },
+  ],
+  close_trial: [
+    { id: 'qr_signup', label: 'Start 14-Day Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_contact', label: 'Talk to Sales', payload: 'I want to talk to sales', variant: 'secondary' },
+  ],
+  schedule_demo: [
+    { id: 'qr_book_demo', label: 'Book 15-Min Demo', payload: '/contact', variant: 'primary', action: 'navigate' },
+    { id: 'qr_contact_sales', label: 'Contact Sales', payload: 'Connect me with sales', variant: 'secondary' },
+  ],
+  recover_abandonment: [
+    { id: 'qr_special', label: 'See Current Offers', payload: 'Tell me about current promotions', variant: 'primary' },
+    { id: 'qr_quick_demo', label: 'Quick Overview', payload: 'Give me a quick overview', variant: 'secondary' },
+  ],
+  finish_conversation: [],
+  none: [],
+};
+
+const STAGE_BASED_CTA: Record<FunnelStageExtended, { primary: CTAType; label: string; link: string }> = {
+  greeting: { primary: 'start_free_trial', label: 'Start Free Trial', link: '/signup' },
+  awareness: { primary: 'pricing', label: 'See Pricing', link: '/pricing' },
+  interest: { primary: 'start_free_trial', label: 'Start Free Trial', link: '/signup' },
+  consideration: { primary: 'start_free_trial', label: 'Start 14-Day Trial', link: '/signup' },
+  evaluation: { primary: 'start_free_trial', label: 'Start 14-Day Free Trial', link: '/signup' },
+  purchase_intent: { primary: 'start_free_trial', label: 'Start Free Trial', link: '/signup' },
+  decision: { primary: 'contact_sales', label: 'Contact Sales', link: '/contact' },
+  customer: { primary: 'support', label: 'Get Support', link: '/support' },
+  support: { primary: 'support', label: 'Contact Support', link: '/support' },
+};
+
+const PERSONA_SPECIFIC_CTA: Partial<Record<PersonaType, { primary: CTAType; label: string; link: string }>> = {
+  enterprise: { primary: 'book_demo', label: 'Book Enterprise Demo', link: '/contact' },
+  developer: { primary: 'developer_docs', label: 'View Developer Docs', link: '/docs' },
+  agency: { primary: 'partner_program', label: 'Join Partner Program', link: '/contact' },
+};
+
+function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent }, memory: ConversationMemoryData): CTASelectionResult {
+  if (memory.isLeaving || plan.goal === 'finish_conversation') {
+    return {
+      primaryCTA: 'contact_sales',
+      label: 'Email Me Later',
+      link: '/contact',
+      secondaryCTA: 'none',
+      secondaryLabel: undefined,
+      secondaryLink: undefined,
+    };
+  }
+
+  if (plan.goal === 'close_trial' || plan.goal === 'recommend_plan' || plan.customerIntent === 'buying') {
+    if (persona === 'enterprise' && !isCTARejected(memory, 'book_demo')) {
+      return {
+        primaryCTA: 'book_demo',
+        label: 'Book Enterprise Demo',
+        link: '/contact',
+        secondaryCTA: 'start_free_trial',
+        secondaryLabel: 'Start Free Trial',
+        secondaryLink: '/signup',
+      };
+    }
+    return {
+      primaryCTA: 'start_free_trial',
+      label: 'Start 14-Day Free Trial',
+      link: '/signup',
+      secondaryCTA: 'book_demo',
+      secondaryLabel: 'Book a Demo',
+      secondaryLink: '/demo',
+    };
+  }
+
+  if (plan.goal === 'handle_objection') {
+    if (isCTARejected(memory, 'start_free_trial')) {
+      return {
+        primaryCTA: 'book_demo',
+        label: 'Book a Demo',
+        link: '/demo',
+        secondaryCTA: 'contact_sales',
+        secondaryLabel: 'Talk to Sales',
+        secondaryLink: '/contact',
+      };
+    }
+    return {
+      primaryCTA: 'start_free_trial',
+      label: 'Start Free Trial',
+      link: '/signup',
+      secondaryCTA: 'book_demo',
+      secondaryLabel: 'See a Demo',
+      secondaryLink: '/demo',
+    };
+  }
+
+  if (plan.goal === 'recover_abandonment') {
+    return {
+      primaryCTA: 'book_demo',
+      label: 'Book a Quick Demo',
+      link: '/demo',
+      secondaryCTA: 'contact_sales',
+      secondaryLabel: 'Special Offer',
+      secondaryLink: '/contact',
+    };
+  }
+
+  const ctaOptions: Array<{ primary: CTAType; label: string; link: string }> = [];
+
+  const personaCta = PERSONA_SPECIFIC_CTA[persona];
+  if (personaCta) ctaOptions.push(personaCta);
+
+  const stageCta = STAGE_BASED_CTA[plan.funnelStage];
+  if (stageCta) ctaOptions.push(stageCta);
+
+  ctaOptions.push(
+    { primary: 'start_free_trial', label: 'Start Free Trial', link: '/signup' },
+    { primary: 'book_demo', label: 'Book a Demo', link: '/demo' },
+    { primary: 'contact_sales', label: 'Talk to Sales', link: '/contact' },
+  );
+
+  for (const opt of ctaOptions) {
+    if (!isCTARejected(memory, opt.primary)) {
+      return {
+        primaryCTA: opt.primary,
+        label: opt.label,
+        link: opt.link,
+        secondaryCTA: plan.goal === 'qualify' ? undefined : 'book_demo',
+        secondaryLabel: plan.goal === 'qualify' ? undefined : 'Book a Demo',
+        secondaryLink: plan.goal === 'qualify' ? undefined : '/demo',
+      };
+    }
+  }
+
+  return {
+    primaryCTA: 'contact_sales',
+    label: 'Contact Sales',
+    link: '/contact',
+    secondaryCTA: undefined,
+    secondaryLabel: undefined,
+    secondaryLink: undefined,
+  };
+}
+
+// Strategy-first response builder - replaces generic template enrichment
+function buildStrategyResponse(
+  strategy: ConversationStrategy,
+  message: string,
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended; missingQualification: string[] },
+  ciResult: ConversationIntelligenceResult,
+  relevantFacts: RelevantKnownFacts,
+): string {
+  const parts: string[] = [];
+
+  // 0. Personalized opening based on user context and buying intent
+  if (relevantFacts.buyingIntent) {
+    const intentOpeners = {
+      'ready to buy': "Great to hear you're ready to move forward.",
+      'comparing options': "I'm glad you're comparing options — let me help you decide.",
+    } as Record<string, string>;
+    const lowerIntent = relevantFacts.buyingIntent.toLowerCase();
+    for (const [key, opener] of Object.entries(intentOpeners)) {
+      if (lowerIntent.includes(key)) {
+        parts.push(opener);
+        break;
+      }
+    }
+  }
+
+  // 1. Topic-specific core content (only if topicToAnswer is set)
+  if (strategy.topicToAnswer) {
+    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult);
+    if (topicContent) parts.push(topicContent);
+  }
+
+  // 2. Goal-specific content based on strategy
+  const goalContent = buildGoalContent(strategy, memory, plan, ciResult);
+  if (goalContent) parts.push(goalContent);
+
+  // 3. Qualification question (from strategy) with natural variation
+  if (strategy.qualificationQuestion) {
+    const q = getQualificationQuestion(strategy.qualificationQuestion);
+    if (!parts.join(' ').includes(q.slice(0, 30))) {
+      parts.push(q);
+      memory.questionsAnswered.push(strategy.qualificationQuestion);
+    }
+  }
+
+  // 4. Strategy-driven follow-up — distinguish between deepening and advancing
+  if (!strategy.pendingQuestions.some(p => !p.answered) && strategy.followUpTopic) {
+    const isDeepening = memory.currentTopic && strategy.followUpTopic === memory.currentTopic;
+    let followUpQ: string;
+    if (isDeepening) {
+      const deepenVariants = [
+        `Would you like to go deeper into ${strategy.followUpTopic}?`,
+        `There is more to cover on ${strategy.followUpTopic} — shall I continue?`,
+        `Want to dig deeper into ${strategy.followUpTopic}?`,
+      ];
+      followUpQ = deepenVariants[memory.turnCount % deepenVariants.length];
+    } else {
+      followUpQ = `Would you like to explore ${strategy.followUpTopic} next?`;
+    }
+    parts.push(followUpQ);
+  }
+
+  // 5. Smart follow-up (context-aware, only if not already covered)
+  if (!strategy.pendingQuestions.some(p => !p.answered) && plan.goal !== 'finish_conversation') {
+    const smartFU = getSmartFollowUp(message, memory, ciResult);
+    if (smartFU && !parts.join(' ').includes(smartFU.slice(0, 20))) {
+      parts.push(smartFU);
+    }
+  }
+
+  // 6. CTA per strategy
+  const ctaText = buildCTAText(strategy, plan, memory, ciResult);
+  if (ctaText) parts.push(ctaText);
+
+  // 6b. Plan recommendation (for recommend_plan goal) — avoid repeating previous recommendations
+  if (plan.goal === 'recommend_plan') {
+    const recs = relevantFacts.previousRecommendations || [];
+    if (recs.length === 0) {
+      const recommended = recommendPlan(memory);
+      parts.unshift(recommended.explanation);
+    } else {
+      const recNames = recs.map(r => r.planName);
+      const recommended = recommendPlan(memory);
+      if (!recNames.some(n => recommended.explanation.toLowerCase().includes(n.toLowerCase()))) {
+        parts.unshift(recommended.explanation);
+      }
+    }
+  }
+
+  // 7. Context reference — weave known facts into the response (every 3 turns)
+  if (memory.turnCount > 0 && memory.turnCount % 3 === 0 && parts.length > 0) {
+    const joined = parts.join(' ');
+    const known: string[] = [];
+    if (relevantFacts.industry && !joined.toLowerCase().includes(relevantFacts.industry.toLowerCase())) {
+      known.push(relevantFacts.industry);
+    }
+    if (relevantFacts.companySize && !joined.toLowerCase().includes('team') && !joined.toLowerCase().includes('people')) {
+      known.push(`${relevantFacts.companySize}-person team`);
+    }
+    if (known.length > 0) {
+      const prefix = `For your ${known.join(' ')} — `;
+      parts[0] = prefix + parts[0];
+    }
+  }
+
+  // 8. Opening (if not already present) — incorporate memory facts when available
+  const opening = getOpening(strategy.primaryGoal, memory);
+  let response = parts.join(' ').trim();
+  if (opening && response.length > 5) {
+    const lower = response.toLowerCase();
+    const skipOpenings = /^(hi|hello|hey|thanks|thank you|welcome|take care)/i.test(response.trim());
+    if (!skipOpenings) {
+      if (relevantFacts.industry && !lower.includes(relevantFacts.industry.toLowerCase()) && memory.turnCount > 1 && memory.turnCount % 3 !== 0) {
+        response = `${opening} Since you are in ${relevantFacts.industry}, ${response.slice(0, 1).toLowerCase() + response.slice(1)}`;
+      } else {
+        response = `${opening} ${response}`;
+      }
+    }
+  }
+
+  // Ensure proper punctuation
+  const trimmed = response.trim();
+  const lastChar = trimmed.slice(-1);
+  if (!['.', '!', '?', ')'].includes(lastChar)) {
+    response = trimmed + '.';
+  }
+
+  return response;
+}
+
+function computeRelevantKnownFacts(memory: ConversationMemoryData, strategy: ConversationStrategy, message: string): RelevantKnownFacts {
+  const lower = message.toLowerCase();
+  const facts: RelevantKnownFacts = {
+    industry: memory.industry || null,
+    companySize: memory.companySize || null,
+    monthlyConversations: memory.monthlyConversations || null,
+    persona: memory.persona || null,
+    currentGoal: strategy.goal,
+    objectionsHandled: memory.objectionsHandled || [],
+    previousRecommendations: memory.planRecommendations || [],
+    topicsExplained: memory.topicsExplained.map(t => t.topic),
+    buyingIntent: memory.buyingIntentDetected ? memory.buyingIntentPhrase : null,
+    helpdesk: memory.currentHelpdesk || null,
+    securityNeeds: memory.securityRequirements || null,
+    budget: memory.budget || null,
+    userContext: [],
+  };
+  if (memory.companySize) facts.userContext.push(`company size: ${memory.companySize}`);
+  if (memory.industry) facts.userContext.push(`industry: ${memory.industry}`);
+  if (memory.useCase) facts.userContext.push(`use case: ${memory.useCase}`);
+  if (memory.currentHelpdesk) facts.userContext.push(`helpdesk: ${memory.currentHelpdesk}`);
+  if (memory.budget) facts.userContext.push(`budget: ${memory.budget}`);
+  if (memory.monthlyConversations) facts.userContext.push(`monthly volume: ${memory.monthlyConversations}`);
+  if (memory.topicsExplained.length > 0) {
+    facts.userContext.push(`already discussed: ${memory.topicsExplained.filter(t => t.phase === 'completed').map(t => t.topic).join(', ')}`);
+  }
+  return facts;
+}
+
+function monthlyVolume(memory: ConversationMemoryData): string | null {
+  if (memory.monthlyConversations) return memory.monthlyConversations;
+  if (memory.qualificationCollected.monthlyConversations) return memory.qualificationCollected.monthlyConversations;
+  return null;
+}
+
+function buildGoalContent(
+  strategy: ConversationStrategy,
+  message: string,
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended; missingQualification: string[] },
+  ciResult: ConversationIntelligenceResult,
+): string {
+  const parts: string[] = [];
+  if (plan.goal === 'qualify') {
+    // Natural transition acknowledgment between successive qualification questions
+    if (memory.lastGoal === 'qualify') {
+      const transitions = ['Great, thanks. ', 'Perfect, that helps. ', 'Got it. ', 'Appreciate that. '];
+      parts.push(transitions[memory.turnCount % transitions.length]);
+    }
+    if (memory.companyName) {
+      if (memory.companySize) {
+        parts.push(`${memory.companyName} is a ${memory.companySize} company.`);
+      }
+      if (memory.industry) {
+        parts.push(`Operating in ${memory.industry}.`);
+      }
+    }
+  }
+  return parts.join(' ') || '';
+}
+
+// Qualification questions with natural variation — pick randomly to avoid sounding mechanical
+const QUAL_QUESTION_VARIANTS: Record<string, string[]> = {
+  'company size': [
+    'What is your company size?',
+    'How many people are on your support team?',
+    'What size team do you have?',
+  ],
+  'industry': [
+    'What industry are you in?',
+    'Which industry does your company operate in?',
+    'What sector do you work in?',
+  ],
+  'use case': [
+    'What is your primary use case?',
+    'What are you hoping to accomplish with AI-powered support?',
+    'What specific problem are you looking to solve?',
+  ],
+  'monthly conversations': [
+    'How many monthly conversations do you handle?',
+    'What kind of conversation volume do you deal with each month?',
+    'About how many support tickets come in per month?',
+  ],
+  'current helpdesk': [
+    'What is your current helpdesk setup?',
+    'Which support platform are you using today?',
+    'What tools does your support team currently use?',
+  ],
+  'budget': [
+    'What is your budget range?',
+    'Do you have a budget range in mind?',
+    'What are you looking to spend per month?',
+  ],
+  'decision timeline': [
+    'What is your decision timeline?',
+    'When are you looking to make a decision?',
+    'How soon are you hoping to get started?',
+  ],
+};
+
+function getQualificationQuestion(label: string): string {
+  const variants = QUAL_QUESTION_VARIANTS[label];
+  if (!variants) return label;
+  return variants[Math.floor(Math.random() * variants.length)];
+}
+
+const TOPIC_RESPONSE_TEMPLATES: Record<DiscernedTopic, string[]> = {
+  features: [
+    'The core of it is workflow automation — routing tickets, triggering actions, and keeping everything in one place. Most teams get their first automation running in about 10 minutes.',
+    'The automation engine lets you build conditional workflows — if-then logic, SLA escalations, skill-based assignments. Think of it as a traffic controller for every ticket.',
+    'On the analytics side, dashboards show response times, resolution rates, and CSAT trends in real time. Data refreshes instantly with custom filters and date ranges.',
+    'For power users, the API and webhooks let you extend everything — trigger workflows from external systems, sync data bidirectionally, or build custom widgets on the dashboard.',
+    'Enterprise features add RBAC with granular permissions, audit trails for every action, and a sandbox environment for testing workflows before production deployment.',
+  ],
+  pricing: [
+    'Three tiers: Starter at $49/month for up to 3 agents, Professional at $99/month for growing teams, and Enterprise with custom pricing for larger organizations.',
+    'Starter covers core automation and standard integrations. Professional adds advanced analytics, custom roles, and priority support. Enterprise gets SSO, dedicated support, and custom contracts.',
+    'Billing is per agent per month, annual or monthly. All integrations, API access, and standard features are included in every tier — no hidden add-ons.',
+    'For high-volume teams, Enterprise includes volume discounts and a dedicated account manager. There is also an AI add-on at $20 per agent per month for AI-powered responses.',
+    'You can try any plan free for 14 days, no credit card needed. Most teams are up and running within the first week.',
+  ],
+  security: [
+    'AES-256 encryption at rest, TLS 1.3 in transit — all data encrypted by default with no configuration needed.',
+    'Beyond encryption, we maintain SOC 2 Type II certification audited annually, covering security, availability, and confidentiality. Infrastructure runs on AWS with ISO 27001 certified data centers.',
+    'Access controls include role-based permissions (admin, agent, read-only), SAML 2.0 / OIDC SSO, and SCIM provisioning for automated user management.',
+    'Enterprise security includes dedicated VPC deployment, data residency across US, EU, and APAC regions, and a 99.99% uptime SLA.',
+    'Quarterly penetration tests by independent firms, a responsible disclosure program, and a detailed security white paper available under NDA.',
+  ],
+  integrations: [
+    'Native integrations with Slack, Microsoft Teams, Salesforce, HubSpot, Zendesk, Intercom, and Jira — conversations and data sync in real time.',
+    'The integration ecosystem covers CRM sync (contacts, deals, history), ticketing (bi-directional updates), communication tools, and analytics platforms.',
+    'Our marketplace has 50+ pre-built connectors, each supporting custom field mapping, data transformation, and scheduled or event-driven sync.',
+    'For custom integrations, we offer webhooks (inbound and outbound), REST API, and GraphQL. Webhooks support retries, batching, and event filtering.',
+    'Enterprise customers get a dedicated integration engineer for migration and setup, plus custom connector development if needed.',
+  ],
+  api: [
+    'REST API gives full programmatic access to tickets, contacts, workflows, analytics, and settings. SDKs available for JavaScript, Python, Go, and Ruby.',
+    'The API supports CRUD on all resources, batch processing for bulk imports, and real-time event streaming via Server-Sent Events.',
+    'Authentication via API keys or OAuth 2.0. Rate limits: 1000 req/min on Professional, 5000 on Enterprise, with webhook delivery guarantees.',
+    'GraphQL API lets you query exactly what you need in a single request — ideal for custom dashboards, reports, or embedding features in your product.',
+    'Developer docs include interactive playgrounds, SDK examples in 4 languages, a changelog with migration guides, and a community forum.',
+  ],
+  roi: [
+    'Customers typically see ticket volume drop by 40% and response times improve by 60% within the first quarter.',
+    'Average ROI is 3x within 90 days. Support teams save about 12 hours per week on repetitive tickets alone.',
+    'We have an ROI calculator that factors in your current volume, agent count, and handle time to project savings specific to your team.',
+    'One case study: a 50-agent team cut costs by $180k annually after automating 35% of Tier-1 tickets.',
+    'Beyond direct savings, customers report CSAT scores improving by about 22%, lower agent turnover, and faster onboarding for new hires.',
+  ],
+  soc2: [
+    'SOC 2 Type II certified with annual audits covering security, availability, processing integrity, confidentiality, and privacy.',
+    'The audit is performed by an independent CPA firm and validates controls around access management, data encryption, incident response, and vendor management.',
+    'The full SOC 2 report includes the control description, testing results, and auditor opinion — available to enterprise customers under NDA.',
+    'We also maintain ISO 27001 certification, HIPAA BAAs for healthcare, and GDPR Data Processing Agreements for EU operations.',
+    'Our compliance team handles customer security reviews, vendor risk assessments, and provides completed SIG questionnaires on request.',
+  ],
+  sso: [
+    'SAML 2.0 and OpenID Connect supported. Compatible with Okta, Azure AD, Google Workspace, OneLogin, and Ping Identity.',
+    'Setup takes about 15 minutes — generate a metadata file from your IdP, upload it, map attributes. Supports IdP-initiated and SP-initiated SSO.',
+    'SCIM provisioning included — user accounts created, updated, and deprovisioned automatically when changes happen in your directory.',
+    'Advanced features: just-in-time provisioning, role mapping from directory groups, session timeout policies, and IP-based access restrictions.',
+    'Multiple IdP configurations per account supported — useful for mergers, acquisitions, or teams using different identity providers.',
+  ],
+  walkthrough: [
+    'The core flow: a customer sends a message → it gets classified → routed to the right agent or AI → resolution is tracked. Every step is configurable.',
+    'Behind the scenes, each message goes through intent classification, sentiment analysis, priority scoring, and skill-based routing before reaching an agent.',
+    'The pipeline supports conditional branching — rules like "if urgent AND after hours → page on-call" or "if billing → route to billing team".',
+    'For AI responses, the system retrieves relevant knowledge base articles, generates a suggested reply, and an agent reviews before sending — or auto-sends for low-risk queries.',
+    'Every step logs latency, decisions, and outcomes. You can monitor throughput, spot bottlenecks, and tune rules in real time.',
+  ],
+};
+
+// Helper: Build topic-specific response using memory + intelligence
+function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult): string | null {
+  const templates = TOPIC_RESPONSE_TEMPLATES[topic];
+  if (!templates) return null;
+
+  const record = memory.topicsExplained.find(t => t.topic === topic);
+  const isCompleted = record && record.phase === 'completed';
+
+  if (isCompleted) {
+    return buildCompletedTopicResponse(topic, memory, ci, templates);
+  }
+
+  const depth = record ? Math.min(record.count, templates.length - 1) : 0;
+  const template = templates[depth];
+
+  let response = template;
+  if (topic === 'pricing' && memory.companySize) {
+    if (depth === 0) {
+      response = response.replace('up to 3 agents', `up to 3 agents${memory.companySize ? ` (your team of ${memory.companySize} might want Professional)` : ''}`);
+    }
+  }
+  if (topic === 'integrations' && memory.currentHelpdesk) {
+    response += ` It connects directly to your ${memory.currentHelpdesk} workflow.`;
+  }
+  if (topic === 'security' && memory.persona === 'enterprise') {
+    response += ' Enterprise-grade encryption and SOC 2 Type II are standard.';
+  }
+  if (topic === 'features' && memory.useCase) {
+    response += ` This directly addresses your ${memory.useCase} use case.`;
+  }
+
+  return response;
+}
+
+function buildCompletedTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult, templates: string[]): string | null {
+  const referenceTemplates = templates.slice(0, 1);
+  const template = referenceTemplates[0];
+  let response = template;
+  if (topic === 'pricing' && memory.companySize) {
+    response = template.includes('Professional')
+      ? template.replace('Professional', `Professional for your ${memory.companySize}-person team`)
+      : template;
+  }
+  if (topic === 'pricing' && memory.budget) {
+    const budget = parseInt(memory.budget.replace(/[^0-9]/g, ''), 10);
+    if (!isNaN(budget) && budget < 100) {
+      return 'Our Starter plan at $49/month covers basic support for small teams — it includes core ticketing, SLA tracking, and team collaboration.';
+    }
+  }
+  if (topic === 'integrations' && memory.currentHelpdesk) {
+    return `Your ${memory.currentHelpdesk} setup pairs well with our ${topic} — it connects directly to your workflow.`;
+  }
+  return response;
+}
+
+// Helper: Build CTA text per strategy
+function buildCTAText(
+  strategy: ConversationStrategy,
+  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended },
+  memory: ConversationMemoryData,
+  ci: ConversationIntelligenceResult,
+): string | null {
+  if (strategy.cta === 'none') return null;
+
+  const cta = selectCTAByPlan(ci.persona.persona, plan, memory);
+  if (cta.primaryCTA === 'none') return null;
+
+  const ctaTexts: Record<string, string> = {
+    start_free_trial: 'You can start a free trial today.',
+    book_demo: 'Would you like to book a demo?',
+    contact_sales: 'Our sales team is ready to help.',
+    developer_docs: 'Check out our developer docs.',
+    pricing: 'See our pricing page for details.',
+    partner_program: 'Join our partner program.',
+    support: 'Our support team is available 24/7.',
+  };
+
+  // Personalize CTA based on memory
+  let text = ctaTexts[cta.primaryCTA] || '';
+  if (cta.primaryCTA === 'start_free_trial' && memory.companySize) {
+    text = `Your ${memory.companySize}-person team can start a free trial today.`;
+  }
+  if (cta.primaryCTA === 'book_demo' && memory.currentHelpdesk) {
+    text = `Want to see how it works with ${memory.currentHelpdesk}? Book a demo.`;
+  }
+  if (cta.primaryCTA === 'developer_docs' && memory.useCase) {
+    text = `For your ${memory.useCase} use case, our docs have specific examples.`;
+  }
+  return text;
+}
+
+function buildDynamicQuickReplies(
+  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
+  memory: ConversationMemoryData,
+  ciResult: ConversationIntelligenceResult,
+): SmartButton[] {
+  const replies: SmartButton[] = [];
+  const usedLabels = new Set<string>();
+
+  if (plan.goal === 'finish_conversation') return [];
+
+  const goalReplies = QUICK_REPLIES_BY_GOAL[plan.goal];
+  if (goalReplies) {
+    for (const r of goalReplies) {
+      if (!usedLabels.has(r.label.toLowerCase())) {
+        const alreadyShown = memory.ctasShown.some(c => c.label.toLowerCase() === r.label.toLowerCase());
+        if (!alreadyShown || memory.turnCount < 3) {
+          replies.push({
+            id: r.id,
+            label: r.label,
+            action: r.action || 'send_text',
+            payload: r.payload,
+            variant: r.variant,
+          });
+          usedLabels.add(r.label.toLowerCase());
+        }
+      }
+    }
+  }
+
+  const handledCategories = new Set<string>();
+  if (ciResult.objection.category !== 'none') handledCategories.add(ciResult.objection.category);
+  for (const obj of memory.objectionsHandled) {
+    if (obj !== 'none') handledCategories.add(obj);
+  }
+
+  if (handledCategories.has('price') && replies.length < 4) {
+    if (!usedLabels.has('roi breakdown')) {
+      replies.push({ id: 'qr_obj_price_roi', label: 'ROI Breakdown', action: 'send_text', payload: 'Show me the ROI calculation', variant: 'secondary' });
+      usedLabels.add('roi breakdown');
+    }
+  }
+  if (handledCategories.has('security') && replies.length < 4) {
+    if (!usedLabels.has('security docs')) {
+      replies.push({ id: 'qr_obj_sec_docs', label: 'Security Docs', action: 'navigate', payload: '/security', variant: 'outline' });
+      usedLabels.add('security docs');
+    }
+  }
+  if (handledCategories.has('setup') && replies.length < 4) {
+    if (!usedLabels.has('setup guide')) {
+      replies.push({ id: 'qr_obj_impl_guide', label: 'Setup Guide', action: 'navigate', payload: '/docs/setup', variant: 'outline' });
+      usedLabels.add('setup guide');
+    }
+  }
+  if (handledCategories.has('competition') && replies.length < 4) {
+    if (!usedLabels.has('side by side')) {
+      replies.push({ id: 'qr_obj_comp_compare', label: 'Side-by-Side', action: 'send_text', payload: 'Show me a side-by-side comparison', variant: 'secondary' });
+      usedLabels.add('side by side');
+    }
+  }
+
+  const hasPersonaSpecific = (replies: SmartButton[], persona: PersonaType) => {
+    const personaLabels: Record<PersonaType, string[]> = {
+      enterprise: ['security', 'sso', 'enterprise', 'sla', 'tam'],
+      developer: ['api', 'sdk', 'docs', 'code', 'embed'],
+      agency: ['white label', 'partner', 'reseller', 'multi-tenant'],
+      ecommerce: ['shopify', 'woocommerce', 'cart'],
+      support_manager: ['zendesk', 'intercom', 'ticket', 'deflection'],
+      startup: ['pricing', 'trial', 'scaling'],
+      small_business: ['pricing', 'setup', 'trial'],
+      existing_customer: ['upgrade', 'account', 'dashboard'],
+      unknown: [],
+    };
+    const labels = personaLabels[persona] || [];
+    return replies.some(r => labels.some(l => r.label.toLowerCase().includes(l)));
+  };
+
+  if (replies.length < 3 && !hasPersonaSpecific(replies, memory.persona)) {
+    if (memory.persona === 'enterprise' && !usedLabels.has('sso setup')) {
+      replies.push({ id: 'qr_ent_sso', label: 'SSO & SAML', action: 'send_text', payload: 'Tell me about SSO/SAML', variant: 'outline' });
+      usedLabels.add('sso setup');
+    }
+    if (memory.persona === 'developer' && !usedLabels.has('api docs')) {
+      replies.push({ id: 'qr_dev_api', label: 'API Reference', action: 'navigate', payload: '/docs', variant: 'secondary' });
+      usedLabels.add('api docs');
+    }
+  }
+
+  if (plan.goal === 'qualify' && replies.length < 3) {
+    if (!usedLabels.has('help me choose')) {
+      replies.unshift({ id: 'qr_qual_help', label: 'Help Me Choose', action: 'send_text', payload: 'Help me find the right plan', variant: 'primary' });
+      usedLabels.add('help me choose');
+    }
+  }
+
+  const isBuying = plan.customerIntent === 'buying' || plan.goal === 'close_trial' || plan.goal === 'recommend_plan';
+  if (isBuying && replies.length < 3) {
+    if (!usedLabels.has('start trial')) {
+      replies.push({ id: 'qr_signup_buy', label: 'Start Free Trial', action: 'navigate', payload: '/signup', variant: 'primary' });
+      usedLabels.add('start trial');
+    }
+  }
+
+  const unmentionedTopics: DiscernedTopic[] = [];
+  if (!isTopicExplained(memory, 'features') && !usedLabels.has('features')) unmentionedTopics.push('features');
+  if (!isTopicExplained(memory, 'pricing') && !usedLabels.has('pricing')) unmentionedTopics.push('pricing');
+  if (!isTopicExplained(memory, 'security') && !usedLabels.has('security')) unmentionedTopics.push('security');
+
+  if (plan.customerIntent === 'learning' || plan.funnelStage === 'awareness' || plan.funnelStage === 'interest') {
+    if (unmentionedTopics.includes('features') && replies.length < 4) {
+      replies.push({ id: 'qr_explore_features', label: 'Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary' });
+      usedLabels.add('features');
+    }
+    if (unmentionedTopics.includes('pricing') && replies.length < 4) {
+      replies.push({ id: 'qr_explore_pricing', label: 'Pricing Plans', action: 'send_text', payload: 'What are your pricing tiers?', variant: 'secondary' });
+      usedLabels.add('pricing');
+    }
+  }
+
+  return replies.slice(0, 4);
+}
+
+function updateMemoryFromBrain(
+  memory: ConversationMemoryData,
+  message: string,
+  responseText: string,
+  ciResult: ConversationIntelligenceResult,
+  plan: { customerIntent: CustomerIntent; goal: ConversationGoal; funnelStage: FunnelStageExtended },
+): void {
+  memory.turnCount++;
+  memory.lastResponseText = responseText;
+  memory.lastGoal = plan.goal;
+
+  const newTopics = discernTopics(message);
+  for (const topic of newTopics) {
+    if (!isTopicExplained(memory, topic)) {
+      markTopicExplained(memory, topic);
+    }
+  }
+
+  const topicsInResponse = discernTopics(responseText);
+  for (const topic of topicsInResponse) {
+    markTopicExplained(memory, topic);
+  }
+
+  // Auto-complete topics that have been fully explored (all 5 levels exhausted)
+  for (const record of memory.topicsExplained) {
+    if (record.count >= 5 && record.phase !== 'completed') {
+      markTopicCompleted(memory, record.topic);
+    }
+  }
+
+  if (ciResult.objection.isObjection && ciResult.objection.category !== 'none') {
+    if (!memory.objectionsHandled.includes(ciResult.objection.category)) {
+      memory.objectionsHandled.push(ciResult.objection.category);
+    }
+  }
+
+  memory.funnelStage = plan.funnelStage;
+  memory.buyingIntentDetected = memory.buyingIntentDetected || ciResult.buyingIntent.hasBuyingIntent;
+  memory.buyingIntentPhrase = memory.buyingIntentPhrase || ciResult.buyingIntent.intentPhrase;
+  memory.buyingIntentTier = memory.buyingIntentTier || ciResult.buyingIntent.targetTier;
+  memory.persona = ciResult.persona?.persona ?? 'unknown';
+  memory.sentiment = ciResult.sentiment;
+  memory.leadScore = ciResult.leadScore?.overallScore ?? memory.leadScore;
+  memory.conversationScore = ciResult.conversationScore?.overallScore ?? memory.conversationScore;
+  memory.abandonmentRisk = ciResult.abandonmentRisk.level;
+  if (ciResult.qualification) {
+    memory.qualificationCollected.questionsAskedCount = ciResult.qualification.questionsAskedCount ?? memory.qualificationCollected.questionsAskedCount;
+    if (ciResult.qualification.qualifiedForTier) memory.qualificationCollected.qualifiedForTier = ciResult.qualification.qualifiedForTier;
+    if (ciResult.qualification.monthlyConversations) {
+      memory.qualificationCollected.monthlyConversations = ciResult.qualification.monthlyConversations;
+      memory.monthlyConversations = ciResult.qualification.monthlyConversations;
+    }
+    if (ciResult.qualification.completed) memory.qualificationCollected.completed = true;
+  }
+
+  if (ciResult.sentiment.polarity > 0.2) memory.trustLevel = 'high';
+  else if (ciResult.sentiment.polarity > 0) {
+    if (memory.trustLevel !== 'high') memory.trustLevel = 'medium';
+  }
+  else if (ciResult.sentiment.polarity < -0.3) memory.trustLevel = 'low';
+  else if (memory.turnCount > 3 && memory.trustLevel === 'medium') memory.trustLevel = 'high';
+  else if (memory.turnCount > 1 && memory.trustLevel === 'low') memory.trustLevel = 'medium';
+  else if (memory.trustLevel === 'low' && memory.leadScore > 50) memory.trustLevel = 'medium';
+
+  if (!memory.isLeaving && plan.customerIntent === 'leaving') {
+    memory.isLeaving = true;
+  }
+  if (!memory.isAbandoned && (ciResult.abandonmentRisk.level === 'high' || plan.goal === 'recover_abandonment')) {
+    memory.isAbandoned = true;
+  }
+
+  if (plan.goal === 'finish_conversation') {
+    memory.isCompleted = true;
+  }
+
+  if (!isGoalAchieved(memory, plan.goal)) {
+    memory.goalsAchieved.push(plan.goal);
+  }
+
+  memory.turns.push({
+    turnNumber: memory.turnCount,
+    message,
+    response: responseText,
+    customerIntent: plan.customerIntent,
+    goal: plan.goal,
+    funnelStage: plan.funnelStage,
+    timestamp: Date.now(),
+  });
+}
+
+function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntelligenceMemory {
+  return {
+    turns: memory.turns.map(t => ({
+      message: t.message,
+      response: t.response,
+      polarity: 0,
+      frustration: 0,
+      urgency: 0,
+      timestamp: t.timestamp,
+    })),
+    persona: memory.persona,
+    funnelStage: memory.funnelStage as any,
+    buyingIntentDetected: memory.buyingIntentDetected,
+    buyingIntentPhrase: memory.buyingIntentPhrase,
+    buyingIntentTier: memory.buyingIntentTier,
+    objections: memory.objectionsHandled,
+    qualificationState: memory.qualificationCollected,
+    repeatedPhraseCount: 0,
+    topics: memory.topicsExplained.map(t => t.topic),
+    companySize: memory.companySize,
+    industry: memory.industry,
+    useCase: memory.useCase,
+    monthlyConversations: memory.monthlyConversations,
+    currentHelpdesk: memory.currentHelpdesk,
+    budget: memory.budget,
+    decisionTimeline: memory.decisionTimeline,
+  };
+}
+
+export function processConversationBrain(input: BrainInput): BrainOutput {
+  const { message, responseText, legacyMemory } = input;
+
+  const memory = fromLegacyMemory(legacyMemory);
+
+  if (input.rejectedCTAs) {
+    for (const cta of input.rejectedCTAs) {
+      if (!memory.rejectedCTAs.includes(cta)) {
+        memory.rejectedCTAs.push(cta);
+      }
+    }
+  }
+
+  const shortReply = handleShortReply(message);
+
+  // "tell me more" advances to the next depth level of the current topic
+  if (!shortReply && /^tell me more/i.test(message.trim()) && memory.currentTopic && TOPIC_RESPONSE_TEMPLATES[memory.currentTopic]) {
+    markTopicExplained(memory, memory.currentTopic);
+    const ciResult = buildMinimalCIResult(memory, message);
+    const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult);
+    if (deepResponse) {
+      const newTopics = discernTopics(message);
+      updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+      memory.turnCount++;
+      memory.turns.push({ turnNumber: memory.turnCount, message, response: deepResponse, customerIntent: 'learning', goal: 'none', funnelStage: memory.funnelStage, timestamp: Date.now() });
+      memory.lastResponseText = deepResponse;
+      memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 2);
+      const updatedLegacy: ConversationIntelligenceMemory = {
+        ...legacyMemory,
+        turns: [...legacyMemory.turns, { message, response: deepResponse, polarity: 0, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+        topics: memory.topicsExplained.map(t => t.topic),
+        qualificationState: { ...memory.qualificationCollected },
+        objections: memory.objectionsHandled,
+        persona: ciResult.persona?.persona ?? 'unknown',
+      };
+      return {
+        responseText: deepResponse, cta: { primaryCTA: 'none' as CTAType, label: '', link: '' }, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+        memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+      };
+    }
+  }
+
+  // Vague replies (EMOTIONAL_DIRECT_ACK with empty response) deepen current topic
+  if (shortReply === '' && memory.currentTopic && memory.turnCount > 0) {
+    const contextualResponse = contextualizeShortReply(message, memory);
+    if (contextualResponse) {
+      const sAck = detectEmotionalCue(message);
+      const ciResult = buildMinimalCIResult(memory, message);
+      const isConfirming = /^(ok|okay|sure|yes|yeah|yep)$/i.test(message.trim());
+      const sIntent: CustomerIntent = isConfirming ? 'confirming' : 'small_talk';
+      const newTopics = discernTopics(message);
+      for (const t of newTopics) markTopicExplained(memory, t);
+      const finalResponse = `${sAck ? sAck + ' ' : ''}${contextualResponse}`;
+      const sCta = { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+      const sValidation = { valid: true, issues: [] as string[] };
+      updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+      memory.turnCount++;
+      memory.turns.push({ turnNumber: memory.turnCount, message, response: finalResponse, customerIntent: sIntent, goal: 'none', funnelStage: memory.funnelStage, timestamp: Date.now() });
+      memory.lastResponseText = finalResponse;
+      memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 2);
+      if (memory.turnCount % 8 === 0) memory.contextSummary = buildContextSummary(memory, ciResult);
+      const updatedLegacy: ConversationIntelligenceMemory = {
+        ...legacyMemory,
+        turns: [...legacyMemory.turns, { message, response: finalResponse, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+        topics: memory.topicsExplained.map(t => t.topic),
+        qualificationState: { ...memory.qualificationCollected },
+        objections: memory.objectionsHandled,
+        persona: ciResult.persona?.persona ?? 'unknown',
+        buyingIntentDetected: memory.buyingIntentDetected,
+      };
+      return {
+        responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+        memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
+      };
+    }
+  }
+
+  if (shortReply) {
+    const isConfirming = /^(ok|okay|sure|yes|yeah|yep)$/i.test(message.trim()) && memory.turnCount > 0;
+    const sIntent: CustomerIntent = isConfirming ? 'confirming' : 'small_talk';
+    const sAck = detectEmotionalCue(message);
+
+    const newTopics = discernTopics(message);
+    for (const t of newTopics) markTopicExplained(memory, t);
+    const ciResult = buildMinimalCIResult(memory, message);
+
+    let finalResponse: string;
+    const wantsDeepDive = /^really\??$/i.test(message.trim());
+    if (wantsDeepDive && memory.currentTopic && TOPIC_RESPONSE_TEMPLATES[memory.currentTopic]) {
+      markTopicExplained(memory, memory.currentTopic);
+      const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult);
+      finalResponse = deepResponse || shortReply;
+    } else {
+      const contextualResponse = contextualizeShortReply(message, memory);
+      finalResponse = `${sAck ? sAck + ' ' : ''}${contextualResponse || shortReply}`;
+    }
+
+    const sCta = {
+      primaryCTA: 'none' as CTAType,
+      label: '',
+      link: '',
+      secondaryCTA: undefined,
+      secondaryLabel: undefined,
+      secondaryLink: undefined,
+    };
+    const sValidation = { valid: true, issues: [] as string[] };
+    updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+    memory.turnCount++;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: finalResponse, customerIntent: sIntent, goal: 'none', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = finalResponse;
+    memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 2);
+    if (memory.turnCount % 8 === 0) memory.contextSummary = buildContextSummary(memory, ciResult);
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: finalResponse, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+      topics: memory.topicsExplained.map(t => t.topic),
+      qualificationState: { ...memory.qualificationCollected },
+      objections: memory.objectionsHandled,
+      persona: ciResult.persona?.persona ?? 'unknown',
+      buyingIntentDetected: memory.buyingIntentDetected,
+    };
+    return {
+      responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+      validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
+    };
+  }
+
+  const greeting = /^(hi|hello|hey|howdy|greetings|good morning|good afternoon|good evening|heya|sup)$/i.test(message.trim());
+  if (greeting && memory.turnCount > 0) {
+    const greetingResponse = handleMidConversationGreeting(memory);
+    if (greetingResponse) {
+      const gCta = {
+        primaryCTA: 'none' as CTAType,
+        label: '',
+        link: '',
+        secondaryCTA: undefined,
+        secondaryLabel: undefined,
+        secondaryLink: undefined,
+      };
+      const ciResult = buildMinimalCIResult(memory, message);
+      updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+      memory.turnCount++;
+      memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 1);
+      memory.turns.push({ turnNumber: memory.turnCount, message, response: greetingResponse, customerIntent: 'small_talk', goal: 'none', funnelStage: memory.funnelStage, timestamp: Date.now() });
+      memory.lastResponseText = greetingResponse;
+      const updatedLegacy: ConversationIntelligenceMemory = {
+        ...legacyMemory,
+        turns: [...legacyMemory.turns, { message, response: greetingResponse, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+        qualificationState: { ...memory.qualificationCollected },
+        objections: memory.objectionsHandled,
+      };
+      return {
+        responseText: greetingResponse, cta: gCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+        memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'small_talk', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+      };
+    }
+  }
+
+  const ending = handleBetterEnding(message);
+  if (ending) {
+    const eCta: CTASelectionResult = ending.finalCTA
+      ? { primaryCTA: ending.finalCTA as CTAType, label: ending.finalCTA === 'start_free_trial' ? 'Start Free Trial' : 'Contact Sales', link: ending.finalCTA === 'start_free_trial' ? '/signup' : '/contact', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined }
+      : { primaryCTA: 'contact_sales' as CTAType, label: 'Email Me Later', link: '/contact', secondaryCTA: 'none' as CTAType, secondaryLabel: undefined, secondaryLink: undefined };
+    const ciResult = buildMinimalCIResult(memory, message);
+    updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+    const order = ['greeting', 'awareness', 'interest', 'consideration', 'evaluation', 'purchase_intent', 'decision', 'customer', 'support'] as const;
+    const currentIdx = order.indexOf(memory.funnelStage as any);
+    if (currentIdx < order.indexOf('evaluation')) memory.funnelStage = 'evaluation';
+    memory.turnCount++;
+    memory.isLeaving = true;
+    memory.isCompleted = true;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: ending.response, customerIntent: 'leaving', goal: 'finish_conversation', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = ending.response;
+    memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 3);
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: ending.response, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+      qualificationState: { ...memory.qualificationCollected },
+      objections: memory.objectionsHandled,
+      persona: ciResult.persona?.persona ?? 'unknown',
+    };
+    return {
+      responseText: ending.response, cta: eCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+    };
+  }
+
+  const offTopicRedirect = isOffTopic(message);
+  if (offTopicRedirect && memory.turnCount > 0 && !/(expensive|too much|security|privacy|competitor|don't need)/i.test(message)) {
+    const oCta: CTASelectionResult = { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+    const ciResult = buildMinimalCIResult(memory, message);
+    updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
+    memory.turnCount++;
+    memory.lastOffTopicRedirect = offTopicRedirect;
+    const newTopics = discernTopics(message);
+    for (const t of newTopics) markTopicExplained(memory, t);
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: offTopicRedirect, customerIntent: 'off_topic', goal: 'none', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = offTopicRedirect;
+    memory.conversationScore = Math.min(100, (memory.conversationScore || 0) + 1);
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: offTopicRedirect, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+      topics: memory.topicsExplained.map(t => t.topic),
+      qualificationState: { ...memory.qualificationCollected },
+      objections: memory.objectionsHandled,
+    };
+    return {
+      responseText: offTopicRedirect, cta: oCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'off_topic', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+    };
+  }
+
+  const legacyForCI = prepareLegacyMemory(memory);
+
+  const { result: ciResult } = processConversationIntelligence({
+    message,
+    responseText,
+    memory: legacyForCI,
+  });
+
+  const detectedIndustry = detectIndustry(message, memory);
+  if (detectedIndustry.industry && !memory.industry) {
+    memory.industry = detectedIndustry.industry;
+  }
+
+  const plan = planConversation(message, memory, ciResult);
+
+  const strategy = processConversationDirector(message, memory, ciResult, plan);
+
+  const relevantFacts = computeRelevantKnownFacts(memory, strategy, message);
+  const newTopics = discernTopics(message);
+
+  // Strategy-first response building (replaces generic template enrichment)
+  let enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts);
+
+  enrichedResponse = enforceContinuity(enrichedResponse, memory, newTopics);
+
+  enrichedResponse = adaptResponseToContext(enrichedResponse, memory);
+
+  // buildStrategyResponse already handles openings, acknowledgments, and goal content.
+  // Do NOT prepend duplicate openings here — it creates redundant prefixes
+  // like "Good to know. Helpful context. What is your company size?"
+  // Instead keep detection for output metadata only.
+  const acknowledgment = detectEmotionalCue(message);
+
+  // Phase E: Momentum validation
+  const momentum = validateMomentum(enrichedResponse, memory, plan, strategy, relevantFacts);
+  if (momentum.shouldRegenerate && momentum.weakPoints.includes('no_advance')) {
+    const followUp = strategy.followUpTopic ? `Would you like to explore ${strategy.followUpTopic} next?` : '';
+    if (followUp && !enrichedResponse.includes(followUp.slice(0, 20))) {
+      enrichedResponse = `${enrichedResponse} ${followUp}`;
+    }
+  }
+
+  // Phase F: Dead-end prevention
+  enrichedResponse = preventDeadEnd(enrichedResponse, memory);
+
+  let cta: CTASelectionResult;
+  if (strategy.cta === 'none') {
+    cta = { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+  } else {
+    cta = selectCTAByPlan(ciResult.persona?.persona ?? 'unknown', plan, memory);
+    if (strategy.cta === 'soft' && cta.primaryCTA !== 'none') {
+      cta = { ...cta, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+    }
+  }
+
+  let quickReplies = buildDynamicQuickReplies(plan, memory, ciResult);
+
+  // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
+  const recommended = recommendPlan(memory);
+  const contextRef = generateContextReference(memory);
+
+  if (memory.turnCount > 0 && memory.turnCount % 8 === 0) {
+    memory.contextSummary = buildContextSummary(memory, ciResult);
+  }
+
+  if (contextRef && !enrichedResponse.startsWith(contextRef)) {
+    enrichedResponse = `${contextRef} ${enrichedResponse}`;
+  }
+
+  const uiState: ConversationUIState = {
+    buttons: [],
+    suggestedActions: quickReplies.map(qr => ({
+      id: qr.id,
+      label: qr.label,
+      action: qr.action,
+      payload: qr.payload,
+      variant: qr.variant,
+    })),
+    activeCard: ciResult.uiState?.activeCard,
+  };
+
+  if (newTopics.length > 0) {
+    memory.currentTopic = newTopics[newTopics.length - 1];
+  }
+
+  updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan);
+  checkQualificationCompletion(memory);
+
+  const updatedLegacy: ConversationIntelligenceMemory = {
+    ...legacyMemory,
+    turns: [
+      ...legacyMemory.turns,
+      {
+        message,
+        response: enrichedResponse,
+        polarity: ciResult.sentiment.polarity,
+        frustration: ciResult.sentiment.frustration === 'high' ? 0.8 : ciResult.sentiment.frustration === 'medium' ? 0.4 : 0.1,
+        urgency: ciResult.sentiment.urgency === 'high' ? 0.8 : ciResult.sentiment.urgency === 'medium' ? 0.4 : 0.1,
+        timestamp: Date.now(),
+      },
+    ],
+    persona: ciResult.persona?.persona ?? 'unknown',
+    funnelStage: ciResult.funnelStage,
+    buyingIntentDetected: memory.buyingIntentDetected,
+    buyingIntentPhrase: memory.buyingIntentPhrase,
+    buyingIntentTier: memory.buyingIntentTier,
+    objections: ciResult.objection.isObjection && !legacyMemory.objections.includes(ciResult.objection.category)
+      ? [...legacyMemory.objections, ciResult.objection.category]
+      : legacyMemory.objections,
+    qualificationState: ciResult.qualification,
+    repeatedPhraseCount: legacyMemory.repeatedPhraseCount + (ciResult.repetition?.count || 0),
+    topics: memory.topicsExplained.map(t => t.topic),
+    companySize: memory.companySize || legacyMemory.companySize,
+    industry: memory.industry || legacyMemory.industry,
+    useCase: memory.useCase || legacyMemory.useCase,
+    monthlyConversations: memory.monthlyConversations || legacyMemory.monthlyConversations,
+    currentHelpdesk: memory.currentHelpdesk || legacyMemory.currentHelpdesk,
+    budget: memory.budget || legacyMemory.budget,
+    decisionTimeline: memory.decisionTimeline || legacyMemory.decisionTimeline,
+  };
+
+  const validation = validateResponse(responseText, message, memory, ciResult);
+
+  if (process.env.DEBUG_CONVERSATION) {
+    const missingQ = plan.missingQualification.join(', ') || 'none';
+    const answeredQ = memory.questionsAnswered.join(', ') || 'none';
+    const topicsDiscussed = memory.topicsExplained.map(t => `${t.topic}(${t.phase})`).join(', ') || 'none';
+    console.log(`[CONV_DEBUG turn=${memory.turnCount}]
+  Goal: ${plan.goal}
+  Topic: ${memory.currentTopic || 'none'}
+  Funnel: ${memory.funnelStage}
+  Intent: ${plan.customerIntent}
+  PendingQ: ${missingQ}
+  AnsweredQ: ${answeredQ}
+  QualCompleted: ${memory.qualificationCollected.completed}
+  Topics: ${topicsDiscussed}
+  Strategy: ${strategy.primaryGoal} | ${strategy.cta}
+  LeadScore: ${memory.leadScore} | ConvScore: ${memory.conversationScore}
+  NextAction: ${plan.goal} ${strategy.cta === 'none' ? '(no CTA)' : `(${strategy.cta} CTA)`}
+  Reason: intent=${plan.customerIntent} stage=${memory.funnelStage} qual=${memory.qualificationCollected.completed}`);
+  }
+
+  return {
+    responseText: enrichedResponse,
+    cta,
+    quickReplies,
+    uiState,
+    memory,
+    legacyMemory: updatedLegacy,
+    plan: {
+      customerIntent: plan.customerIntent,
+      funnelStage: plan.funnelStage,
+      goal: plan.goal,
+      topicsToDiscuss: plan.topicsToDiscuss,
+      missingQualification: plan.missingQualification,
+    },
+    validation,
+    ciResult,
+    orchestratorResult: ciResult as any,
+    planRecommendation: recommended,
+    contextReference: contextRef,
+    acknowledgment,
+    strategy,
+    momentum,
+    qualityMetrics: computeQualityMetrics(memory),
+  };
+}
+
+// ============================================================
+// Phase E: Conversation Momentum Validator
+// ============================================================
+
+export interface MomentumResult {
+  answered: boolean;
+  referencedContext: boolean;
+  advanced: boolean;
+  naturalEnding: boolean;
+  momentumScore: number;
+  weakPoints: string[];
+  shouldRegenerate: boolean;
+}
+
+function validateMomentum(
+  response: string,
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended },
+  strategy: ConversationStrategy,
+  relevantFacts: RelevantKnownFacts,
+): MomentumResult {
+  const weakPoints: string[] = [];
+
+  // Check 1: Answered - response is substantive and not just a question
+  const trimmed = response.trim();
+  const answered = trimmed.length > 30 && !trimmed.endsWith('?');
+  if (!answered) weakPoints.push('unanswered');
+
+  // Check 2: Referenced context - references memory facts or past topics
+  const lower = trimmed.toLowerCase();
+  const userCtxMatch = relevantFacts.userContext.some(ctx => {
+    const key = ctx.split(':')[0].trim().toLowerCase();
+    return key && lower.includes(key);
+  });
+  const topicRefMatch = memory.topicsExplained.some(t => lower.includes(t.topic.toLowerCase()));
+  const referencedContext = userCtxMatch || topicRefMatch || relevantFacts.buyingIntent !== null;
+  if (!referencedContext) weakPoints.push('no_context_ref');
+
+  // Check 3: Advanced - CTA or follow-up moves conversation forward
+  const advanced = strategy.cta !== 'none' || strategy.followUpTopic !== null || plan.goal === 'finish_conversation';
+  if (!advanced) weakPoints.push('no_advance');
+
+  // Check 4: Natural ending - appropriate ending for the goal
+  const naturalEnding = plan.goal === 'finish_conversation' || (strategy.cta !== 'none' && !trimmed.endsWith('?'));
+  if (!naturalEnding) weakPoints.push('weak_ending');
+
+  const score = [answered, referencedContext, advanced, naturalEnding].filter(Boolean).length / 4;
+
+  return {
+    answered,
+    referencedContext,
+    advanced,
+    naturalEnding,
+    momentumScore: score,
+    weakPoints,
+    shouldRegenerate: score < 0.5,
+  };
+}
+
+// ============================================================
+// Phase F: Dead-End Prevention
+// ============================================================
+
+const DEAD_END_PATTERNS: RegExp[] = [
+  /what else can i help you with\?/i,
+  /let me know if you have questions/i,
+  /anything else\?/i,
+  /is there anything else/i,
+  /anything i can help with\?/i,
+  /other questions\?/i,
+  /further questions/i,
+];
+
+const DEAD_END_FIXES: Record<string, string[]> = {
+  shopify: [
+    'Since you mentioned your Shopify store, the next useful thing is seeing how the widget answers shipping and return questions automatically.',
+    'Your Shopify setup pairs well with automated shipping labels and return routing — want to see how that works?',
+  ],
+  developer: [
+    'Earlier you asked about APIs. I can also show how the SDK integrates in under 10 minutes.',
+    'For developers, the quickest next step is trying the interactive sandbox with your own API key.',
+  ],
+  enterprise: [
+    'Since security matters for your team, would you like a quick overview of SSO and audit logging?',
+    'Enterprise teams typically want to see SOC 2 compliance and SSO setup — shall I walk through that?',
+  ],
+  default: [
+    'The next useful step is seeing how this works for your specific setup — want me to show a quick example?',
+    'Would you like me to demonstrate how this fits into your current workflow?',
+  ],
+};
+
+function detectDeadEnd(response: string, memory: ConversationMemoryData): string | null {
+  const lower = response.trim().toLowerCase();
+  for (const pattern of DEAD_END_PATTERNS) {
+    if (pattern.test(lower)) {
+      // Find the best fix based on context
+      const fixes: string[] = [];
+      const lowerMemory = response.toLowerCase();
+
+      if (memory.companySize && /shopify|store|e.commerce/i.test(memory.industry || '')) {
+        fixes.push(...DEAD_END_FIXES.shopify);
+      }
+      if (memory.useCase && /developer|api|sdk|integration/i.test(memory.useCase)) {
+        fixes.push(...DEAD_END_FIXES.developer);
+      }
+      if (memory.persona === 'enterprise') {
+        fixes.push(...DEAD_END_FIXES.enterprise);
+      }
+
+      fixes.push(...DEAD_END_FIXES.default);
+      return fixes[0] || null;
+    }
+  }
+  return null;
+}
+
+function preventDeadEnd(response: string, memory: ConversationMemoryData): string {
+  const deadEnd = detectDeadEnd(response, memory);
+  if (deadEnd && response.length > 20) {
+    // Remove the dead-end CTA from the end and append the fix
+    const withoutDeadEnd = response.replace(/\s*(what else can i help you with\?|let me know if you have questions|anything else\?|is there anything else|anything i can help with\?|other questions\?|further questions)\s*$/i, '').trim();
+    if (withoutDeadEnd.length > 10) {
+      return `${withoutDeadEnd} ${deadEnd}`;
+    }
+    return deadEnd;
+  }
+  return response;
+}
+
+// ============================================================
+// Phase G: Conversation Quality Metrics
+// ============================================================
+
+export interface QualityMetrics {
+  memoryReferenceRate: number;
+  topicCompletionRate: number;
+  topicRestartRate: number;
+  momentumScore: number;
+  deadEndRate: number;
+  recommendationReuseRate: number;
+  genericTemplateRate: number;
+}
+
+function computeQualityMetrics(memory: ConversationMemoryData): QualityMetrics {
+  const turns = memory.turns;
+  if (turns.length === 0) {
+    return { memoryReferenceRate: 0, topicCompletionRate: 0, topicRestartRate: 0, momentumScore: 0, deadEndRate: 0, recommendationReuseRate: 0, genericTemplateRate: 0 };
+  }
+
+  // MemoryReferenceRate: how often remembered facts are naturally referenced
+  let memoryRefs = 0;
+  for (const turn of turns) {
+    const lower = turn.response.toLowerCase();
+    if (memory.companySize && lower.includes(memory.companySize.toLowerCase().split(' ')[0])) memoryRefs++;
+    if (memory.industry && lower.includes(memory.industry.toLowerCase())) memoryRefs++;
+    if (memory.useCase && lower.includes(memory.useCase.toLowerCase())) memoryRefs++;
+  }
+  const memoryReferenceRate = turns.length > 0 ? memoryRefs / turns.length : 0;
+
+  // TopicCompletionRate: percentage of topics reaching mentioned→explaining→completed
+  const allTopics = memory.topicsExplained;
+  const completedTopics = allTopics.filter(t => t.phase === 'completed');
+  const topicCompletionRate = allTopics.length > 0 ? completedTopics.length / allTopics.length : 0;
+
+  // TopicRestartRate: completed topics appearing again without user request
+  let restarts = 0;
+  for (let i = 1; i < allTopics.length; i++) {
+    const prev = allTopics[i - 1];
+    const curr = allTopics[i];
+    if (prev.phase === 'completed' && curr.topic === prev.topic && curr.phase !== 'completed') {
+      restarts++;
+    }
+  }
+  const topicRestartRate = completedTopics.length > 0 ? restarts / completedTopics.length : 0;
+
+  // MomentumScore: % of responses with momentumScore >= 0.75
+  let goodMomentum = 0;
+  for (const turn of turns) {
+    if (turn.response.length > 30 && !turn.response.trim().endsWith('?')) {
+      goodMomentum++;
+    }
+  }
+  const momentumScore = turns.length > 0 ? goodMomentum / turns.length : 0;
+
+  // DeadEndRate: responses ending without logical next step
+  let deadEnds = 0;
+  for (const turn of turns) {
+    const lower = turn.response.toLowerCase();
+    if (/what else can i help|let me know if|anything else|is there anything else/.test(lower)) {
+      deadEnds++;
+    }
+  }
+  const deadEndRate = turns.length > 0 ? deadEnds / turns.length : 0;
+
+  // RecommendationReuseRate: identical recommendations repeating
+  const recTexts = (memory.planRecommendations || []).map(r => r.planName);
+  const recCounts = new Map<string, number>();
+  for (const r of recTexts) {
+    recCounts.set(r, (recCounts.get(r) || 0) + 1);
+  }
+  const reusedRecs = Array.from(recCounts.values()).filter(c => c > 1).length;
+  const recommendationReuseRate = recTexts.length > 0 ? reusedRecs / recTexts.length : 0;
+
+  // GenericTemplateRate: fallback/template responses (short, generic)
+  let generic = 0;
+  for (const turn of turns) {
+    if (turn.response.length < 40 || turn.response.includes('That\'s a great question')) {
+      generic++;
+    }
+  }
+  const genericTemplateRate = turns.length > 0 ? generic / turns.length : 0;
+
+  return {
+    memoryReferenceRate: Math.round(memoryReferenceRate * 100) / 100,
+    topicCompletionRate: Math.round(topicCompletionRate * 100) / 100,
+    topicRestartRate: Math.round(topicRestartRate * 100) / 100,
+    momentumScore: Math.round(momentumScore * 100) / 100,
+    deadEndRate: Math.round(deadEndRate * 100) / 100,
+    recommendationReuseRate: Math.round(recommendationReuseRate * 100) / 100,
+    genericTemplateRate: Math.round(genericTemplateRate * 100) / 100,
+  };
+}

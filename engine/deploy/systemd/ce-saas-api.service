@@ -1,0 +1,58 @@
+# ─── Conversation Engine — Systemd Service ─────────────────────────
+# Installed at: /etc/systemd/system/ce-saas-api.service
+#
+# Manages the SaaS API + Pipeline via PM2 with automatic restart.
+#
+# Installation:
+#   sudo cp ce-saas-api.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable ce-saas-api
+#   sudo systemctl start ce-saas-api
+#
+# Commands:
+#   sudo systemctl status ce-saas-api
+#   sudo systemctl restart ce-saas-api
+#   sudo journalctl -u ce-saas-api -f
+
+[Unit]
+Description=Conversation Engine — SaaS API + Pipeline
+Documentation=https://github.com/conversation-engine/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=ce
+Group=ce
+
+WorkingDirectory=/opt/conversation-engine/engine
+
+EnvironmentFile=/opt/conversation-engine/.env
+
+ExecStart=/usr/bin/pm2 start ecosystem.config.js --env production
+ExecStop=/usr/bin/pm2 stop ecosystem.config.js
+ExecReload=/usr/bin/pm2 reload ecosystem.config.js
+Restart=on-failure
+RestartSec=10
+
+# PM2 saves process list; after boot, restore it
+ExecStartPost=/usr/bin/pm2 save
+
+# Security hardening
+ProtectSystem=full
+ProtectHome=true
+NoNewPrivileges=true
+PrivateDevices=true
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Logging to journald + PM2 logs
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

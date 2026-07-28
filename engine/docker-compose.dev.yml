@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+  saas-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.saas-api
+    container_name: ce-saas-api-dev
+    ports:
+      - "3457:3457"
+    environment:
+      - PORT=3457
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - JWT_SECRET=dev-jwt-secret-change-in-production
+      - CORS_ORIGIN=*
+      - DB_PATH=/data/saas.db
+      - APP_URL=http://localhost:5173
+      - WIDGET_SECRET=dev-widget-secret
+      - OPENAI_API_KEY=
+      - EMBEDDING_DIMENSION=128
+      - PIPELINE_URL=http://pipeline-orchestrator:3456
+      - INTERNAL_SYNC_KEY=dev-sync-key
+      - RATE_LIMIT_WINDOW_MS=60000
+      - RATE_LIMIT_MAX=1000
+    volumes:
+      - dev-data:/data
+    depends_on:
+      - pipeline-orchestrator
+    restart: unless-stopped
+
+  pipeline-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ce-pipeline-dev
+    ports:
+      - "3456:3456"
+    environment:
+      - PORT=3456
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - DATA_DIR=/data
+      - LLM_API_KEY=
+      - INTERNAL_SYNC_KEY=dev-sync-key
+    volumes:
+      - dev-data:/data
+    restart: unless-stopped
+
+volumes:
+  dev-data:

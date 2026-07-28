@@ -1,0 +1,39 @@
+{
+  "name": "conversation-engine",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "verify:build": "powershell -NoProfile -File scripts/verify-build-fresh.ps1",
+    "ci": "npm run verify:build && npm run build && npm run lint && npm test",
+    "test:regression": "vitest run packages/saas-api/src/__tests__/conversation-regression.test.ts",
+    "test:metrics": "npx tsx packages/saas-api/src/orchestrator/conversation-metrics.ts",
+    "start": "node packages/pipeline-orchestrator/dist/server.js",
+    "seed": "node scripts/seed-test-data.js"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/compression": "^1.8.1",
+    "@types/express": "^5.0.0",
+    "@types/uuid": "^10.0.0",
+    "jsdom": "^29.1.1",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
+    "better-sqlite3": "^12.11.1",
+    "compression": "^1.8.1",
+    "express": "^4.18.2",
+    "pino": "^10.3.1",
+    "uuid": "^14.0.1"
+  }
+}

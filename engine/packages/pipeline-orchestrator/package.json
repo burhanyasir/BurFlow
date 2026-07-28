@@ -1,0 +1,33 @@
+{
+  "name": "@conversation-engine/pipeline-orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc", "test": "vitest run", "start": "node dist/server.js", "seed": "node dist/seed.js" },
+  "dependencies": {
+    "@conversation-engine/core-types": "*",
+    "@conversation-engine/stage-1-ingestion": "*",
+    "@conversation-engine/stage-2-tenant-context": "*",
+    "@conversation-engine/stage-4-context": "*",
+    "@conversation-engine/stage-5-response-generation": "*",
+    "@conversation-engine/stage-7-persistence": "*",
+    "@conversation-engine/stage-8-dispatch": "*",
+    "@conversation-engine/tenant-registry": "*",
+    "@conversation-engine/session-store": "*",
+    "@conversation-engine/config-store": "*",
+    "@conversation-engine/dedup-store": "*",
+    "@conversation-engine/secrets-vault": "*",
+    "@conversation-engine/trip-wire": "*",
+    "@conversation-engine/input-guardrail": "*",
+    "@conversation-engine/pii-detector": "*",
+    "@conversation-engine/output-guardrail": "*",
+    "@conversation-engine/grounding-verifier": "*",
+    "@conversation-engine/stage-6a-safety": "*",
+    "@conversation-engine/conversation-orchestrator": "*",
+    "@conversation-engine/response-generator": "*",
+    "express": "^4.18.2",
+    "pino": "^10.3.1",
+    "uuid": "^14.0.1"
+  }
+}

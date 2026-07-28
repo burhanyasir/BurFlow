@@ -1,0 +1,16 @@
+{
+  "name": "@conversation-engine/stage-1-ingestion",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc", "test": "vitest run" },
+  "dependencies": {
+    "@conversation-engine/core-types": "*",
+    "@conversation-engine/tenant-registry": "*",
+    "@conversation-engine/dedup-store": "*",
+    "@conversation-engine/trip-wire": "*",
+    "@conversation-engine/input-guardrail": "*",
+    "@conversation-engine/pii-detector": "*"
+  }
+}
