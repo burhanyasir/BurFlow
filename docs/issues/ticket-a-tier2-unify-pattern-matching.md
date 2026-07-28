@@ -160,7 +160,7 @@ Two possibilities — triage on pickup:
     - Multi-word keyword matching (e.g., "active directory" → sso) and ≥3 char substring guard to prevent short-token false positives.
     - 19 new live-path tests prove `processConversationBrain()` returns topic-relevant responses for regex-miss queries like "data protection" → security, "single sign on" → sso, "webhook endpoint" → api, "embed code" → integrations.
     - 1578/1590 passing (+19), same 12 pre-existing failures, zero regressions.
-- [ ] 4. `LEARNING_PATTERNS` collision resolved; downstream `customerIntent` consumers audited
+- [x] 4. `LEARNING_PATTERNS` collision resolved; downstream `customerIntent` consumers audited — **Done:** Removed `&& memory.turnCount > 1` guard from `EVALUATING_PATTERNS` check in `conversation-planner.ts:128`, making it fire unconditionally before `LEARNING_PATTERNS`. This ensures any query with evaluating/pricing/feature language (e.g. "what are your prices" at turnCount=0) correctly returns `'evaluating'` instead of `'learning'`. No problematic edge cases found — every query matching both patterns IS evaluative. Test at `conversation-brain.test.ts:464` flipped from `'learning'` → `'evaluating'`. 1565/1577 passing, zero regressions.
 - [ ] 5. GROWTH/VALUE false-positive source tightened or documented
 - [ ] 6. Long-distance negation gap documented in known-limitations
 - [ ] 7. Cross-cutting audit report delivered

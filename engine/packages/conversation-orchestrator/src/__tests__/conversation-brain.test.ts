@@ -461,11 +461,11 @@ describe('Conversation Planner', () => {
     expect(plan.customerIntent).toBe('evaluating');
   });
 
-  it('"what are your prices?" (turnCount=0) → learning (known LEARNING_PATTERNS collision at low turns)', () => {
+  it('"what are your prices?" (turnCount=0) → evaluating (EVALUATING_PATTERNS fires unconditionally before LEARNING_PATTERNS)', () => {
     const { brain } = makeBrainMemory(0);
     const ciResult = { objection: { isObjection: false }, funnelStage: 'greeting', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
     const plan = planConversation('What are your prices?', brain, ciResult);
-    expect(plan.customerIntent).toBe('learning');
+    expect(plan.customerIntent).toBe('evaluating');
   });
 });
 

@@ -125,7 +125,7 @@ function detectCustomerIntent(message: string, memory: ConversationMemoryData, c
   if (ciResult.objection.isObjection || OBJECTION_PATTERNS.test(lower)) return 'objection';
   if (REALLY_PATTERNS.test(lower) && memory.turnCount > 0) return 'objection';
   if (IMPLEMENTATION_PATTERNS.test(lower) && memory.turnCount > 1) return 'implementation';
-  if (EVALUATING_PATTERNS.test(lower) && memory.turnCount > 1) return 'evaluating';
+  if (EVALUATING_PATTERNS.test(lower)) return 'evaluating';
   if (LEARNING_PATTERNS.test(lower) && memory.turnCount <= 2) return 'learning';
   if (CONFIRMING_PATTERNS.test(lower) && memory.turnCount > 0) return 'confirming';
   if (REJECTING_PATTERNS.test(lower) && memory.turnCount > 0) return 'rejecting';
