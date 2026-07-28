@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { detectBuyingSignal } from '@conversation-engine/conversation-orchestrator';
 import {
   processRapportRepair,
   createInitialState,
@@ -426,7 +427,25 @@ describe('No generic fallback loops',()=>{
   it('fallback response is safe',()=>{const s=sid();const r=executePipeline({message:'Crash',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).not.toMatch(/internal|error|exception|undefined|null/i);});
 });
 
-// ═══════════════════════════════════ 43. DEDUP & CLEANUP — 8 ═══════════════════════════════════
+// ═══════════════════════════════════ 43. BUYING SIGNALS — SHARED FUNCTION 40 ══════════════════
+describe('Buying signal — shared detectBuyingSignal',()=>{
+  const POSITIVE=['buy','purchase','sign up','subscribe','get started','start free trial','start a trial','free trial','try it','ready to buy','sign me up','book demo','buy now','take my money',"let's do it","let's go",'how do i start','where do i begin','want a trial','i want to try it','pricing','price','prices','cost','how much','what do you charge','what does it cost','book a demo','schedule a call','set up a meeting','enterprise','upgrade','scale','grow','moving forward','ready to','proposal','quote','contract','agreement','order','compare','competitor','alternative','versus','vs','reduce support tickets','improve response time','reduce cost'];
+  it.each(POSITIVE)('detectBuyingSignal("%s")→true',(m)=>{expect(detectBuyingSignal(m)).toBe(true);});
+  const NEGATIVE=['contact sales','tell me more','interesting','hello','what are your features','how does it work','thanks','bye','yes','no','maybe'];
+  it.each(NEGATIVE)('detectBuyingSignal("%s")→false',(m)=>{expect(detectBuyingSignal(m)).toBe(false);});
+  const NEGATED=['i am not ready to buy',"i don't want a free trial",'not interested in pricing',"we're not looking to upgrade right now","i don't want to purchase",'no i do not want a trial','not looking for a demo','no enterprise plan needed','we do not need to scale yet',"i'm not trying to grow my stack right now",'never mind the pricing'];
+  it.each(NEGATED)('detectBuyingSignal("%s")→false (negation)',(m)=>{expect(detectBuyingSignal(m)).toBe(false);});
+  it('"why not purchase today?" → true (rhetorical override)',()=>{expect(detectBuyingSignal('why not purchase today?')).toBe(true);});
+});
+describe('Buying signal — pipeline integration',()=>{
+  const POSITIVE=[['start free trial',true],['free trial',true],['prices',true],['pricing plans',true],['buy now',true],['I want to purchase',true],['sign up please',true],['schedule demo',true],['compare to competitors',true],['reduce ticket volume',true]];
+  it.each(POSITIVE)('"%s" → buyingSignalDetected=%s',(m,expected)=>{const c=createInitialState(sid(),tenant,policy);const r=processPolicyEngine(m,c,{handled:false,strategy:'answer'});expect(r.buyingSignalDetected).toBe(expected);});
+  it('"contact sales" → no buying signal',()=>{const r=processPolicyEngine('contact sales',createInitialState(sid(),tenant,policy),{handled:false,strategy:'answer'});expect(r.buyingSignalDetected).toBe(false);});
+  it('"tell me more" → no buying signal',()=>{const r=processPolicyEngine('tell me more',createInitialState(sid(),tenant,policy),{handled:false,strategy:'answer'});expect(r.buyingSignalDetected).toBe(false);});
+  it('"what are your prices?" → buying signal (contains prices)',()=>{const r=processPolicyEngine('what are your prices?',createInitialState(sid(),tenant,policy),{handled:false,strategy:'answer'});expect(r.buyingSignalDetected).toBe(true);});
+});
+
+// ═══════════════════════════════════ 44. DEDUP & CLEANUP — 8 ═══════════════════════════════════
 describe('Dedup & cleanup',()=>{
   it('dedup identical sentences',()=>{const c=createInitialState(sid(),tenant,policy);const r=composeResponse('The automation engine works. The automation engine works.',c,'');expect(r.text.match(/The automation engine works/g)?.length??0).toBeLessThanOrEqual(1);});
   it('double spaces',()=>{const c=createInitialState(sid(),tenant,policy);expect(composeResponse('The  automation  engine  works.',c,'').text).not.toContain('  ');});

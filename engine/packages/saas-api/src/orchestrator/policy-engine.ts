@@ -1,3 +1,4 @@
+import { detectBuyingSignal } from '@conversation-engine/conversation-orchestrator';
 import { OrchestratorState, Strategy, STRATEGY_PRIORITY, PolicyPriority } from './types';
 
 const QUESTION_PATTERNS = [
@@ -25,17 +26,6 @@ const OBJECTION_PATTERNS = [
   /\b(implementation|setup|deploy) (time|cost|effort)\b/i,
 ];
 
-const BUYING_SIGNAL_PATTERNS = [
-  /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|free\s+)?trial|free\s+trial|try it)\b/i,
-  /\b(pric(?:e|ing|es)|cost|how much|what (do|does) (you|it) (cost|charge))\b/i,
-  /\b(book|schedule|set up) (a |the |)(demo|calls?|meeting|appointment)\b/i,
-  /\b(enterprise|upgrade|scale|grow)\b/i,
-  /\b(moving forward|ready to|let'?s do it|let'?s go)\b/i,
-  /\b(proposal|quote|contract|agreement|order)\b/i,
-  /\b(compare|competitor|alternative|versus|vs)\b/i,
-  /\b(reduce (ticket|support|cost)|improve (response|satisfaction|csat))\b/i,
-];
-
 const ACTION_PATTERNS = [
   /\b(reset|change|update) (password|email|setting)\b/i,
   /\b(find|track|search) (order|shipment|invoice|product)\b/i,
@@ -53,10 +43,6 @@ function detectTrustQuestion(message: string): boolean {
 
 function detectObjection(message: string): boolean {
   return OBJECTION_PATTERNS.some(p => p.test(message));
-}
-
-function detectBuyingSignal(message: string): boolean {
-  return BUYING_SIGNAL_PATTERNS.some(p => p.test(message));
 }
 
 function detectActionRequest(message: string): boolean {

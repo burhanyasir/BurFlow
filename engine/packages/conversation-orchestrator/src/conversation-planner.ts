@@ -41,6 +41,45 @@ const REJECTING_PATTERNS = /\b(no|nah|nope|not really|not what|don.t think|won.t
 const REALLY_PATTERNS = /\breally\b/i;
 const WHO_MADE_PATTERNS = /(who (made|created|built) you|who are you|where.*from)/i;
 
+const BUYING_SIGNAL_REGEX = /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|the\s+|my\s+|your\s+|our\s+|free\s+)?trial|free\s+trial|try it|ready to buy|sign me up|book demo|buy now|take my money|let'?s do( it)?$|how do i start|where do i begin|want\s+.*trial)\b/i;
+const PRICING_SIGNAL_REGEX = /\b(pric(?:e|ing|es)|cost|how much|what (do|does) (you|it) (cost|charge))\b/i;
+const DEMO_SIGNAL_REGEX = /\b(book|schedule|set up) (a |the |)(demo|calls?|meeting|appointment)\b/i;
+const GROWTH_SIGNAL_REGEX = /\b(enterprise|upgrade|scale|grow)\b/i;
+const COMMITMENT_SIGNAL_REGEX = /\b(moving forward|ready to|let'?s go)\b/i;
+const PROCUREMENT_SIGNAL_REGEX = /\b(proposal|quote|contract|agreement|order)\b/i;
+const COMPARISON_SIGNAL_REGEX = /\b(compare|competitor|alternative|versus|vs)\b/i;
+const VALUE_SIGNAL_REGEX = /\b(reduce (ticket|support|cost)|improve (response|satisfaction|csat))\b/i;
+
+const SIGNAL_REGEXES = [
+  BUYING_SIGNAL_REGEX, PRICING_SIGNAL_REGEX, DEMO_SIGNAL_REGEX,
+  GROWTH_SIGNAL_REGEX, COMMITMENT_SIGNAL_REGEX, PROCUREMENT_SIGNAL_REGEX,
+  COMPARISON_SIGNAL_REGEX, VALUE_SIGNAL_REGEX,
+];
+const NEGATION_WORDS = /\b(?:not|no|never)\b|n't\b/i;
+const NEGATION_OVERRIDE = /\b(?:why\s+(?:not|n't)|what.*n't|how about|how does)\b/i;
+const NEGATION_IDIOMS = /\bno (problem|rush|worries|doubt|worry|need to|stress|big deal)\b/i;
+
+function isNegatedBefore(text: string, signalStart: number): boolean {
+  if (signalStart <= 0) return false;
+  const before = text.slice(Math.max(0, signalStart - 40), signalStart);
+  if (NEGATION_OVERRIDE.test(before)) return false;
+  if (NEGATION_IDIOMS.test(before)) return false;
+  return NEGATION_WORDS.test(before);
+}
+
+export function detectBuyingSignal(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  if (!lower) return false;
+  for (const regex of SIGNAL_REGEXES) {
+    const re = new RegExp(regex.source, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(lower)) !== null) {
+      if (!isNegatedBefore(lower, match.index)) return true;
+    }
+  }
+  return false;
+}
+
 const QUALIFICATION_QUESTIONS: Array<{ key: keyof ConversationMemoryData; question: string; priority: number }> = [
   { key: 'companySize', question: 'company size', priority: 1 },
   { key: 'industry', question: 'industry', priority: 2 },
@@ -81,9 +120,9 @@ function detectCustomerIntent(message: string, memory: ConversationMemoryData, c
   if (LEARNING_PATTERNS.test(lower) && memory.turnCount <= 2) return 'learning';
   if (CONFIRMING_PATTERNS.test(lower) && memory.turnCount > 0) return 'confirming';
   if (REJECTING_PATTERNS.test(lower) && memory.turnCount > 0) return 'rejecting';
-  if (LEARNING_PATTERNS.test(lower)) return 'learning';
-  if (/\bwhy\b/i.test(lower) && memory.turnCount > 1) return 'comparing';
   if (EVALUATING_PATTERNS.test(lower)) return 'evaluating';
+  if (/\bwhy\b/i.test(lower) && memory.turnCount > 1) return 'comparing';
+  if (LEARNING_PATTERNS.test(lower)) return 'learning';
 
   return 'unknown';
 }
