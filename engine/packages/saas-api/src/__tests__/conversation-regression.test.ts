@@ -542,6 +542,30 @@ describe('Knowledge base provider', () => {
   });
 });
 
+// ═══════════════════════════════════ 47. REGRESSION LOCKS — 3 ════════════════════
+describe('Regression locks', () => {
+  it('"how are you?" at turnCount=2 passes through rapport to brain (not canned greeting)', () => {
+    const c = createInitialState(sid(), tenant, policy);
+    c.turnCount = 2;
+    const r = processRapportRepair('How are you?', c);
+    expect(r.handled).toBe(false);
+  });
+
+  it('"makes sense" at turnCount=2 gets appreciative mood from rapport, confirming intent from brain', () => {
+    const c = createInitialState(sid(), tenant, policy);
+    c.turnCount = 2;
+    const r = processRapportRepair('makes sense', c);
+    expect(r.handled).toBe(false);
+    expect(r.mood).toBe('appreciative');
+  });
+
+  it('"worried about security" pipeline response is appropriate regardless of strategy label', () => {
+    const s = sid();
+    const r = executePipeline({ message: "I'm worried about security", sessionId: s, tenantId: tenant, brainFunction: processConversationBrain, policy });
+    expect(r.response).toMatch(/data|secure|protect|encrypt|isolated/i);
+  });
+});
+
 // ═══════════════════════════════════ 46. DB KNOWLEDGE BASE PROVIDER — 4 ═════════════════════
 function createTestDb() {
   const p = join(tmpdir(), `test-kb-${Date.now()}.db`);
