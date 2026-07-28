@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { detectBuyingSignal } from '@conversation-engine/conversation-orchestrator';
+import { detectBuyingSignal, DefaultKnowledgeBaseProvider, KnowledgeBaseProvider, DiscernedTopic, processConversationBrain } from '@conversation-engine/conversation-orchestrator';
 import {
   processRapportRepair,
   createInitialState,
@@ -7,7 +7,11 @@ import {
   composeResponse,
   executePipeline,
   stateManager,
+  DbKnowledgeBaseProvider,
 } from '../orchestrator';
+import { TopicResponseTemplateRepository, createDatabase } from '@conversation-engine/saas-core';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 function fakeBrain(t: string) { return () => ({ responseText: t, legacyMemory: { turns: [], funnelStage: 'discovery', topics: [] }, plan: { customerIntent: 'question', goal: 'answer', topicsToDiscuss: [] }, strategy: { primaryGoal: 'answer', topicToAnswer: '', followUpTopic: '' } }); }
 const noopBrain = fakeBrain('');
@@ -455,4 +459,123 @@ describe('Dedup & cleanup',()=>{
   it('collapses ??',()=>{const c=createInitialState(sid(),tenant,policy);expect(composeResponse('Are you sure??',c,'').text).not.toContain('??');});
   it('empty in→empty out',()=>{const c=createInitialState(sid(),tenant,policy);const r=composeResponse('',c,'');expect(r.text).toBe('');expect(r.leakageDetected).toBe(false);});
   it('tracks duplicates',()=>{const c=createInitialState(sid(),tenant,policy);expect(composeResponse('Yes. Yes.',c,'').duplicatesRemoved).toBeGreaterThanOrEqual(0);});
+});
+
+// ═══════════════════════════════════ 45. KNOWLEDGE BASE PROVIDER — 12 ════════════════════════
+describe('Knowledge base provider', () => {
+  it('DefaultKnowledgeBaseProvider returns content for known topics', () => {
+    const dp = new DefaultKnowledgeBaseProvider();
+    const r = dp.getTopicResponse('pricing', 't1', 0);
+    expect(r).not.toBeNull();
+    expect(r!.answer).toContain('$49/month');
+  });
+
+  it('DefaultKnowledgeBaseProvider returns null for unknown depth', () => {
+    const dp = new DefaultKnowledgeBaseProvider();
+    expect(dp.getTopicResponse('pricing', 't1', 99)).toBeNull();
+  });
+
+  it('custom provider response used by real brain (knowledgeBaseProvider on BrainInput)', () => {
+    const CUSTOM_ANSWER = 'This is our custom feature description.';
+    class CustomProvider implements KnowledgeBaseProvider {
+      getTopicResponse(topic: DiscernedTopic, _tid: string, _depth: number) {
+        if (topic === 'features') return { answer: CUSTOM_ANSWER };
+        return null;
+      }
+      getAvailableTopics() { return ['features'] as DiscernedTopic[]; }
+    }
+    const brainInput = {
+      message: 'Tell me about your features',
+      responseText: '',
+      tenantId: 't1',
+      knowledgeBaseProvider: new CustomProvider(),
+      legacyMemory: {
+        turns: [], turnCount: 0, funnelStage: 'discovery' as const,
+        persona: 'small_business', topics: [] as string[],
+        objections: [] as string[], qualificationState: { completed: false, questionsAskedCount: 0 },
+        buyingIntentDetected: false, buyingIntentPhrase: '', industry: '', useCase: '',
+        repeatedPhraseCount: 0,
+      },
+    };
+    const output = processConversationBrain(brainInput as any);
+    expect(output.responseText).toContain(CUSTOM_ANSWER);
+  });
+
+  it('real brain falls back to TOPIC_RESPONSE_TEMPLATES when provider returns null', () => {
+    class NullProvider implements KnowledgeBaseProvider {
+      getTopicResponse() { return null; }
+      getAvailableTopics() { return []; }
+    }
+    const brainInput = {
+      message: 'Tell me about pricing',
+      responseText: '',
+      tenantId: 't1',
+      knowledgeBaseProvider: new NullProvider(),
+      legacyMemory: {
+        turns: [], turnCount: 0, funnelStage: 'discovery' as const,
+        persona: 'small_business', topics: [] as string[],
+        objections: [] as string[], qualificationState: { completed: false, questionsAskedCount: 0 },
+        buyingIntentDetected: false, buyingIntentPhrase: '', industry: '', useCase: '',
+        repeatedPhraseCount: 0,
+      },
+    };
+    const output = processConversationBrain(brainInput as any);
+    // Should contain default hardcoded content
+    expect(output.responseText).toContain('$49/month');
+  });
+
+  it('real brain works without knowledgeBaseProvider (backward compat)', () => {
+    const brainInput = {
+      message: 'Tell me about features',
+      responseText: '',
+      legacyMemory: {
+        turns: [], turnCount: 0, funnelStage: 'discovery' as const,
+        persona: 'small_business', topics: [] as string[],
+        objections: [] as string[], qualificationState: { completed: false, questionsAskedCount: 0 },
+        buyingIntentDetected: false, buyingIntentPhrase: '', industry: '', useCase: '',
+        repeatedPhraseCount: 0,
+      },
+    };
+    const output = processConversationBrain(brainInput as any);
+    expect(output.responseText).toBeTruthy();
+    expect(output.responseText).toContain('workflow automation');
+  });
+});
+
+// ═══════════════════════════════════ 46. DB KNOWLEDGE BASE PROVIDER — 4 ═════════════════════
+function createTestDb() {
+  const p = join(tmpdir(), `test-kb-${Date.now()}.db`);
+  const db = createDatabase(p);
+  const now = new Date().toISOString();
+  db.prepare('INSERT INTO users (id, email, password_hash, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run('u1', 'test@test.com', 'hash', 'Test User', now, now);
+  db.prepare('INSERT INTO tenants (id, name, slug, owner_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)').run('t1', 'Test Tenant', 'test-tenant', 'u1', now, now);
+  return { db, path: p };
+}
+describe('DbKnowledgeBaseProvider', () => {
+  it('DbKnowledgeBaseProvider returns DB content when present', () => {
+    const { db, path } = createTestDb();
+    try {
+      const repo = new TopicResponseTemplateRepository(db);
+      repo.upsert('t1', 'pricing', 0, 'Custom pricing answer.');
+      const provider = new DbKnowledgeBaseProvider(repo);
+      const r = provider.getTopicResponse('pricing', 't1', 0);
+      expect(r).not.toBeNull();
+      expect(r!.answer).toBe('Custom pricing answer.');
+    } finally {
+      try { require('fs').unlinkSync(path); } catch {}
+    }
+  });
+
+  it('DbKnowledgeBaseProvider falls back to defaults when no DB row', () => {
+    const { db, path } = createTestDb();
+    try {
+      const repo = new TopicResponseTemplateRepository(db);
+      const provider = new DbKnowledgeBaseProvider(repo);
+      const r = provider.getTopicResponse('features', 'nonexistent-tenant', 0);
+      expect(r).not.toBeNull();
+      expect(r!.answer).toContain('workflow automation');
+    } finally {
+      try { require('fs').unlinkSync(path); } catch {}
+    }
+  });
 });

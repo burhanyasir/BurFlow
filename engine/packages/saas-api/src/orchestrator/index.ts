@@ -1,4 +1,5 @@
 export { executePipeline, PipelineInput, PipelineResult, getState } from './pipeline';
+export { DbKnowledgeBaseProvider } from './knowledge-base-db-provider';
 export { stateManager, ConversationStateManager, createInitialState } from './state-manager';
 export { processRapportRepair } from './rapport-repair';
 export { processPolicyEngine, PolicyDecision } from './policy-engine';
