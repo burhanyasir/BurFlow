@@ -703,7 +703,10 @@ function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryDat
 
   // Fall back to hardcoded TOPIC_RESPONSE_TEMPLATES
   const templates = TOPIC_RESPONSE_TEMPLATES[topic];
-  if (!templates) return null;
+  if (!templates) {
+    console.warn(`[buildTopicResponse] no response available for topic="${topic}"`);
+    return null;
+  }
 
   if (isCompleted) {
     return buildCompletedTopicResponse(topic, memory, ci, templates);

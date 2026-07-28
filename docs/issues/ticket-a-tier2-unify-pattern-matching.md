@@ -165,7 +165,7 @@ Two possibilities — triage on pickup:
 - [ ] 6. Long-distance negation gap documented in known-limitations
 - [ ] 7. Cross-cutting audit report delivered
 - [ ] 8. GREETING/FAREWELL consolidated into shared module
-- [ ] 9. DOCUMENTED_KNOWLEDGE dead outputs removed or consumer wired
+- [x] 9. DOCUMENTED_KNOWLEDGE dead outputs removed or consumer wired — **Done:** Deleted the entire dead path — `DOCUMENTED_KNOWLEDGE` map (7 entries), `simpleStem` import (now unused in orchestrator), `FALLBACK_TEXT`, stem-aware token overlap + routing guard, and `isFallback`/`FALLBACK_TEXT` fallback. Also deleted the 13 `Grounded Knowledge Retrieval` tests in `orchestrator.test.ts` (whole file). Added `console.warn` at `buildTopicResponse()` return-null point to surface true unanswered-topic events in logs, fulfilling the analytics gap left by removing the dead `isFallback` path. 1565/1577 passing (−13 tests, zero regressions).
 
 ## References
 
