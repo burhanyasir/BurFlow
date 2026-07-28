@@ -48,6 +48,29 @@ const DOCUMENTED_KNOWLEDGE: Record<string, { answer: string; sources: string[] }
 
 const FALLBACK_TEXT = "I couldn't find this in the documentation, so I won't guess. If you'd like, I can connect you with our team.";
 
+function simpleStem(word: string): string {
+  const w = word.toLowerCase();
+  if (w.length < 4) return w;
+  if (w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.endsWith('ves')) return w.slice(0, -3) + 'f';
+  if (/[^aeiou](ss|sh|ch|x|z)es$/.test(w) && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  if (w.endsWith('ing')) {
+    const base = w.slice(0, -3);
+    if (base.length >= 3) return base;
+    return base + 'e';
+  }
+  if (w.endsWith('ied') && w.length > 4) return w.slice(0, -3) + 'y';
+  if (w.endsWith('ed') && !w.endsWith('eed') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('tion')) return w.slice(0, -4) + 'te';
+  if (w.endsWith('ment')) return w.slice(0, -4);
+  if (w.endsWith('ness')) return w.slice(0, -4);
+  if (w.endsWith('ly')) return w.slice(0, -2);
+  if (w.endsWith('er') && w.length > 4) return w.slice(0, -2);
+  if (w.endsWith('or') && w.length > 4) return w.slice(0, -2);
+  return w;
+}
+
 export interface OrchestratorInput {
   message: string;
   history?: string[];
@@ -106,6 +129,9 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
     sources = objection.sources;
   } else {
     // 8. Grounded Knowledge Retrieval
+    const messageTokens = lowerMsg.split(/\s+/).filter(t => t.length > 0);
+    const stemmedMsgTokens = new Set(messageTokens.map(simpleStem));
+
     let matchedKey = '';
     for (const [key, value] of Object.entries(DOCUMENTED_KNOWLEDGE)) {
       if (
@@ -117,6 +143,29 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
         responseText = value.answer;
         sources = value.sources;
         break;
+      }
+
+      // 4. Stem-aware token overlap: at least half the key tokens stem-match message tokens
+      //    Guards against false positives via routing keyword overlap check
+      if (!matchedKey) {
+        const keyTokens = key.split(' ').filter(t => t.length > 0);
+        const stemMatchCount = keyTokens.filter(kt =>
+          stemmedMsgTokens.has(simpleStem(kt))
+        ).length;
+        const threshold = Math.max(1, Math.ceil(keyTokens.length / 2));
+        const routingOverlap = routing.searchKeywords.some(kw => {
+          if (key.includes(kw) || kw.includes(key)) return true;
+          if (keyTokens.some(kt => kw.includes(kt) || kt.includes(kw))) return true;
+          const kwTokens = kw.toLowerCase().split(/\s+/).filter(t => t.length > 0);
+          return kwTokens.some(kwt => keyTokens.some(kt => simpleStem(kwt) === simpleStem(kt)));
+        });
+        if (stemMatchCount >= threshold &&
+            (stemMatchCount >= keyTokens.length || routingOverlap)) {
+          matchedKey = key;
+          responseText = value.answer;
+          sources = value.sources;
+          break;
+        }
       }
     }
 

@@ -148,9 +148,9 @@ Two possibilities — triage on pickup:
 
 ## Acceptance Criteria
 
-- [ ] 1. Consolidation decision made (merge `BUYING_PATTERNS` into `SIGNAL_REGEXES` or document intentional separation)
-- [ ] 2. Per-tenant `KnowledgeBaseProvider` designed and wired into brain
-- [ ] 3. Fuzzy/stem matching evaluated and implemented (or deferred until item 2 is done)
+- [x] 1. Consolidation decision made (merge `BUYING_PATTERNS` into `SIGNAL_REGEXES` or document intentional separation) — **Done:** `BUYING_PATTERNS` aligned to match `BUYING_SIGNAL_REGEX` minus `try it`; `detectBuyingIntent()` with negation awareness added. Committed `84b9e7e`.
+- [x] 2. Per-tenant `KnowledgeBaseProvider` designed and wired into brain — **Done:** `KnowledgeBaseProvider` interface + `DefaultKnowledgeBaseProvider` in orchestrator, `DbKnowledgeBaseProvider` in saas-api, wired through `BrainInput` pipeline. Committed `47791e2` + `8a6baac`. 491/491 regression passing.
+- [x] 3. Fuzzy/stem matching evaluated and implemented (or deferred until item 2 is done) — **Done:** Inline `simpleStem()` function (no deps) handles English plurals, -ing, -ed, -tion, -ment, -ness, -ly, -er/or. Added stem-aware token overlap as 4th matching strategy in `orchestrator.ts`. Routing guard prevents false positives (e.g., "support" in query not matching "support sso" when routing is customization domain). 13 new tests. 1559/1571 passing (+13), zero regressions.
 - [ ] 4. `LEARNING_PATTERNS` collision resolved; downstream `customerIntent` consumers audited
 - [ ] 5. GROWTH/VALUE false-positive source tightened or documented
 - [ ] 6. Long-distance negation gap documented in known-limitations
