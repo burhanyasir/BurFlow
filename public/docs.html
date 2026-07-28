@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation — BrightSmile AI</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/landing.css">
+  <style>
+    .md-viewer { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 34px; max-width: 820px; margin: 0 auto; box-shadow: var(--shadow); line-height: 1.6; }
+    .md-viewer h1 { font-size: 26px; margin-bottom: 12px; }
+    .md-viewer h2 { font-size: 20px; margin: 22px 0 8px; }
+    .md-viewer h3 { font-size: 16px; margin: 16px 0 6px; }
+    .md-viewer blockquote { border-left: 4px solid var(--primary); padding: 4px 16px; color: var(--text-light); margin: 12px 0; }
+    .md-viewer pre.code { margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <header class="lp-nav">
+    <div class="lp-container lp-nav-inner">
+      <div class="lp-brand"><span class="lp-logo">B</span> BrightSmile <span class="lp-brand-sub">AI</span></div>
+      <nav class="lp-nav-links"><a href="/landing">Home</a><a href="/demo">Demo</a><a href="/sales">Sales</a><a href="/admin">Console</a></nav>
+      <a class="btn btn-primary btn-sm" href="/landing#book">Book Demo</a>
+    </div>
+  </header>
+
+  <main class="lp-container" style="padding:48px 24px 80px">
+    <div style="text-align:center;margin-bottom:36px">
+      <div class="lp-badge">Documentation</div>
+      <h1 style="font-size:34px;font-weight:800">Guides & References</h1>
+      <p class="text-light" style="margin-top:10px">Everything you need to operate, deploy, and support BrightSmile AI.</p>
+    </div>
+
+    <div class="grid grid-2" id="doc-grid" style="max-width:900px;margin:0 auto"></div>
+  </main>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+  <script src="/js/markdown.js"></script>
+  <script src="/js/docs.js"></script>
+</body>
+</html>

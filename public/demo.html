@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guided Demo — BrightSmile AI</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/landing.css">
+</head>
+<body>
+  <header class="lp-nav">
+    <div class="lp-container lp-nav-inner">
+      <div class="lp-brand"><span class="lp-logo">B</span> BrightSmile <span class="lp-brand-sub">AI</span></div>
+      <nav class="lp-nav-links"><a href="/landing">Home</a><a href="/sales">Sales</a><a href="/docs">Docs</a><a href="/admin">Console</a></nav>
+      <a class="btn btn-primary btn-sm" href="#step1">Start</a>
+    </div>
+  </header>
+
+  <main class="lp-container" style="padding:40px 24px 80px; max-width:920px">
+    <div style="text-align:center;margin-bottom:8px">
+      <div class="lp-badge">Interactive Walkthrough</div>
+      <h1 style="font-size:34px;font-weight:800;letter-spacing:-0.5px">Deploy a Client in 7 Guided Steps</h1>
+      <p class="text-light" style="margin-top:10px">Watch the full agency workflow run live — from adding a client to a working chatbot on their site.</p>
+    </div>
+
+    <div class="stepper" id="stepper" style="margin:28px 0"></div>
+    <div id="steps"></div>
+    <div class="mt-24 row between">
+      <button class="btn btn-secondary" id="prev-btn" onclick="window.__prev()">← Back</button>
+      <button class="btn btn-primary" id="next-btn" onclick="window.__next()">Next Step →</button>
+    </div>
+  </main>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+  <script src="/js/demo.js"></script>
+</body>
+</html>

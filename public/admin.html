@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BrightSmile AI — Agency Console</title>
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo">B</div>
+        <div>
+          <div class="brand-name">BrightSmile AI</div>
+          <div class="brand-sub">Agency Console</div>
+        </div>
+      </div>
+      <div class="nav-section">Overview</div>
+      <div class="nav-item active" data-view="dashboard"><span class="nav-icon">▦</span> Dashboard</div>
+      <div class="nav-section">Clients</div>
+      <div class="nav-item" data-view="crm"><span class="nav-icon">◍</span> Client CRM</div>
+      <div class="nav-item" data-view="onboarding"><span class="nav-icon">✦</span> Onboarding</div>
+      <div class="nav-item" data-view="scanner"><span class="nav-icon">⌖</span> Website Scanner</div>
+      <div class="nav-item" data-view="proposals"><span class="nav-icon">▤</span> Proposals</div>
+      <div class="nav-item" data-view="invoices"><span class="nav-icon">▣</span> Invoices</div>
+      <div class="nav-section">Platform</div>
+      <div class="nav-item" data-view="branding"><span class="nav-icon">◈</span> Tenants & Branding</div>
+      <div class="nav-item" data-view="deployment"><span class="nav-icon">⤓</span> Deployment</div>
+      <div class="nav-item" data-view="health"><span class="nav-icon">♥</span> System Health</div>
+      <div class="nav-spacer"></div>
+      <div class="nav-footer">v1.0 · Demo Mode</div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="page-title">Dashboard</h1>
+          <div class="subtitle" id="page-subtitle">Agency overview</div>
+        </div>
+        <div class="topbar-actions" id="topbar-actions"></div>
+      </header>
+      <main class="content" id="content"></main>
+    </div>
+  </div>
+
+  <div id="modal-root"></div>
+  <div class="toast-wrap" id="toast-wrap"></div>
+
+  <script src="/js/admin.js"></script>
+</body>
+</html>

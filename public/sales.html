@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sales Assets — BrightSmile AI</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/landing.css">
+  <style>
+    .md-table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+    .md-table th, .md-table td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; }
+    .md-table th { background: var(--surface-2); }
+    .md-viewer { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 28px 34px; max-width: 820px; margin: 0 auto; box-shadow: var(--shadow); line-height: 1.6; }
+    .md-viewer h1 { font-size: 26px; margin-bottom: 12px; }
+    .md-viewer h2 { font-size: 20px; margin: 22px 0 8px; }
+    .md-viewer h3 { font-size: 16px; margin: 16px 0 6px; }
+    .md-viewer blockquote { border-left: 4px solid var(--primary); padding: 4px 16px; color: var(--text-light); margin: 12px 0; }
+    .md-viewer pre.code { margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <header class="lp-nav">
+    <div class="lp-container lp-nav-inner">
+      <div class="lp-brand"><span class="lp-logo">B</span> BrightSmile <span class="lp-brand-sub">AI</span></div>
+      <nav class="lp-nav-links"><a href="/landing">Home</a><a href="/demo">Demo</a><a href="/docs">Docs</a><a href="/admin">Console</a></nav>
+      <a class="btn btn-primary btn-sm" href="#contact">Book Demo</a>
+    </div>
+  </header>
+
+  <main class="lp-container" style="padding:48px 24px 80px">
+    <div style="text-align:center;margin-bottom:36px">
+      <div class="lp-badge">Sales & Marketing</div>
+      <h1 style="font-size:34px;font-weight:800">Close more deals with BrightSmile AI</h1>
+      <p class="text-light" style="margin-top:10px">Calculate ROI, then grab the assets you need to win the meeting.</p>
+    </div>
+
+    <!-- ROI Calculator -->
+    <div class="card" style="max-width:720px;margin:0 auto 36px">
+      <div class="card-header"><div class="card-title">ROI Calculator</div><span class="badge badge-blue">interactive</span></div>
+      <div class="form-row">
+        <div class="form-group"><label>Website visitors / month</label><input id="roi-visitors" type="number" value="5000"></div>
+        <div class="form-group"><label>Current conversion %</label><input id="roi-conv" type="number" value="2" step="0.1"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Avg. value per booking ($)</label><input id="roi-value" type="number" value="450"></div>
+        <div class="form-group"><label>Expected uplift from AI (%)</label><input id="roi-uplift" type="number" value="40"></div>
+      </div>
+      <div class="grid grid-3" style="margin-top:10px">
+        <div class="stat-card"><div class="stat-label">Extra bookings/mo</div><div class="stat-value" id="roi-bookings" style="font-size:24px">—</div></div>
+        <div class="stat-card"><div class="stat-label">Extra revenue/mo</div><div class="stat-value" id="roi-monthly" style="font-size:24px">—</div></div>
+        <div class="stat-card"><div class="stat-label">Extra revenue/yr</div><div class="stat-value" id="roi-annual" style="font-size:24px">—</div></div>
+      </div>
+      <p class="text-sm text-light mt-12">Estimate only. Uplift is the relative increase in visitor→booking conversion after deploying the assistant.</p>
+    </div>
+
+    <!-- Asset grid -->
+    <h2 style="text-align:center;margin-bottom:18px">Sales Assets</h2>
+    <div class="grid grid-2" style="max-width:900px;margin:0 auto">
+      <div class="card"><div class="card-title">📊 Pitch Deck</div><p class="text-light text-sm mb-16">10-slide narrative for demos and investor meetings.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('pitch-deck.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('pitch-deck.md')">Download</button></div></div>
+      <div class="card"><div class="card-title">📄 One-Page Brochure</div><p class="text-light text-sm mb-16">Print-ready overview of features, plans, and results.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('brochure.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('brochure.md')">Download</button></div></div>
+      <div class="card"><div class="card-title">⚖️ Feature Comparison</div><p class="text-light text-sm mb-16">How we stack up against chatbots, live chat, and forms.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('comparison.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('comparison.md')">Download</button></div></div>
+      <div class="card"><div class="card-title">🏆 Case Study Template</div><p class="text-light text-sm mb-16">Structured template plus a filled example.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('case-study.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('case-study.md')">Download</button></div></div>
+      <div class="card"><div class="card-title">✉️ Outreach Emails</div><p class="text-light text-sm mb-16">Six ready-to-send templates: cold, follow-up, post-demo, proposal, objection, re-engagement.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('outreach-emails.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('outreach-emails.md')">Download</button></div></div>
+      <div class="card"><div class="card-title">📝 Proposal Template</div><p class="text-light text-sm mb-16">The structure behind the in-console proposal generator — problem, solution, plan, ROI.</p><div class="row"><button class="btn btn-sm btn-primary" onclick="window.__viewAsset('proposal-template.md')">View</button><button class="btn btn-sm btn-secondary" onclick="window.__download('proposal-template.md')">Download</button></div></div>
+    </div>
+  </main>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+  <script src="/js/markdown.js"></script>
+  <script src="/js/sales.js"></script>
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Industry Solutions — BrightSmile AI</title>
+  <link rel="stylesheet" href="/css/admin.css">
+  <link rel="stylesheet" href="/css/landing.css">
+  <style>
+    .ind-hero { background: linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%); color:#fff; }
+    .ind-hero .lp-hero-copy h1 { color:#fff; }
+    .ind-pains { list-style:none; padding:0; margin:0; }
+    .ind-pains li { padding:12px 16px; border-left:4px solid var(--primary); background:var(--surface-2); margin-bottom:10px; border-radius:8px; }
+    .ind-chat .lp-bubble.bot { background:#eef2ff; }
+    .ind-cta { display:flex; gap:14px; flex-wrap:wrap; margin-top:18px; }
+    .sample-badge { display:inline-block; font-size:11px; letter-spacing:.04em; text-transform:uppercase; background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:3px 9px; border-radius:999px; font-weight:700; }
+  </style>
+</head>
+<body>
+  <header class="lp-nav">
+    <div class="lp-container lp-nav-inner">
+      <div class="lp-brand"><span class="lp-logo">B</span> BrightSmile <span class="lp-brand-sub">AI</span></div>
+      <nav class="lp-nav-links"><a href="/landing">Home</a><a href="/landing#features">Features</a><a href="/landing#pricing">Pricing</a><a href="/docs">Docs</a></nav>
+      <a class="btn btn-primary btn-sm" href="/landing#book">Book Demo</a>
+    </div>
+  </header>
+
+  <section class="lp-hero ind-hero" id="ind-hero">
+    <div class="lp-container lp-hero-inner">
+      <div class="lp-hero-copy">
+        <div class="lp-badge" id="ind-emoji">🦷</div>
+        <h1 id="ind-title">Industry Solutions</h1>
+        <p class="lp-lead" id="ind-sub">See how BrightSmile AI is built for your business.</p>
+        <div class="ind-cta">
+          <a class="btn btn-primary btn-lg" href="/landing#book">Book a Demo</a>
+          <a class="btn btn-secondary btn-lg" href="/demo">Try the Guided Demo</a>
+        </div>
+      </div>
+      <div class="lp-hero-widget">
+        <div class="lp-chat">
+          <div class="lp-chat-head">BrightSmile AI · Online</div>
+          <div class="lp-chat-body" id="ind-chat"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section">
+    <div class="lp-container">
+      <div class="lp-section-head"><h2>Why <span id="ind-name">this industry</span> needs AI reception</h2></div>
+      <ul class="ind-pains" id="ind-pains"></ul>
+    </div>
+  </section>
+
+  <section class="lp-section lp-section-alt">
+    <div class="lp-container">
+      <div class="lp-section-head"><h2>What the assistant handles</h2></div>
+      <div class="lp-grid lp-grid-3" id="ind-solutions"></div>
+    </div>
+  </section>
+
+  <section class="lp-section">
+    <div class="lp-container lp-narrow">
+      <div class="lp-section-head"><h2>Estimate your upside</h2><p>Plug in your numbers — the calculator uses the typical uplift we see in this industry.</p></div>
+      <div class="card">
+        <div class="form-row">
+          <div class="form-group"><label>Website visitors / month</label><input id="roi-visitors" type="number" value="5000"></div>
+          <div class="form-group"><label>Current conversion %</label><input id="roi-conv" type="number" value="2" step="0.1"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Avg. value per booking ($)</label><input id="roi-value" type="number" value="450"></div>
+          <div class="form-group"><label>Expected uplift from AI (%)</label><input id="roi-uplift" type="number" value="40"></div>
+        </div>
+        <div class="grid grid-3" style="margin-top:10px">
+          <div class="stat-card"><div class="stat-label">Extra bookings/mo</div><div class="stat-value" id="roi-bookings" style="font-size:24px">—</div></div>
+          <div class="stat-card"><div class="stat-label">Extra revenue/mo</div><div class="stat-value" id="roi-monthly" style="font-size:24px">—</div></div>
+          <div class="stat-card"><div class="stat-label">Extra revenue/yr</div><div class="stat-value" id="roi-annual" style="font-size:24px">—</div></div>
+        </div>
+        <p class="text-sm text-light mt-12">Estimate only. Uplift is the relative increase in visitor→booking conversion after deploying the assistant.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="lp-section lp-section-alt">
+    <div class="lp-container lp-narrow" style="text-align:center">
+      <h2>Ready to see it on your own site?</h2>
+      <p class="text-light">Book a 20-minute demo and we'll deploy a live assistant on your website in the meeting.</p>
+      <div class="ind-cta" style="justify-content:center">
+        <a class="btn btn-primary btn-lg" href="/landing#book">Book a Demo</a>
+        <a class="btn btn-secondary btn-lg" href="/demo">Run the Guided Demo</a>
+      </div>
+      <p class="mt-12"><span class="sample-badge">Sample</span> Example conversations and figures shown are illustrative.</p>
+    </div>
+  </section>
+
+  <footer class="lp-footer">
+    <div class="lp-container lp-footer-inner">
+      <div class="lp-brand"><span class="lp-logo">B</span> BrightSmile AI</div>
+      <div class="lp-footer-links"><a href="/landing">Home</a><a href="/demo">Demo</a><a href="/sales">Sales</a><a href="/docs">Docs</a><a href="/admin">Console</a></div>
+      <div class="lp-footer-sub">© 2026 BrightSmile AI · Demo Mode · Not a real medical or legal service</div>
+    </div>
+  </footer>
+
+  <div class="toast-wrap" id="toast-wrap"></div>
+  <script src="/js/industries.js"></script>
+</body>
+</html>

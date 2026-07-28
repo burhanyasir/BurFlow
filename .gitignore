@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Logs
+*.log
+*.err
+server.log
+startup.log
+boot*.log
+fuzz-*.log
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# QA reports
+qa_report_*.json
+
+# Fuzzer output
+fuzz-output/
+fuzz-output-v*
+
+# Python/Node artifacts
+test_flows.py
+*test_flows.pyc
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+tmp/
+*data/
+
+# Docker
+*.log
+*__pycache__/

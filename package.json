@@ -1,0 +1,22 @@
+{
+  "name": "ai-lead-platform-demo",
+  "version": "1.0.0",
+  "description": "AI Lead Generation Platform - Demo Mode for Dental Clinics",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "start:prod": "cross-env NODE_ENV=production node server.js",
+    "qa": "node qa_suite.js",
+    "fuzz": "node scripts/fuzz.js",
+    "agency:e2e": "node agency_e2e.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "cheerio": "^1.2.0",
+    "cors": "^2.8.5",
+    "cross-env": "^10.1.0",
+    "express": "^4.18.2",
+    "pino": "^10.3.1",
+    "uuid": "^14.0.1"
+  }
+}

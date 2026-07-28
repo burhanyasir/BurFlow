@@ -1,0 +1,160 @@
+{
+  "thresholds": {
+    "lowConfidence": 0.28,
+    "unknown": 0.15,
+    "workflowStart": 0.15
+  },
+  "defaultSuggestions": ["appointment_booking", "pricing", "insurance", "business_info"],
+  "contextBoost": {
+    "activeWorkflowMultiplier": 1.3,
+    "activeWorkflowAdd": 5,
+    "lastIntentPricingAdd": 3,
+    "lastIntentBookingAdd": 4,
+    "lastIntentClarificationAdd": 4
+  },
+  "serviceMatch": {
+    "multiBookingWeight": 15,
+    "singleFaqWeight": 8,
+    "singlePricingWeight": 4
+  },
+  "genericSignals": [
+    { "pattern": "need", "maxLen": 30, "scores": { "appointment_booking": 3, "faq": 2 } },
+    { "pattern": "^(?:i need|i want|i'd like|i would like|can i|could i|i was wondering)", "exclude": "info|question|about", "scores": { "appointment_booking": 5 } }
+  ],
+  "intents": [
+    {
+      "label": "emergency",
+      "route": "emergency",
+      "weight": 20,
+      "patterns": ["emergency", "toothache", "pain", "hurts?", "hurt(ing)?", "urgent", "bleeding", "swelling", "broken tooth", "cracked tooth", "dental emergency", "my tooth"],
+      "suggest": "Get emergency help"
+    },
+    {
+      "label": "appointment_reschedule",
+      "route": "booking",
+      "weight": 18,
+      "patterns": ["reschedule", "rescheduling", "move my", "change my", "something came up"],
+      "suggest": "Reschedule an appointment"
+    },
+    {
+      "label": "appointment_cancel",
+      "route": "general",
+      "weight": 16,
+      "patterns": ["cancel my appointment", "cancel booking", "i want to cancel", "cancel it", "cancel that"],
+      "suggest": "Cancel an appointment"
+    },
+    {
+      "label": "appointment_booking",
+      "route": "booking",
+      "weight": 15,
+      "patterns": ["appointment", "book", "schedule", "reserve", "checkup", "cleaning", "visit", "come in"],
+      "exclude": ["reschedule", "rescheduling", "move my", "change my", "something came up", "cancel"],
+      "suggest": "Book an appointment"
+    },
+    {
+      "label": "insurance",
+      "route": "insurance",
+      "weight": 14,
+      "patterns": ["insurance", "coverage", "delta dental", "metlife", "cigna", "aetna", "blue cross", "united healthcare", "in.?network", "out.?of.?pocket", "deductible", "copay", "claim", "do you accept", "do you take"],
+      "suggest": "Ask about insurance"
+    },
+    {
+      "label": "pricing",
+      "route": "pricing",
+      "weight": 12,
+      "patterns": ["how much", "cost", "price", "pricing", "fee", "charges?", "rates?", "\\$\\d+", "afford", "expensive", "cheap", "financ"],
+      "suggest": "Check pricing"
+    },
+    {
+      "label": "payment",
+      "route": "general",
+      "weight": 10,
+      "patterns": ["pay my bill", "payment methods", "pay online", "do you take cards", "how do i pay", "payment options"],
+      "suggest": "Payment options"
+    },
+    {
+      "label": "lead_capture",
+      "route": "lead",
+      "weight": 10,
+      "patterns": ["sign up", "contact", "call me", "email me", "more info", "interested in", "i'd like", "newsletter", "promo", "reach me"],
+      "suggest": "Get a callback"
+    },
+    {
+      "label": "contact_request",
+      "route": "lead",
+      "weight": 11,
+      "patterns": ["call me back", "contact me", "reach out", "get in touch", "someone call", "talk to a person"],
+      "suggest": "Talk to a person"
+    },
+    {
+      "label": "complaint",
+      "route": "general",
+      "weight": 9,
+      "patterns": ["complaint", "unhappy", "dissatisfied", "not satisfied", "terrible experience", "worst", "awful", "frustrated with"],
+      "suggest": "Share feedback"
+    },
+    {
+      "label": "location",
+      "route": "business_info",
+      "weight": 9,
+      "patterns": ["where are you", "where is", "your address", "directions", "how do i get there", "find you"],
+      "suggest": "Get directions"
+    },
+    {
+      "label": "hours",
+      "route": "business_info",
+      "weight": 9,
+      "patterns": ["what are your hours", "your hours", "what time do you open", "when are you open", "what time do you close"],
+      "suggest": "View hours"
+    },
+    {
+      "label": "business_info",
+      "route": "business_info",
+      "weight": 8,
+      "patterns": ["hours", "open", "close", "location", "address", "phone", "where are", "weekend", "saturday", "sunday", "parking", "direction"],
+      "suggest": "Location & hours"
+    },
+    {
+      "label": "doctors",
+      "route": "general",
+      "weight": 8,
+      "patterns": ["who is the dentist", "which dentist", "meet the dentist", "your doctors", "about the doctor", "who works there"],
+      "suggest": "Meet the team"
+    },
+    {
+      "label": "services",
+      "route": "general",
+      "weight": 8,
+      "patterns": ["what do you offer", "list services", "what services", "menu of services", "what can you do"],
+      "suggest": "Browse services"
+    },
+    {
+      "label": "faq",
+      "route": "general",
+      "weight": 5,
+      "patterns": ["what is", "what are", "how long", "how often", "how does", "tell me", "do you offer", "what about", "question", "how do"],
+      "suggest": "Ask a question"
+    },
+    {
+      "label": "thanks",
+      "route": "general",
+      "weight": 6,
+      "patterns": ["thank you", "thanks", "appreciate"],
+      "suggest": "You're welcome"
+    },
+    {
+      "label": "goodbye",
+      "route": "general",
+      "weight": 6,
+      "patterns": ["bye", "goodbye", "see you", "talk later"],
+      "suggest": "Goodbye"
+    },
+    {
+      "label": "small_talk",
+      "route": "general",
+      "weight": 5,
+      "patterns": ["how are you", "how's it going", "what's up", "how are things", "how've you been"],
+      "suggest": "Say hi"
+    }
+  ]
+}
