@@ -41,6 +41,7 @@ import {
   QualificationState,
   PersonaDetectionResult,
 } from './types';
+import { KnowledgeBaseProvider } from './knowledge-base-provider';
 
 function detectSentimentPolarity(message: string): number {
   const lower = message.toLowerCase();
@@ -127,6 +128,8 @@ export interface BrainInput {
   responseText: string;
   legacyMemory: ConversationIntelligenceMemory;
   rejectedCTAs?: string[];
+  tenantId?: string;
+  knowledgeBaseProvider?: KnowledgeBaseProvider;
 }
 
 export interface BrainOutput {
@@ -377,6 +380,8 @@ function buildStrategyResponse(
   plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended; missingQualification: string[] },
   ciResult: ConversationIntelligenceResult,
   relevantFacts: RelevantKnownFacts,
+  tenantId?: string,
+  kbProvider?: KnowledgeBaseProvider,
 ): string {
   const parts: string[] = [];
 
@@ -397,7 +402,7 @@ function buildStrategyResponse(
 
   // 1. Topic-specific core content (only if topicToAnswer is set)
   if (strategy.topicToAnswer) {
-    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult);
+    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult, tenantId, kbProvider);
     if (topicContent) parts.push(topicContent);
   }
 
@@ -672,12 +677,22 @@ const TOPIC_RESPONSE_TEMPLATES: Record<DiscernedTopic, string[]> = {
 };
 
 // Helper: Build topic-specific response using memory + intelligence
-function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult): string | null {
-  const templates = TOPIC_RESPONSE_TEMPLATES[topic];
-  if (!templates) return null;
-
+function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryData, ci: ConversationIntelligenceResult, tenantId?: string, kbProvider?: KnowledgeBaseProvider): string | null {
   const record = memory.topicsExplained.find(t => t.topic === topic);
   const isCompleted = record && record.phase === 'completed';
+
+  // Try per-tenant knowledge base first
+  if (kbProvider && tenantId) {
+    const depth = record ? Math.min(record.count, 4) : 0;
+    const kbEntry = kbProvider.getTopicResponse(topic, tenantId, isCompleted ? 0 : depth);
+    if (kbEntry) {
+      return kbEntry.answer;
+    }
+  }
+
+  // Fall back to hardcoded TOPIC_RESPONSE_TEMPLATES
+  const templates = TOPIC_RESPONSE_TEMPLATES[topic];
+  if (!templates) return null;
 
   if (isCompleted) {
     return buildCompletedTopicResponse(topic, memory, ci, templates);
@@ -1003,7 +1018,7 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
 }
 
 export function processConversationBrain(input: BrainInput): BrainOutput {
-  const { message, responseText, legacyMemory } = input;
+  const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider } = input;
 
   const memory = fromLegacyMemory(legacyMemory);
 
@@ -1018,10 +1033,10 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
   const shortReply = handleShortReply(message);
 
   // "tell me more" advances to the next depth level of the current topic
-  if (!shortReply && /^tell me more/i.test(message.trim()) && memory.currentTopic && TOPIC_RESPONSE_TEMPLATES[memory.currentTopic]) {
+  if (!shortReply && /^tell me more/i.test(message.trim()) && memory.currentTopic) {
     markTopicExplained(memory, memory.currentTopic);
     const ciResult = buildMinimalCIResult(memory, message);
-    const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult);
+    const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider);
     if (deepResponse) {
       const newTopics = discernTopics(message);
       updateTrustFromSentiment(memory, ciResult.sentiment.polarity);
@@ -1092,9 +1107,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
 
     let finalResponse: string;
     const wantsDeepDive = /^really\??$/i.test(message.trim());
-    if (wantsDeepDive && memory.currentTopic && TOPIC_RESPONSE_TEMPLATES[memory.currentTopic]) {
+    if (wantsDeepDive && memory.currentTopic) {
       markTopicExplained(memory, memory.currentTopic);
-      const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult);
+      const deepResponse = buildTopicResponse(memory.currentTopic, memory, ciResult, tenantId, kbProvider);
       finalResponse = deepResponse || shortReply;
     } else {
       const contextualResponse = contextualizeShortReply(message, memory);
@@ -1241,7 +1256,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
   const newTopics = discernTopics(message);
 
   // Strategy-first response building (replaces generic template enrichment)
-  let enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts);
+  let enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
 
   enrichedResponse = enforceContinuity(enrichedResponse, memory, newTopics);
 

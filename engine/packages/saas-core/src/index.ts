@@ -15,6 +15,7 @@ export {
   WebhookRepository, WebhookDeliveryRepository,
   UptimeRepository, SecurityStatusRepository, IncidentRepository,
   ComplianceDocumentRepository, DpaRepository, SubprocessorRepository,
+  TopicResponseTemplateRepository,
 } from './db/repositories';
 export {
   hashPassword, comparePassword, generateToken, verifyToken,
@@ -40,6 +41,7 @@ export type {
   UptimeHistory, SecurityStatus, SecurityStatusType,
   Incident, IncidentSeverity, IncidentStatus,
   ComplianceDocument, DpaDocument, Subprocessor,
+  TopicResponseTemplate,
 } from './types';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';
 export type { PaddlePlanConfig, PlanLimits } from './paddle';

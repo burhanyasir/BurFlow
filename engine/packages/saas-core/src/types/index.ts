@@ -549,3 +549,14 @@ export interface Subprocessor {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface TopicResponseTemplate {
+  id: string;
+  tenantId: string;
+  topic: string;
+  depth: number;
+  answer: string;
+  sources: string;
+  createdAt: string;
+  updatedAt: string;
+}

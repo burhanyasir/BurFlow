@@ -4,7 +4,7 @@ import {
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
 import { requireJsonObject, validateRequiredString, validationError, MESSAGE_MAX } from '../middleware/validate';
-import { processConversationBrain } from '@conversation-engine/conversation-orchestrator';
+import { processConversationBrain, DefaultKnowledgeBaseProvider, KnowledgeBaseProvider } from '@conversation-engine/conversation-orchestrator';
 import { executePipeline, getState } from '../orchestrator';
 import { DEFAULT_TENANT_POLICY } from '../orchestrator/types';
 
@@ -14,7 +14,9 @@ export function createChatRoutes(
   conversationRepo: ConversationRepository,
   messageRepo: MessageRepository,
   usageRepo: UsageRepository,
+  kbProvider?: KnowledgeBaseProvider,
 ): Router {
+  const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
 
   router.post('/', requireJsonObject, (req: Request, res: Response) => {
@@ -66,6 +68,7 @@ export function createChatRoutes(
         sessionId: convSessionId,
         tenantId: tenantId!,
         brainFunction: brainFn,
+        knowledgeBaseProvider: kb,
         policy: {
           qualification: DEFAULT_TENANT_POLICY.qualification,
           cta: DEFAULT_TENANT_POLICY.cta,

@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus } from '../types';
+import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus } from '../types';
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
@@ -1828,6 +1828,45 @@ export class SubprocessorRepository {
     return {
       id: row.id, tenantId: row.tenant_id, name: row.name, purpose: row.purpose,
       location: row.location, dataProcessed: row.data_processed, status: row.status,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+}
+
+export class TopicResponseTemplateRepository {
+  constructor(private db: Database.Database) {}
+
+  upsert(tenantId: string, topic: string, depth: number, answer: string, sources?: string[]): TopicResponseTemplate {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO topic_response_templates (id, tenant_id, topic, depth, answer, sources, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tenant_id, topic, depth) DO UPDATE SET answer = excluded.answer, sources = excluded.sources, updated_at = excluded.updated_at
+    `).run(id, tenantId, topic, depth, answer, JSON.stringify(sources || []), now, now);
+    return this.findByTenantTopic(tenantId, topic).find(r => r.depth === depth)!;
+  }
+
+  findByTenantTopic(tenantId: string, topic: string): TopicResponseTemplate[] {
+    const rows = this.db.prepare('SELECT * FROM topic_response_templates WHERE tenant_id = ? AND topic = ? ORDER BY depth ASC')
+      .all(tenantId, topic) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  findByTenant(tenantId: string): TopicResponseTemplate[] {
+    const rows = this.db.prepare('SELECT * FROM topic_response_templates WHERE tenant_id = ? ORDER BY topic, depth')
+      .all(tenantId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  deleteByTenantTopic(tenantId: string, topic: string): void {
+    this.db.prepare('DELETE FROM topic_response_templates WHERE tenant_id = ? AND topic = ?').run(tenantId, topic);
+  }
+
+  private mapRow(row: any): TopicResponseTemplate {
+    return {
+      id: row.id, tenantId: row.tenant_id, topic: row.topic, depth: row.depth,
+      answer: row.answer, sources: row.sources,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }

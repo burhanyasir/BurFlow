@@ -4,6 +4,7 @@ import { processRapportRepair } from './rapport-repair';
 import { processPolicyEngine, PolicyDecision } from './policy-engine';
 import { composeResponse, CompositionResult } from './response-composer';
 import { TenantPolicy } from './types';
+import { KnowledgeBaseProvider } from '@conversation-engine/conversation-orchestrator';
 
 export interface PipelineInput {
   message: string;
@@ -11,6 +12,7 @@ export interface PipelineInput {
   tenantId: string;
   brainFunction: (input: any) => any;
   policy?: Partial<TenantPolicy>;
+  knowledgeBaseProvider?: KnowledgeBaseProvider;
 }
 
 export interface PipelineResult {
@@ -32,7 +34,7 @@ const TRACE_LOG = true;
 
 export function executePipeline(input: PipelineInput): PipelineResult {
   const startTime = Date.now();
-  const { message, sessionId, tenantId, brainFunction, policy } = input;
+  const { message, sessionId, tenantId, brainFunction, policy, knowledgeBaseProvider: kbProvider } = input;
   const traceId = `${sessionId.slice(-8)}-${Date.now() % 10000}`;
 
   // Step 1: Load conversation state
@@ -114,7 +116,7 @@ export function executePipeline(input: PipelineInput): PipelineResult {
   }
 
   // Step 5: Build brain input with full conversation context
-  const brainInput = buildBrainInput(message, state, policyDecision);
+  const brainInput = buildBrainInput(message, state, policyDecision, tenantId, kbProvider);
 
   // Step 6: Call frozen Conversation Engine
   let brainOutput: any;
@@ -206,8 +208,7 @@ function mapStrategyToStage(strategy: Strategy): string {
   return map[strategy] || 'discovery';
 }
 
-function buildBrainInput(message: string, state: OrchestratorState, policy: PolicyDecision): any {
-  // Build a representative turns array from conversation summary
+function buildBrainInput(message: string, state: OrchestratorState, policy: PolicyDecision, tenantId?: string, kbProvider?: KnowledgeBaseProvider): any {
   const turns = state.turnCount > 0
     ? [{ message: state.lastUserMessage || '', response: state.lastBotMessage || '', polarity: 0, frustration: 0, urgency: 0, timestamp: Date.now() }]
     : [];
@@ -215,6 +216,8 @@ function buildBrainInput(message: string, state: OrchestratorState, policy: Poli
   return {
     message,
     responseText: '',
+    tenantId,
+    knowledgeBaseProvider: kbProvider,
     legacyMemory: {
       turns,
       turnCount: state.turnCount,
