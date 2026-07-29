@@ -1,7 +1,13 @@
 // Canonical pattern definitions — single source of truth
 // All modules MUST import from here; no inline regex duplicates allowed.
 
-export const GREETING_PATTERNS = /^(hi|hello|hey|howdy|greetings|good morning|good afternoon|good evening|good day|yo|sup|heya|nice to meet you)\b/i;
+export const GREETING_PATTERNS = /^(?:hi|hello|hey|howdy|greetings|good morning|good afternoon|good evening|good day|yo|sup|heya|nice to meet you)\b/i;
+
+// Extended greeting patterns used by rapport-repair's isPureGreeting
+// to also classify "how are you" variants as greetings (for pass-through routing).
+// These are excluded from canonical GREETING_PATTERNS because the planner
+// needs them in SMALL_TALK_PATTERNS for correct intent classification.
+export const RAPPORT_GREETING_EXTRA = /^(?:how are you|how's it going|what's up|how do you do)\b/i;
 
 export const FAREWELL_PATTERNS = /\b(bye|goodbye|see you|talk (?:later|to you (?:later|soon|tomorrow))|catch you|take care|have a (?:good|nice)|cya|farewell|adios|(?:good)?night|g ?night|gn)\b/i;
 

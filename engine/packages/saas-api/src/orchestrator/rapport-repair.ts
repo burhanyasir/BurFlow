@@ -4,6 +4,7 @@ import {
   FAREWELL_PATTERNS,
   SMALL_TALK_PATTERNS,
   GRATITUDE_PATTERNS,
+  RAPPORT_GREETING_EXTRA,
 } from '@conversation-engine/conversation-orchestrator';
 
 interface RapportResult {
@@ -76,7 +77,8 @@ function matchesAny(message: string, patterns: RegExp[]): boolean {
 }
 
 function isPureGreeting(message: string): boolean {
-  if (GREETING_PATTERNS.test(message.trim().toLowerCase())) {
+  const lower = message.trim().toLowerCase();
+  if (GREETING_PATTERNS.test(lower) || RAPPORT_GREETING_EXTRA.test(lower)) {
     if (message.split(/\s+/).length > 3 && hasBusinessIntent(message)) return false;
     return true;
   }
