@@ -1,14 +1,16 @@
 import { ConversationMemoryData } from './conversation-memory';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
+import {
+  GREETING_PATTERNS,
+  FAREWELL_PATTERNS,
+  GRATITUDE_PATTERNS,
+} from './patterns';
 
 export interface ValidationResult {
   valid: boolean;
   issues: string[];
 }
 
-const GREETING_PATTERNS = /^(hi|hello|hey|howdy|greetings|good morning|good afternoon|good evening|yo|sup)\b/i;
-const FAREWELL_PATTERNS = /\b(bye|goodbye|see you|talk later|catch you|take care)\b/i;
-const GRATITUDE_PATTERNS = /^(thanks|thank you|appreciate|thankyou|ty)\b/i;
 const CTA_PATTERNS = /\b(trial|demo|sign.?up|start|purchase|buy|schedule|contact|talk to sales|book)\b/i;
 const QUALIFICATION_QUESTION_PATTERNS = /\b(how many|what.*industry|what.*company|what.*team|do you use|what.*budget|what.*timeline|how.*large|what.*size|what.*monthly)\b/i;
 

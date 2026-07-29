@@ -1,10 +1,11 @@
 import { PersonaType } from './types';
+import { GREETING_PATTERNS, GRATITUDE_PATTERNS } from './patterns';
 
 export function handleGreeting(message: string, persona: PersonaType): string | null {
   const text = message.toLowerCase().trim();
 
-  const isGreeting = /^(hi|hello|hey|good morning|good afternoon|good evening|greetings)\b/i.test(text);
-  const isThanks = /^(thanks|thank you|thx|awesome|great|perfect)\b/i.test(text);
+  const isGreeting = GREETING_PATTERNS.test(text);
+  const isThanks = GRATITUDE_PATTERNS.test(text);
 
   if (!isGreeting && !isThanks) return null;
 

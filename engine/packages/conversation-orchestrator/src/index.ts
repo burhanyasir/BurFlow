@@ -18,6 +18,7 @@ export * from './conversation-validator';
 export { processConversationBrain } from './conversation-brain';
 export type { BrainInput, BrainOutput } from './conversation-brain';
 export * from './knowledge-base-provider';
+export * from './patterns';
 export * from './conversation-personality';
 export { processConversationDirector } from './conversation-director';
 export type { ConversationStrategy, AgendaState, TopicLifecycle, TopicStatus, PendingQuestion, ProfileConfidence, CTATiming, ProfileConfidenceField } from './conversation-director';
