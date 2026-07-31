@@ -34,7 +34,26 @@ export interface GeneratorInput {
     details?: string;
   };
   contextStack: Record<string, unknown>;
-  knowledgeResults: Array<{ title: string; content: string; source?: string }>;
+  knowledgeResults: Array<{
+    title: string;
+    content: string;
+    source?: string;
+    documentId?: string;
+    score?: number;
+    confidence?: number;
+    sourceType?: string;
+  }>;
+  knowledgeCitations?: Array<{
+    documentId: string;
+    documentTitle: string;
+    sectionPath: string;
+    snippet: string;
+    score: number;
+    confidence: number;
+    sourceType?: string;
+  }>;
+  knowledgeEvidenceConfidence?: number;
+  knowledgeLowConfidence?: boolean;
   currentCta: {
     primaryCTA: string;
     label: string;

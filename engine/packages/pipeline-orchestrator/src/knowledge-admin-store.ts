@@ -19,9 +19,12 @@ export interface KnowledgeMonitoringStats {
   totalDocuments: number;
   totalChunks: number;
   indexedDocuments: number;
+  publishedDocuments: number;
   failedDocuments: number;
   queuedDocuments: number;
   processingDocuments: number;
+  failedRatio: number;
+  publishedRatio: number;
   embeddingProgress: number;
 }
 
@@ -128,13 +131,19 @@ export class KnowledgeAdminStore {
   getMonitoringStats(tenantId: string): KnowledgeMonitoringStats {
     const row = this.db.prepare('SELECT * FROM knowledge_monitoring WHERE tenant_id = ?').get(tenantId) as any;
     if (row) {
+      const publishedDocuments = (this.db.prepare("SELECT COUNT(*) as c FROM knowledge_documents WHERE tenant_id = ? AND status = 'published'").get(tenantId) as any)?.c || 0;
+      const failedDocuments = row.failed_documents;
+      const totalDocuments = row.total_documents;
       return {
-        totalDocuments: row.total_documents,
+        totalDocuments,
         totalChunks: row.total_chunks,
         indexedDocuments: row.indexed_documents,
-        failedDocuments: row.failed_documents,
-        queuedDocuments: row.total_documents - row.indexed_documents - row.failed_documents,
+        publishedDocuments,
+        failedDocuments,
+        queuedDocuments: Math.max(0, totalDocuments - publishedDocuments - failedDocuments),
         processingDocuments: 0,
+        failedRatio: totalDocuments > 0 ? Math.round((failedDocuments / totalDocuments) * 10000) / 100 : 0,
+        publishedRatio: totalDocuments > 0 ? Math.round((publishedDocuments / totalDocuments) * 10000) / 100 : 0,
         embeddingProgress: row.embedding_progress,
       };
     }

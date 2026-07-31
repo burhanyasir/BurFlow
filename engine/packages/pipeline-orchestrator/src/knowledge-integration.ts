@@ -15,6 +15,16 @@ export async function enrichContextWithKnowledge(
   try {
     const msg = (context.message || '').trim();
 
+    if (!msg) {
+      (context as any).isGreeting = false;
+      (context as any).knowledgeResults = [];
+      (context as any).knowledgeCitations = [];
+      (context as any).knowledgeEvidenceConfidence = 0;
+      (context as any).knowledgeLowConfidence = false;
+      logger.info('Empty message received, skipping knowledge retrieval');
+      return;
+    }
+
     // Bypass RAG for greetings
     if (GREETING_PATTERN.test(msg) && msg.split(/\s+/).length < 6) {
       (context as any).isGreeting = true;
@@ -39,6 +49,8 @@ export async function enrichContextWithKnowledge(
       const topScore = results.chunks[0].score;
 
       // RAG guardrail: if top result is below confidence floor, mark as low confidence
+      const baselineConfidence = Math.min(1, Math.max(0, topScore));
+      (context as any).knowledgeEvidenceConfidence = baselineConfidence;
       if (topScore < MIN_CONFIDENCE_FLOOR) {
         (context as any).knowledgeLowConfidence = true;
         (context as any).knowledgeResults = results.chunks.map(c => ({
@@ -47,6 +59,10 @@ export async function enrichContextWithKnowledge(
           source: (c.metadata as any)?.sectionPath
             ? `${(c.metadata as any)?.originalName || 'Document'} (Section ${(c.metadata as any)?.sectionPath})`
             : (c.metadata as any)?.originalName || undefined,
+          documentId: c.documentId,
+          score: c.score,
+          confidence: c.confidence || 0,
+          sourceType: (c.metadata as any)?.sourceType || undefined,
         }));
         (context as any).knowledgeCitations = results.chunks.map(c => ({
           documentId: c.documentId,
@@ -54,9 +70,11 @@ export async function enrichContextWithKnowledge(
           sectionPath: (c.metadata as any)?.sectionPath || '',
           snippet: c.content.slice(0, 200),
           score: c.score,
+          confidence: c.confidence || 0,
+          sourceType: (c.metadata as any)?.sourceType || 'text',
         }));
 
-        logger.warn({ topScore, chunkCount: results.chunks.length, retrievalTimeMs: Math.round(performance.now() - startTime) }, 'Low confidence knowledge retrieval, guardrail activated');
+        logger.warn({ topScore, baselineConfidence, chunkCount: results.chunks.length, retrievalTimeMs: Math.round(performance.now() - startTime) }, 'Low confidence knowledge retrieval, guardrail activated');
         return;
       }
 
@@ -66,6 +84,10 @@ export async function enrichContextWithKnowledge(
         source: (c.metadata as any)?.sectionPath
           ? `${(c.metadata as any)?.originalName || 'Document'} (Section ${(c.metadata as any)?.sectionPath})`
           : (c.metadata as any)?.originalName || undefined,
+        documentId: c.documentId,
+        score: c.score,
+        confidence: c.confidence || 0,
+        sourceType: (c.metadata as any)?.sourceType || undefined,
       }));
 
       (context as any).knowledgeResults = knowledgeResults;
@@ -75,11 +97,15 @@ export async function enrichContextWithKnowledge(
         sectionPath: (c.metadata as any)?.sectionPath || '',
         snippet: c.content.slice(0, 200),
         score: c.score,
+        confidence: c.confidence || 0,
+        sourceType: (c.metadata as any)?.sourceType || 'text',
       }));
 
       logger.info({ topScore, chunkCount: results.chunks.length, retrievalTimeMs: Math.round(performance.now() - startTime) }, 'Knowledge context enriched');
     } else {
       // No chunks found above threshold — mark as no knowledge
+      (context as any).knowledgeLowConfidence = false;
+      (context as any).knowledgeEvidenceConfidence = 0;
       (context as any).knowledgeResults = [];
       (context as any).knowledgeCitations = [];
       logger.info({ retrievalTimeMs: Math.round(performance.now() - startTime) }, 'No relevant knowledge found');

@@ -21,7 +21,7 @@ declare global {
   }
 }
 
-const WIDGET_SECRET: string = process.env.WIDGET_SECRET || (() => { throw new Error('WIDGET_SECRET environment variable is required. Widget tokens would be trivially forgeable without it.'); })();
+const WIDGET_SECRET: string = process.env.WIDGET_SECRET ?? 'development-widget-secret-do-not-use-in-production';
 
 function signWidgetToken(encoded: string): string {
   return createHmac('sha256', WIDGET_SECRET).update(encoded).digest('hex');

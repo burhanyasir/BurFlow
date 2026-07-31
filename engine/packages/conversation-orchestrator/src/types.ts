@@ -9,6 +9,127 @@ export type PersonaType =
   | 'existing_customer'
   | 'unknown';
 
+export type BuyerRole =
+  | 'ceo'
+  | 'manager'
+  | 'developer'
+  | 'sales'
+  | 'support'
+  | 'healthcare'
+  | 'retail'
+  | 'agency'
+  | 'enterprise'
+  | 'small_business'
+  | 'unknown';
+
+export type ConversationStage =
+  | 'greeting'
+  | 'discovery'
+  | 'qualification'
+  | 'education'
+  | 'objection'
+  | 'comparison'
+  | 'pricing'
+  | 'decision'
+  | 'purchase'
+  | 'post_purchase'
+  | 'support'
+  | 'escalation';
+
+export type Temperature = 'cold' | 'warm' | 'hot' | 'ready_to_buy' | 'lost';
+
+export type BusinessType =
+  | 'saas'
+  | 'shopify'
+  | 'dental'
+  | 'healthcare'
+  | 'legal'
+  | 'real_estate'
+  | 'hotel'
+  | 'restaurant'
+  | 'agency'
+  | 'education'
+  | 'manufacturing'
+  | 'consulting'
+  | 'generic';
+
+export type UniversalIntent =
+  | 'buy'
+  | 'research'
+  | 'compare'
+  | 'support'
+  | 'billing'
+  | 'refund'
+  | 'warranty'
+  | 'technical_issue'
+  | 'appointment'
+  | 'booking'
+  | 'complaint'
+  | 'partnership'
+  | 'careers'
+  | 'contact'
+  | 'faq'
+  | 'unknown';
+
+export type ModuleName =
+  | 'sales'
+  | 'customer_support'
+  | 'booking'
+  | 'billing'
+  | 'technical_support'
+  | 'faq'
+  | 'product_advisor'
+  | 'complaint_resolution'
+  | 'lead_qualification';
+
+export interface BusinessProfile {
+  businessType: BusinessType;
+  industry: string;
+  products: string[];
+  services: string[];
+  policies: string[];
+  goals: string[];
+  brandTone: string;
+  supportedCTAs: string[];
+  locale?: string;
+}
+
+export interface UniversalIntentResult {
+  intent: UniversalIntent;
+  confidence: number;
+  reason: string;
+}
+
+export interface JourneyStageDefinition {
+  id: string;
+  name: string;
+  description: string;
+  keywords: string[];
+}
+
+export interface JourneyTemplate {
+  id: string;
+  businessType: BusinessType;
+  industry: string;
+  name: string;
+  stages: JourneyStageDefinition[];
+  ctas: string[];
+  enabled: boolean;
+}
+
+export interface JourneyDetectionResult {
+  stage: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface ModuleRoutingDecision {
+  module: ModuleName;
+  confidence: number;
+  reason: string;
+  primary: boolean;
+}
+
 export interface PersonaDetectionResult {
   persona: PersonaType;
   confidence: number; // 0 to 1
@@ -78,13 +199,57 @@ export interface CTASelectionResult {
   secondaryLink?: string;
 }
 
+export type NextBestActionType =
+  | 'educate'
+  | 'ask_qualification'
+  | 'handle_objection'
+  | 'show_proof'
+  | 'offer_trial'
+  | 'book_demo'
+  | 'offer_discount'
+  | 'escalate_human'
+  | 'wait';
+
+export interface NextBestAction {
+  action: NextBestActionType;
+  confidence: number; // 0-1
+  expectedValue: number; // normalized expected business value
+  risk: 'low' | 'medium' | 'high';
+  reason: string;
+}
+
+export interface DebugPanel {
+  conversationStage: ConversationStage;
+  customerTemperature: Temperature;
+  buyingIntent: BuyingIntentResult;
+  trustLevel: 'low' | 'medium' | 'high';
+  momentum: { answered: boolean; referencedContext: boolean; advanced: boolean; naturalEnding: boolean; momentumScore: number; weakPoints: string[]; shouldRegenerate: boolean };
+  qualificationPercent: number;
+  objections: string[];
+  nextBestAction: NextBestAction;
+  topButtons: Array<{ id: string; label: string; score: number; category?: string; reason?: string }>;
+  buttonScores: Record<string, number>;
+  expectedValue: number;
+  decisionReason: string;
+  conversionPrediction: Record<string, number>;
+}
+
 export interface SmartButton {
   id: string;
   label: string;
   action: 'send_text' | 'select_choice' | 'navigate' | 'open_modal';
   payload: string;
-  icon?: string;
+  // Optional UI metadata
+  icon?: string; // future icon name
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  // Internal ranking score (0-100). Higher = more likely to help conversion
+  score?: number;
+  // Category helps grouping and future analytics (e.g., 'pricing','security','trial')
+  category?: string;
+  // Locale for localization support (e.g., 'en-US'). Default handled at rendering time
+  locale?: string;
+  // Why this button was surfaced for the current context
+  reason?: string;
 }
 
 export interface ConversationUIState {

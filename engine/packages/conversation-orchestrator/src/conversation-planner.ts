@@ -8,12 +8,15 @@ import {
   isTopicExplained,
   isGoalAchieved,
 } from './conversation-memory';
+import { ConversationStage, BuyerRole } from './types';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
 import { FunnelStage } from './types';
 
 export interface ConversationPlan {
   customerIntent: CustomerIntent;
   funnelStage: FunnelStageExtended;
+  conversationStage: ConversationStage;
+  buyerRole: BuyerRole;
   goal: ConversationGoal;
   topicsToDiscuss: DiscernedTopic[];
   missingQualification: string[];
@@ -38,6 +41,19 @@ const IMPLEMENTATION_PATTERNS = /\b(setup|install|deploy|migrate|integration|how
 const LEAVING_PATTERNS = /\b(think about it|maybe later|not now|not interested|leave|stop|unsubscribe|call me later|get back to me|still thinking|will let you know|i.m done|i.m leaving|talk later|catch you later)\b/i;
 const CONFIRMING_PATTERNS = /\b(yes|yeah|sure|ok|okay|correct|right|exactly|that.s right|i agree|makes sense|got it|i see)\b/i;
 const REJECTING_PATTERNS = /\b(no|nah|nope|not really|not what|don.t think|won.t work|doesn.t fit|not for me|no thanks)\b/i;
+const ROLE_PATTERNS: Record<BuyerRole, RegExp> = {
+  ceo: /\b(ceo|chief executive|founder|co-founder|owner|president)\b/i,
+  manager: /\b(manager|director|head of|lead|team lead|supervisor)\b/i,
+  developer: /\b(developer|engineer|programmer|software engineer|dev)\b/i,
+  sales: /\b(sales|account executive|ae|business development|bdm|sales rep)\b/i,
+  support: /\b(support|customer success|cs|help desk|service)\b/i,
+  healthcare: /\b(healthcare|medical|clinic|hospital|health care)\b/i,
+  retail: /\b(retail|ecommerce|e-commerce|store|shop)\b/i,
+  agency: /\b(agency|consulting|consultant|creative firm|marketing firm)\b/i,
+  enterprise: /\b(enterprise|corporate|global|large company|forty|hundreds|thousands)\b/i,
+  small_business: /\b(small business|startup|small company|mom and pop|micro business)\b/i,
+  unknown: /^(?!.*$).*$/i,
+};
 const REALLY_PATTERNS = /\breally\b/i;
 const WHO_MADE_PATTERNS = /(who (made|created|built) you|who are you|where.*from)/i;
 
@@ -60,6 +76,34 @@ const QUALIFICATION_MARKERS: Record<string, (mem: ConversationMemoryData) => boo
   'budget': (mem) => !!mem.budget,
   'decision timeline': (mem) => !!mem.decisionTimeline,
 };
+
+function detectBuyerRole(message: string, memory: ConversationMemoryData): BuyerRole {
+  const lower = message.toLowerCase();
+  for (const role of Object.keys(ROLE_PATTERNS) as BuyerRole[]) {
+    if (role === 'unknown') continue;
+    if (ROLE_PATTERNS[role].test(lower) || memory.buyerRole === role) {
+      return role;
+    }
+  }
+  return memory.buyerRole || 'unknown';
+}
+
+function detectConversationStage(message: string, memory: ConversationMemoryData, ciResult: ConversationIntelligenceResult): ConversationStage {
+  const lower = message.toLowerCase().trim();
+  if (FAREWELL_PATTERNS.test(lower)) return 'decision';
+  if (ciResult.escalation?.shouldEscalate || /\b(manager|human agent|agent|supervisor|hand over|escalate)\b/i.test(lower)) return 'escalation';
+  if (ciResult.objection.isObjection || OBJECTION_PATTERNS.test(lower)) return 'objection';
+  if (COMPARING_PATTERNS.test(lower)) return 'comparison';
+  if (BUYING_PATTERNS.test(lower)) return 'pricing';
+  if (EVALUATING_PATTERNS.test(lower)) return 'pricing';
+  if (IMPLEMENTATION_PATTERNS.test(lower)) return 'support';
+  if (LEARNING_PATTERNS.test(lower)) return 'education';
+  if (GREETING_PATTERNS.test(lower) || memory.turnCount === 0) return 'greeting';
+  if (SMALL_TALK_PATTERNS.test(lower)) return 'discovery';
+  if (memory.funnelStage === 'customer' || memory.isCustomer) return 'post_purchase';
+  if (memory.isLeaving || LEAVING_PATTERNS.test(lower)) return 'decision';
+  return memory.currentStage || 'discovery';
+}
 
 function detectCustomerIntent(message: string, memory: ConversationMemoryData, ciResult: ConversationIntelligenceResult): CustomerIntent {
   const lower = message.toLowerCase().trim();
@@ -259,6 +303,8 @@ export function planConversation(
 ): ConversationPlan {
   const customerIntent = detectCustomerIntent(message, memory, ciResult);
   const funnelStage = detectFunnelStageExtended(message, memory, ciResult);
+  const conversationStage = detectConversationStage(message, memory, ciResult);
+  const buyerRole = detectBuyerRole(message, memory);
   const goal = chooseGoal(customerIntent, funnelStage, memory, ciResult);
   const missingQualification = findMissingQualification(memory);
   const newTopics = discernTopics(message);
@@ -287,6 +333,8 @@ export function planConversation(
   return {
     customerIntent,
     funnelStage,
+    conversationStage,
+    buyerRole,
     goal,
     topicsToDiscuss,
     missingQualification,

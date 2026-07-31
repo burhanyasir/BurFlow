@@ -30,7 +30,7 @@ export interface VectorStore {
   search(query: number[], tenantId: string, topK: number, threshold?: number, filters?: Record<string, unknown>, queryText?: string): Promise<VectorSearchResult[]>;
   softDelete(chunkIds: string[]): Promise<void>;
   hardDelete(chunkIds: string[]): Promise<void>;
-  deleteByDocument(documentId: string): Promise<void>;
+  deleteByDocument(documentId: string, tenantId?: string): Promise<void>;
   deleteByTenant(tenantId: string): Promise<void>;
   getStats(tenantId: string): Promise<{ totalChunks: number; deletedChunks: number; activeChunks: number }>;
   reindex(records: VectorRecord[]): Promise<void>;

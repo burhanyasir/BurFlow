@@ -40,7 +40,13 @@ import {
   ObjectionResult,
   QualificationState,
   PersonaDetectionResult,
+  ConversationStage,
+  Temperature,
+  NextBestAction,
+  NextBestActionType,
+  DebugPanel,
 } from './types';
+import { buttonTelemetry } from './button-telemetry';
 
 function detectSentimentPolarity(message: string): number {
   const lower = message.toLowerCase();
@@ -95,6 +101,157 @@ function updateTrustFromSentiment(memory: ConversationMemoryData, polarity: numb
   else if (memory.turnCount > 1 && memory.trustLevel === 'low') memory.trustLevel = 'medium';
 }
 
+function calculateCustomerTemperature(
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended },
+  ciResult: ConversationIntelligenceResult,
+): Temperature {
+  let score = 0;
+  if (memory.trustLevel === 'high') score += 2;
+  else if (memory.trustLevel === 'medium') score += 1;
+  if (memory.buyingIntentDetected) score += 2;
+  if (memory.qualificationCollected.completed) score += 1;
+  if (ciResult.objection.isObjection) score -= 1;
+  if (ciResult.sentiment.polarity > 0.2) score += 1;
+  if (ciResult.sentiment.polarity < -0.3) score -= 1;
+  if (memory.isAbandoned || plan.customerIntent === 'leaving') return 'lost';
+  if (plan.goal === 'handle_objection' && ciResult.objection.isObjection && memory.trustLevel === 'low') return 'cold';
+  if (plan.goal === 'close_trial' || plan.goal === 'recommend_plan') {
+    if (score >= 4) return 'ready_to_buy';
+    if (score >= 2) return 'hot';
+  }
+  if (score >= 3) return 'hot';
+  if (score >= 1) return 'warm';
+  return 'cold';
+}
+
+function determineNextBestAction(
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended },
+  memory: ConversationMemoryData,
+  ciResult: ConversationIntelligenceResult,
+): NextBestAction {
+  let confidence = 0.3;
+  let expectedValue = 0.2;
+  let risk: 'low' | 'medium' | 'high' = 'low';
+  let reason = 'Based on the current goal, customer intent, and objections.';
+
+  if (plan.goal === 'handle_objection') {
+    reason = 'The customer has an objection and the goal is to resolve it before moving forward.';
+    confidence = 0.8;
+    expectedValue = 0.7;
+    risk = ciResult.objection.isObjection ? 'medium' : 'low';
+    return { action: 'handle_objection', confidence, expectedValue, risk, reason };
+  }
+
+  if (plan.goal === 'qualify') {
+    reason = 'We need qualification details to recommend the right plan.';
+    confidence = 0.75;
+    expectedValue = 0.65;
+    risk = 'low';
+    return { action: 'ask_qualification', confidence, expectedValue, risk, reason };
+  }
+
+  if (plan.goal === 'answer_question' || plan.customerIntent === 'learning') {
+    reason = 'The customer is seeking information, so education is the next best step.';
+    confidence = 0.7;
+    expectedValue = 0.45;
+    risk = 'low';
+    return { action: 'educate', confidence, expectedValue, risk, reason };
+  }
+
+  if (plan.goal === 'recommend_plan' || plan.goal === 'close_trial') {
+    reason = 'The customer is evaluating or ready to buy, so offering a trial or demo is valuable.';
+    confidence = 0.8;
+    expectedValue = 0.8;
+    risk = 'medium';
+    return { action: 'offer_trial', confidence, expectedValue, risk, reason };
+  }
+
+  if (plan.goal === 'schedule_demo' || memory.persona === 'enterprise') {
+    reason = 'Enterprise-oriented conversations often benefit from booking a demo.';
+    confidence = 0.75;
+    expectedValue = 0.75;
+    risk = 'medium';
+    return { action: 'book_demo', confidence, expectedValue, risk, reason };
+  }
+
+  if (plan.goal === 'finish_conversation' || memory.isLeaving) {
+    reason = 'The customer appears ready to disengage, so it is safest to wait or end gracefully.';
+    confidence = 0.65;
+    expectedValue = 0.2;
+    risk = 'low';
+    return { action: 'wait', confidence, expectedValue, risk, reason };
+  }
+
+  if (ciResult.objection.isObjection) {
+    reason = 'An objection is present and should be addressed to prevent losing the customer.';
+    confidence = 0.7;
+    expectedValue = 0.6;
+    risk = 'medium';
+    return { action: 'handle_objection', confidence, expectedValue, risk, reason };
+  }
+
+  reason = 'Continue advancing the conversation toward action by showing proof or next steps.';
+  confidence = 0.6;
+  expectedValue = 0.5;
+  risk = 'low';
+  return { action: 'show_proof', confidence, expectedValue, risk, reason };
+}
+
+function estimateConversionPrediction(
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended },
+  ciResult: ConversationIntelligenceResult,
+): Record<string, number> {
+  const base = memory.trustLevel === 'high' ? 0.25 : memory.trustLevel === 'medium' ? 0.15 : 0.05;
+  const intent = memory.buyingIntentDetected ? 0.25 : 0;
+  const temp = memory.customerTemperature === 'ready_to_buy' ? 0.25 : memory.customerTemperature === 'hot' ? 0.18 : memory.customerTemperature === 'warm' ? 0.1 : 0;
+  const qual = memory.qualificationCollected.completed ? 0.1 : 0;
+  const objection = ciResult.objection.isObjection ? -0.08 : 0;
+  const leaving = memory.isLeaving ? -0.1 : 0;
+  const purchaseLikelihood = Math.min(0.95, Math.max(0, base + intent + temp + qual + objection + leaving));
+  const demoLikelihood = Math.min(0.95, Math.max(0, base + 0.2 + (memory.currentStage === 'decision' ? 0.1 : 0) + qual - (ciResult.objection.isObjection ? 0.05 : 0)));
+  const leaveLikelihood = Math.min(0.95, Math.max(0, 0.15 - intent + (memory.customerTemperature === 'cold' ? 0.15 : 0) + (ciResult.objection.isObjection ? 0.1 : 0)));
+  return {
+    likelihoodToBookDemo: Math.round(demoLikelihood * 100),
+    likelihoodToPurchase: Math.round(purchaseLikelihood * 100),
+    likelihoodToLeave: Math.round(leaveLikelihood * 100),
+    likelihoodToStay: Math.max(0, 100 - Math.round(leaveLikelihood * 100)),
+  };
+}
+
+function buildDebugPanel(
+  memory: ConversationMemoryData,
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended },
+  ciResult: ConversationIntelligenceResult,
+  quickReplies: SmartButton[],
+  nextBestAction: NextBestAction,
+  momentum: MomentumResult,
+): DebugPanel {
+  const topButtons = quickReplies.slice(0, 10).map(btn => ({ id: btn.id, label: btn.label, score: btn.score ?? 0, category: btn.category, reason: btn.reason }));
+  const buttonScores = Object.fromEntries(quickReplies.map(btn => [btn.id, btn.score ?? 0]));
+  const conversionPrediction = estimateConversionPrediction(memory, plan, ciResult);
+  const qualificationPercent = memory.qualificationCollected.completed ? 100 : Math.min(90, memory.qualificationCollected.questionsAskedCount * 15);
+  const expectedValue = nextBestAction.expectedValue;
+  const decisionReason = `Selected ${nextBestAction.action} because ${nextBestAction.reason}`;
+
+  return {
+    conversationStage: memory.currentStage ?? 'discovery',
+    customerTemperature: memory.customerTemperature ?? 'cold',
+    buyingIntent: ciResult.buyingIntent,
+    trustLevel: memory.trustLevel,
+    momentum,
+    qualificationPercent,
+    objections: memory.objectionsHandled,
+    nextBestAction,
+    topButtons,
+    buttonScores,
+    expectedValue,
+    decisionReason,
+    conversionPrediction,
+  };
+}
+
 function checkQualificationCompletion(memory: ConversationMemoryData): void {
   if (memory.qualificationCollected.completed) return;
   const required = [memory.companySize, memory.industry].filter(Boolean);
@@ -127,6 +284,15 @@ export interface BrainInput {
   responseText: string;
   legacyMemory: ConversationIntelligenceMemory;
   rejectedCTAs?: string[];
+  clickedButtonIds?: string[];
+  ignoredButtonIds?: string[];
+}
+
+export interface DecisionTrace {
+  chosenButtons: Array<{ id: string; label: string; category?: string; score: number }>;
+  buttonScores: Record<string, number>;
+  buttonClicked?: string[];
+  buttonCTR: Record<string, number>;
 }
 
 export interface BrainOutput {
@@ -139,6 +305,8 @@ export interface BrainOutput {
   plan: {
     customerIntent: CustomerIntent;
     funnelStage: FunnelStageExtended;
+    conversationStage: ConversationStage;
+    buyerRole: BuyerRole;
     goal: ConversationGoal;
     topicsToDiscuss: DiscernedTopic[];
     missingQualification: string[];
@@ -152,6 +320,8 @@ export interface BrainOutput {
   strategy?: ConversationStrategy;
   momentum?: MomentumResult;
   qualityMetrics?: QualityMetrics;
+  decisionTrace?: DecisionTrace;
+  debugPanel?: DebugPanel;
 }
 
 const FOLLOW_UP_BY_GOAL: Record<ConversationGoal, string[]> = {
@@ -762,125 +932,289 @@ function buildCTAText(
   return text;
 }
 
+interface ButtonCandidate extends SmartButton {
+  category: string;
+  defaultScore: number;
+  icon?: string;
+  locale?: string;
+  tags: string[];
+}
+
+const BUTTON_CATALOG: ButtonCandidate[] = [
+  { id: 'btn_pricing', label: 'Tell me about pricing', payload: 'Tell me about pricing', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 45, icon: 'price-tag', locale: 'en-US', tags: ['pricing', 'cost', 'plans'] },
+  { id: 'btn_book_demo', label: 'Book a demo', payload: '/demo', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 55, icon: 'calendar', locale: 'en-US', tags: ['demo', 'sales'] },
+  { id: 'btn_features', label: 'Features', payload: 'What features do you offer?', action: 'send_text', variant: 'secondary', category: 'features', defaultScore: 40, icon: 'sparkles', locale: 'en-US', tags: ['features', 'capabilities'] },
+  { id: 'btn_help_choose', label: 'Help me choose', payload: 'Help me choose the right plan', action: 'send_text', variant: 'primary', category: 'qualification', defaultScore: 45, icon: 'lightbulb', locale: 'en-US', tags: ['help', 'choose', 'plan'] },
+  { id: 'btn_compare_plans', label: 'Compare plans', payload: 'Compare plans', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 35, icon: 'compare', locale: 'en-US', tags: ['compare', 'plans', 'pricing'] },
+  { id: 'btn_free_trial', label: 'Free trial', payload: '/signup', action: 'navigate', variant: 'primary', category: 'trial', defaultScore: 50, icon: 'gift', locale: 'en-US', tags: ['trial', 'signup'] },
+  { id: 'btn_talk_to_sales', label: 'Talk to sales', payload: '/contact', action: 'navigate', variant: 'outline', category: 'sales', defaultScore: 45, icon: 'phone', locale: 'en-US', tags: ['sales', 'contact'] },
+  { id: 'btn_monthly_plans', label: 'Monthly plans', payload: 'Tell me about monthly pricing', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 40, icon: 'calendar-month', locale: 'en-US', tags: ['monthly', 'pricing'] },
+  { id: 'btn_annual_discount', label: 'Annual discount', payload: 'Tell me about annual discounts', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 38, icon: 'discount', locale: 'en-US', tags: ['annual', 'pricing', 'discount'] },
+  { id: 'btn_enterprise_pricing', label: 'Enterprise pricing', payload: 'What does enterprise pricing look like?', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 42, icon: 'shield-check', locale: 'en-US', tags: ['enterprise', 'pricing'] },
+  { id: 'btn_roi_calculator', label: 'ROI calculator', payload: 'Show me the ROI calculator', action: 'send_text', variant: 'secondary', category: 'roi', defaultScore: 38, icon: 'trend-up', locale: 'en-US', tags: ['roi', 'savings'] },
+  { id: 'btn_security_docs', label: 'Security documentation', payload: '/security', action: 'navigate', variant: 'secondary', category: 'security', defaultScore: 47, icon: 'shield', locale: 'en-US', tags: ['security', 'compliance'] },
+  { id: 'btn_soc2_iso', label: 'SOC2 / ISO', payload: 'Tell me about SOC2 and ISO compliance', action: 'send_text', variant: 'secondary', category: 'security', defaultScore: 45, icon: 'certificate', locale: 'en-US', tags: ['soc2', 'iso', 'compliance'] },
+  { id: 'btn_gdpr', label: 'GDPR', payload: 'Tell me about GDPR and data privacy', action: 'send_text', variant: 'secondary', category: 'security', defaultScore: 40, icon: 'globe', locale: 'en-US', tags: ['gdpr', 'privacy'] },
+  { id: 'btn_data_privacy', label: 'Data privacy', payload: 'Tell me about data privacy', action: 'send_text', variant: 'secondary', category: 'security', defaultScore: 38, icon: 'lock', locale: 'en-US', tags: ['privacy', 'security'] },
+  { id: 'btn_architecture', label: 'Architecture', payload: 'Show me the architecture overview', action: 'send_text', variant: 'secondary', category: 'architecture', defaultScore: 38, icon: 'server', locale: 'en-US', tags: ['architecture', 'technical'] },
+  { id: 'btn_talk_security_expert', label: 'Talk to security expert', payload: '/contact', action: 'navigate', variant: 'outline', category: 'security', defaultScore: 42, icon: 'user-shield', locale: 'en-US', tags: ['security', 'expert'] },
+  { id: 'btn_show_integrations', label: 'Show integrations', payload: 'Show me integrations', action: 'send_text', variant: 'secondary', category: 'integrations', defaultScore: 40, icon: 'puzzle-piece', locale: 'en-US', tags: ['integrations', 'connect'] },
+  { id: 'btn_api_docs', label: 'API docs', payload: '/docs', action: 'navigate', variant: 'secondary', category: 'developer', defaultScore: 42, icon: 'code', locale: 'en-US', tags: ['api', 'developer'] },
+  { id: 'btn_use_cases', label: 'Use cases', payload: 'What are the use cases?', action: 'send_text', variant: 'secondary', category: 'features', defaultScore: 37, icon: 'lightbulb', locale: 'en-US', tags: ['use cases', 'case studies'] },
+  { id: 'btn_customer_stories', label: 'Customer stories', payload: 'Tell me about customer stories', action: 'send_text', variant: 'secondary', category: 'trust', defaultScore: 36, icon: 'users', locale: 'en-US', tags: ['customers', 'stories'] },
+  { id: 'btn_compare_competitors', label: 'Compare competitors', payload: 'Compare to competitors', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 40, icon: 'balance-scale', locale: 'en-US', tags: ['compare', 'competition'] },
+  { id: 'btn_live_demo', label: 'Live demo', payload: '/demo', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 45, icon: 'play', locale: 'en-US', tags: ['demo', 'live'] },
+  { id: 'btn_under_10', label: 'We\'re under 10 people', payload: 'We are under 10 people', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
+  { id: 'btn_10_50', label: '10-50 employees', payload: 'We have 10-50 employees', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
+  { id: 'btn_50_200', label: '50-200 employees', payload: 'We have 50-200 employees', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
+  { id: 'btn_200_plus', label: '200+', payload: 'We have 200+ employees', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
+  { id: 'btn_not_sure', label: 'Not sure', payload: 'I am not sure yet', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 35, icon: 'question', locale: 'en-US', tags: ['uncertain', 'qualification'] },
+  { id: 'btn_budget_low', label: '<$100', payload: 'Our budget is under $100', action: 'send_text', variant: 'secondary', category: 'budget', defaultScore: 38, icon: 'dollar-sign', locale: 'en-US', tags: ['budget'] },
+  { id: 'btn_budget_mid', label: '$100-$500', payload: 'Our budget is $100-$500', action: 'send_text', variant: 'secondary', category: 'budget', defaultScore: 38, icon: 'dollar-sign', locale: 'en-US', tags: ['budget'] },
+  { id: 'btn_budget_high', label: '$500-$2000', payload: 'Our budget is $500-$2000', action: 'send_text', variant: 'secondary', category: 'budget', defaultScore: 38, icon: 'dollar-sign', locale: 'en-US', tags: ['budget'] },
+  { id: 'btn_budget_enterprise', label: 'Enterprise', payload: 'Our budget is enterprise-level', action: 'send_text', variant: 'secondary', category: 'budget', defaultScore: 38, icon: 'shield', locale: 'en-US', tags: ['budget', 'enterprise'] },
+  { id: 'btn_timeline_immediately', label: 'Immediately', payload: 'We need it immediately', action: 'send_text', variant: 'secondary', category: 'timeline', defaultScore: 38, icon: 'clock', locale: 'en-US', tags: ['timeline'] },
+  { id: 'btn_timeline_month', label: 'This month', payload: 'We are looking to decide this month', action: 'send_text', variant: 'secondary', category: 'timeline', defaultScore: 38, icon: 'calendar', locale: 'en-US', tags: ['timeline'] },
+  { id: 'btn_timeline_quarter', label: 'This quarter', payload: 'We are deciding this quarter', action: 'send_text', variant: 'secondary', category: 'timeline', defaultScore: 38, icon: 'calendar', locale: 'en-US', tags: ['timeline'] },
+  { id: 'btn_timeline_research', label: 'Just researching', payload: 'I am just researching', action: 'send_text', variant: 'secondary', category: 'timeline', defaultScore: 35, icon: 'search', locale: 'en-US', tags: ['timeline'] },
+  { id: 'btn_compare_intercom', label: 'Compare with Intercom', payload: 'Compare with Intercom', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 42, icon: 'shield-check', locale: 'en-US', tags: ['intercom', 'competitor'] },
+  { id: 'btn_compare_zendesk', label: 'Compare with Zendesk', payload: 'Compare with Zendesk', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 42, icon: 'shield-check', locale: 'en-US', tags: ['zendesk', 'competitor'] },
+  { id: 'btn_why_choose_us', label: 'Why choose us', payload: 'Why should I choose your product?', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 40, icon: 'thumb-up', locale: 'en-US', tags: ['why choose us'] },
+  { id: 'btn_migration_guide', label: 'Migration guide', payload: 'Show me a migration guide', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 40, icon: 'map', locale: 'en-US', tags: ['migration', 'competitor'] },
+  { id: 'btn_email_me', label: 'Email me', payload: 'Email me the details', action: 'send_text', variant: 'outline', category: 'sales', defaultScore: 36, icon: 'mail', locale: 'en-US', tags: ['email'] },
+  { id: 'btn_talk_later', label: 'Talk later', payload: 'I will talk later', action: 'send_text', variant: 'outline', category: 'sales', defaultScore: 32, icon: 'clock', locale: 'en-US', tags: ['later'] },
+  { id: 'btn_setup_guide', label: 'Setup guide', payload: 'Show me a setup guide', action: 'send_text', variant: 'secondary', category: 'support', defaultScore: 42, icon: 'wrench', locale: 'en-US', tags: ['setup', 'support', 'installation'] },
+  { id: 'btn_contact_support', label: 'Contact support', payload: '/support', action: 'navigate', variant: 'secondary', category: 'support', defaultScore: 40, icon: 'life-ring', locale: 'en-US', tags: ['support'] },
+];
+
+const MAX_QUICK_REPLIES = 4;
+const MIN_QUICK_REPLIES = 3;
+
+function extractMessageTags(message: string): Set<string> {
+  const tags = new Set<string>();
+  const lower = message.toLowerCase();
+
+  if (/(pricing|price|cost|plan|annual|monthly|tier|expensive)/i.test(lower)) tags.add('pricing');
+  if (/(security|compliance|gdpr|soc2|iso|privacy|architecture|data)/i.test(lower)) tags.add('security');
+  if (/(compare|comparison|competitor|intercom|zendesk|why choose|migration)/i.test(lower)) tags.add('competitor');
+  if (/(demo|walkthrough|live demo|see it in action|book a demo)/i.test(lower)) tags.add('demo');
+  if (/(free trial|trial|signup|start free|14-day)/i.test(lower)) tags.add('trial');
+  if (/(support|setup|installation|onboarding|help|customer service|technical support)/i.test(lower)) tags.add('support');
+  if (/(integration|integrations|api|docs|use case|customer stories|case studies|shopify|woocommerce|magento|bigcommerce|ecommerce)/i.test(lower)) tags.add('features');
+  if (/(roi|return on investment|savings|cost savings)/i.test(lower)) tags.add('roi');
+  if (/(what plan|should i pick|best plan|right plan|choose a plan)/i.test(lower)) tags.add('qualification');
+  if (/(company size|employees|people|team|under 10|10-50|50-200|200\+|just researching|this month|this quarter|immediately)/i.test(lower)) tags.add('qualification');
+  if (/(budget|spend|price range|cost range|dollars)/i.test(lower)) tags.add('budget');
+  if (/(immediately|this month|this quarter|just researching|researching)/i.test(lower)) tags.add('timeline');
+  if (/(sales|talk to sales|contact sales|enterprise sales)/i.test(lower)) tags.add('sales');
+
+  return tags;
+}
+
+function explainButtonSelection(
+  button: ButtonCandidate,
+  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
+  memory: ConversationMemoryData,
+  ciResult: ConversationIntelligenceResult,
+  messageTags: Set<string>,
+): string {
+  const reasons: string[] = [];
+  if (plan.goal === 'qualify' && button.category === 'qualification') reasons.push('helps qualify the opportunity');
+  if (plan.goal === 'recommend_plan' && ['trial', 'demo', 'sales'].includes(button.category)) reasons.push('supports the next purchase step');
+  if (plan.goal === 'handle_objection' && button.category === 'security' && ciResult.objection.category === 'security') reasons.push('addresses the customer security concern');
+  if (plan.customerIntent === 'comparing' && button.category === 'competitor') reasons.push('matches the customer comparison intent');
+  if (messageTags.has(button.category)) reasons.push('relevant to the current request');
+  if (button.category === 'budget' && plan.goal === 'qualify') reasons.push('helps gather budget information');
+  if (button.category === 'timeline' && plan.goal === 'qualify') reasons.push('supports decision timeline qualification');
+  if (memory.buyerRole === 'developer' && button.category === 'developer') reasons.push('tailored for developer buyers');
+  if (memory.buyerRole === 'enterprise' && button.category === 'security') reasons.push('fits enterprise security needs');
+  if (memory.buttonAcceptances.includes(button.id)) reasons.push('customer has engaged with this button before');
+  if (memory.buttonRejections.includes(button.id)) reasons.push('previously rejected by the customer');
+  return reasons.length > 0 ? reasons.join('; ') : 'scored for relevance and conversion potential.';
+}
+
+function scoreButtonCandidate(
+  button: ButtonCandidate,
+  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
+  memory: ConversationMemoryData,
+  ciResult: ConversationIntelligenceResult,
+  historicalCTR: Record<string, number>,
+  messageTags: Set<string>,
+): number {
+  let score = button.defaultScore;
+  const lowerLabel = button.label.toLowerCase();
+
+  if (plan.goal === 'finish_conversation') score += button.category === 'sales' ? 10 : 0;
+  if (plan.goal === 'qualify' && button.category === 'qualification') score += 30;
+  if (plan.goal === 'qualify' && button.category === 'timeline') score += 15;
+  if (plan.goal === 'qualify' && button.category === 'budget') score += 15;
+  if (plan.goal === 'recommend_plan' && ['trial', 'demo', 'sales'].includes(button.category)) score += 20;
+  if (plan.goal === 'close_trial' && button.category === 'trial') score += 25;
+  if (plan.goal === 'schedule_demo' && button.category === 'demo') score += 30;
+  if (plan.goal === 'handle_objection' && button.category === 'security' && ciResult.objection.category === 'security') score += 30;
+  if (plan.goal === 'handle_objection' && ciResult.objection.category === 'price') {
+    if (button.category === 'roi') score += 60;
+    if (button.category === 'demo') score += 35;
+    if (button.category === 'trust') score += 25;
+    if (button.category === 'pricing') score -= 20;
+  }
+  if (plan.goal === 'handle_objection' && button.category === 'competitor' && ciResult.objection.category === 'competition') score += 30;
+  if (plan.goal === 'advance_funnel' && button.category === 'pricing') score += 20;
+  if (plan.goal === 'build_trust' && ['features', 'security', 'trust'].includes(button.category)) score += 20;
+
+  if (plan.customerIntent === 'comparing' || lowerLabel.includes('compare')) score += 20;
+  if (plan.customerIntent === 'buying' && ['trial', 'demo', 'sales'].includes(button.category)) score += 15;
+  if (plan.customerIntent === 'learning' && ['features', 'pricing', 'security', 'integrations', 'developer'].includes(button.category)) score += 15;
+
+  if (memory.persona === 'enterprise' && button.category === 'security') score += 15;
+  if (memory.persona === 'developer' && button.category === 'developer') score += 20;
+  if (memory.persona === 'support_manager' && ['support', 'integration', 'features'].includes(button.category)) score += 15;
+
+  if (memory.currentTopic && button.category === memory.currentTopic) score += 10;
+  if (memory.currentTopic && lowerLabel.includes(memory.currentTopic)) score += 10;
+
+  if (memory.companySize && button.category === 'qualification' && /people|employees/.test(lowerLabel)) score += 5;
+  if (memory.budget && button.category === 'budget') score += 5;
+
+  const completedTopics = memory.topicsExplained.filter(t => t.phase === 'completed').map(t => t.topic);
+  if (completedTopics.includes('pricing') && button.category === 'pricing') score -= 15;
+  if (completedTopics.includes('security') && button.category === 'security') score -= 15;
+  if (completedTopics.includes('features') && button.category === 'features') score -= 10;
+
+  if (messageTags.has(button.category)) score += 25;
+  if (button.tags.some(tag => messageTags.has(tag))) score += 20;
+  if (button.tags.some(tag => lowerLabel.includes(tag))) score += 10;
+
+  const recentSeen = memory.buttonsShown.some(b => b.buttonId === button.id || b.label.toLowerCase() === lowerLabel);
+  if (recentSeen) score -= 1000;
+  if (memory.buttonRejections.includes(button.id)) score -= 1000;
+  if (memory.buttonRejections.some(rejected => lowerLabel.includes(rejected.toLowerCase()))) score -= 500;
+  if (memory.buttonAcceptances.includes(button.id)) score += 20;
+ 
+  const historical = historicalCTR[button.id] ?? 0;
+  score += Math.min(15, historical * 20);
+ 
+  return Math.max(0, score);
+}
+
+function isButtonRelevant(
+  button: ButtonCandidate,
+  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
+  memory: ConversationMemoryData,
+  ciResult: ConversationIntelligenceResult,
+  messageTags: Set<string>,
+): boolean {
+  if (plan.goal === 'finish_conversation' && button.category === 'competitor') return false;
+  if (button.category === 'qualification' && plan.goal !== 'qualify') return false;
+  if (button.category === 'budget' && plan.goal !== 'qualify' && plan.customerIntent !== 'buying') return false;
+  if (button.category === 'timeline' && plan.goal !== 'qualify') return false;
+  if (button.category === 'developer' && plan.customerIntent !== 'learning' && memory.persona !== 'developer') return false;
+  if (button.category === 'support' && !messageTags.has('support') && plan.goal !== 'handle_objection' && plan.goal !== 'finish_conversation') return false;
+  if (button.category === 'competitor' && !messageTags.has('competitor') && plan.customerIntent !== 'comparing') return false;
+  if (button.category === 'sales' && plan.goal === 'build_trust') return false;
+  return true;
+}
+
+function normalizeButtons(buttons: SmartButton[]): SmartButton[] {
+  const deduped: SmartButton[] = [];
+  const seen = new Set<string>();
+  for (const button of buttons) {
+    const key = button.label.trim().toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      deduped.push(button);
+    }
+  }
+  return deduped;
+}
+
+function recordShownButtons(memory: ConversationMemoryData, buttons: SmartButton[]): void {
+  const shownAt = Date.now();
+  for (const button of buttons) {
+    memory.buttonsShown.push({
+      buttonId: button.id,
+      label: button.label,
+      category: button.category,
+      score: button.score ?? 0,
+      turnNumber: memory.turnCount + 1,
+      shownAt,
+    });
+  }
+  if (memory.buttonsShown.length > 50) {
+    memory.buttonsShown = memory.buttonsShown.slice(-50);
+  }
+}
+
 function buildDynamicQuickReplies(
+  message: string,
   plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
   memory: ConversationMemoryData,
   ciResult: ConversationIntelligenceResult,
 ): SmartButton[] {
-  const replies: SmartButton[] = [];
-  const usedLabels = new Set<string>();
-
   if (plan.goal === 'finish_conversation') return [];
 
-  const goalReplies = QUICK_REPLIES_BY_GOAL[plan.goal];
-  if (goalReplies) {
-    for (const r of goalReplies) {
-      if (!usedLabels.has(r.label.toLowerCase())) {
-        const alreadyShown = memory.ctasShown.some(c => c.label.toLowerCase() === r.label.toLowerCase());
-        if (!alreadyShown || memory.turnCount < 3) {
-          replies.push({
-            id: r.id,
-            label: r.label,
-            action: r.action || 'send_text',
-            payload: r.payload,
-            variant: r.variant,
-          });
-          usedLabels.add(r.label.toLowerCase());
-        }
-      }
+  const historical = buttonTelemetry.snapshot().byButton;
+  const recentLabels = new Set(memory.buttonsShown.filter(b => b.turnNumber >= memory.turnCount - 2).map(b => b.label.toLowerCase()));
+  const messageTags = extractMessageTags(message);
+
+  const candidates: Array<SmartButton> = BUTTON_CATALOG
+    .filter(button => isButtonRelevant(button, plan, memory, ciResult, messageTags))
+    .map(button => ({
+      ...button,
+      score: scoreButtonCandidate(
+        button,
+        plan,
+        memory,
+        ciResult,
+        Object.fromEntries(Object.entries(historical).map(([k, v]) => [k, v.ctr])),
+        messageTags,
+      ),
+      reason: explainButtonSelection(button, plan, memory, ciResult, messageTags),
+    }))
+    .filter(button => button.score > 0)
+    .filter(button => !recentLabels.has(button.label.toLowerCase()));
+
+  candidates.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+  const topButtons = normalizeButtons(
+    candidates.slice(0, MAX_QUICK_REPLIES).map(button => ({
+      id: button.id,
+      label: button.label,
+      action: button.action,
+      payload: button.payload,
+      variant: button.variant,
+      icon: button.icon,
+      score: button.score,
+      category: button.category,
+      locale: button.locale,
+    })),
+  ).slice(0, MAX_QUICK_REPLIES);
+
+  const replies = [...topButtons];
+
+  if (replies.length < MIN_QUICK_REPLIES) {
+    const fallback = BUTTON_CATALOG.filter(button => !recentLabels.has(button.label.toLowerCase()) && button.category !== 'qualification').slice(0, MIN_QUICK_REPLIES - replies.length);
+    for (const fallbackButton of fallback) {
+      replies.push({
+        id: fallbackButton.id,
+        label: fallbackButton.label,
+        action: fallbackButton.action,
+        payload: fallbackButton.payload,
+        variant: fallbackButton.variant,
+        icon: fallbackButton.icon,
+        score: fallbackButton.defaultScore,
+        category: fallbackButton.category,
+        locale: fallbackButton.locale,
+      });
     }
   }
 
-  const handledCategories = new Set<string>();
-  if (ciResult.objection.category !== 'none') handledCategories.add(ciResult.objection.category);
-  for (const obj of memory.objectionsHandled) {
-    if (obj !== 'none') handledCategories.add(obj);
+  recordShownButtons(memory, replies);
+  for (const button of replies) {
+    buttonTelemetry.recordShown(button.id, button.label, button.category, undefined, memory.turnCount + 1);
   }
 
-  if (handledCategories.has('price') && replies.length < 4) {
-    if (!usedLabels.has('roi breakdown')) {
-      replies.push({ id: 'qr_obj_price_roi', label: 'ROI Breakdown', action: 'send_text', payload: 'Show me the ROI calculation', variant: 'secondary' });
-      usedLabels.add('roi breakdown');
-    }
-  }
-  if (handledCategories.has('security') && replies.length < 4) {
-    if (!usedLabels.has('security docs')) {
-      replies.push({ id: 'qr_obj_sec_docs', label: 'Security Docs', action: 'navigate', payload: '/security', variant: 'outline' });
-      usedLabels.add('security docs');
-    }
-  }
-  if (handledCategories.has('setup') && replies.length < 4) {
-    if (!usedLabels.has('setup guide')) {
-      replies.push({ id: 'qr_obj_impl_guide', label: 'Setup Guide', action: 'navigate', payload: '/docs/setup', variant: 'outline' });
-      usedLabels.add('setup guide');
-    }
-  }
-  if (handledCategories.has('competition') && replies.length < 4) {
-    if (!usedLabels.has('side by side')) {
-      replies.push({ id: 'qr_obj_comp_compare', label: 'Side-by-Side', action: 'send_text', payload: 'Show me a side-by-side comparison', variant: 'secondary' });
-      usedLabels.add('side by side');
-    }
-  }
-
-  const hasPersonaSpecific = (replies: SmartButton[], persona: PersonaType) => {
-    const personaLabels: Record<PersonaType, string[]> = {
-      enterprise: ['security', 'sso', 'enterprise', 'sla', 'tam'],
-      developer: ['api', 'sdk', 'docs', 'code', 'embed'],
-      agency: ['white label', 'partner', 'reseller', 'multi-tenant'],
-      ecommerce: ['shopify', 'woocommerce', 'cart'],
-      support_manager: ['zendesk', 'intercom', 'ticket', 'deflection'],
-      startup: ['pricing', 'trial', 'scaling'],
-      small_business: ['pricing', 'setup', 'trial'],
-      existing_customer: ['upgrade', 'account', 'dashboard'],
-      unknown: [],
-    };
-    const labels = personaLabels[persona] || [];
-    return replies.some(r => labels.some(l => r.label.toLowerCase().includes(l)));
-  };
-
-  if (replies.length < 3 && !hasPersonaSpecific(replies, memory.persona)) {
-    if (memory.persona === 'enterprise' && !usedLabels.has('sso setup')) {
-      replies.push({ id: 'qr_ent_sso', label: 'SSO & SAML', action: 'send_text', payload: 'Tell me about SSO/SAML', variant: 'outline' });
-      usedLabels.add('sso setup');
-    }
-    if (memory.persona === 'developer' && !usedLabels.has('api docs')) {
-      replies.push({ id: 'qr_dev_api', label: 'API Reference', action: 'navigate', payload: '/docs', variant: 'secondary' });
-      usedLabels.add('api docs');
-    }
-  }
-
-  if (plan.goal === 'qualify' && replies.length < 3) {
-    if (!usedLabels.has('help me choose')) {
-      replies.unshift({ id: 'qr_qual_help', label: 'Help Me Choose', action: 'send_text', payload: 'Help me find the right plan', variant: 'primary' });
-      usedLabels.add('help me choose');
-    }
-  }
-
-  const isBuying = plan.customerIntent === 'buying' || plan.goal === 'close_trial' || plan.goal === 'recommend_plan';
-  if (isBuying && replies.length < 3) {
-    if (!usedLabels.has('start trial')) {
-      replies.push({ id: 'qr_signup_buy', label: 'Start Free Trial', action: 'navigate', payload: '/signup', variant: 'primary' });
-      usedLabels.add('start trial');
-    }
-  }
-
-  const unmentionedTopics: DiscernedTopic[] = [];
-  if (!isTopicExplained(memory, 'features') && !usedLabels.has('features')) unmentionedTopics.push('features');
-  if (!isTopicExplained(memory, 'pricing') && !usedLabels.has('pricing')) unmentionedTopics.push('pricing');
-  if (!isTopicExplained(memory, 'security') && !usedLabels.has('security')) unmentionedTopics.push('security');
-
-  if (plan.customerIntent === 'learning' || plan.funnelStage === 'awareness' || plan.funnelStage === 'interest') {
-    if (unmentionedTopics.includes('features') && replies.length < 4) {
-      replies.push({ id: 'qr_explore_features', label: 'Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary' });
-      usedLabels.add('features');
-    }
-    if (unmentionedTopics.includes('pricing') && replies.length < 4) {
-      replies.push({ id: 'qr_explore_pricing', label: 'Pricing Plans', action: 'send_text', payload: 'What are your pricing tiers?', variant: 'secondary' });
-      usedLabels.add('pricing');
-    }
-  }
-
-  return replies.slice(0, 4);
+  return replies;
 }
 
 function updateMemoryFromBrain(
@@ -1012,6 +1346,20 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       if (!memory.rejectedCTAs.includes(cta)) {
         memory.rejectedCTAs.push(cta);
       }
+    }
+  }
+
+  if (input.clickedButtonIds) {
+    for (const buttonId of input.clickedButtonIds) {
+      memory.buttonClicks.push(buttonId);
+      if (!memory.buttonAcceptances.includes(buttonId)) memory.buttonAcceptances.push(buttonId);
+      buttonTelemetry.recordClicked(buttonId, buttonId, undefined, undefined, memory.turnCount + 1);
+    }
+  }
+  if (input.ignoredButtonIds) {
+    for (const buttonId of input.ignoredButtonIds) {
+      if (!memory.buttonRejections.includes(buttonId)) memory.buttonRejections.push(buttonId);
+      buttonTelemetry.recordIgnored(buttonId, buttonId, undefined, undefined, memory.turnCount + 1);
     }
   }
 
@@ -1234,6 +1582,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
   }
 
   const plan = planConversation(message, memory, ciResult);
+  memory.currentStage = plan.conversationStage;
+  memory.buyerRole = plan.buyerRole;
+  memory.customerTemperature = calculateCustomerTemperature(memory, plan, ciResult);
 
   const strategy = processConversationDirector(message, memory, ciResult, plan);
 
@@ -1274,8 +1625,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       cta = { ...cta, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
     }
   }
-
-  let quickReplies = buildDynamicQuickReplies(plan, memory, ciResult);
+ 
+  const nextBestAction = determineNextBestAction(plan, memory, ciResult);
+  let quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult);
 
   // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
   const recommended = recommendPlan(memory);
@@ -1362,6 +1714,14 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
   Reason: intent=${plan.customerIntent} stage=${memory.funnelStage} qual=${memory.qualificationCollected.completed}`);
   }
 
+  const telemetrySnapshot = buttonTelemetry.snapshot();
+  const decisionTrace: DecisionTrace = {
+    chosenButtons: quickReplies.map(btn => ({ id: btn.id, label: btn.label, category: btn.category, score: btn.score ?? 0 })),
+    buttonScores: Object.fromEntries(quickReplies.map(btn => [btn.id, btn.score ?? 0])),
+    buttonClicked: input.clickedButtonIds,
+    buttonCTR: Object.fromEntries(Object.entries(telemetrySnapshot.byButton).map(([buttonId, record]) => [buttonId, record.ctr])),
+  };
+
   return {
     responseText: enrichedResponse,
     cta,
@@ -1372,6 +1732,8 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     plan: {
       customerIntent: plan.customerIntent,
       funnelStage: plan.funnelStage,
+      conversationStage: plan.conversationStage,
+      buyerRole: plan.buyerRole,
       goal: plan.goal,
       topicsToDiscuss: plan.topicsToDiscuss,
       missingQualification: plan.missingQualification,
@@ -1385,6 +1747,8 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     strategy,
     momentum,
     qualityMetrics: computeQualityMetrics(memory),
+    decisionTrace,
+    debugPanel: buildDebugPanel(memory, plan, ciResult, quickReplies, nextBestAction, momentum),
   };
 }
 

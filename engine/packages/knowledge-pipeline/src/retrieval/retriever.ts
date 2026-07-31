@@ -14,8 +14,20 @@ export class KnowledgeRetriever implements Retriever {
 
   async retrieve(query: RetrievalQuery): Promise<RetrievalResult> {
     const startTime = performance.now();
+    const sanitizedQuery = query.query.trim();
 
-    const queryEmbedding = await this.embedder.embedQuery(query.query);
+    if (!sanitizedQuery) {
+      return {
+        chunks: [],
+        query: query.query,
+        retrievalTimeMs: performance.now() - startTime,
+        totalCandidates: 0,
+        usedReranker: query.useReranker || false,
+        usedHybridSearch: query.useHybridSearch || false,
+      };
+    }
+
+    const queryEmbedding = await this.embedder.embedQuery(sanitizedQuery);
 
     let results = await this.vectorStore.search(
       queryEmbedding,
@@ -23,21 +35,26 @@ export class KnowledgeRetriever implements Retriever {
       query.useHybridSearch ? query.topK * 3 : query.topK,
       query.threshold,
       query.metadataFilters,
-      query.useHybridSearch ? query.query : undefined,
+      query.useHybridSearch ? sanitizedQuery : undefined,
     );
 
     const totalCandidates = results.length;
 
     if (query.useReranker && this.reranker && results.length > 0) {
-      results = await this.reranker.rerank(query.query, results, query.topK);
+      results = await this.reranker.rerank(sanitizedQuery, results, query.topK);
     } else {
       results = results.slice(0, query.topK);
     }
 
+    const enhancedResults = results.map(r => ({
+      ...r,
+      confidence: Math.min(1, Math.max(0, r.score)),
+    }));
+
     const retrievalTimeMs = performance.now() - startTime;
 
     return {
-      chunks: results,
+      chunks: enhancedResults,
       query: query.query,
       retrievalTimeMs,
       totalCandidates,

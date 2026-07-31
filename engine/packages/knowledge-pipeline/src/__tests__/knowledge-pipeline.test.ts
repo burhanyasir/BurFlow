@@ -615,6 +615,56 @@ describe('Retrieval', () => {
     expect(results.retrievalTimeMs).toBeGreaterThanOrEqual(0);
   });
 
+  it('attaches normalized confidence to retrieved chunks', async () => {
+    const retriever = new KnowledgeRetriever(embedder, vectorStore);
+    const results = await retriever.retrieve({ query: 'cat', tenantId: 't1', topK: 3, threshold: 0 });
+    expect(results.chunks.length).toBeGreaterThan(0);
+    for (const chunk of results.chunks) {
+      expect(typeof chunk.confidence).toBe('number');
+      expect(chunk.confidence).toBeGreaterThanOrEqual(0);
+      expect(chunk.confidence).toBeLessThanOrEqual(1);
+    }
+  });
+
+  it('returns empty results for blank queries', async () => {
+    const retriever = new KnowledgeRetriever(embedder, vectorStore);
+    const results = await retriever.retrieve({ query: '   ', tenantId: 't1', topK: 3, threshold: 0 });
+    expect(results.chunks).toHaveLength(0);
+    expect(results.totalCandidates).toBe(0);
+  });
+
+  it('deletes knowledge by document and tenant without leaking to other tenants', async () => {
+    const store = new SqliteVectorStore(new Database(':memory:'), 3);
+    const sharedDocId = 'shared-doc';
+    const query = [1, 0, 0];
+
+    await store.upsert([
+      {
+        chunkId: 'shared-t1', tenantId: 't1', documentId: sharedDocId, knowledgeVersion: 1,
+        embeddingVersion: 'v1', embeddingModel: 'mock', chunkingVersion: '1', embedding: query,
+        metadata: { category: 'sales', content: 'tenant one copy' }, deleted: false,
+      },
+      {
+        chunkId: 'shared-t2', tenantId: 't2', documentId: sharedDocId, knowledgeVersion: 1,
+        embeddingVersion: 'v1', embeddingModel: 'mock', chunkingVersion: '1', embedding: query,
+        metadata: { category: 'sales', content: 'tenant two copy' }, deleted: false,
+      },
+    ]);
+
+    await store.deleteByDocument(sharedDocId, 't1');
+
+    const remainingTenantOne = await store.search(query, 't1', 10, 0);
+    const remainingTenantTwo = await store.search(query, 't2', 10, 0);
+
+    expect(remainingTenantOne).toHaveLength(0);
+    expect(remainingTenantTwo.some(r => r.documentId === sharedDocId)).toBe(true);
+  });
+
+  it('rejects unsafe metadata filter keys before executing the query', async () => {
+    const store = new SqliteVectorStore(new Database(':memory:'), 3);
+    await expect(store.search([1, 0, 0], 't1', 5, 0, { "foo;DROP TABLE users;--": 'x' }, 'hello')).rejects.toThrow(/Invalid metadata filter key/);
+  });
+
   it('enforces tenant isolation', async () => {
     const retriever = new KnowledgeRetriever(embedder, vectorStore);
     const results = await retriever.retrieve({ query: 'cat', tenantId: 't2', topK: 5, threshold: 0 });
@@ -697,6 +747,16 @@ describe('ContextAssembler', () => {
     expect(assembled.citations[0].documentTitle).toBe('Test Doc');
     expect(assembled.citations[0].sectionPath).toBe('2.1');
     expect(assembled.citations[0].snippet).toBe('Important content here');
+  });
+
+  it('includes evidence confidence on citations', async () => {
+    const results = [
+      { chunkId: 'c1', documentId: 'd1', tenantId: 't1', score: 0.75, content: 'Important content here', metadata: { sectionPath: '2.1' } },
+    ];
+    const docs = new Map([['d1', { title: 'Test Doc', sourceType: 'text' as const }]]);
+    const assembled = await assembler.assemble(results, 1000, docs);
+    expect(assembled.citations[0].confidence).toBeCloseTo(0.75, 2);
+    expect(assembled.citations[0].score).toBe(0.75);
   });
 
   it('includes source attribution in context', async () => {

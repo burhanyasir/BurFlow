@@ -1,4 +1,4 @@
-import { PersonaType, FunnelStage, ObjectionCategory, QualificationState } from './types';
+import { PersonaType, FunnelStage, ObjectionCategory, QualificationState, ConversationStage, BuyerRole, Temperature } from './types';
 import { SentimentSnapshot, ConversationIntelligenceMemory } from './conversation-intelligence-types';
 
 export type ConversationGoal =
@@ -73,6 +73,15 @@ export interface CTARecord {
   rejected: boolean;
 }
 
+export interface ButtonHistoryRecord {
+  buttonId: string;
+  label: string;
+  category?: string;
+  score: number;
+  turnNumber: number;
+  shownAt: number;
+}
+
 export interface TurnRecord {
   turnNumber: number;
   message: string;
@@ -123,6 +132,8 @@ export interface ConversationMemoryData {
   objectionsHandled: ObjectionCategory[];
 
   ctasShown: CTARecord[];
+  buttonsShown: ButtonHistoryRecord[];
+  buttonClicks: string[];
 
   buyingIntentDetected: boolean;
   buyingIntentPhrase?: string;
@@ -151,9 +162,14 @@ export interface ConversationMemoryData {
 
   usedOpenings: string[];
   currentTopic?: DiscernedTopic;
+  currentStage?: ConversationStage;
+  buyerRole?: BuyerRole;
+  customerTemperature?: Temperature;
   lastOffTopicRedirect?: string;
   contextSummary: ContextSummaryData;
   contextSummaryTurn: number;
+  buttonRejections: string[];
+  buttonAcceptances: string[];
 }
 
 export function createMemory(data?: Partial<ConversationMemoryData>): ConversationMemoryData {
@@ -167,6 +183,8 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
     qualificationCollected: { questionsAskedCount: 0, completed: false },
     objectionsHandled: [],
     ctasShown: [],
+    buttonsShown: [],
+    buttonClicks: [],
     buyingIntentDetected: false,
     trustLevel: 'medium',
     sentiment: { polarity: 0, frustration: 'low', urgency: 'low', trend: 'stable' },
@@ -180,6 +198,11 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
     isCompleted: false,
     rejectedCTAs: [],
     usedOpenings: [],
+    buttonRejections: [],
+    buttonAcceptances: [],
+    currentStage: 'greeting',
+    buyerRole: 'unknown',
+    customerTemperature: 'cold',
     contextSummary: {
       lastUpdatedAtTurn: 0,
       buyingIntent: 'low',
@@ -208,6 +231,11 @@ export function fromLegacyMemory(legacy: ConversationIntelligenceMemory): Conver
   mem.currentHelpdesk = legacy.currentHelpdesk;
   mem.budget = legacy.budget;
   mem.decisionTimeline = legacy.decisionTimeline;
+  mem.currentStage = (legacy as any).currentStage ?? 'greeting';
+  mem.buyerRole = (legacy as any).buyerRole ?? 'unknown';
+  mem.customerTemperature = (legacy as any).customerTemperature ?? 'cold';
+  mem.buttonRejections = (legacy as any).buttonRejections ?? [];
+  mem.buttonAcceptances = (legacy as any).buttonAcceptances ?? [];
 
   const stageMap: Record<FunnelStage, FunnelStageExtended> = {
     greeting: 'greeting',
@@ -253,8 +281,8 @@ export function discernTopics(message: string): DiscernedTopic[] {
   const lower = message.toLowerCase();
   const topics: DiscernedTopic[] = [];
   if (/(feature|capabilit|what do you do|what can|what does|product|platform|functionality)/i.test(lower)) topics.push('features');
-  if (/(price|pricing|cost|plan|tier|how much|subscription|overage)/i.test(lower)) topics.push('pricing');
-  if (/(integrat|zendesk|intercom|slack|widget|embed|connect|plugin|connect)/i.test(lower)) topics.push('integrations');
+  if (/(price|pricing|cost|plan|tier|how much|subscription|overage|expensive)/i.test(lower)) topics.push('pricing');
+  if (/(integrat|zendesk|intercom|slack|widget|embed|connect|plugin|shopify|woocommerce|magento|bigcommerce|ecommerce)/i.test(lower)) topics.push('integrations');
   if (/(security|compliance|soc2|soc 2|gdpr|hipaa|encrypt|data.privacy|data.residency)/i.test(lower)) topics.push('security');
   if (/(api|sdk|developer|dev|code|webhook|rest|endpoint)/i.test(lower)) topics.push('api');
   if (/(demo|trial|free|try|get.started|sandbox)/i.test(lower)) topics.push('trial');

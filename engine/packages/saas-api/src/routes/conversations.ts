@@ -24,6 +24,9 @@ export function createConversationRoutes(conversationRepo: ConversationRepositor
   router.get('/:id', (req: Request, res: Response) => {
     if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
 
+    const idErr = validateUUID(req.params.id, 'id');
+    if (idErr) return validationError(res, [idErr]);
+
     const conversation = findConversation(conversationRepo, req.user.tenantId, req.params.id);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found' });
@@ -33,6 +36,9 @@ export function createConversationRoutes(conversationRepo: ConversationRepositor
 
   router.get('/:id/messages', (req: Request, res: Response) => {
     if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+
+    const idErr = validateUUID(req.params.id, 'id');
+    if (idErr) return validationError(res, [idErr]);
 
     const conversation = findConversation(conversationRepo, req.user.tenantId, req.params.id);
     if (!conversation) {

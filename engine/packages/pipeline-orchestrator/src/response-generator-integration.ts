@@ -75,6 +75,9 @@ export function buildGeneratorInput(context: TurnContext): GeneratorInput | null
     },
     contextStack: state as Record<string, unknown>,
     knowledgeResults: (context as any).knowledgeResults || [],
+    knowledgeCitations: (context as any).knowledgeCitations || [],
+    knowledgeEvidenceConfidence: (context as any).knowledgeEvidenceConfidence || 0,
+    knowledgeLowConfidence: (context as any).knowledgeLowConfidence || false,
     currentCta: {
       primaryCTA: intel.cta?.primaryCTA || 'none',
       label: intel.cta?.label || '',

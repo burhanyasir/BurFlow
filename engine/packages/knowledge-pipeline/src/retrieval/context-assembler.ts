@@ -1,4 +1,4 @@
-import { VectorSearchResult, ContextAssemblyResult, Citation } from '../types';
+import { VectorSearchResult, ContextAssemblyResult, EvidenceCitation } from '../types';
 import { ContextAssembler } from '../interfaces';
 
 export class DefaultContextAssembler implements ContextAssembler {
@@ -25,7 +25,7 @@ export class DefaultContextAssembler implements ContextAssembler {
 
     const selected: VectorSearchResult[] = [];
     let totalTokens = 0;
-    const citations: Citation[] = [];
+    const citations: EvidenceCitation[] = [];
 
     for (const r of unique) {
       const tokens = Math.ceil(r.content.length / 4);
@@ -35,6 +35,9 @@ export class DefaultContextAssembler implements ContextAssembler {
       totalTokens += tokens;
 
       const docInfo = documents.get(r.documentId) || { title: r.documentId, sourceType: 'text' as const };
+      const score = r.score;
+      const confidence = Math.min(1, Math.max(0, score));
+      const sourceStrength = typeof (r.metadata as any)?.sourceStrength === 'number' ? (r.metadata as any).sourceStrength : undefined;
       citations.push({
         chunkId: r.chunkId,
         documentId: r.documentId,
@@ -42,6 +45,9 @@ export class DefaultContextAssembler implements ContextAssembler {
         sourceType: docInfo.sourceType as any,
         sectionPath: (r.metadata as any)?.sectionPath || '',
         snippet: r.content.slice(0, 200),
+        score,
+        confidence,
+        sourceStrength,
       });
     }
 

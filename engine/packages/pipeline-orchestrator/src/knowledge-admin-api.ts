@@ -132,7 +132,8 @@ export function createKnowledgeAdminRouter(
   router.delete('/admin/knowledge/documents/:documentId', async (req: Request, res: Response) => {
     try {
       const pid = paramId(req);
-      await vectorStore.deleteByDocument(pid);
+      const tenantId = getTenantId(req);
+      await vectorStore.deleteByDocument(pid, tenantId);
       adminStore.deleteDocument(pid);
       res.json({ status: 'deleted' });
     } catch (err: any) {
@@ -145,10 +146,11 @@ export function createKnowledgeAdminRouter(
   router.post('/admin/knowledge/documents/:documentId/reindex', async (req: Request, res: Response) => {
     try {
       const pid = paramId(req);
+      const tenantId = getTenantId(req);
       const { content } = req.body;
       if (!content) return res.status(400).json({ error: 'content is required for re-index' });
 
-      await vectorStore.deleteByDocument(pid);
+      await vectorStore.deleteByDocument(pid, tenantId);
       const result = await pipeline.processDocument(pid, content);
       adminStore.upsertDocument({
         documentId: pid,

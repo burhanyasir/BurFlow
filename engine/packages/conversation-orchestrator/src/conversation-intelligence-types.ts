@@ -73,6 +73,16 @@ export interface ConversationIntelligenceMemory {
   budget?: string;
   /** @reserved — declared for future qualification extraction; not yet populated by any engine path */
   decisionTimeline?: string;
+  currentStage?: string;
+  customerTemperature?: 'cold' | 'warm' | 'hot' | 'ready_to_buy' | 'lost';
+  trustLevel?: 'low' | 'medium' | 'high';
+  goalsAchieved?: string[];
+  buttonClicks?: string[];
+  buttonAcceptances?: string[];
+  buttonRejections?: string[];
+  leadScore?: number;
+  conversationScore?: number;
+  knowledgeEvidenceConfidence?: number;
 }
 
 export interface ConversationIntelligenceResult {

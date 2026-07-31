@@ -17,7 +17,11 @@ export * from './conversation-planner';
 export * from './conversation-validator';
 export { processConversationBrain } from './conversation-brain';
 export type { BrainInput, BrainOutput } from './conversation-brain';
+export { buttonTelemetry } from './button-telemetry';
+export type { ButtonEvent, ButtonEventType } from './button-telemetry';
 export * from './conversation-personality';
+export * from './universal-customer-journey';
+export * from './journey-telemetry';
 export { processConversationDirector } from './conversation-director';
 export type { ConversationStrategy, AgendaState, TopicLifecycle, TopicStatus, PendingQuestion, ProfileConfidence, CTATiming, ProfileConfidenceField } from './conversation-director';
 

@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { EnhancedApiKeyRepository, TenantRepository, AuditLogRepository } from '@conversation-engine/saas-core';
 import {
   requireJsonObject, validateRequiredString, validateRequiredEnum,
-  validationError, LABEL_MAX,
+  validationError, LABEL_MAX, validateUUID,
 } from '../middleware/validate';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 
@@ -40,10 +40,11 @@ const VALID_ROLES = ['admin', 'operator', 'service', 'end-user'] as const;
 export function createApiKeyRoutes(
   apiKeyRepo: EnhancedApiKeyRepository,
   tenantRepo: TenantRepository,
-  auditRepo: AuditLogRepository,
+  auditRepo?: AuditLogRepository,
 ): Router {
   const router = Router();
   const logger = createLogger('saas-api:api-keys');
+  const safeAuditRepo = auditRepo ?? { record: () => undefined } as AuditLogRepository;
 
   const adminOnly = (req: Request, res: Response, next: Function) => {
     if (!req.user?.role || !['admin', 'owner'].includes(req.user.role)) {
@@ -98,7 +99,7 @@ export function createApiKeyRoutes(
 
       syncKeyToPipeline(req.user.tenantId, key, label, role || 'end-user');
 
-      auditRepo.record(req.user.tenantId, {
+      safeAuditRepo.record(req.user.tenantId, {
         userId: req.user.sub,
         userName: req.user.name || req.user.email,
         eventType: 'api_key.created',
@@ -109,13 +110,15 @@ export function createApiKeyRoutes(
 
       res.status(201).json({
         key,
-        id: record.id,
-        label: record.label,
-        keyPrefix: record.keyPrefix,
-        role: record.role,
-        createdAt: record.createdAt,
-        expiresAt: record.expiresAt,
-        permissions: record.permissions,
+        apiKey: {
+          id: record.id,
+          label: record.label,
+          keyPrefix: record.keyPrefix,
+          role: record.role,
+          createdAt: record.createdAt,
+          expiresAt: record.expiresAt,
+          permissions: record.permissions,
+        },
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Create API key failed');
@@ -137,6 +140,9 @@ export function createApiKeyRoutes(
   router.get('/:id', (req: Request, res: Response) => {
     try {
       if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+      const idErr = validateUUID(req.params.id, 'id');
+      if (idErr) return validationError(res, [idErr]);
+
       const key = apiKeyRepo.findById(req.params.id);
       if (!key || key.tenantId !== req.user.tenantId || key.revokedAt) {
         return res.status(404).json({ error: 'API key not found' });
@@ -151,10 +157,13 @@ export function createApiKeyRoutes(
   router.put('/:id/rotate', adminOnly, (req: Request, res: Response) => {
     try {
       if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+      const idErr = validateUUID(req.params.id, 'id');
+      if (idErr) return validationError(res, [idErr]);
+
       const result = apiKeyRepo.rotate(req.params.id, req.user.tenantId);
       if (!result) return res.status(404).json({ error: 'API key not found' });
 
-      auditRepo.record(req.user.tenantId, {
+      safeAuditRepo.record(req.user.tenantId, {
         userId: req.user.sub,
         userName: req.user.name || req.user.email,
         eventType: 'api_key.rotated',
@@ -181,6 +190,9 @@ export function createApiKeyRoutes(
   router.delete('/:id', adminOnly, (req: Request, res: Response) => {
     try {
       if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+      const idErr = validateUUID(req.params.id, 'id');
+      if (idErr) return validationError(res, [idErr]);
+
       const key = apiKeyRepo.findById(req.params.id);
       if (!key || key.tenantId !== req.user.tenantId) {
         return res.status(404).json({ error: 'API key not found' });
@@ -189,7 +201,7 @@ export function createApiKeyRoutes(
       const revoked = apiKeyRepo.revoke(req.params.id, req.user.tenantId);
       if (!revoked) return res.status(404).json({ error: 'API key not found or already revoked' });
 
-      auditRepo.record(req.user.tenantId, {
+      safeAuditRepo.record(req.user.tenantId, {
         userId: req.user.sub,
         userName: req.user.name || req.user.email,
         eventType: 'api_key.deleted',
@@ -198,7 +210,10 @@ export function createApiKeyRoutes(
         details: JSON.stringify({ label: key.label }),
       });
 
-      res.status(204).send();
+      res.status(200).json({
+        message: 'API key revoked',
+        apiKey: { id: key.id, revoked: true },
+      });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Revoke API key failed');
       res.status(500).json({ error: 'Failed to revoke API key' });
@@ -208,6 +223,9 @@ export function createApiKeyRoutes(
   router.get('/:id/usage', (req: Request, res: Response) => {
     try {
       if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+      const idErr = validateUUID(req.params.id, 'id');
+      if (idErr) return validationError(res, [idErr]);
+
       const key = apiKeyRepo.findById(req.params.id);
       if (!key || key.tenantId !== req.user.tenantId || key.revokedAt) {
         return res.status(404).json({ error: 'API key not found' });

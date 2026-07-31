@@ -14,6 +14,7 @@ import {
 import { validateResponse } from '../conversation-validator';
 import { planConversation } from '../conversation-planner';
 import { processConversationBrain } from '../conversation-brain';
+import { buttonTelemetry } from '../button-telemetry';
 import { ConversationIntelligenceMemory } from '../conversation-intelligence-types';
 
 function makeLegacyMemory(overrides?: Partial<ConversationIntelligenceMemory>): ConversationIntelligenceMemory {
@@ -408,7 +409,23 @@ describe('Conversation Planner', () => {
     const plan = planConversation('How does your pricing compare to Intercom?', brain, ciResult);
     expect(plan.constraints.tone).toBe('professional');
   });
-
+ 
+  it('detects comparison stage and CEO buyer role', () => {
+    const { brain } = makeBrainMemory(3);
+    const ciResult = { objection: { isObjection: false }, funnelStage: 'evaluation', sentiment: { polarity: 0.1, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
+    const plan = planConversation('As a CEO, how do you compare with Zendesk?', brain, ciResult);
+    expect(plan.conversationStage).toBe('comparison');
+    expect(plan.buyerRole).toBe('ceo');
+  });
+ 
+  it('detects objection stage for security concerns', () => {
+    const { brain } = makeBrainMemory(3);
+    const ciResult = { objection: { isObjection: true, category: 'security' }, funnelStage: 'objection', sentiment: { polarity: -0.1, frustration: 'medium', urgency: 'low' }, trustSignal: { shouldInject: true } } as any;
+    const plan = planConversation('I am worried about data privacy', brain, ciResult);
+    expect(plan.conversationStage).toBe('objection');
+    expect(plan.goal).toBe('handle_objection');
+  });
+ 
   it('detects missing qualification fields', () => {
     const { brain } = makeBrainMemory(2);
     const ciResult = { objection: { isObjection: false }, funnelStage: 'discovery', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
@@ -473,6 +490,10 @@ describe('Conversation Planner', () => {
 // BRAIN TESTS
 // ============================================================================
 describe('Conversation Brain', () => {
+  beforeEach(() => {
+    buttonTelemetry.reset();
+  });
+
   it('processes a greeting turn', () => {
     const legacy = makeLegacyMemory();
     const result = processConversationBrain({
@@ -972,6 +993,124 @@ describe('Conversation Brain', () => {
       legacyMemory: legacy,
     });
     expect(result.memory.objectionsHandled).toContain('enterprise_procurement');
+  });
+
+  it('generates pricing quick replies for pricing inquiries', () => {
+    const { legacy } = makeBrainMemory(2);
+    const result = processConversationBrain({
+      message: 'Tell me about pricing',
+      responseText: 'Our pricing is simple and transparent.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('monthly plans'))).toBe(true);
+    expect(labels.some(l => l.includes('annual discount'))).toBe(true);
+    expect(result.quickReplies.length).toBeGreaterThanOrEqual(3);
+    expect(result.quickReplies.length).toBeLessThanOrEqual(8);
+    expect(result.decisionTrace).toBeDefined();
+    expect(result.decisionTrace?.buttonScores[result.quickReplies[0].id]).toBeDefined();
+  });
+ 
+  it('returns debug panel for pricing inquiries', () => {
+    const { legacy } = makeBrainMemory(2);
+    const result = processConversationBrain({
+      message: 'Tell me about pricing',
+      responseText: 'Our pricing is simple and transparent.',
+      legacyMemory: legacy,
+    });
+    expect(result.debugPanel).toBeDefined();
+    expect(result.debugPanel?.conversationStage).toBe('pricing');
+    expect(result.debugPanel?.customerTemperature).toBeDefined();
+    expect(result.debugPanel?.nextBestAction.action).toBeDefined();
+    expect(result.debugPanel?.conversionPrediction.likelihoodToPurchase).toBeGreaterThanOrEqual(0);
+  });
+ 
+  it('records ignored buttons and avoids recommending them again', () => {
+    const legacy = makeLegacyMemory();
+    const first = processConversationBrain({
+      message: 'Tell me about pricing',
+      responseText: 'Our pricing is simple and transparent.',
+      legacyMemory: legacy,
+      ignoredButtonIds: ['btn_free_trial'],
+    });
+    expect(first.memory.buttonRejections).toContain('btn_free_trial');
+ 
+    const second = processConversationBrain({
+      message: 'Tell me about pricing',
+      responseText: 'Our pricing is simple and transparent.',
+      legacyMemory: first.legacyMemory,
+    });
+    expect(second.quickReplies.some(q => q.id === 'btn_free_trial')).toBe(false);
+  });
+ 
+  it('records accepted buttons for future personalization', () => {
+    const legacy = makeLegacyMemory();
+    const result = processConversationBrain({
+      message: 'Book a demo',
+      responseText: 'Absolutely, I can help with that.',
+      legacyMemory: legacy,
+      clickedButtonIds: ['btn_book_demo'],
+    });
+    expect(result.memory.buttonAcceptances).toContain('btn_book_demo');
+  });
+ 
+  it('generates security quick replies for security objections', () => {
+    const { legacy } = makeBrainMemory(3);
+    const result = processConversationBrain({
+      message: 'I need to know your SOC2 and GDPR posture',
+      responseText: 'We have SOC2 Type II and GDPR controls in place.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('soc2 / iso') || l.includes('gdpr') || l.includes('security documentation'))).toBe(true);
+  });
+
+  it('generates enterprise and competitor quick replies for comparing questions', () => {
+    const { legacy } = makeBrainMemory(4);
+    legacy.persona = 'enterprise';
+    const result = processConversationBrain({
+      message: 'How do you compare with Zendesk?',
+      responseText: 'Here is how we compare with Zendesk.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('compare with zendesk') || l.includes('why choose us') || l.includes('migration guide'))).toBe(true);
+  });
+
+  it('generates qualification quick replies for buying readiness', () => {
+    const { legacy } = makeBrainMemory(3);
+    legacy.qualificationState.completed = false;
+    const result = processConversationBrain({
+      message: 'What is the right plan for our team?',
+      responseText: 'To recommend the best plan, I need a little information.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('we\'re under 10 people') || l.includes('10-50 employees') || l.includes('not sure'))).toBe(true);
+  });
+
+  it('generates demo and trial quick replies for buying intent', () => {
+    const { legacy } = makeBrainMemory(4);
+    legacy.buyingIntentDetected = true;
+    legacy.qualificationState.completed = true;
+    const result = processConversationBrain({
+      message: 'I want to start a free trial',
+      responseText: 'Great, I can help you get started with a trial.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('free trial') || l.includes('book a demo'))).toBe(true);
+  });
+
+  it('generates support quick replies for support inquiries', () => {
+    const { legacy } = makeBrainMemory(3);
+    const result = processConversationBrain({
+      message: 'I need support for setup',
+      responseText: 'Our support team is available to help.',
+      legacyMemory: legacy,
+    });
+    const labels = result.quickReplies.map(q => q.label.toLowerCase());
+    expect(labels.some(l => l.includes('contact support') || l.includes('setup guide'))).toBe(true);
   });
 
   it('handles "really" question with acknowledgment', () => {

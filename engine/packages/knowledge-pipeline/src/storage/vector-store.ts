@@ -76,12 +76,17 @@ export class SqliteVectorStore implements VectorStore {
   }
 
   async search(query: number[], tenantId: string, topK: number, threshold = 0.0, filters?: Record<string, unknown>, queryText?: string): Promise<VectorSearchResult[]> {
+    if (!tenantId || typeof tenantId !== 'string') {
+      return [];
+    }
+
     let sql = 'SELECT chunk_id, document_id, tenant_id, embedding, content, metadata, knowledge_version FROM knowledge_vectors WHERE tenant_id = ? AND deleted = 0';
     const params: any[] = [tenantId];
 
     if (filters) {
       for (const [key, value] of Object.entries(filters)) {
-        sql += ` AND json_extract(metadata, '$.${key}') = ?`;
+        const normalizedKey = this.validateMetadataKey(key);
+        sql += ` AND json_extract(metadata, '$.${normalizedKey}') = ?`;
         params.push(String(value));
       }
     }
@@ -147,7 +152,8 @@ export class SqliteVectorStore implements VectorStore {
       const contentLower = row.content.toLowerCase();
       let score = 0;
       for (const term of terms) {
-        const tf = (contentLower.match(new RegExp(term, 'g')) || []).length;
+        const safeTerm = this.escapeRegExp(term);
+        const tf = (contentLower.match(new RegExp(safeTerm, 'g')) || []).length;
         if (tf > 0) {
           score += (idf.get(term) || 0) * ((tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (docLen / avgDocLen))));
         }
@@ -172,7 +178,11 @@ export class SqliteVectorStore implements VectorStore {
     })();
   }
 
-  async deleteByDocument(documentId: string): Promise<void> {
+  async deleteByDocument(documentId: string, tenantId?: string): Promise<void> {
+    if (tenantId) {
+      this.db.prepare('DELETE FROM knowledge_vectors WHERE document_id = ? AND tenant_id = ?').run(documentId, tenantId);
+      return;
+    }
     this.db.prepare('DELETE FROM knowledge_vectors WHERE document_id = ?').run(documentId);
   }
 
@@ -189,6 +199,18 @@ export class SqliteVectorStore implements VectorStore {
   async reindex(records: VectorRecord[]): Promise<void> {
     await this.hardDelete(records.map(r => r.chunkId));
     await this.upsert(records);
+  }
+
+  private validateMetadataKey(key: string): string {
+    const normalized = key.trim();
+    if (!normalized || normalized.includes('..') || !/^[A-Za-z0-9_.-]+$/.test(normalized)) {
+      throw new Error(`Invalid metadata filter key: ${key}`);
+    }
+    return normalized;
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {

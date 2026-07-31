@@ -294,7 +294,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
     }
 
     const vectorStore = getVectorStore(deps);
-    vectorStore.deleteByDocument(req.params.id).then(() => {
+    vectorStore.deleteByDocument(req.params.id, req.user.tenantId).then(() => {
       res.json({ message: 'Source deleted', documentId: req.params.id });
     }).catch(() => {
       res.status(500).json({ error: 'Failed to delete source' });

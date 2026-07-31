@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { SessionStore, SessionRecord } from '@conversation-engine/session-store';
 import { createLogger } from '@conversation-engine/logger';
 import { AdminStore } from './admin-store';
+import { buttonTelemetry } from '@conversation-engine/conversation-orchestrator';
 
 const logger = createLogger('admin-api');
 
@@ -27,6 +28,12 @@ interface IntelligenceMemory {
   qualificationState: Record<string, unknown>;
   repeatedPhraseCount: number;
   topics: string[];
+  currentStage?: string;
+  customerTemperature?: string;
+  trustLevel?: 'low' | 'medium' | 'high';
+  goalsAchieved?: string[];
+  leadScore?: number;
+  conversationScore?: number;
 }
 
 interface SessionSummary {
@@ -40,6 +47,9 @@ interface SessionSummary {
   persona: string;
   funnelStage: string;
   buyingIntentDetected: boolean;
+  currentStage: string;
+  customerTemperature: string;
+  trustLevel: 'low' | 'medium' | 'high';
   hasIntel: boolean;
 }
 
@@ -52,6 +62,9 @@ interface SessionDetail extends SessionSummary {
   buyingIntentPhrase?: string;
   buyingIntentTier?: string;
   state: string;
+  goalsAchieved?: string[];
+  leadScore?: number;
+  conversationScore?: number;
 }
 
 function parseIntel(state: string): IntelligenceMemory | null {
@@ -61,6 +74,94 @@ function parseIntel(state: string): IntelligenceMemory | null {
     if (intel && typeof intel === 'object') return intel as IntelligenceMemory;
   } catch {}
   return null;
+}
+
+export function buildAdminAnalyticsReport(sessions: SessionRecord[]) {
+  const withIntel = sessions.map(s => ({ s, intel: parseIntel(s.state) })).filter(x => x.intel);
+  const total = withIntel.length;
+  const stageCounts: Record<string, number> = {};
+  const temperatureCounts: Record<string, number> = {};
+  const trustCounts: Record<string, number> = {};
+  const objections: string[] = [];
+  let turnSum = 0;
+  let buyingIntentCount = 0;
+  let qualifiedCount = 0;
+  let demoBookings = 0;
+  let trialStarts = 0;
+  let purchases = 0;
+  let leadScoreTotal = 0;
+  let conversationScoreTotal = 0;
+  let knowledgeConfidenceTotal = 0;
+  let knowledgeConfidenceCount = 0;
+
+  for (const { s, intel } of withIntel) {
+    const stage = intel.currentStage || intel.funnelStage || 'greeting';
+    stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+    const temp = intel.customerTemperature || 'cold';
+    temperatureCounts[temp] = (temperatureCounts[temp] || 0) + 1;
+    const trust = intel.trustLevel || 'medium';
+    trustCounts[trust] = (trustCounts[trust] || 0) + 1;
+    objections.push(...intel.objections);
+    turnSum += intel.turns.length;
+    if (intel.buyingIntentDetected) buyingIntentCount += 1;
+    if (intel.qualificationState?.completed === true) qualifiedCount += 1;
+    const goals = intel.goalsAchieved || [];
+    if (goals.includes('schedule_demo')) demoBookings += 1;
+    if (goals.includes('close_trial')) trialStarts += 1;
+    if (goals.includes('finish_conversation')) purchases += 1;
+    if (typeof intel.leadScore === 'number') leadScoreTotal += intel.leadScore;
+    if (typeof intel.conversationScore === 'number') conversationScoreTotal += intel.conversationScore;
+    if (typeof (intel as any).knowledgeEvidenceConfidence === 'number') {
+      knowledgeConfidenceTotal += (intel as any).knowledgeEvidenceConfidence;
+      knowledgeConfidenceCount += 1;
+    }
+  }
+
+  const topObjections = Object.entries(objections.reduce<Record<string, number>>((acc, obj) => {
+    acc[obj] = (acc[obj] || 0) + 1;
+    return acc;
+  }, {})).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }));
+
+  const topButtons = Object.entries(buttonTelemetry.snapshot().byButton)
+    .map(([buttonId, metrics]) => ({ buttonId, ...metrics }))
+    .sort((a, b) => b.ctr - a.ctr)
+    .slice(0, 10);
+
+  const stageDistribution = Object.entries(stageCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([stage, count]) => ({ stage, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }));
+
+  const temperatureDistribution = Object.entries(temperatureCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([temperature, count]) => ({ temperature, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }));
+
+  const trustDistribution = Object.entries(trustCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([trust, count]) => ({ trust, count, percentage: total > 0 ? Math.round((count / total) * 100) : 0 }));
+
+  return {
+    totalSessions: total,
+    avgConversationScore: total > 0 ? Math.round(conversationScoreTotal / total) : 0,
+    avgLeadScore: total > 0 ? Math.round(leadScoreTotal / total) : 0,
+    avgSentiment: 0,
+    avgBuyingIntentRate: total > 0 ? Math.round((buyingIntentCount / total) * 100) : 0,
+    topObjections,
+    topCtaClicks: topButtons,
+    mostCommonFunnelEntry: stageDistribution.length > 0 ? stageDistribution[0].stage : '',
+    mostCommonFunnelExit: stageDistribution.length > 0 ? stageDistribution[stageDistribution.length - 1].stage : '',
+    qualificationCompletionRate: total > 0 ? Math.round((qualifiedCount / total) * 100) : 0,
+    avgTurns: total > 0 ? Math.round(turnSum / total) : 0,
+    escalationRate: 0,
+    handoffRate: 0,
+    stageDistribution,
+    temperatureDistribution,
+    trustDistribution,
+    demoBookings,
+    trialStarts,
+    purchases,
+    conversionRate: total > 0 ? Math.round((purchases / total) * 100) : 0,
+    avgKnowledgeConfidence: knowledgeConfidenceCount > 0 ? Math.round((knowledgeConfidenceTotal / knowledgeConfidenceCount) * 100) / 100 : 0,
+  };
 }
 
 function getTenantId(req: Request): string {
@@ -102,6 +203,9 @@ export function createAdminRouter(sessionStore: SessionStore, adminStore: AdminS
       turnCount: intel?.turns?.length ?? 0,
       persona: intel?.persona ?? 'unknown',
       funnelStage: intel?.funnelStage ?? 'greeting',
+      currentStage: intel?.currentStage || intel?.funnelStage || 'greeting',
+      customerTemperature: intel?.customerTemperature || 'cold',
+      trustLevel: intel?.trustLevel || 'medium',
       buyingIntentDetected: intel?.buyingIntentDetected ?? false,
       hasIntel: intel !== null,
     };
@@ -119,6 +223,9 @@ export function createAdminRouter(sessionStore: SessionStore, adminStore: AdminS
       buyingIntentPhrase: intel?.buyingIntentPhrase,
       buyingIntentTier: intel?.buyingIntentTier,
       state: s.state,
+      goalsAchieved: intel?.goalsAchieved,
+      leadScore: intel?.leadScore,
+      conversationScore: intel?.conversationScore,
     };
   }
 
@@ -196,56 +303,8 @@ export function createAdminRouter(sessionStore: SessionStore, adminStore: AdminS
     try {
       const tenantId = getTenantId(req);
       const { sessions } = await sessionStore.listSessions(tenantId, 500, 0);
-
-      const withIntel = sessions.map(s => ({ s, intel: parseIntel(s.state) })).filter(x => x.intel);
-
-      const total = withIntel.length;
-      if (total === 0) {
-        return res.json({
-          totalSessions: 0, avgConversationScore: 0, avgLeadScore: 0, avgSentiment: 0,
-          avgBuyingIntentRate: 0, topObjections: [], topCtaClicks: [],
-          mostCommonFunnelExit: '', mostCommonFunnelEntry: '',
-          qualificationCompletionRate: 0, avgTurns: 0, escalationRate: 0, handoffRate: 0,
-        });
-      }
-
-      const funnelStages = withIntel.map(x => x.intel!.funnelStage);
-      const objections = withIntel.flatMap(x => x.intel!.objections);
-      const turnCounts = withIntel.map(x => x.intel!.turns.length);
-      const buyingIntentCount = withIntel.filter(x => x.intel!.buyingIntentDetected).length;
-      const qualifiedCount = withIntel.filter(x => x.intel!.qualificationState?.completed === true).length;
-
-      const objectionCounts: Record<string, number> = {};
-      for (const obj of objections) {
-        objectionCounts[obj] = (objectionCounts[obj] || 0) + 1;
-      }
-      const topObjections = Object.entries(objectionCounts)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 5)
-        .map(([name, count]) => ({ name, count, percentage: Math.round((count / total) * 100) }));
-
-      const stageCounts: Record<string, number> = {};
-      for (const stage of funnelStages) {
-        stageCounts[stage] = (stageCounts[stage] || 0) + 1;
-      }
-      const sortedStages = Object.entries(stageCounts).sort((a, b) => b[1] - a[1]);
-
-      res.json({
-        totalSessions: total,
-        avgConversationScore: 0,
-        avgLeadScore: 0,
-        avgSentiment: 0,
-        avgBuyingIntentRate: total > 0 ? Math.round((buyingIntentCount / total) * 100) : 0,
-        topObjections,
-        topCtaClicks: [],
-        mostCommonFunnelEntry: sortedStages.length > 0 ? sortedStages[0][0] : '',
-        mostCommonFunnelExit: sortedStages.length > 0 ? sortedStages[sortedStages.length - 1]?.[0] ?? '' : '',
-        qualificationCompletionRate: total > 0 ? Math.round((qualifiedCount / total) * 100) : 0,
-        avgTurns: total > 0 ? Math.round(turnCounts.reduce((a, b) => a + b, 0) / total) : 0,
-        escalationRate: 0,
-        handoffRate: 0,
-        stageDistribution: sortedStages.map(([stage, count]) => ({ stage, count, percentage: Math.round((count / total) * 100) })),
-      });
+      const report = buildAdminAnalyticsReport(sessions);
+      res.json(report);
     } catch (err: any) {
       logger.error({ err }, 'Failed to compute analytics');
       res.status(500).json({ error: 'Failed to compute analytics' });

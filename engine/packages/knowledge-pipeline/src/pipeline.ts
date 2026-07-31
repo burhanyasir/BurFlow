@@ -132,7 +132,7 @@ export class KnowledgePipeline {
       const embedded = await this.embedder.embed(chunks, embeddingConfig);
       this.updateStatus(documentId, 'indexed');
 
-      await this.vectorStore.deleteByDocument(documentId);
+      await this.vectorStore.deleteByDocument(documentId, queueItem.tenantId);
 
       const records: VectorRecord[] = embedded.map(e => ({
         chunkId: e.chunk.chunkId,

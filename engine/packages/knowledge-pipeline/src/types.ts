@@ -143,11 +143,23 @@ export interface RetrievalResult {
   usedHybridSearch: boolean;
 }
 
+export interface EvidenceCitation {
+  chunkId: string;
+  documentId: string;
+  documentTitle: string;
+  sourceType: SourceType;
+  sectionPath: string;
+  snippet: string;
+  score: number;
+  confidence: number;
+  sourceStrength?: number;
+}
+
 export interface ContextAssemblyResult {
   context: string;
   chunks: VectorSearchResult[];
   tokenCount: number;
-  citations: Citation[];
+  citations: EvidenceCitation[];
 }
 
 export interface Citation {
