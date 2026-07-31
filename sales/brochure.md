@@ -1,8 +1,8 @@
-# BrightSmile AI — One-Page Brochure
+# BurFlow AI — One-Page Brochure
 
-**BrightSmile AI**
+**BurFlow AI**
 AI chat assistants for local service businesses.
-brightsmile.ai · hello@brightsmile.ai
+BurFlow.ai · hello@BurFlow.ai
 
 ---
 
@@ -26,11 +26,11 @@ Dental · Restaurants · Law Firms · Gyms · Real Estate · Salons
 | Growth | $599/mo | Multi-location, branding |
 | Enterprise | $999/mo | White-label, integrations |
 
-## A Day With BrightSmile AI
+## A Day With BurFlow AI
 - 2:14 AM — Visitor asks about teeth whitening → assistant quotes price, offers booking
 - 9:30 AM — Emergency patient booked into urgent slot
 - 1:00 PM — Lead captured with email + phone
 - 4:45 PM — Insurance question answered accurately
 
 ## Get Started
-Book a free demo: brightsmile.ai/book
+Book a free demo: BurFlow.ai/book

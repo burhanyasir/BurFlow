@@ -437,7 +437,7 @@
         <div class="card">
           <div class="card-header"><div class="card-title">Branding</div><button class="btn btn-sm btn-primary" onclick="window.__saveTenant('${id}')">Save</button></div>
           <div class="form-group"><label>Brand Name</label><input id="b-name" value="${esc(t.brand_name)}"></div>
-          <div class="form-group"><label>Subdomain</label><input id="b-sub" value="${esc(t.subdomain)}"><div class="hint">Used for the hosted widget: <code class="inline">${esc(t.subdomain)}.brightsmile.ai</code></div></div>
+          <div class="form-group"><label>Subdomain</label><input id="b-sub" value="${esc(t.subdomain)}"><div class="hint">Used for the hosted widget: <code class="inline">${esc(t.subdomain)}.BurFlow.ai</code></div></div>
           <div class="form-group"><label>Custom Domain</label><input id="b-dom" value="${esc(t.custom_domain || "")}"></div>
           <div class="form-group"><label>Logo URL</label><input id="b-logo" value="${esc(t.brand_logo_url)}"></div>
           <div class="form-row">

@@ -1,9 +1,9 @@
 version: "3.9"
 
 services:
-  brightsmile:
+  BurFlow:
     build: .
-    container_name: brightsmile-ai
+    container_name: BurFlow-ai
     ports:
       - "3456:3456"
     environment:
@@ -19,22 +19,22 @@ services:
       start_period: 10s
     # Uncomment for persistent storage:
     # volumes:
-    #   - brightsmile-data:/app/data
+    #   - BurFlow-data:/app/data
     # depends_on:
     #   - postgres
 
   # Uncomment when PostgreSQL is needed:
   # postgres:
   #   image: postgres:16-alpine
-  #   container_name: brightsmile-db
+  #   container_name: BurFlow-db
   #   environment:
-  #     - POSTGRES_DB=brightsmile
-  #     - POSTGRES_USER=brightsmile
+  #     - POSTGRES_DB=BurFlow
+  #     - POSTGRES_USER=BurFlow
   #     - POSTGRES_PASSWORD=change-me
   #   volumes:
   #     - pgdata:/var/lib/postgresql/data
   #   restart: unless-stopped
 
 # volumes:
-#   brightsmile-data:
+#   BurFlow-data:
 #   pgdata:

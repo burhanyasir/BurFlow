@@ -1,13 +1,13 @@
 const demoData = {
   clinic: {
-    name: "BrightSmile Dental Care",
+    name: "BurFlow Dental Care",
     address: "123 Wellness Ave, Suite 200",
     phone: "(555) 234-5678",
-    email: "hello@brightsmile.demo",
+    email: "hello@BurFlow.demo",
     hours: "Monday through Friday 8:00 AM - 6:00 PM, Saturday 9:00 AM - 2:00 PM",
     rating: "4.8",
     paymentProvider: "CareCredit",
-    assistantName: "BrightSmile AI",
+    assistantName: "BurFlow AI",
     pediatricServiceLabel: "pediatric dentistry",
     customerLabel: "Patient",
     clientNoun: "patients",
@@ -72,7 +72,7 @@ const demoData = {
       appointmentTime: "2026-07-18T09:30:00Z",
       messages: [
         { role: "visitor", text: "I need to schedule my 6-month checkup and cleaning." },
-        { role: "ai", text: "I'd be happy to help! Are you an existing patient at BrightSmile Dental Care?" },
+        { role: "ai", text: "I'd be happy to help! Are you an existing patient at BurFlow Dental Care?" },
         { role: "visitor", text: "Yes, I've been coming here for about 2 years." },
         { role: "ai", text: "Great, welcome back! We have availability next Monday at 9:30 AM or Wednesday at 11:00 AM. Which works for you?" },
         { role: "visitor", text: "Monday at 9:30 works great." },
@@ -93,7 +93,7 @@ const demoData = {
       appointmentBooked: false,
       messages: [
         { role: "visitor", text: "I'm considering Invisalign. How much does it cost and how long does it take?" },
-        { role: "ai", text: "Great question! Invisalign treatment at BrightSmile ranges from $3,000-$5,000 depending on your case complexity. Most patients complete treatment in 6-18 months. We offer flexible payment plans starting at $150/month. Would you like to book a free consultation to see if you're a candidate?" },
+        { role: "ai", text: "Great question! Invisalign treatment at BurFlow ranges from $3,000-$5,000 depending on your case complexity. Most patients complete treatment in 6-18 months. We offer flexible payment plans starting at $150/month. Would you like to book a free consultation to see if you're a candidate?" },
         { role: "visitor", text: "That's helpful. Does insurance cover any of it?" },
         { role: "ai", text: "Many dental insurance plans cover 20-50% of orthodontic treatment. We can verify your benefits and provide a detailed estimate. We also accept HSA/FSA payments. Would you like me to check your insurance coverage?" },
         { role: "visitor", text: "Yes, please! My insurance is Cigna PPO." },
@@ -156,7 +156,7 @@ const demoData = {
       appointmentTime: "2026-07-15T14:00:00Z",
       messages: [
         { role: "visitor", text: "Hi! I just moved to the area and need to find a new dentist." },
-        { role: "ai", text: "Welcome to the neighborhood! We'd love to have you at BrightSmile Dental Care. We're located at 123 Wellness Ave, Suite 200, right near the new shopping center. Would you like to come in for a new patient exam and cleaning?" },
+        { role: "ai", text: "Welcome to the neighborhood! We'd love to have you at BurFlow Dental Care. We're located at 123 Wellness Ave, Suite 200, right near the new shopping center. Would you like to come in for a new patient exam and cleaning?" },
         { role: "visitor", text: "That sounds perfect. What's included in the new patient exam?" },
         { role: "ai", text: "Our new patient package includes a comprehensive exam, digital X-rays, oral cancer screening, professional cleaning, and a personalized treatment plan. It's $150 and includes everything. We also offer a $50 discount for new patients!" },
         { role: "visitor", text: "Great! Can I book for next Wednesday?" },
@@ -198,7 +198,7 @@ const demoData = {
       appointmentBooked: false,
       messages: [
         { role: "visitor", text: "How much do dental implants cost?" },
-        { role: "ai", text: "Dental implants at BrightSmile range from $3,000-$4,500 per tooth, depending on the complexity. This includes the implant, abutment, and crown. We offer payment plans through CareCredit with 0% financing for 6-12 months." },
+        { role: "ai", text: "Dental implants at BurFlow range from $3,000-$4,500 per tooth, depending on the complexity. This includes the implant, abutment, and crown. We offer payment plans through CareCredit with 0% financing for 6-12 months." },
         { role: "visitor", text: "That's helpful, thanks for the information." },
         { role: "ai", text: "You're welcome! Would you like to book a free consultation to see if implants are right for you? Dr. Patel can create a customized treatment plan." },
         { role: "visitor", text: "Not right now, but I'll keep you in mind." },

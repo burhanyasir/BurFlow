@@ -1,7 +1,7 @@
-# BrightSmile AI — Investor & Sales Pitch Deck
+# BurFlow AI — Investor & Sales Pitch Deck
 
 ## Slide 1 — Title
-**BrightSmile AI**
+**BurFlow AI**
 Turn every website visitor into a booked appointment.
 Agency platform for local service businesses.
 
@@ -51,4 +51,4 @@ One console to launch and manage hundreds of clients.
 
 ## Slide 10 — The Ask
 Let's deploy your first client this week.
-Book a demo: brightsmile.ai/book
+Book a demo: BurFlow.ai/book
