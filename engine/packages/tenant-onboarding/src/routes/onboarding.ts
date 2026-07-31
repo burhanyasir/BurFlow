@@ -18,7 +18,8 @@ router.post('/start', async (req: Request, res: Response) => {
 // Submit step
 router.post('/:onboardingId/step', async (req: Request, res: Response) => {
   try {
-    const { onboardingId } = req.params;
+    const raw = req.params.onboardingId;
+    const onboardingId = Array.isArray(raw) ? raw[0] : (raw || '');
     const step = req.body;
     const result = await service.submitStep(onboardingId, step);
     res.json(result);
@@ -30,7 +31,8 @@ router.post('/:onboardingId/step', async (req: Request, res: Response) => {
 // Finalize and create tenant
 router.post('/:onboardingId/complete', async (req: Request, res: Response) => {
   try {
-    const { onboardingId } = req.params;
+    const raw = req.params.onboardingId;
+    const onboardingId = Array.isArray(raw) ? raw[0] : (raw || '');
     const tenant = await service.complete(onboardingId);
     res.status(201).json(tenant);
   } catch (err: any) {
