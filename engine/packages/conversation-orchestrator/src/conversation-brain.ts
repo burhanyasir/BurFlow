@@ -14,6 +14,7 @@ import {
   isTopicExplained,
   isCTARejected,
   isGoalAchieved,
+  extractSalesSignals,
 } from './conversation-memory';
 import { planConversation } from './conversation-planner';
 import { validateResponse } from './conversation-validator';
@@ -207,6 +208,15 @@ interface QRDef {
   id: string; label: string; payload: string; variant: 'primary' | 'secondary' | 'outline'; action?: 'send_text' | 'navigate';
 }
 
+function getContextPrefix(memory: ConversationMemoryData, relevantFacts: RelevantKnownFacts): string | null {
+  const persona = memory.persona && memory.persona !== 'unknown' ? memory.persona.replace(/_/g, ' ') : null;
+  if (relevantFacts.industry) return `For ${relevantFacts.industry} teams, this is especially relevant.`;
+  if (persona) return `For ${persona} teams, this is especially relevant.`;
+  if (relevantFacts.useCase) return `For ${relevantFacts.useCase} use cases, this is especially relevant.`;
+  if (relevantFacts.companySize) return `For a ${relevantFacts.companySize}-person team, this is especially relevant.`;
+  return null;
+}
+
 const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
   build_trust: [
     { id: 'qr_how_works', label: 'How It Works', payload: 'How does the grounding engine work?', variant: 'secondary' },
@@ -267,6 +277,17 @@ const PERSONA_SPECIFIC_CTA: Partial<Record<PersonaType, { primary: CTAType; labe
   agency: { primary: 'partner_program', label: 'Join Partner Program', link: '/contact' },
 };
 
+function inferPersonaFromMessage(message: string, memory: ConversationMemoryData): PersonaType {
+  const lower = message.toLowerCase();
+  if (/(shopify|woocommerce|magento|cart|checkout|ecommerce|store)/i.test(lower)) return 'ecommerce';
+  if (/(zendesk|intercom|freshdesk|customer support|support manager|ticket deflection|help desk)/i.test(lower)) return 'support_manager';
+  if (/(startup|founder|co-founder|saas|early stage|seed)/i.test(lower)) return 'startup';
+  if (/(enterprise|procurement|sso|soc 2|tam|security questionnaire|vpc)/i.test(lower)) return 'enterprise';
+  if (/(developer|api|sdk|webhook|code|integration)/i.test(lower)) return 'developer';
+  if (memory.persona !== 'unknown') return memory.persona;
+  return 'unknown';
+}
+
 function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent }, memory: ConversationMemoryData): CTASelectionResult {
   if (memory.isLeaving || plan.goal === 'finish_conversation') {
     return {
@@ -301,7 +322,30 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
   }
 
   if (plan.goal === 'handle_objection') {
-    if (isCTARejected(memory, 'start_free_trial')) {
+    const hasProofGap = memory.trustLevel === 'low' || memory.salesSignals.trustIssues.length > 0 || memory.salesSignals.objections.length > 0;
+    const hasBuyingSignal = memory.buyingIntentDetected || memory.qualificationCollected.completed || memory.salesSignals.timelineSignals.length > 0;
+    const hasPriceObjection = memory.objectionsHandled.includes('price') || memory.salesSignals.objections.includes('price') || memory.salesSignals.budget === 'budget-sensitive';
+    if (hasPriceObjection && !hasProofGap) {
+      return {
+        primaryCTA: 'start_free_trial',
+        label: 'Start 14-Day Free Trial',
+        link: '/signup',
+        secondaryCTA: 'book_demo',
+        secondaryLabel: 'Book a Demo',
+        secondaryLink: '/demo',
+      };
+    }
+    if (hasBuyingSignal) {
+      return {
+        primaryCTA: 'start_free_trial',
+        label: 'Start 14-Day Free Trial',
+        link: '/signup',
+        secondaryCTA: 'book_demo',
+        secondaryLabel: 'Book a Demo',
+        secondaryLink: '/demo',
+      };
+    }
+    if (hasProofGap || isCTARejected(memory, 'start_free_trial')) {
       return {
         primaryCTA: 'book_demo',
         label: 'Book a Demo',
@@ -312,12 +356,12 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
       };
     }
     return {
-      primaryCTA: 'start_free_trial',
-      label: 'Start Free Trial',
-      link: '/signup',
-      secondaryCTA: 'book_demo',
-      secondaryLabel: 'See a Demo',
-      secondaryLink: '/demo',
+      primaryCTA: 'book_demo',
+      label: 'See a Demo',
+      link: '/demo',
+      secondaryCTA: 'contact_sales',
+      secondaryLabel: 'Talk to Sales',
+      secondaryLink: '/contact',
     };
   }
 
@@ -374,11 +418,13 @@ function buildStrategyResponse(
   strategy: ConversationStrategy,
   message: string,
   memory: ConversationMemoryData,
-  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended; missingQualification: string[] },
+  plan: { goal: ConversationGoal; customerIntent: CustomerIntent; funnelStage: FunnelStageExtended; missingQualification: string[]; topicsToDiscuss?: DiscernedTopic[] },
   ciResult: ConversationIntelligenceResult,
   relevantFacts: RelevantKnownFacts,
 ): string {
   const parts: string[] = [];
+
+  const topicForResponse = strategy.topicToAnswer ?? (plan.topicsToDiscuss?.[0] as DiscernedTopic | undefined) ?? memory.currentTopic ?? null;
 
   // 0. Personalized opening based on user context and buying intent
   if (relevantFacts.buyingIntent) {
@@ -395,15 +441,49 @@ function buildStrategyResponse(
     }
   }
 
-  // 1. Topic-specific core content (only if topicToAnswer is set)
-  if (strategy.topicToAnswer) {
-    const topicContent = buildTopicResponse(strategy.topicToAnswer, memory, ciResult);
+  // 1. Topic-specific core content (use the strategy topic, or a planned next topic when relevant)
+  if (topicForResponse) {
+    const topicContent = buildTopicResponse(topicForResponse, memory, ciResult);
     if (topicContent) parts.push(topicContent);
   }
 
   // 2. Goal-specific content based on strategy
-  const goalContent = buildGoalContent(strategy, memory, plan, ciResult);
+  const goalContent = buildGoalContent(strategy, message, memory, plan, ciResult);
   if (goalContent) parts.push(goalContent);
+
+  // 2b. Strategy-chosen action (planner-directed) — override or augment goal behavior
+  if (strategy.chosenAction) {
+    const act = strategy.chosenAction.action;
+    if (act === 'ask_qualification') {
+      const qLabel = strategy.qualificationQuestion || (plan.missingQualification && plan.missingQualification[0]) || '';
+      if (qLabel) {
+        const qText = getQualificationQuestion(qLabel);
+        if (!parts.join(' ').includes(qText.slice(0, 30))) {
+          parts.push(qText);
+          memory.questionsAnswered.push(qLabel);
+        }
+      }
+    }
+    if (act === 'book_demo') {
+      const booking = 'I can book a short 15-minute demo to walk through this — what day/time works for you?';
+      if (!parts.join(' ').includes(booking)) parts.push(booking);
+      // prefer demo CTA
+      memory.lastCta = 'book_demo';
+    }
+    if (act === 'offer_trial') {
+      const trial = 'You can try our 14-day free trial to evaluate it with your own data — would you like a link to get started?';
+      if (!parts.join(' ').includes(trial)) parts.push(trial);
+      memory.lastCta = 'start_free_trial';
+    }
+    if (act === 'show_proof' || act === 'handle_objection') {
+      if (ciResult.objection && ciResult.objection.groundedAnswer) {
+        const proof = ciResult.objection.groundedAnswer.split(/[.!?]/).map(s => s.trim()).filter(Boolean)[0];
+        if (proof) parts.push(`To address that directly: ${proof}`);
+      } else if (memory.trustLevel === 'low') {
+        parts.push('I understand your concern — we use AES-256 encryption, SOC 2 Type II compliance, and role-based access controls.');
+      }
+    }
+  }
 
   // 3. Qualification question (from strategy) with natural variation
   if (strategy.qualificationQuestion) {
@@ -477,6 +557,12 @@ function buildStrategyResponse(
   // 8. Opening (if not already present) — incorporate memory facts when available
   const opening = getOpening(strategy.primaryGoal, memory);
   let response = parts.join(' ').trim();
+  if (response.length > 5) {
+    const contextPrefix = getContextPrefix(memory, relevantFacts);
+    if (contextPrefix && !response.toLowerCase().includes(contextPrefix.toLowerCase().trim())) {
+      response = `${contextPrefix} ${response}`;
+    }
+  }
   if (opening && response.length > 5) {
     const lower = response.toLowerCase();
     const skipOpenings = /^(hi|hello|hey|thanks|thank you|welcome|take care)/i.test(response.trim());
@@ -542,12 +628,16 @@ function buildGoalContent(
   ciResult: ConversationIntelligenceResult,
 ): string {
   const parts: string[] = [];
+  if (plan.goal === 'build_trust') {
+    parts.push('We can help you evaluate this with confidence.');
+  }
+
   if (plan.goal === 'qualify') {
-    // Natural transition acknowledgment between successive qualification questions
     if (memory.lastGoal === 'qualify') {
       const transitions = ['Great, thanks. ', 'Perfect, that helps. ', 'Got it. ', 'Appreciate that. '];
       parts.push(transitions[memory.turnCount % transitions.length]);
     }
+    parts.push('To recommend the right plan, I just need a bit more context about company size, industry, monthly volume, and your current setup.');
     if (memory.companyName) {
       if (memory.companySize) {
         parts.push(`${memory.companyName} is a ${memory.companySize} company.`);
@@ -557,6 +647,35 @@ function buildGoalContent(
       }
     }
   }
+
+  if (plan.goal === 'handle_objection') {
+    if (ciResult.objection.groundedAnswer) {
+      const proof = ciResult.objection.groundedAnswer
+        .split(/[.!?]/)
+        .map(s => s.trim())
+        .filter(Boolean)[0] || ciResult.objection.groundedAnswer;
+      parts.push(`I understand the concern. ${proof}`);
+    } else {
+      parts.push('I understand the concern and want to address it directly.');
+    }
+  }
+
+  if (plan.goal === 'answer_question') {
+    parts.push('Here is the most relevant detail for your situation.');
+  }
+
+  if (plan.goal === 'advance_funnel') {
+    parts.push('We can take the next step from here.');
+  }
+
+  if (plan.goal === 'recommend_plan') {
+    parts.push('I would recommend the plan that best fits your context.');
+  }
+
+  if (plan.goal === 'close_trial' || plan.goal === 'schedule_demo') {
+    parts.push('You can get started right away.');
+  }
+
   return parts.join(' ') || '';
 }
 
@@ -564,8 +683,8 @@ function buildGoalContent(
 const QUAL_QUESTION_VARIANTS: Record<string, string[]> = {
   'company size': [
     'What is your company size?',
-    'How many people are on your support team?',
-    'What size team do you have?',
+  'What company size is your team?',
+  'What is your company size and team size?',
   ],
   'industry': [
     'What industry are you in?',
@@ -607,15 +726,15 @@ function getQualificationQuestion(label: string): string {
 
 const TOPIC_RESPONSE_TEMPLATES: Record<DiscernedTopic, string[]> = {
   features: [
-    'The core of it is workflow automation — routing tickets, triggering actions, and keeping everything in one place. Most teams get their first automation running in about 10 minutes.',
-    'The automation engine lets you build conditional workflows — if-then logic, SLA escalations, skill-based assignments. Think of it as a traffic controller for every ticket.',
-    'On the analytics side, dashboards show response times, resolution rates, and CSAT trends in real time. Data refreshes instantly with custom filters and date ranges.',
-    'For power users, the API and webhooks let you extend everything — trigger workflows from external systems, sync data bidirectionally, or build custom widgets on the dashboard.',
-    'Enterprise features add RBAC with granular permissions, audit trails for every action, and a sandbox environment for testing workflows before production deployment.',
+    'Here are the core product features: workflow automation, knowledge grounding, and analytics. The feature set is designed to help teams answer support questions faster without adding admin overhead.',
+    'A key feature is the automation engine, which lets you build conditional workflows with if-then logic, SLA escalations, and skill-based assignments. It acts like a traffic controller for every ticket.',
+    'The analytics feature gives you live dashboards for response times, resolution rates, and CSAT trends. The reporting view refreshes instantly with custom filters and date ranges.',
+    'For power users, the API and webhooks are a major feature because they let you trigger workflows from external systems and sync data bidirectionally.',
+    'Enterprise features include granular RBAC permissions, audit trails for every action, and a sandbox environment for testing workflows before production deployment.',
   ],
   pricing: [
-    'Three tiers: Starter at $49/month for up to 3 agents, Professional at $99/month for growing teams, and Enterprise with custom pricing for larger organizations.',
-    'Starter covers core automation and standard integrations. Professional adds advanced analytics, custom roles, and priority support. Enterprise gets SSO, dedicated support, and custom contracts.',
+    'Here is the pricing overview: three tiers — Starter at $49/month for up to 3 agents, Professional at $99/month for growing teams, and Enterprise with custom pricing for larger organizations.',
+    'Our pricing model is simple: Starter covers core automation and standard integrations, Professional adds advanced analytics and custom roles, and Enterprise adds SSO, dedicated support, and custom contracts.',
     'Billing is per agent per month, annual or monthly. All integrations, API access, and standard features are included in every tier — no hidden add-ons.',
     'For high-volume teams, Enterprise includes volume discounts and a dedicated account manager. There is also an AI add-on at $20 per agent per month for AI-powered responses.',
     'You can try any plan free for 14 days, no credit card needed. Most teams are up and running within the first week.',
@@ -663,11 +782,32 @@ const TOPIC_RESPONSE_TEMPLATES: Record<DiscernedTopic, string[]> = {
     'Multiple IdP configurations per account supported — useful for mergers, acquisitions, or teams using different identity providers.',
   ],
   walkthrough: [
-    'The core flow: a customer sends a message → it gets classified → routed to the right agent or AI → resolution is tracked. Every step is configurable.',
-    'Behind the scenes, each message goes through intent classification, sentiment analysis, priority scoring, and skill-based routing before reaching an agent.',
+    'This walkthrough shows how the platform works: a customer sends a message → it gets classified → routed to the right agent or AI → resolution is tracked. Every step is configurable.',
+    'In this walkthrough of the platform, each message goes through intent classification, sentiment analysis, priority scoring, and skill-based routing before reaching an agent.',
     'The pipeline supports conditional branching — rules like "if urgent AND after hours → page on-call" or "if billing → route to billing team".',
     'For AI responses, the system retrieves relevant knowledge base articles, generates a suggested reply, and an agent reviews before sending — or auto-sends for low-risk queries.',
     'Every step logs latency, decisions, and outcomes. You can monitor throughput, spot bottlenecks, and tune rules in real time.',
+  ],
+  comparison: [
+    'Compared with alternatives, our platform is faster to deploy and more grounded in your own documentation than generic AI tools.',
+    'We are stronger on accuracy, setup speed, and support coverage than many generic AI tools, and the experience is easier to roll out across a team.',
+    'When teams compare options, they usually notice that our setup is simpler, the answers are more accurate, and the support coverage is stronger from day one.',
+  ],
+  demo: [
+    'We can schedule a personalized demo to show the product in your context.',
+    'A demo is the fastest way to see the workflows, integrations, and reporting in action.',
+  ],
+  trial: [
+    'A free trial gives you a safe way to test the experience without committing.',
+    'The trial includes the core workflows and support needed to evaluate it properly before you make a decision.',
+  ],
+  onboarding: [
+    'Onboarding is fast and guided — setup takes about 10 minutes with our onboarding flow.',
+    'Our onboarding process includes documentation, templates, and support.',
+  ],
+  developer: [
+    'Developers can use our API and SDK to build custom integrations and automations for their product or workflow.',
+    'We also provide implementation examples, reference materials, and webhooks for teams that want to embed the experience in their own stack.',
   ],
 };
 
@@ -739,8 +879,8 @@ function buildCTAText(
   if (cta.primaryCTA === 'none') return null;
 
   const ctaTexts: Record<string, string> = {
-    start_free_trial: 'You can start a free trial today.',
-    book_demo: 'Would you like to book a demo?',
+    start_free_trial: 'Would you like to get started?',
+    book_demo: 'Would you like to get started with a guided walkthrough?',
     contact_sales: 'Our sales team is ready to help.',
     developer_docs: 'Check out our developer docs.',
     pricing: 'See our pricing page for details.',
@@ -893,6 +1033,12 @@ function updateMemoryFromBrain(
   memory.turnCount++;
   memory.lastResponseText = responseText;
   memory.lastGoal = plan.goal;
+
+  memory.salesSignals = extractSalesSignals(message, memory.salesSignals);
+  const inferredPersona = inferPersonaFromMessage(message, memory);
+  if (inferredPersona !== 'unknown' && (memory.persona === 'unknown' || inferredPersona !== memory.persona)) {
+    memory.persona = inferredPersona;
+  }
 
   const newTopics = discernTopics(message);
   for (const topic of newTopics) {
@@ -1233,6 +1379,12 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     memory.industry = detectedIndustry.industry;
   }
 
+  const inferredPersona = inferPersonaFromMessage(message, memory);
+  if (inferredPersona !== 'unknown' && (memory.persona === 'unknown' || inferredPersona !== memory.persona)) {
+    memory.persona = inferredPersona;
+    ciResult.persona = { persona: inferredPersona, confidence: 0.9, reasoning: 'Inferred from message patterns' };
+  }
+
   const plan = planConversation(message, memory, ciResult);
 
   const strategy = processConversationDirector(message, memory, ciResult, plan);
@@ -1301,7 +1453,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     activeCard: ciResult.uiState?.activeCard,
   };
 
-  if (newTopics.length > 0) {
+  if (strategy.topicToAnswer) {
+    memory.currentTopic = strategy.topicToAnswer;
+  } else if (newTopics.length > 0) {
     memory.currentTopic = newTopics[newTopics.length - 1];
   }
 

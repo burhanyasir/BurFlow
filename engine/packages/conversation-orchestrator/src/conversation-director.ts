@@ -1,10 +1,10 @@
 import {
   ConversationMemoryData, ConversationGoal, FunnelStageExtended,
-  DiscernedTopic, isTopicExplained, discernTopics,
+  DiscernedTopic, isTopicExplained, discernTopics, shouldAskQualificationMemory,
 } from './conversation-memory';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
 import { SmartButton, CTAType, PersonaType } from './types';
-import { ConversationPlan } from './conversation-planner';
+import { ConversationPlan, ActionScore } from './conversation-planner';
 
 export type TopicStatus = 'unknown' | 'mentioned' | 'explained' | 'completed';
 
@@ -60,6 +60,7 @@ export interface ConversationStrategy {
   agenda: AgendaState;
   profileConfidence: ProfileConfidence;
   reasoning: string[];
+  chosenAction?: ActionScore | null; // planner-driven chosen action for the Brain
 }
 
 const AGENDA_TOPIC_ORDER: DiscernedTopic[] = [
@@ -175,33 +176,38 @@ function shouldAskQualification(plan: ConversationPlan, memory: ConversationMemo
 function determineCTATiming(plan: ConversationPlan, memory: ConversationMemoryData, ciResult: ConversationIntelligenceResult): CTATiming {
   if (plan.goal === 'finish_conversation') return 'none';
 
-  // Conversion goals always need strong CTA
+  const hasTrustConcern = memory.trustLevel === 'low' || memory.salesSignals.trustIssues.length > 0;
+  const hasObjection = memory.salesSignals.objections.length > 0 || ciResult.objection.isObjection;
+  const hasStrongBuyingIntent = ciResult.buyingIntent.hasBuyingIntent || memory.buyingIntentDetected || memory.salesSignals.timelineSignals.length > 0;
+
   if (plan.goal === 'close_trial' || plan.goal === 'schedule_demo') return 'strong';
   if (plan.goal === 'recover_abandonment') return 'strong';
-  if (plan.goal === 'recommend_plan') return 'soft';
+  if (plan.goal === 'recommend_plan') return memory.turnCount >= 3 ? 'soft' : 'none';
 
-  // Value gate: early turns (0-1) with no topics don't get CTAs
-  if (memory.turnCount <= 1 && memory.topicsExplained.length === 0 && plan.goal !== 'recommend_plan') {
-    return 'none';
-  }
+  if (memory.turnCount <= 1 && memory.topicsExplained.length === 0) return 'none';
 
-  if (plan.goal === 'recommend_plan') return 'soft';
-
-  // Qualification: show CTA only after some conversation has happened
   if (plan.goal === 'qualify') {
+    if (hasTrustConcern) return 'none';
+    // allow qualification if the objection is pricing — qualification can help resolve budget queries
+    const hasPriceObjection = memory.salesSignals.objections.includes('price') || ciResult.objection.category === 'price';
+    if (hasObjection && !hasPriceObjection) return 'none';
     if (memory.persona === 'enterprise' || memory.persona === 'developer' || memory.persona === 'agency') return 'soft';
     if (memory.turnCount >= 3 || memory.qualificationCollected.completed) return 'soft';
     return 'none';
   }
 
+  // Only suppress CTAs for trust/security objections — allow soft CTAs for pricing objections
+  const hasPriceObjection = memory.salesSignals.objections.includes('price') || ciResult.objection.category === 'price';
+  if (hasTrustConcern || (hasObjection && !hasPriceObjection)) return 'none';
+
   const stage = plan.funnelStage;
   if (stage === 'purchase_intent' || stage === 'decision') return 'strong';
+  if (stage === 'evaluation' && hasStrongBuyingIntent) return 'strong';
   if (stage === 'evaluation') return 'soft';
   if (stage === 'interest' || stage === 'consideration') return 'soft';
-  if (memory.turnCount <= 1) return 'none';
+  if (memory.turnCount <= 2) return 'none';
 
-  // Match strength to buying intent
-  if (ciResult.buyingIntent.hasBuyingIntent || memory.buyingIntentDetected) return 'strong';
+  if (hasStrongBuyingIntent) return 'strong';
 
   return 'soft';
 }
@@ -305,13 +311,29 @@ export function processConversationDirector(
 
   let topicToAnswer: DiscernedTopic | null = null;
   if (newTopics.length > 0) {
+    const explicitReask = newTopics.some(topic => isTopicExplained(memory, topic) && /tell me more|again|revisit|back to|explain/i.test(message.toLowerCase()));
     const unhandled = newTopics.filter(t => !isTopicExplained(memory, t));
-    if (unhandled.length > 0) {
+    if (explicitReask) {
+      topicToAnswer = newTopics.find(topic => isTopicExplained(memory, topic)) || newTopics[0];
+      reasoning.push(`Re-answering topic on explicit request: ${topicToAnswer}`);
+    } else if (unhandled.length > 0) {
       topicToAnswer = unhandled[0];
       reasoning.push(`Answering new topic: ${topicToAnswer}`);
     } else {
-      topicToAnswer = newTopics[0];
-      reasoning.push(`Re-answering topic: ${topicToAnswer}`);
+      const nextPlanned = plan.topicsToDiscuss.find(t => !isTopicExplained(memory, t));
+      if (nextPlanned) {
+        topicToAnswer = nextPlanned;
+        reasoning.push(`Following planned topic: ${topicToAnswer}`);
+      } else {
+        topicToAnswer = null;
+        reasoning.push('Avoiding repeated topic explanation');
+      }
+    }
+  } else if (plan.topicsToDiscuss.length > 0) {
+    const nextTopic = plan.topicsToDiscuss.find(t => !isTopicExplained(memory, t));
+    if (nextTopic) {
+      topicToAnswer = nextTopic;
+      reasoning.push(`Following planned topic: ${topicToAnswer}`);
     }
   } else if (hasPendingUnanswered) {
     const firstPending = pending.find(p => !p.answered);
@@ -324,7 +346,10 @@ export function processConversationDirector(
     }
   }
   if (memory.currentTopic && !topicToAnswer) {
-    topicToAnswer = memory.currentTopic;
+    const currentRecord = memory.topicsExplained.find(t => t.topic === memory.currentTopic);
+    if (!currentRecord || currentRecord.phase !== 'completed') {
+      topicToAnswer = memory.currentTopic;
+    }
   }
 
   let followUpTopic = determineFollowUpTopic(agenda, memory, newTopics, hasPendingUnanswered);
@@ -348,29 +373,47 @@ export function processConversationDirector(
   }
 
   const cta = determineCTATiming(plan, memory, ciResult);
-  reasoning.push(`CTA timing: ${cta}`);
+ reasoning.push(`CTA timing: ${cta}`);
 
-  const tone = plan.constraints.tone;
-  const responseLength = determineResponseLength(plan, memory);
+ const tone = plan.constraints.tone;
+ const responseLength = determineResponseLength(plan, memory);
 
-  const profileConfidence = computeProfileConfidence(memory);
+ const profileConfidence = computeProfileConfidence(memory);
 
-  if (pending.length > 0) {
-    reasoning.push(`${pending.filter(p => !p.answered).length} unanswered pending questions`);
-  }
+ if (pending.length > 0) {
+   reasoning.push(`${pending.filter(p => !p.answered).length} unanswered pending questions`);
+ }
 
-  return {
-    primaryGoal,
-    topicToAnswer,
-    followUpTopic,
-    qualificationQuestion,
-    cta,
-    quickReplies: [],
-    tone,
-    responseLength,
-    pendingQuestions: pending,
-    agenda,
-    profileConfidence,
-    reasoning,
-  };
+ // Select top planner action while respecting constraints and CTA timing
+ let chosenAction: ActionScore | null = null;
+ const scores = plan.actionScores || [];
+ const avoidCTAs = plan.constraints.avoidCTAs || [];
+ for (const s of scores) {
+   // map action names to CTA ids for avoid list check
+   if ((s.action === 'book_demo' || s.action === 'escalate_to_human') && avoidCTAs.includes('book_demo')) continue;
+   if (s.action === 'offer_trial' && avoidCTAs.includes('start_free_trial')) continue;
+   if (s.action === 'ask_qualification' && !shouldAskQualificationMemory(memory, plan.missingQualification[0] || '')) continue;
+   // suppress hard CTAs if CTA timing is none
+   if (cta === 'none' && (s.action === 'book_demo' || s.action === 'offer_trial')) continue;
+   // pick the first allowed top-scoring action
+   chosenAction = s;
+   reasoning.push(`Chosen action: ${s.action} (ev=${s.ev.toFixed(2)})`);
+   break;
+ }
+
+ return {
+   primaryGoal,
+   topicToAnswer,
+   followUpTopic,
+   qualificationQuestion,
+   cta,
+   quickReplies: [],
+   tone,
+   responseLength,
+   pendingQuestions: pending,
+   agenda,
+   profileConfidence,
+   reasoning,
+   chosenAction,
+ };
 }

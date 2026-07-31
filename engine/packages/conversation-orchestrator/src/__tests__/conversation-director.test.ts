@@ -98,6 +98,20 @@ describe('Agenda Management', () => {
     const strategy = processConversationDirector('What about security?', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBe('security');
   });
+
+  it('selects a planner-chosen action when available and allowed', () => {
+    const mem = createMemory({ turnCount: 4, trustLevel: 'high' });
+    const ci = makeCIResult({ buyingIntent: { hasBuyingIntent: true, confidence: 0.9 }, funnelStage: 'evaluation' });
+    const plan = makePlan({ goal: 'answer_question' });
+    // simulate planner actionScores (book_demo highest)
+    (plan as any).actionScores = [
+      { action: 'book_demo', ev: 40, trustGain: 0.02, qualGain: 0.4, abandonRisk: 0.05 },
+      { action: 'offer_trial', ev: 30, trustGain: 0.01, qualGain: 0.25, abandonRisk: 0.06 },
+    ];
+    const strategy = processConversationDirector('We are ready to book a demo', mem, ci, plan as any);
+    expect(strategy.chosenAction).toBeDefined();
+    expect(strategy.chosenAction?.action).toBe('book_demo');
+  });
 });
 
 // ============================================================================
