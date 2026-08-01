@@ -147,7 +147,18 @@ export class KnowledgeAdminStore {
         embeddingProgress: row.embedding_progress,
       };
     }
-    return { totalDocuments: 0, totalChunks: 0, indexedDocuments: 0, failedDocuments: 0, queuedDocuments: 0, processingDocuments: 0, embeddingProgress: 0 };
+    return {
+      totalDocuments: 0,
+      totalChunks: 0,
+      indexedDocuments: 0,
+      publishedDocuments: 0,
+      failedDocuments: 0,
+      queuedDocuments: 0,
+      processingDocuments: 0,
+      failedRatio: 0,
+      publishedRatio: 0,
+      embeddingProgress: 0,
+    };
   }
 
   private updateMonitoringStats(tenantId: string): void {

@@ -37,8 +37,10 @@ import {
   PersonaType,
   SmartButton,
   FunnelStage,
+  BuyerRole,
   BuyingIntentResult,
   ObjectionResult,
+  ObjectionCategory,
   QualificationState,
   PersonaDetectionResult,
   ConversationStage,
@@ -379,6 +381,23 @@ const FOLLOW_UP_BY_GOAL: Record<ConversationGoal, string[]> = {
 
 interface QRDef {
   id: string; label: string; payload: string; variant: 'primary' | 'secondary' | 'outline'; action?: 'send_text' | 'navigate';
+}
+
+interface RelevantKnownFacts {
+  industry: string | null;
+  companySize: string | null;
+  monthlyConversations: string | null;
+  persona: PersonaType | null;
+  currentGoal: ConversationGoal;
+  objectionsHandled: ObjectionCategory[];
+  previousRecommendations: Array<{ planName: string; reason?: string }>;
+  topicsExplained: string[];
+  buyingIntent: string | null;
+  useCase?: string | null;
+  helpdesk: string | null;
+  securityNeeds: string[] | null;
+  budget: string | null;
+  userContext: string[];
 }
 
 function getContextPrefix(memory: ConversationMemoryData, relevantFacts: RelevantKnownFacts): string | null {
@@ -770,8 +789,9 @@ function computeRelevantKnownFacts(memory: ConversationMemoryData, strategy: Con
     currentGoal: strategy.goal,
     objectionsHandled: memory.objectionsHandled || [],
     previousRecommendations: memory.planRecommendations || [],
-    topicsExplained: memory.topicsExplained.map(t => t.topic),
-    buyingIntent: memory.buyingIntentDetected ? memory.buyingIntentPhrase : null,
+    topicsExplained: memory.topicsExplained?.map(t => t.topic) || [],
+    buyingIntent: memory.buyingIntentDetected ? memory.buyingIntentPhrase || null : null,
+    useCase: memory.useCase || null,
     helpdesk: memory.currentHelpdesk || null,
     securityNeeds: memory.securityRequirements || null,
     budget: memory.budget || null,
@@ -1068,7 +1088,7 @@ function buildCompletedTopicResponse(topic: DiscernedTopic, memory: Conversation
 // Helper: Build CTA text per strategy
 function buildCTAText(
   strategy: ConversationStrategy,
-  plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended },
+  plan: { customerIntent: CustomerIntent; goal: ConversationGoal; funnelStage: FunnelStageExtended },
   memory: ConversationMemoryData,
   ci: ConversationIntelligenceResult,
 ): string | null {
@@ -1562,10 +1582,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       };
       return {
         responseText: deepResponse, cta: { primaryCTA: 'none' as CTAType, label: '', link: '' }, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-        memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
-      };
-    }
+      };    }
   }
 
   // Vague replies (EMOTIONAL_DIRECT_ACK with empty response) deepen current topic
@@ -1598,7 +1617,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       };
       return {
         responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-        memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
       };
     }
@@ -1650,7 +1669,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     };
     return {
       responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-      memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
       validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
     };
   }
@@ -1681,7 +1700,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       };
       return {
         responseText: greetingResponse, cta: gCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-        memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'small_talk', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'small_talk', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
       };
     }
@@ -1712,7 +1731,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     };
     return {
       responseText: ending.response, cta: eCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
       validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
     };
   }
@@ -1738,7 +1757,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     };
     return {
       responseText: offTopicRedirect, cta: oCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'off_topic', funnelStage: memory.funnelStage, goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'off_topic', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
       validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
     };
   }

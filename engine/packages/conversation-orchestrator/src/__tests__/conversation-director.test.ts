@@ -37,6 +37,8 @@ function makePlan(overrides?: Partial<ConversationPlan>): ConversationPlan {
   const base: ConversationPlan = {
     customerIntent: 'learning' as CustomerIntent,
     funnelStage: 'interest' as FunnelStageExtended,
+    conversationStage: 'education',
+    buyerRole: 'unknown',
     goal: 'answer_question' as ConversationGoal,
     topicsToDiscuss: [] as DiscernedTopic[],
     missingQualification: [] as string[],

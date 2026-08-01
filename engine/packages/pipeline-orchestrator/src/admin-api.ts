@@ -77,7 +77,9 @@ function parseIntel(state: string): IntelligenceMemory | null {
 }
 
 export function buildAdminAnalyticsReport(sessions: SessionRecord[]) {
-  const withIntel = sessions.map(s => ({ s, intel: parseIntel(s.state) })).filter(x => x.intel);
+  const withIntel = sessions
+    .map(s => ({ s, intel: parseIntel(s.state) }))
+    .filter((x): x is { s: SessionRecord; intel: IntelligenceMemory } => x.intel !== null);
   const total = withIntel.length;
   const stageCounts: Record<string, number> = {};
   const temperatureCounts: Record<string, number> = {};

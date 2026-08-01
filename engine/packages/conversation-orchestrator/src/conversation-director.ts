@@ -50,6 +50,7 @@ export type CTATiming = 'none' | 'soft' | 'strong';
 
 export interface ConversationStrategy {
   primaryGoal: ConversationGoal;
+  goal: ConversationGoal;
   topicToAnswer: DiscernedTopic | null;
   followUpTopic: DiscernedTopic | null;
   qualificationQuestion: string | null;
@@ -410,6 +411,7 @@ export function processConversationDirector(
 
  return {
    primaryGoal,
+   goal: primaryGoal,
    topicToAnswer,
    followUpTopic,
    qualificationQuestion,

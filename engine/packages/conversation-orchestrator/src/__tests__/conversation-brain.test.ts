@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   createMemory,
   fromLegacyMemory,
@@ -373,7 +373,7 @@ describe('Conversation Planner', () => {
 
   it('detects implementation intent', () => {
     const { brain } = makeBrainMemory(3);
-    brain.topicsExplained.push({ topic: 'features', explainedAtTurn: 1, count: 1 });
+  brain.topicsExplained.push({ topic: 'features', explainedAtTurn: 1, count: 1, phase: 'mentioned' });
     const ciResult = { objection: { isObjection: false }, funnelStage: 'evaluation', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
     const plan = planConversation('How do I set up the widget?', brain, ciResult);
     expect(['implementation', 'unknown', 'learning']).toContain(plan.customerIntent);

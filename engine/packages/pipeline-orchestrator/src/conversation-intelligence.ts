@@ -89,7 +89,7 @@ export async function enrichWithConversationIntelligence(
   const { ciResult } = brainResult;
 
   return {
-    response: brainResult.responseText,
+    response: pipelineResponse.response,
     turnId: pipelineResponse.turnId,
     latencyMs: pipelineResponse.latencyMs,
     stageTimings: pipelineResponse.stageTimings,

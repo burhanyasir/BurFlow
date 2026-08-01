@@ -64,6 +64,7 @@ export interface ConversationIntelligenceMemory {
   repeatedPhraseCount: number;
   topics: string[];
   industry?: string;
+  companySize?: string;
   monthlyConversations?: string;
   /** @reserved — declared for future qualification extraction; not yet populated by any engine path */
   useCase?: string;

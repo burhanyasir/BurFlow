@@ -163,6 +163,7 @@ export interface ConversationMemoryData {
   buyingIntentPhrase?: string;
   buyingIntentTier?: string;
   recommendedPlan?: string;
+  planRecommendations?: Array<{ planName: string; reason?: string }>;
 
   trustLevel: 'low' | 'medium' | 'high';
   trustHistory: TrustRecord[];
@@ -186,13 +187,16 @@ export interface ConversationMemoryData {
   isLeaving: boolean;
   isAbandoned: boolean;
   isCompleted: boolean;
-
+  isCustomer?: boolean;
+ 
   rejectedCTAs: string[];
 
   usedOpenings: string[];
   currentTopic?: DiscernedTopic;
   currentStage?: ConversationStage;
   buyerRole?: BuyerRole;
+  companyName?: string;
+  securityRequirements?: string[];
   customerTemperature?: Temperature;
   lastOffTopicRedirect?: string;
   contextSummary: ContextSummaryData;
@@ -216,6 +220,7 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
     buttonsShown: [],
     buttonClicks: [],
     buyingIntentDetected: false,
+    planRecommendations: [],
     trustLevel: 'medium',
     trustHistory: [],
     sentiment: { polarity: 0, frustration: 'low', urgency: 'low', trend: 'stable' },
@@ -242,6 +247,9 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
     isLeaving: false,
     isAbandoned: false,
     isCompleted: false,
+    isCustomer: false,
+    companyName: undefined,
+    securityRequirements: [],
     rejectedCTAs: [],
     usedOpenings: [],
     buttonRejections: [],

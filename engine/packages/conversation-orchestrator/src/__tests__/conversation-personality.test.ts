@@ -131,14 +131,14 @@ describe('ShortReplyIntelligence', () => {
 describe('SmartFollowUps', () => {
   it('asks about monthly conversations when discussing pricing', () => {
     const mem = createMemory({ companySize: '50', currentHelpdesk: 'Zendesk' });
-    mem.topicsExplained.push({ topic: 'pricing', explainedAtTurn: 1, count: 1 });
+    mem.topicsExplained.push({ topic: 'pricing', explainedAtTurn: 1, count: 1, phase: 'mentioned' });
     const followUp = getSmartFollowUp('Tell me about pricing', mem, {} as any);
     expect(followUp).toContain('conversations');
   });
 
   it('asks about challenge for founder persona', () => {
     const mem = createMemory();
-    mem.topicsExplained.push({ topic: 'features', explainedAtTurn: 1, count: 1 });
+    mem.topicsExplained.push({ topic: 'features', explainedAtTurn: 1, count: 1, phase: 'mentioned' });
     const followUp = getSmartFollowUp('I am the founder', mem, {} as any);
     expect(followUp).toContain('challenge');
   });

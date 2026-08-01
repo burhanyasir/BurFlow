@@ -318,13 +318,6 @@ function chooseGoal(
     }
   }
 
-  if (customerIntent === 'buying') {
-    if (memory.qualificationCollected.completed || memory.turnCount >= 5) {
-      return 'close_trial';
-    }
-    return 'recommend_plan';
-  }
-
   if (customerIntent === 'implementation') {
     return isGoalAchieved(memory, 'answer_question') ? 'advance_funnel' : 'answer_question';
   }

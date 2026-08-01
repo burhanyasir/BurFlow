@@ -54,7 +54,8 @@ export class GroundingVerifier {
 
     // Language support check: if response mentions a specific language not in supported list
     const KNOWN_LANGUAGES = ['english', 'spanish', 'french', 'german', 'chinese', 'japanese', 'korean', 'portuguese', 'italian', 'dutch', 'russian', 'arabic', 'hindi', 'bengali', 'turkish', 'vietnamese', 'polish', 'thai', 'swedish', 'danish', 'finnish', 'norwegian', 'czech', 'romanian', 'hungarian', 'ukrainian', 'hebrew', 'indonesian', 'malay', 'tagalog'];
-    const lowerWords = lower.split(/\s+/);
+    const normalized = lower.replace(/[^a-z0-9\s]/g, ' ');
+    const lowerWords = normalized.split(/\s+/);
     const mentionedLang = KNOWN_LANGUAGES.find(lang => lowerWords.includes(lang));
     if (mentionedLang) {
       const supported = config.supportedLanguages.map(l => l.toLowerCase());
@@ -81,9 +82,8 @@ export class GroundingVerifier {
   private hasPiiLeakage(response: string, config: TenantConfig): boolean {
     if (!this.piiDetector || !config.safety.piiRedactionEnabled) return false;
     const mode = config.safety.piiRedactionMode;
-    // Only flag PII as a grounding failure in 'block' mode.
-    // 'mask' and 'notify' modes handle PII gracefully without replacing the response.
-    if (mode === 'allow' || mode === 'mask' || mode === 'notify') return false;
+    // Flag PII leakage unless redaction is explicitly disabled or allowed.
+    if (mode === 'allow') return false;
     const result = this.piiDetector.check(response, mode);
     return result.found;
   }

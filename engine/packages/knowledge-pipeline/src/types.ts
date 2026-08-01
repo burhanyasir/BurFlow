@@ -121,6 +121,7 @@ export interface VectorSearchResult {
   score: number;
   content: string;
   metadata: Record<string, unknown>;
+  confidence?: number;
 }
 
 export interface RetrievalQuery {
