@@ -1,3 +1,4 @@
+import { detectBuyingSignal, OBJECTION_PATTERNS as CANONICAL_OBJECTION_PATTERNS } from '@conversation-engine/conversation-orchestrator';
 import { OrchestratorState, Strategy, STRATEGY_PRIORITY, PolicyPriority } from './types';
 
 const QUESTION_PATTERNS = [
@@ -13,27 +14,6 @@ const TRUST_QUESTION_PATTERNS = [
   /\b(can i|can we) trust/i,
   /\b(how do you|how does) (protect|secure|handle) (my |our |)data/i,
   /\b(where is|where are) (my|our) (data|information) stored/i,
-];
-
-const OBJECTION_PATTERNS = [
-  /\b(expensive|too much|overpriced|pricey|steep)\b/i,
-  /\b(already use|happy with|current (tool|solution|provider|system))\b/i,
-  /\b(not interested|not for us|not ready|too early|not now)\b/i,
-  /\b(waste|not worth|don'?t need|overkill)\b/i,
-  /\b(competitor|alternative|another (tool|platform|solution))\b/i,
-  /\b(switching|migrating|moving) (is|would be) (hard|difficult|complex)\b/i,
-  /\b(implementation|setup|deploy) (time|cost|effort)\b/i,
-];
-
-const BUYING_SIGNAL_PATTERNS = [
-  /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|free\s+)?trial|free\s+trial|try it)\b/i,
-  /\b(pric(?:e|ing|es)|cost|how much|what (do|does) (you|it) (cost|charge))\b/i,
-  /\b(book|schedule|set up) (a |the |)(demo|calls?|meeting|appointment)\b/i,
-  /\b(enterprise|upgrade|scale|grow)\b/i,
-  /\b(moving forward|ready to|let'?s do it|let'?s go)\b/i,
-  /\b(proposal|quote|contract|agreement|order)\b/i,
-  /\b(compare|competitor|alternative|versus|vs)\b/i,
-  /\b(reduce (ticket|support|cost)|improve (response|satisfaction|csat))\b/i,
 ];
 
 const ACTION_PATTERNS = [
@@ -52,11 +32,7 @@ function detectTrustQuestion(message: string): boolean {
 }
 
 function detectObjection(message: string): boolean {
-  return OBJECTION_PATTERNS.some(p => p.test(message));
-}
-
-function detectBuyingSignal(message: string): boolean {
-  return BUYING_SIGNAL_PATTERNS.some(p => p.test(message));
+  return CANONICAL_OBJECTION_PATTERNS.test(message.trim().toLowerCase());
 }
 
 function detectActionRequest(message: string): boolean {

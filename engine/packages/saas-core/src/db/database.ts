@@ -568,4 +568,19 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_compliance_docs_tenant ON compliance_documents(tenant_id);
     CREATE INDEX IF NOT EXISTS idx_subprocessors_tenant ON subprocessors(tenant_id);
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS topic_response_templates (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      topic TEXT NOT NULL,
+      depth INTEGER NOT NULL,
+      answer TEXT NOT NULL,
+      sources TEXT DEFAULT '[]',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      UNIQUE(tenant_id, topic, depth)
+    );
+    CREATE INDEX IF NOT EXISTS idx_trt_tenant_topic ON topic_response_templates(tenant_id, topic);
+  `);
 }

@@ -478,11 +478,26 @@ describe('Conversation Planner', () => {
     expect(plan.customerIntent).toBe('evaluating');
   });
 
-  it('"what are your prices?" (turnCount=0) → learning (known LEARNING_PATTERNS collision at low turns)', () => {
+  it('"what are your prices?" (turnCount=0) → evaluating (EVALUATING_PATTERNS fires unconditionally before LEARNING_PATTERNS)', () => {
     const { brain } = makeBrainMemory(0);
     const ciResult = { objection: { isObjection: false }, funnelStage: 'greeting', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
     const plan = planConversation('What are your prices?', brain, ciResult);
-    expect(plan.customerIntent).toBe('learning');
+    expect(plan.customerIntent).toBe('evaluating');
+  });
+
+  it('"how are you?" at turnCount=2 → small_talk (pass-through reaches planner, not canned greeting)', () => {
+    const { brain } = makeBrainMemory(2);
+    const ciResult = { objection: { isObjection: false }, funnelStage: 'discovery', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
+    const plan = planConversation('how are you?', brain, ciResult);
+    expect(plan.customerIntent).toBe('small_talk');
+  });
+
+  it('"makes sense" at turnCount=2 → confirming + advance_funnel', () => {
+    const { brain } = makeBrainMemory(2);
+    const ciResult = { objection: { isObjection: false }, funnelStage: 'discovery', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
+    const plan = planConversation('makes sense', brain, ciResult);
+    expect(plan.customerIntent).toBe('confirming');
+    expect(plan.goal).toBe('advance_funnel');
   });
 });
 
@@ -543,6 +558,18 @@ describe('Conversation Brain', () => {
     expect(result.plan.goal).toBe('handle_objection');
     expect(result.memory.objectionsHandled).toContain('price');
     expect(result.cta.primaryCTA).toBe('start_free_trial');
+  });
+
+  it('handles "worried about security" as objection regardless of pipeline strategy label', () => {
+    const { legacy } = makeBrainMemory(2);
+    const result = processConversationBrain({
+      message: "I'm worried about security",
+      responseText: 'Your data is protected.',
+      legacyMemory: legacy,
+    });
+    expect(result.plan.customerIntent).toBe('objection');
+    expect(result.plan.goal).toBe('handle_objection');
+    expect(result.responseText).toMatch(/data|secure|protect|encrypt|isolated/i);
   });
 
   it('processes a buying intent', () => {

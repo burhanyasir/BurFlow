@@ -11,6 +11,13 @@ import {
 import { ConversationStage, BuyerRole } from './types';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
 import { FunnelStage } from './types';
+import {
+  GREETING_PATTERNS,
+  FAREWELL_PATTERNS,
+  SMALL_TALK_PATTERNS,
+  GRATITUDE_PATTERNS,
+  OBJECTION_PATTERNS,
+} from './patterns';
 
 export interface ConversationPlan {
   customerIntent: CustomerIntent;
@@ -28,15 +35,10 @@ export interface ConversationPlan {
   };
 }
 
-const GREETING_PATTERNS = /^(hi|hello|hey|howdy|greetings|good morning|good afternoon|good evening|yo|sup|heya)\b/i;
-const FAREWELL_PATTERNS = /\b(bye|goodbye|see you|talk later|catch you|take care|have a good)\b/i;
-const GRATITUDE_PATTERNS = /^(thanks|thank you|appreciate|thankyou|ty|thx)\b/i;
-const SMALL_TALK_PATTERNS = /\b(how are you|how.s it going|what.s up|how do you do|good morning|good afternoon|good evening)\b/i;
 const LEARNING_PATTERNS = /\b(what (is|are|does|do|can|features)|how (does|do|can|is)|tell me about|explain|i.d like to know|curious about|can you.*tell)\b/i;
 const COMPARING_PATTERNS = /\b(compare|vs |versus|alternative|competitor|difference|better than|cheaper|differentiate|why choose|how.*different|what sets)\b/i;
 const EVALUATING_PATTERNS = /\b(pric(?:e|ing|es)|cost|plan|tier|how much|subscription|feature|capabilit|demo|trial|free)\b/i;
-const BUYING_PATTERNS = /\b(ready to buy|sign me up|start\s+(a\s+|the\s+|my\s+|your\s+|our\s+|free\s+)?trial|free\s+trial|book demo|purchase|buy now|take my money|let.s do it|sign up|how do i start|where do i begin|want\s+.*trial)\b/i;
-const OBJECTION_PATTERNS = /\b(expensive|too high|why pay|hallucinate|security|privacy|competitor|hard to|difficult|don.t need|not sure|worried|concerned about)\b/i;
+const BUYING_PATTERNS = /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|the\s+|my\s+|your\s+|our\s+|free\s+)?trial|free\s+trial|ready to buy|sign me up|book demo|buy now|take my money|let'?s do( it)?$|how do i start|where do i begin|want\s+.*trial)\b/i;
 const IMPLEMENTATION_PATTERNS = /\b(setup|install|deploy|migrate|integration|how long|time to|onboard|configure|connect)\b/i;
 const LEAVING_PATTERNS = /\b(think about it|maybe later|not now|not interested|leave|stop|unsubscribe|call me later|get back to me|still thinking|will let you know|i.m done|i.m leaving|talk later|catch you later)\b/i;
 const CONFIRMING_PATTERNS = /\b(yes|yeah|sure|ok|okay|correct|right|exactly|that.s right|i agree|makes sense|got it|i see)\b/i;
@@ -56,6 +58,54 @@ const ROLE_PATTERNS: Record<BuyerRole, RegExp> = {
 };
 const REALLY_PATTERNS = /\breally\b/i;
 const WHO_MADE_PATTERNS = /(who (made|created|built) you|who are you|where.*from)/i;
+
+const BUYING_SIGNAL_REGEX = /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|the\s+|my\s+|your\s+|our\s+|free\s+)?trial|free\s+trial|try it|ready to buy|sign me up|book demo|buy now|take my money|let'?s do( it)?$|how do i start|where do i begin|want\s+.*trial)\b/i;
+const PRICING_SIGNAL_REGEX = /\b(pric(?:e|ing|es)|cost|how much|what (do|does) (you|it) (cost|charge))\b/i;
+const DEMO_SIGNAL_REGEX = /\b(book|schedule|set up) (a |the |)(demo|calls?|meeting|appointment)\b/i;
+const GROWTH_SIGNAL_REGEX = /\b(enterprise|upgrade|scale|grow)\b/i;
+const COMMITMENT_SIGNAL_REGEX = /\b(moving forward|ready to|let'?s go)\b/i;
+const PROCUREMENT_SIGNAL_REGEX = /\b(proposal|quote|contract|agreement|order)\b/i;
+const COMPARISON_SIGNAL_REGEX = /\b(compare|competitor|alternative|versus|vs)\b/i;
+const VALUE_SIGNAL_REGEX = /\b(reduce (ticket|support|cost)|improve (response|satisfaction|csat))\b/i;
+
+const SIGNAL_REGEXES = [
+  BUYING_SIGNAL_REGEX, PRICING_SIGNAL_REGEX, DEMO_SIGNAL_REGEX,
+  GROWTH_SIGNAL_REGEX, COMMITMENT_SIGNAL_REGEX, PROCUREMENT_SIGNAL_REGEX,
+  COMPARISON_SIGNAL_REGEX, VALUE_SIGNAL_REGEX,
+];
+const NEGATION_WORDS = /\b(?:not|no|never)\b|n't\b/i;
+const NEGATION_OVERRIDE = /\b(?:why\s+(?:not|n't)|what.*n't|how about|how does)\b/i;
+const NEGATION_IDIOMS = /\bno (problem|rush|worries|doubt|worry|need to|stress|big deal)\b/i;
+
+function isNegatedBefore(text: string, signalStart: number): boolean {
+  if (signalStart <= 0) return false;
+  const before = text.slice(Math.max(0, signalStart - 40), signalStart);
+  if (NEGATION_OVERRIDE.test(before)) return false;
+  if (NEGATION_IDIOMS.test(before)) return false;
+  return NEGATION_WORDS.test(before);
+}
+
+function detectBuyingIntent(text: string): boolean {
+  const re = new RegExp(BUYING_PATTERNS.source, 'gi');
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    if (!isNegatedBefore(text, match.index)) return true;
+  }
+  return false;
+}
+
+export function detectBuyingSignal(message: string): boolean {
+  const lower = message.toLowerCase().trim();
+  if (!lower) return false;
+  for (const regex of SIGNAL_REGEXES) {
+    const re = new RegExp(regex.source, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = re.exec(lower)) !== null) {
+      if (!isNegatedBefore(lower, match.index)) return true;
+    }
+  }
+  return false;
+}
 
 const QUALIFICATION_QUESTIONS: Array<{ key: keyof ConversationMemoryData; question: string; priority: number }> = [
   { key: 'companySize', question: 'company size', priority: 1 },
@@ -117,17 +167,17 @@ function detectCustomerIntent(message: string, memory: ConversationMemoryData, c
   if (GREETING_PATTERNS.test(lower)) return 'greeting';
   if (GRATITUDE_PATTERNS.test(lower)) return 'confirming';
   if (COMPARING_PATTERNS.test(lower)) return 'comparing';
-  if (BUYING_PATTERNS.test(lower)) return 'buying';
+  if (detectBuyingIntent(lower)) return 'buying';
   if (ciResult.objection.isObjection || OBJECTION_PATTERNS.test(lower)) return 'objection';
   if (REALLY_PATTERNS.test(lower) && memory.turnCount > 0) return 'objection';
   if (IMPLEMENTATION_PATTERNS.test(lower) && memory.turnCount > 1) return 'implementation';
-  if (EVALUATING_PATTERNS.test(lower) && memory.turnCount > 1) return 'evaluating';
+  if (EVALUATING_PATTERNS.test(lower)) return 'evaluating';
   if (LEARNING_PATTERNS.test(lower) && memory.turnCount <= 2) return 'learning';
   if (CONFIRMING_PATTERNS.test(lower) && memory.turnCount > 0) return 'confirming';
   if (REJECTING_PATTERNS.test(lower) && memory.turnCount > 0) return 'rejecting';
-  if (LEARNING_PATTERNS.test(lower)) return 'learning';
-  if (/\bwhy\b/i.test(lower) && memory.turnCount > 1) return 'comparing';
   if (EVALUATING_PATTERNS.test(lower)) return 'evaluating';
+  if (/\bwhy\b/i.test(lower) && memory.turnCount > 1) return 'comparing';
+  if (LEARNING_PATTERNS.test(lower)) return 'learning';
 
   return 'unknown';
 }

@@ -19,6 +19,8 @@ export { processConversationBrain } from './conversation-brain';
 export type { BrainInput, BrainOutput } from './conversation-brain';
 export { buttonTelemetry } from './button-telemetry';
 export type { ButtonEvent, ButtonEventType } from './button-telemetry';
+export * from './knowledge-base-provider';
+export * from './patterns';
 export * from './conversation-personality';
 export * from './universal-customer-journey';
 export * from './journey-telemetry';

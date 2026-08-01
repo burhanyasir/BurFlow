@@ -18,6 +18,7 @@ import {
   WebhookRepository, WebhookDeliveryRepository,
   UptimeRepository, SecurityStatusRepository, IncidentRepository,
   ComplianceDocumentRepository, DpaRepository, SubprocessorRepository,
+  TopicResponseTemplateRepository,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth } from './middleware/auth';
@@ -34,6 +35,7 @@ import { createKnowledgeBaseRoutes } from './routes/knowledge-base';
 import { createKnowledgeRoutes } from './routes/knowledge';
 import { createOnboardingRoutes } from './routes/onboarding';
 import { createChatRoutes } from './routes/chat';
+import { DbKnowledgeBaseProvider } from './orchestrator';
 import { createWidgetRoutes } from './routes/widget';
 import { createBillingRoutes } from './routes/billing';
 import { createBillingWebhookRoutes } from './routes/billing-webhooks';
@@ -167,6 +169,7 @@ const incidentRepo = new IncidentRepository(db);
 const complianceRepo = new ComplianceDocumentRepository(db);
 const dpaRepo = new DpaRepository(db);
 const subprocessorRepo = new SubprocessorRepository(db);
+const topicResponseRepo = new TopicResponseTemplateRepository(db);
 
 const app = express();
 
@@ -261,7 +264,8 @@ app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRep
 app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conversationRepo, messageRepo));
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
 app.use('/api/knowledge-bases', auth, tenantGuard, createKnowledgeBaseRoutes(kbRepo, docRepo));
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo));
+const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo);
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/billing', createBillingWebhookRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo));

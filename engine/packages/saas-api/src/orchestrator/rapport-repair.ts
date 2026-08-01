@@ -1,4 +1,11 @@
 import { Strategy, ConversationMood, OrchestratorState } from './types';
+import {
+  GREETING_PATTERNS,
+  FAREWELL_PATTERNS,
+  SMALL_TALK_PATTERNS,
+  GRATITUDE_PATTERNS,
+  RAPPORT_GREETING_EXTRA,
+} from '@conversation-engine/conversation-orchestrator';
 
 interface RapportResult {
   handled: boolean;
@@ -6,23 +13,6 @@ interface RapportResult {
   mood: ConversationMood;
   response: string;
 }
-
-const GREETING_PATTERNS = [
-  /^(hi|hello|hey|howdy|yo|sup)\b/i,
-  /^good (morning|afternoon|evening|day)\b/i,
-  /^(how are you|how's it going|what's up|how do you do)\b/i,
-  /^nice to meet you/i,
-];
-
-const SMALL_TALK_PATTERNS = [
-  /(?:nice|great|lovely|beautiful)\s+(weather|day|afternoon)/i,
-  /how('s| is) (everything|things|life|work)/i,
-  /(?:what'?s|tell me)\s+(new|up|going on)/i,
-  /(?:how'?s|how is) your (day|week|morning)/i,
-  /(?:long time|been a while)/i,
-  /(?:hope you'?re|you doing) (well|okay|good)/i,
-  /(?:have a|had a) (great|good|nice|lovely) (day|weekend|evening)/i,
-];
 
 const CONFUSION_PATTERNS = [
   /^(hmm|huh|wait|hold on)/i,
@@ -63,21 +53,6 @@ const HUMOR_PATTERNS = [
   /^(haha|hahaha|hehe)/i,
 ];
 
-const APPRECIATION_PATTERNS = [
-  /^(thanks|thank you|thankyou|thx|ty)\b/i,
-  /\b(that'?s|that is) (helpful|great|awesome|perfect|excellent)\b/i,
-  /\b(great|awesome|fantastic) (answer|response|explanation)\b/i,
-  /\b(this is|that is) (exactly what|just what) (i|we) (needed|wanted|were looking)\b/i,
-  /\b(makes sense|got it|i see|understood|clear now)\b/i,
-];
-
-const FAREWELL_PATTERNS = [
-  /^(bye|goodbye|see you|talk later|cya|farewell|adios)\b/i,
-  /^(take care|have a good|have a nice)\b/i,
-  /\b(see you|talk to you) (later|soon|tomorrow)\b/i,
-  /^(night|goodnight|g night|gn)\b/i,
-];
-
 const BUSINESS_WORDS = new Set([
   'help', 'need', 'question', 'issue', 'problem', 'support', 'ticket',
   'pricing', 'cost', 'price', 'plan', 'buy', 'trial', 'sign up',
@@ -102,7 +77,8 @@ function matchesAny(message: string, patterns: RegExp[]): boolean {
 }
 
 function isPureGreeting(message: string): boolean {
-  if (matchesAny(message, GREETING_PATTERNS)) {
+  const lower = message.trim().toLowerCase();
+  if (GREETING_PATTERNS.test(lower) || RAPPORT_GREETING_EXTRA.test(lower)) {
     if (message.split(/\s+/).length > 3 && hasBusinessIntent(message)) return false;
     return true;
   }
@@ -114,10 +90,10 @@ function detectMood(message: string): ConversationMood | null {
   if (matchesAny(message, CONFUSION_PATTERNS)) return 'confused';
   if (matchesAny(message, SKEPTICISM_PATTERNS)) return 'skeptical';
   if (matchesAny(message, HUMOR_PATTERNS)) return 'humorous';
-  if (matchesAny(message, APPRECIATION_PATTERNS)) return 'appreciative';
+  if (GRATITUDE_PATTERNS.test(message.trim().toLowerCase())) return 'appreciative';
   if (/\b(angry|mad|furious|livid|pissed)\b/i.test(message)) return 'angry';
   if (/\b(maybe|perhaps|i guess|not sure if|possibly|might)\b/i.test(message)) return 'hesitant';
-  if (matchesAny(message, GREETING_PATTERNS) || matchesAny(message, SMALL_TALK_PATTERNS)) return 'positive';
+  if (GREETING_PATTERNS.test(message.trim().toLowerCase()) || SMALL_TALK_PATTERNS.test(message.trim().toLowerCase())) return 'positive';
   return null;
 }
 
@@ -126,10 +102,10 @@ function getGreetingResponse(message: string): string {
   if (/^how (are you|are things|is it going)\b/i.test(lower)) {
     return "I'm doing well, thanks! What can I help you with today?";
   }
-  if (matchesAny(message, APPRECIATION_PATTERNS)) {
+  if (GRATITUDE_PATTERNS.test(lower)) {
     return "You're welcome! Is there anything else I can help you with?";
   }
-  if (matchesAny(message, FAREWELL_PATTERNS)) {
+  if (FAREWELL_PATTERNS.test(lower)) {
     return "Take care! Feel free to reach out anytime.";
   }
   if (/^good (morning|afternoon|evening|day)\b/i.test(lower)) {
@@ -177,7 +153,7 @@ export function processRapportRepair(message: string, state: OrchestratorState):
   const mood = detectMood(message);
   if (mood) state.mood = mood;
 
-  if (matchesAny(message, FAREWELL_PATTERNS) && !hasBusinessIntent(message)) {
+  if (FAREWELL_PATTERNS.test(message.trim().toLowerCase()) && !hasBusinessIntent(message)) {
     return {
       handled: true,
       strategy: 'close_conversation',
@@ -254,7 +230,7 @@ export function processRapportRepair(message: string, state: OrchestratorState):
     };
   }
 
-  if (matchesAny(message, SMALL_TALK_PATTERNS) && !hasBusinessIntent(message) && state.turnCount === 0) {
+  if (SMALL_TALK_PATTERNS.test(message.trim().toLowerCase()) && !hasBusinessIntent(message) && state.turnCount === 0) {
     return {
       handled: true,
       strategy: 'greeting',
