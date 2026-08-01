@@ -16,7 +16,8 @@ export default class TenantService {
     const state: OnboardingState = { id, steps: [payload], createdAt: new Date().toISOString() };
     this.store.set(id, state);
     // quick background init: create default workspace, api key, analytics
-    await this.initializeDefaults(id, payload);
+    // run initialization in the background so startOnboarding is low-latency and resilient
+    this.initializeDefaults(id, payload).catch((err) => console.error('initializeDefaults.error', err));
     return id;
   }
 
@@ -61,6 +62,11 @@ export default class TenantService {
     }
 
     // simulate padddle checkout session creation
-    await this.paddle.createCheckout({ onboardingId, workspaceId: workspace.id, amount: 0 });
+    // run checkout creation defensively and log failures — do not throw to caller during init
+    try {
+      await this.paddle.createCheckout({ onboardingId, workspaceId: workspace.id, amount: 0 });
+    } catch (err) {
+      console.error('paddle.createCheckout.error', err);
+    }
   }
 }

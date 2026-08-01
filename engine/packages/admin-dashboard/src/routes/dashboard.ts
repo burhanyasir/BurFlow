@@ -1,10 +1,15 @@
 import { Router, Request, Response } from 'express';
 import * as integration from '../services/integration';
+import { authenticate, requireTenant, requireRole, requirePermission, auditAction, rateLimit } from '../middleware/auth';
 
 const router = Router();
 
+// Apply authentication and basic rate limiting to all admin routes
+router.use(authenticate());
+router.use(rateLimit('admin', 200, 60));
+
 // Dashboard home summary
-router.get('/home', async (req: Request, res: Response) => {
+router.get('/home', requireTenant, requirePermission('dashboard.view'), async (req: Request, res: Response) => {
   try {
     const summary = await integration.getTelemetrySummary();
     res.json({ ok: true, summary });
@@ -15,7 +20,7 @@ router.get('/home', async (req: Request, res: Response) => {
 });
 
 // Analytics
-router.get('/analytics', async (req: Request, res: Response) => {
+router.get('/analytics', requireTenant, requirePermission('analytics.view'), async (req: Request, res: Response) => {
   try {
     const analytics = await integration.getAnalytics();
     res.json({ ok: true, analytics });
@@ -26,7 +31,7 @@ router.get('/analytics', async (req: Request, res: Response) => {
 });
 
 // Conversations listing/search stub
-router.get('/conversations', async (req: Request, res: Response) => {
+router.get('/conversations', requireTenant, requirePermission('conversations.view'), async (req: Request, res: Response) => {
   try {
     const q = req.query.q as string | undefined;
     const conversations = await integration.getConversations({ q });
@@ -38,7 +43,7 @@ router.get('/conversations', async (req: Request, res: Response) => {
 });
 
 // Knowledge summary
-router.get('/knowledge', async (req: Request, res: Response) => {
+router.get('/knowledge', requireTenant, requirePermission('knowledge.view'), async (req: Request, res: Response) => {
   try {
     const k = await integration.getKnowledgeSummary();
     res.json({ ok: true, knowledge: k });
@@ -49,7 +54,7 @@ router.get('/knowledge', async (req: Request, res: Response) => {
 });
 
 // Widget management
-router.get('/widgets/:widgetId/preview', async (req: Request, res: Response) => {
+router.get('/widgets/:widgetId/preview', requireTenant, requirePermission('widget.manage'), auditAction('widget_preview'), async (req: Request, res: Response) => {
   try {
     const widgetId = req.params.widgetId || '';
     const preview = await integration.getInstallSnippet(widgetId);
@@ -61,7 +66,7 @@ router.get('/widgets/:widgetId/preview', async (req: Request, res: Response) => 
 });
 
 // API keys
-router.get('/api-keys', async (req: Request, res: Response) => {
+router.get('/api-keys', requireTenant, requirePermission('apikey.manage'), auditAction('apikey_list'), async (req: Request, res: Response) => {
   try {
     const keys = await integration.listApiKeys();
     res.json({ ok: true, keys });
@@ -72,7 +77,7 @@ router.get('/api-keys', async (req: Request, res: Response) => {
 });
 
 // Billing summary (uses mock provider via abstraction)
-router.get('/billing', async (req: Request, res: Response) => {
+router.get('/billing', requireTenant, requirePermission('billing.view'), auditAction('billing_view'), async (req: Request, res: Response) => {
   try {
     const billing = await integration.getBillingSummary();
     res.json({ ok: true, billing });
@@ -83,7 +88,7 @@ router.get('/billing', async (req: Request, res: Response) => {
 });
 
 // Settings and audit logs
-router.get('/settings', async (req: Request, res: Response) => {
+router.get('/settings', requireTenant, requirePermission('settings.manage'), auditAction('settings_view'), async (req: Request, res: Response) => {
   try {
     const settings = await integration.getSettings();
     res.json({ ok: true, settings });
@@ -93,7 +98,7 @@ router.get('/settings', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/audit-logs', async (req: Request, res: Response) => {
+router.get('/audit-logs', requireTenant, requireRole('super_admin','owner','admin'), auditAction('audit_view'), async (req: Request, res: Response) => {
   try {
     const logs = await integration.getAuditLogs();
     res.json({ ok: true, logs });
