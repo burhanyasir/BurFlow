@@ -2,7 +2,7 @@ import { forwardRef, type HTMLAttributes } from 'react';
 import { cn } from '../../utils/cn';
 
 export interface CardProps extends HTMLAttributes<HTMLDivElement> {
-  variant?: 'default' | 'bordered' | 'flat';
+  variant?: 'default' | 'bordered' | 'flat' | 'elevated';
   padding?: 'none' | 'sm' | 'md' | 'lg';
   hoverable?: boolean;
 }
@@ -10,7 +10,8 @@ export interface CardProps extends HTMLAttributes<HTMLDivElement> {
 const variantStyles = {
   default: 'bg-[var(--color-neutral-0)] shadow-sm border border-[var(--color-neutral-200)]',
   bordered: 'border-2 border-[var(--color-neutral-200)]',
-  flat: 'bg-[var(--color-neutral-50)]'
+  flat: 'bg-[var(--color-neutral-50)]',
+  elevated: 'bg-[var(--color-neutral-0)] shadow-md border border-[var(--color-neutral-200)]'
 };
 
 const paddingStyles = {

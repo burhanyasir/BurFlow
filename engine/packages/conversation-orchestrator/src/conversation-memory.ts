@@ -106,6 +106,22 @@ export interface TurnRecord {
   timestamp: number;
 }
 
+export interface DecisionTraceRecord {
+  turnNumber: number;
+  timestamp: number;
+  memoryConfidence: number;
+  trustLevel: 'low'|'medium'|'high';
+  buyingIntentScore: number; // 0-1
+  qualificationConfidence: number; // aggregate 0-1
+  plannerActionScores?: Array<{ action: string; ev: number; trustGain?: number; qualGain?: number; abandonRisk?: number}>;
+  directorChosenAction?: string;
+  brainExecutedAction?: string;
+  memoryUpdates?: string[];
+  trustChanges?: { from: string; to: string; reason?: string }[];
+  ctaDecision?: { ctaId?: string; timing?: 'strong'|'soft'|'none' };
+  objectionResolution?: { category?: string; resolved?: boolean; evidenceUsed?: string[] };
+}
+
 export interface ContextSummaryData {
   lastUpdatedAtTurn: number;
   persona?: PersonaType;
@@ -134,6 +150,9 @@ export interface TrustRecord {
 
 export interface ConversationMemoryData {
   persona: PersonaType;
+  // decisionTrace and telemetry events appended per turn for observability
+  decisionTrace?: DecisionTraceRecord[];
+  telemetryEvents?: Array<{ event: string; timestamp: number; payload?: any }>;
   industry?: string;
   companySize?: string;
   /** captured qualification fields as a flexible map (BANT/MEDDICC/SPICED) */
@@ -178,6 +197,7 @@ export interface ConversationMemoryData {
   lastCta?: string;
   lastResponseText?: string;
   lastGoal?: ConversationGoal;
+  lastGoalStreak?: number;
 
   salesSignals: SalesSignals;
   turns: TurnRecord[];
@@ -257,6 +277,8 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
     currentStage: 'greeting',
     buyerRole: 'unknown',
     customerTemperature: 'cold',
+    lastGoal: 'none',
+    lastGoalStreak: 0,
     contextSummary: {
       lastUpdatedAtTurn: 0,
       buyingIntent: 'low',
@@ -265,6 +287,8 @@ export function createMemory(data?: Partial<ConversationMemoryData>): Conversati
       missingQualification: [],
     },
     contextSummaryTurn: 0,
+    decisionTrace: [],
+    telemetryEvents: [],
     ...data,
   };
 }
@@ -290,6 +314,8 @@ export function fromLegacyMemory(legacy: ConversationIntelligenceMemory): Conver
   mem.customerTemperature = (legacy as any).customerTemperature ?? 'cold';
   mem.buttonRejections = (legacy as any).buttonRejections ?? [];
   mem.buttonAcceptances = (legacy as any).buttonAcceptances ?? [];
+  mem.lastGoal = (legacy as any).lastGoal ?? 'none';
+  mem.lastGoalStreak = (legacy as any).lastGoalStreak ?? 0;
 
   const stageMap: Record<FunnelStage, FunnelStageExtended> = {
     greeting: 'greeting',
@@ -524,6 +550,16 @@ export function markCTAAccepted(memory: ConversationMemoryData, cta: string): vo
   } else {
     memory.ctasShown.push({ cta, label: cta, turnNumber: memory.turnCount, accepted: true, rejected: false });
   }
+}
+
+export function pushDecisionTrace(memory: ConversationMemoryData, trace: DecisionTraceRecord): void {
+  if (!memory.decisionTrace) memory.decisionTrace = [];
+  memory.decisionTrace.push(trace);
+}
+
+export function recordTelemetryEvent(memory: ConversationMemoryData, event: string, payload?: any): void {
+  if (!memory.telemetryEvents) memory.telemetryEvents = [];
+  memory.telemetryEvents.push({ event, timestamp: Date.now(), payload });
 }
 
 export function isGoalAchieved(memory: ConversationMemoryData, goal: ConversationGoal): boolean {

@@ -84,6 +84,8 @@ export interface ConversationIntelligenceMemory {
   leadScore?: number;
   conversationScore?: number;
   knowledgeEvidenceConfidence?: number;
+  lastGoal?: string;
+  lastGoalStreak?: number;
 }
 
 export interface ConversationIntelligenceResult {

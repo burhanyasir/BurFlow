@@ -270,6 +270,14 @@ function findMissingQualification(memory: ConversationMemoryData): string[] {
   return missing.slice(0, Math.max(1, maxToAsk));
 }
 
+function countRecentGoal(memory: ConversationMemoryData, goal: ConversationGoal, window: number = 5): number {
+  return memory.turns.slice(-window).filter(t => t.goal === goal).length;
+}
+
+function isRepeatedGoal(memory: ConversationMemoryData, goal: ConversationGoal, threshold: number): boolean {
+  return memory.lastGoal === goal && (memory.lastGoalStreak ?? 0) >= threshold;
+}
+
 function chooseGoal(
   customerIntent: CustomerIntent,
   funnelStage: FunnelStageExtended,
@@ -303,7 +311,12 @@ function chooseGoal(
   if (customerIntent === 'learning') {
     if (memory.turnCount <= 2) return 'answer_question';
     if (isGoalAchieved(memory, 'answer_question') && memory.qualificationCollected.completed) return 'advance_funnel';
-    if (isGoalAchieved(memory, 'answer_question')) return 'qualify';
+    if (isGoalAchieved(memory, 'answer_question')) {
+      if (isRepeatedGoal(memory, 'qualify', 2)) {
+        return 'advance_funnel';
+      }
+      return 'qualify';
+    }
     return 'answer_question';
   }
 
@@ -314,6 +327,9 @@ function chooseGoal(
         return 'recommend_plan';
       }
       if (qualCompleted) return 'advance_funnel';
+      if (isRepeatedGoal(memory, 'qualify', 2)) {
+        return 'advance_funnel';
+      }
       return 'qualify';
     }
   }
@@ -324,6 +340,7 @@ function chooseGoal(
 
   if (customerIntent === 'confirming') {
     if (memory.turnCount >= 3 && funnelStage === 'evaluation') {
+      if (isRepeatedGoal(memory, 'qualify', 2)) return 'close_trial';
       return memory.qualificationCollected.completed || memory.salesSignals.timelineSignals.length > 0 ? 'close_trial' : 'qualify';
     }
     return 'advance_funnel';
@@ -334,9 +351,16 @@ function chooseGoal(
   }
 
   if (funnelStage === 'decision') return 'finish_conversation';
-  if (funnelStage === 'purchase_intent') return memory.qualificationCollected.completed ? 'close_trial' : 'qualify';
+  if (funnelStage === 'purchase_intent') {
+    if (memory.qualificationCollected.completed) return 'close_trial';
+    if (isRepeatedGoal(memory, 'qualify', 2)) return 'advance_funnel';
+    return 'qualify';
+  }
 
   if (memory.turnCount >= 3 && !memory.qualificationCollected.completed) {
+    if (isRepeatedGoal(memory, 'qualify', 2)) {
+      return 'advance_funnel';
+    }
     return 'qualify';
   }
 

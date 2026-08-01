@@ -1,0 +1,120 @@
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { authClient } from './auth-client';
+import { storage } from './storage';
+import type { AuthState, AuthUser, AuthTenant } from './auth-types';
+
+interface AuthContextValue extends AuthState {
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, companyName?: string) => Promise<void>;
+  logout: () => void;
+  refreshUser: () => Promise<void>;
+  updateProfile: (name?: string, avatarUrl?: string) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    tenant: null,
+    isAuthenticated: false,
+    loading: true,
+  });
+
+  const setUser = useCallback((user: AuthUser | null, tenant?: AuthTenant | null) => {
+    setState({
+      user,
+      tenant: tenant || null,
+      isAuthenticated: !!user,
+      loading: false,
+    });
+  }, []);
+
+  const refreshUser = useCallback(async () => {
+    const token = storage.getToken();
+    if (!token) {
+      setUser(null);
+      return;
+    }
+    const applyUser = (data: any) => {
+      const primaryTenant = data.tenants?.[0] || null;
+      setUser(
+        { ...data.user, emailVerified: true },
+        primaryTenant ? { id: primaryTenant.id, name: primaryTenant.name, slug: primaryTenant.slug, plan: primaryTenant.plan, subscriptionStatus: primaryTenant.subscriptionStatus } : null,
+      );
+    };
+    const isAuthError = (err: any) => {
+      const status = err?.status ?? err?.statusCode ?? err?.response?.status;
+      return status === 401 || status === 403;
+    };
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        applyUser(await authClient.getMe());
+        return;
+      } catch (err: any) {
+        if (isAuthError(err)) {
+          storage.removeToken();
+          setUser(null);
+          return;
+        }
+        if (attempt < 3) await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      }
+    }
+    setState(prev => ({ ...prev, loading: false }));
+  }, [setUser]);
+
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
+
+  useEffect(() => {
+    const onFocus = () => {
+      if (storage.getToken()) refreshUser();
+    };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [refreshUser]);
+
+  const login = useCallback(async (email: string, password: string) => {
+    const data = await authClient.login(email, password);
+    storage.setToken(data.token);
+    setUser(
+      { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: true },
+      data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null,
+    );
+  }, [setUser]);
+
+  const signup = useCallback(async (email: string, password: string, name: string, companyName?: string) => {
+    const data = await authClient.signup(email, password, name, companyName);
+    storage.setToken(data.token);
+    setUser(
+      { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: false },
+      data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null,
+    );
+  }, [setUser]);
+
+  const logout = useCallback(() => {
+    storage.removeToken();
+    setUser(null);
+  }, [setUser]);
+
+  const updateProfile = useCallback(async (name?: string, avatarUrl?: string) => {
+    const data = await authClient.updateProfile(name, avatarUrl);
+    setState(prev => ({
+      ...prev,
+      user: prev.user ? { ...prev.user, ...data.user } : null,
+    }));
+  }, []);
+
+  return (
+    <AuthContext.Provider value={{ ...state, login, signup, logout, refreshUser, updateProfile }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+export function useAuth(): AuthContextValue {
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
+  return ctx;
+}

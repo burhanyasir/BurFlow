@@ -5,6 +5,7 @@ import {
   FunnelStageExtended,
   DiscernedTopic,
   TurnRecord,
+  DecisionTraceRecord,
   createMemory,
   fromLegacyMemory,
   discernTopics,
@@ -15,8 +16,10 @@ import {
   isCTARejected,
   isGoalAchieved,
   extractSalesSignals,
+  pushDecisionTrace,
+  recordTelemetryEvent,
 } from './conversation-memory';
-import { planConversation } from './conversation-planner';
+import { planConversation, ActionScore } from './conversation-planner';
 import { validateResponse } from './conversation-validator';
 import { processConversationIntelligence, IntelligenceInput } from './conversation-intelligence-service';
 import {
@@ -1412,6 +1415,7 @@ function updateMemoryFromBrain(
   responseText: string,
   ciResult: ConversationIntelligenceResult,
   plan: { customerIntent: CustomerIntent; goal: ConversationGoal; funnelStage: FunnelStageExtended },
+  options?: { plannerActionScores?: ActionScore[]; directorChosenAction?: string; brainExecutedAction?: string; ctaDecision?: { ctaId?: string; timing?: 'strong'|'soft'|'none' } }
 ): void {
   memory.turnCount++;
   memory.lastResponseText = responseText;
@@ -1487,6 +1491,13 @@ function updateMemoryFromBrain(
     memory.isCompleted = true;
   }
 
+  if (memory.lastGoal === plan.goal) {
+    memory.lastGoalStreak = (memory.lastGoalStreak || 0) + 1;
+  } else {
+    memory.lastGoal = plan.goal;
+    memory.lastGoalStreak = 1;
+  }
+
   if (!isGoalAchieved(memory, plan.goal)) {
     memory.goalsAchieved.push(plan.goal);
   }
@@ -1500,6 +1511,43 @@ function updateMemoryFromBrain(
     funnelStage: plan.funnelStage,
     timestamp: Date.now(),
   });
+
+  // Build aggregate qualification confidence (average of known fields)
+  let qualConf = 0;
+  const qfields = Object.values(memory.qualificationFields || {});
+  if (qfields.length > 0) qualConf = qfields.reduce((s, f) => s + (f.confidence || 0), 0) / qfields.length;
+
+  // Build decision trace record
+  const trace: DecisionTraceRecord = {
+    turnNumber: memory.turnCount,
+    timestamp: Date.now(),
+    memoryConfidence: memory.memoryConfidence ?? 0,
+    trustLevel: memory.trustLevel,
+    buyingIntentScore: ciResult.buyingIntent?.confidence ?? (ciResult.buyingIntent?.hasBuyingIntent ? 1 : 0),
+    qualificationConfidence: qualConf,
+    plannerActionScores: options?.plannerActionScores ? options.plannerActionScores.map(a => ({ action: a.action, ev: a.ev, trustGain: a.trustGain, qualGain: a.qualGain, abandonRisk: a.abandonRisk })) : undefined,
+    directorChosenAction: options?.directorChosenAction,
+    brainExecutedAction: options?.brainExecutedAction,
+    memoryUpdates: [],
+    trustChanges: [],
+    ctaDecision: options?.ctaDecision,
+    objectionResolution: ciResult.objection?.isObjection ? { category: ciResult.objection.category, resolved: false, evidenceUsed: ciResult.objection.sources || [] } : undefined,
+  };
+
+  // Push trace and telemetry
+  try {
+    pushDecisionTrace(memory, trace);
+    if (ciResult.qualification && ciResult.qualification.completed) {
+      recordTelemetryEvent(memory, 'qualification_completed', { turn: memory.turnCount });
+    }
+    if (options?.ctaDecision && options.ctaDecision.ctaId && options.ctaDecision.timing !== 'none') {
+      recordTelemetryEvent(memory, 'cta_shown', { cta: options.ctaDecision.ctaId, timing: options.ctaDecision.timing, turn: memory.turnCount });
+    }
+  } catch (e) {
+    // best-effort: do not break the conversation if telemetry fails
+    // eslint-disable-next-line no-console
+    console.warn('Failed to record decision trace or telemetry', e);
+  }
 }
 
 function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntelligenceMemory {
@@ -1528,6 +1576,8 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
     currentHelpdesk: memory.currentHelpdesk,
     budget: memory.budget,
     decisionTimeline: memory.decisionTimeline,
+    lastGoal: memory.lastGoal,
+    lastGoalStreak: memory.lastGoalStreak,
   };
 }
 
@@ -1579,12 +1629,22 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
         qualificationState: { ...memory.qualificationCollected },
         objections: memory.objectionsHandled,
         persona: ciResult.persona?.persona ?? 'unknown',
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
       };
       return {
-        responseText: deepResponse, cta: { primaryCTA: 'none' as CTAType, label: '', link: '' }, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
-      memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
-        validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
-      };    }
+        responseText: deepResponse,
+        cta: { primaryCTA: 'none' as CTAType, label: '', link: '' },
+        quickReplies: [],
+        uiState: { buttons: [], suggestedActions: [] },
+        memory,
+        legacyMemory: updatedLegacy,
+        plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
+        validation: { valid: true, issues: [] },
+        ciResult,
+        orchestratorResult: ciResult as any,
+      };
+    }
   }
 
   // Vague replies (EMOTIONAL_DIRECT_ACK with empty response) deepen current topic
@@ -1613,7 +1673,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
         qualificationState: { ...memory.qualificationCollected },
         objections: memory.objectionsHandled,
         persona: ciResult.persona?.persona ?? 'unknown',
-        buyingIntentDetected: memory.buyingIntentDetected,
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
+buyingIntentDetected: memory.buyingIntentDetected,
       };
       return {
         responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
@@ -1665,7 +1727,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       qualificationState: { ...memory.qualificationCollected },
       objections: memory.objectionsHandled,
       persona: ciResult.persona?.persona ?? 'unknown',
-      buyingIntentDetected: memory.buyingIntentDetected,
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
+buyingIntentDetected: memory.buyingIntentDetected,
     };
     return {
       responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
@@ -1697,6 +1761,8 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
         turns: [...legacyMemory.turns, { message, response: greetingResponse, polarity: ciResult.sentiment.polarity, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
         qualificationState: { ...memory.qualificationCollected },
         objections: memory.objectionsHandled,
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
       };
       return {
         responseText: greetingResponse, cta: gCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
@@ -1728,7 +1794,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       qualificationState: { ...memory.qualificationCollected },
       objections: memory.objectionsHandled,
       persona: ciResult.persona?.persona ?? 'unknown',
-    };
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
+};
     return {
       responseText: ending.response, cta: eCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
       memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
@@ -1754,6 +1822,8 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       topics: memory.topicsExplained.map(t => t.topic),
       qualificationState: { ...memory.qualificationCollected },
       objections: memory.objectionsHandled,
+      lastGoal: memory.lastGoal,
+      lastGoalStreak: memory.lastGoalStreak,
     };
     return {
       responseText: offTopicRedirect, cta: oCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
@@ -1825,9 +1895,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       cta = { ...cta, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
     }
   }
- 
+
   const nextBestAction = determineNextBestAction(plan, memory, ciResult);
-  let quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult);
+  const quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult);
 
   // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
   const recommended = recommendPlan(memory);
@@ -1859,7 +1929,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     memory.currentTopic = newTopics[newTopics.length - 1];
   }
 
-  updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan);
+  updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan, { plannerActionScores: (plan as any).actionScores || [], directorChosenAction: strategy.chosenAction?.action, brainExecutedAction: strategy.chosenAction?.action, ctaDecision: { ctaId: cta.primaryCTA, timing: strategy.cta } });
   checkQualificationCompletion(memory);
 
   const updatedLegacy: ConversationIntelligenceMemory = {
@@ -1876,7 +1946,9 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
       },
     ],
     persona: ciResult.persona?.persona ?? 'unknown',
-    funnelStage: ciResult.funnelStage,
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
+funnelStage: ciResult.funnelStage,
     buyingIntentDetected: memory.buyingIntentDetected,
     buyingIntentPhrase: memory.buyingIntentPhrase,
     buyingIntentTier: memory.buyingIntentTier,
