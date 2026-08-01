@@ -7,6 +7,7 @@ import {
   discernTopics,
   isTopicExplained,
   isGoalAchieved,
+  extractSalesSignals,
 } from './conversation-memory';
 import { ConversationStage, BuyerRole } from './types';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
@@ -18,6 +19,15 @@ import {
   GRATITUDE_PATTERNS,
   OBJECTION_PATTERNS,
 } from './patterns';
+import { detectIndustry } from './conversation-personality';
+
+export interface ActionScore {
+  action: string;
+  ev: number; // expected value (conversion-weighted)
+  trustGain: number; // expected trust delta
+  qualGain: number; // expected qualification delta
+  abandonRisk: number; // 0..1
+}
 
 export interface ConversationPlan {
   customerIntent: CustomerIntent;
@@ -33,6 +43,8 @@ export interface ConversationPlan {
     useTrustSignal: boolean;
     tone: 'casual' | 'professional' | 'empathic' | 'urgent';
   };
+  // optional probability-driven action scores to inform the Director/Brain
+  actionScores?: ActionScore[];
 }
 
 const LEARNING_PATTERNS = /\b(what (is|are|does|do|can|features)|how (does|do|can|is)|tell me about|explain|i.d like to know|curious about|can you.*tell)\b/i;
@@ -267,7 +279,15 @@ function chooseGoal(
   if (memory.isLeaving || customerIntent === 'leaving') return 'finish_conversation';
   if (memory.isAbandoned) return 'recover_abandonment';
 
-  if (ciResult.objection.isObjection) {
+  if (customerIntent === 'buying') {
+    if (memory.qualificationCollected.completed || memory.turnCount >= 5) {
+      return 'close_trial';
+    }
+    return 'recommend_plan';
+  }
+
+  const hasSalesObjection = ciResult.objection.isObjection || memory.salesSignals.objections.length > 0 || memory.salesSignals.trustIssues.length > 0;
+  if (hasSalesObjection) {
     if (isGoalAchieved(memory, 'handle_objection')) {
       return memory.trustLevel === 'low' ? 'build_trust' : 'advance_funnel';
     }
@@ -299,7 +319,7 @@ function chooseGoal(
   }
 
   if (customerIntent === 'buying') {
-    if (memory.qualificationCollected.completed) {
+    if (memory.qualificationCollected.completed || memory.turnCount >= 5) {
       return 'close_trial';
     }
     return 'recommend_plan';
@@ -311,7 +331,7 @@ function chooseGoal(
 
   if (customerIntent === 'confirming') {
     if (memory.turnCount >= 3 && funnelStage === 'evaluation') {
-      return memory.qualificationCollected.completed ? 'close_trial' : 'qualify';
+      return memory.qualificationCollected.completed || memory.salesSignals.timelineSignals.length > 0 ? 'close_trial' : 'qualify';
     }
     return 'advance_funnel';
   }
@@ -346,11 +366,157 @@ function findTopMissingUnasked(memory: ConversationMemoryData): DiscernedTopic[]
   return allTopics.filter(t => !isTopicExplained(memory, t));
 }
 
+function inferQualificationSignals(message: string, memory: ConversationMemoryData): void {
+  const lower = message.toLowerCase();
+  const detectedIndustry = detectIndustry(message, memory);
+  if (detectedIndustry.industry && !memory.industry) {
+    memory.industry = detectedIndustry.industry;
+  }
+
+  if (!memory.companySize) {
+    const teamMatch = lower.match(/(?:team|company|staff|employees?|agents?|reps?)\s+(?:of\s+)?(\d+)/i);
+    if (teamMatch) memory.companySize = teamMatch[1];
+    else if (/enterprise|large organization|mid-market|small business|startup/i.test(lower)) {
+      memory.companySize = /enterprise|large organization/i.test(lower) ? '500+' : '10-50';
+    }
+  }
+
+  if (!memory.useCase) {
+    if (/support|deflect|tickets|customer support|help desk|agent/i.test(lower)) memory.useCase = 'customer support';
+    else if (/order|product|returns|shipping|store|shopify|ecommerce/i.test(lower)) memory.useCase = 'ecommerce support';
+    else if (/appointment|patient|clinic|healthcare|medical/i.test(lower)) memory.useCase = 'patient support';
+    else if (/intake|client|case|legal|law/i.test(lower)) memory.useCase = 'client intake';
+  }
+
+  if (!memory.currentHelpdesk) {
+    const helpdeskPatterns = [
+      { pattern: /zendesk/i, value: 'Zendesk' },
+      { pattern: /intercom/i, value: 'Intercom' },
+      { pattern: /hubspot/i, value: 'HubSpot' },
+      { pattern: /salesforce/i, value: 'Salesforce' },
+      { pattern: /slack/i, value: 'Slack' },
+      { pattern: /shopify/i, value: 'Shopify' },
+      { pattern: /jira/i, value: 'Jira' },
+      { pattern: /okta|azure ad|sso/i, value: 'SSO / IAM' },
+    ];
+    for (const entry of helpdeskPatterns) {
+      if (entry.pattern.test(lower)) {
+        memory.currentHelpdesk = entry.value;
+        break;
+      }
+    }
+  }
+
+  if (!memory.monthlyConversations) {
+    const volumeMatch = lower.match(/(\d+)\s*(k|thousand| thousand|million|m)\s*(conversations|tickets|requests|questions)/i)
+      || lower.match(/(\d+)\s*(conversations|tickets|requests|questions)\s*(per|a)?\s*(month|monthly)/i)
+      || lower.match(/(under|around|about)\s*(\d+)/i);
+    if (volumeMatch) {
+      const value = volumeMatch[1] || volumeMatch[2] || '';
+      memory.monthlyConversations = value ? value.toString() : undefined;
+    }
+  }
+
+  if (!memory.budget) {
+    if (/free trial|under \$|budget|cheap|affordable|costly|expensive|price/i.test(lower)) {
+      memory.budget = /expensive|costly|too high|budget/i.test(lower) ? 'budget-sensitive' : 'considering budget';
+    }
+  }
+
+  if (!memory.decisionTimeline) {
+    if (/asap|urgent|today|this week|this month|tomorrow|quarter end|deadline|by next/i.test(lower)) {
+      memory.decisionTimeline = 'near-term';
+    } else if (/next quarter|later|eventually|soon/i.test(lower)) {
+      memory.decisionTimeline = 'medium-term';
+    }
+  }
+}
+
+function computeActionEV(action: string, memory: ConversationMemoryData, ciResult: ConversationIntelligenceResult): ActionScore {
+  // Base heuristics mapped to business-value oriented scores.
+  // Values are scaled 0..1 internally then scaled for EV.
+  const buyIntent = (ciResult.buyingIntent?.confidence ?? 0) || (memory.buyingIntentDetected ? 0.6 : 0);
+  const trust = memory.trustLevel === 'high' ? 1 : memory.trustLevel === 'medium' ? 0.6 : 0.2;
+  const momentum = memory.momentumScore ?? 0; // -1..1
+  const momentumFactor = 1 + Math.max(-0.5, Math.min(0.5, momentum));
+
+  // heuristics for expected conversion uplift and risks
+  let convProb = 0.01;
+  let trustGain = 0;
+  let qualGain = 0;
+  let abandonRisk = 0.02;
+
+  switch (action) {
+    case 'ask_qualification':
+      convProb = 0.02 * (1 + buyIntent);
+      trustGain = -0.01; // slight friction
+      qualGain = 0.25;
+      abandonRisk = 0.05;
+      break;
+    case 'educate':
+      convProb = 0.03 * (0.5 + buyIntent);
+      trustGain = 0.05;
+      qualGain = 0.05;
+      abandonRisk = 0.01;
+      break;
+    case 'handle_objection':
+      convProb = 0.04 * (0.5 + buyIntent);
+      trustGain = 0.08;
+      qualGain = 0.02;
+      abandonRisk = 0.02;
+      break;
+    case 'show_proof':
+      convProb = 0.06 * (0.5 + buyIntent);
+      trustGain = 0.12;
+      qualGain = 0.02;
+      abandonRisk = 0.01;
+      break;
+    case 'book_demo':
+      convProb = 0.2 * (0.5 + buyIntent) * trust;
+      trustGain = 0.02;
+      qualGain = 0.4;
+      abandonRisk = 0.08 * (1 - trust);
+      break;
+    case 'offer_trial':
+      convProb = 0.12 * (0.5 + buyIntent) * (trust >= 0.6 ? 1 : 0.6);
+      trustGain = 0.01;
+      qualGain = 0.25;
+      abandonRisk = 0.06;
+      break;
+    case 'wait':
+      convProb = 0.005 * (0.2 + buyIntent);
+      trustGain = 0.01;
+      qualGain = 0;
+      abandonRisk = 0.0;
+      break;
+    case 'escalate_to_human':
+      convProb = 0.15 * (0.3 + buyIntent);
+      trustGain = 0.1;
+      qualGain = 0.3;
+      abandonRisk = 0.12;
+      break;
+    default:
+      convProb = 0.01;
+  }
+
+  const ev = convProb * 100 * momentumFactor; // scale into human-friendly 0..100-ish
+  return { action, ev, trustGain, qualGain, abandonRisk };
+}
+
 export function planConversation(
   message: string,
   memory: ConversationMemoryData,
   ciResult: ConversationIntelligenceResult,
 ): ConversationPlan {
+  inferQualificationSignals(message, memory);
+
+  const salesSignals = extractSalesSignals(message, memory.salesSignals);
+  memory.salesSignals = salesSignals;
+  if (salesSignals.objections.length > 0 || salesSignals.trustIssues.length > 0 || salesSignals.urgencySignals.length > 0) {
+    memory.buyingIntentDetected = true;
+    memory.buyingIntentPhrase = memory.buyingIntentPhrase || 'evaluation signals detected';
+  }
+
   const customerIntent = detectCustomerIntent(message, memory, ciResult);
   const funnelStage = detectFunnelStageExtended(message, memory, ciResult);
   const conversationStage = detectConversationStage(message, memory, ciResult);
@@ -380,6 +546,10 @@ export function planConversation(
 
   const tone = determineTone(customerIntent, ciResult.sentiment);
 
+  // Compute action scores for candidate actions using expected value
+  const candidateActions = ['ask_qualification', 'educate', 'handle_objection', 'show_proof', 'book_demo', 'offer_trial', 'wait', 'escalate_to_human'];
+  const actionScores = candidateActions.map(a => computeActionEV(a, memory, ciResult)).sort((x, y) => y.ev - x.ev);
+
   return {
     customerIntent,
     funnelStage,
@@ -388,6 +558,7 @@ export function planConversation(
     goal,
     topicsToDiscuss,
     missingQualification,
+    actionScores,
     constraints: {
       avoidTopics,
       avoidCTAs,
