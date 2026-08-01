@@ -37,6 +37,22 @@ export interface QualificationState {
   qualifiedForTier?: 'free' | 'starter' | 'professional' | 'enterprise';
   questionsAskedCount: number;
   completed: boolean;
+  // extractedFields holds rich qualification fields with confidence for BANT/MEDDICC/SPICED
+  extractedFields?: Record<string, { value?: string; confidence: number }>; 
+}
+
+export interface ObjectionResult {
+  isObjection: boolean;
+  category: ObjectionCategory;
+  groundedAnswer: string;
+  sources: string[];
+  // additional mapped resources for objection resolution
+  proof?: string;
+  documentation?: string;
+  caseStudy?: string;
+  faq?: string;
+  comparison?: string;
+  recommendedCTA?: CTAType;
 }
 
 export type ObjectionCategory =
@@ -85,6 +101,12 @@ export interface SmartButton {
   payload: string;
   icon?: string;
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  // Optional runtime score used for ranking (0-1)
+  score?: number;
+  // Optional semantic category for analytics or UI grouping
+  category?: string;
+  // Localized labels by locale (locale->label). If present, consumer should prefer locale label.
+  localeLabels?: Record<string, string>;
 }
 
 export interface ConversationUIState {

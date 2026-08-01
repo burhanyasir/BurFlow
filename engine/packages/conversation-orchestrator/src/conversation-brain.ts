@@ -15,6 +15,8 @@ import {
   isCTARejected,
   isGoalAchieved,
   extractSalesSignals,
+  pushDecisionTrace,
+  recordTelemetryEvent,
 } from './conversation-memory';
 import { planConversation } from './conversation-planner';
 import { validateResponse } from './conversation-validator';
@@ -42,6 +44,7 @@ import {
   QualificationState,
   PersonaDetectionResult,
 } from './types';
+import { generateChoices } from './dynamic-choice-engine';
 
 function detectSentimentPolarity(message: string): number {
   const lower = message.toLowerCase();
@@ -1023,12 +1026,15 @@ function buildDynamicQuickReplies(
   return replies.slice(0, 4);
 }
 
+import { ActionScore } from './conversation-planner';
+
 function updateMemoryFromBrain(
   memory: ConversationMemoryData,
   message: string,
   responseText: string,
   ciResult: ConversationIntelligenceResult,
   plan: { customerIntent: CustomerIntent; goal: ConversationGoal; funnelStage: FunnelStageExtended },
+  options?: { plannerActionScores?: ActionScore[]; directorChosenAction?: string; brainExecutedAction?: string; ctaDecision?: { ctaId?: string; timing?: 'strong'|'soft'|'none' } }
 ): void {
   memory.turnCount++;
   memory.lastResponseText = responseText;
@@ -1117,6 +1123,43 @@ function updateMemoryFromBrain(
     funnelStage: plan.funnelStage,
     timestamp: Date.now(),
   });
+
+  // Build aggregate qualification confidence (average of known fields)
+  let qualConf = 0;
+  const qfields = Object.values(memory.qualificationFields || {});
+  if (qfields.length > 0) qualConf = qfields.reduce((s, f) => s + (f.confidence || 0), 0) / qfields.length;
+
+  // Build decision trace record
+  const trace: DecisionTraceRecord = {
+    turnNumber: memory.turnCount,
+    timestamp: Date.now(),
+    memoryConfidence: memory.memoryConfidence ?? 0,
+    trustLevel: memory.trustLevel,
+    buyingIntentScore: ciResult.buyingIntent?.confidence ?? (ciResult.buyingIntent?.hasBuyingIntent ? 1 : 0),
+    qualificationConfidence: qualConf,
+    plannerActionScores: options?.plannerActionScores ? options.plannerActionScores.map(a => ({ action: a.action, ev: a.ev, trustGain: a.trustGain, qualGain: a.qualGain, abandonRisk: a.abandonRisk })) : undefined,
+    directorChosenAction: options?.directorChosenAction,
+    brainExecutedAction: options?.brainExecutedAction,
+    memoryUpdates: [],
+    trustChanges: [],
+    ctaDecision: options?.ctaDecision,
+    objectionResolution: ciResult.objection?.isObjection ? { category: ciResult.objection.category, resolved: false, evidenceUsed: ciResult.objection.sources || [] } : undefined,
+  };
+
+  // Push trace and telemetry
+  try {
+    pushDecisionTrace(memory, trace);
+    if (ciResult.qualification && ciResult.qualification.completed) {
+      recordTelemetryEvent(memory, 'qualification_completed', { turn: memory.turnCount });
+    }
+    if (options?.ctaDecision && options.ctaDecision.ctaId && options.ctaDecision.timing !== 'none') {
+      recordTelemetryEvent(memory, 'cta_shown', { cta: options.ctaDecision.ctaId, timing: options.ctaDecision.timing, turn: memory.turnCount });
+    }
+  } catch (e) {
+    // best-effort: do not break the conversation if telemetry fails
+    // eslint-disable-next-line no-console
+    console.warn('Failed to record decision trace or telemetry', e);
+  }
 }
 
 function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntelligenceMemory {
@@ -1427,7 +1470,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     }
   }
 
-  let quickReplies = buildDynamicQuickReplies(plan, memory, ciResult);
+  let quickReplies = generateChoices({ memory, currentTopic: memory.currentTopic ? memory.currentTopic : undefined, persona: memory.persona, planGoal: plan.goal, funnelStage: plan.funnelStage, objections: memory.salesSignals.objections, buyingIntentScore: ciResult.buyingIntent?.confidence ?? 0 }) as any;
 
   // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
   const recommended = recommendPlan(memory);
@@ -1459,7 +1502,7 @@ export function processConversationBrain(input: BrainInput): BrainOutput {
     memory.currentTopic = newTopics[newTopics.length - 1];
   }
 
-  updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan);
+  updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan, { plannerActionScores: (plan as any).actionScores || [], directorChosenAction: strategy.chosenAction?.action, brainExecutedAction: strategy.chosenAction?.action, ctaDecision: { ctaId: cta.primaryCTA, timing: strategy.cta } });
   checkQualificationCompletion(memory);
 
   const updatedLegacy: ConversationIntelligenceMemory = {
