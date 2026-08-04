@@ -2,6 +2,13 @@ import Database from 'better-sqlite3';
 import { v4 as uuid } from 'uuid';
 import { StoreHealth } from '@conversation-engine/core-types';
 
+export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const CLIENT_SESSION_RE = /^session_[A-Za-z0-9._:-]+$/;
+
+export function isValidSessionId(sessionId: string): boolean {
+  return UUID_RE.test(sessionId) || CLIENT_SESSION_RE.test(sessionId);
+}
+
 export interface SessionRecord {
   tenantId: string;
   sessionId: string;
@@ -18,7 +25,7 @@ export interface SessionRecord {
 }
 
 export interface SessionStore {
-  createSession(tenantId: string, configVersion: number, ttlMinutes?: number): Promise<SessionRecord>;
+  createSession(tenantId: string, configVersion: number, ttlMinutes?: number, sessionId?: string): Promise<SessionRecord>;
   loadSession(tenantId: string, sessionId: string): Promise<SessionRecord | null>;
   commitSession(tenantId: string, sessionId: string, expectedVersion: number, updates: Partial<SessionRecord>): Promise<{ success: boolean; newVersion?: number; sequenceCounter?: number }>;
   incrementSequence(tenantId: string, sessionId: string): Promise<number>;
@@ -56,15 +63,48 @@ export class SqliteSessionStore implements SessionStore {
     `);
   }
 
-  async createSession(tenantId: string, configVersion: number, ttlMinutes = 1440): Promise<SessionRecord> {
-    const sessionId = uuid();
+  async createSession(tenantId: string, configVersion: number, ttlMinutes = 1440, sessionId?: string): Promise<SessionRecord> {
+    const normalizedSessionId = sessionId || uuid();
+    if (sessionId && !isValidSessionId(sessionId)) {
+      throw new Error('Invalid sessionId format');
+    }
+
+    const existingForTenant = this.db.prepare(
+      'SELECT tenant_id, session_id, version, state, state_machine, sequence_counter, config_version, created_at, updated_at, ttl_minutes, grace_period_days, legal_hold_days FROM sessions WHERE tenant_id = ? AND session_id = ?'
+    ).get(tenantId, normalizedSessionId) as any;
+
+    if (existingForTenant) {
+      return {
+        tenantId: existingForTenant.tenant_id,
+        sessionId: existingForTenant.session_id,
+        version: existingForTenant.version,
+        state: existingForTenant.state,
+        stateMachine: existingForTenant.state_machine,
+        sequenceCounter: existingForTenant.sequence_counter,
+        configVersion: existingForTenant.config_version,
+        createdAt: existingForTenant.created_at,
+        updatedAt: existingForTenant.updated_at,
+        ttlMinutes: existingForTenant.ttl_minutes,
+        gracePeriodDays: existingForTenant.grace_period_days,
+        legalHoldDays: existingForTenant.legal_hold_days,
+      };
+    }
+
+    const existingAnyTenant = this.db.prepare(
+      'SELECT tenant_id FROM sessions WHERE session_id = ? LIMIT 1'
+    ).get(normalizedSessionId) as any;
+
+    if (sessionId && existingAnyTenant && existingAnyTenant.tenant_id !== tenantId) {
+      throw new Error('SessionId already exists for a different tenant');
+    }
+
     const now = new Date().toISOString();
     this.db.prepare(`
       INSERT INTO sessions (tenant_id, session_id, version, state, state_machine, sequence_counter, config_version, created_at, updated_at, ttl_minutes)
       VALUES (?, ?, 1, '{}', 'initial', 0, ?, ?, ?, ?)
-    `).run(tenantId, sessionId, configVersion, now, now, ttlMinutes);
+    `).run(tenantId, normalizedSessionId, configVersion, now, now, ttlMinutes);
     return {
-      tenantId, sessionId, version: 1, state: '{}', stateMachine: 'initial',
+      tenantId, sessionId: normalizedSessionId, version: 1, state: '{}', stateMachine: 'initial',
       sequenceCounter: 0, configVersion, createdAt: now, updatedAt: now,
       ttlMinutes, gracePeriodDays: 7, legalHoldDays: 90,
     };

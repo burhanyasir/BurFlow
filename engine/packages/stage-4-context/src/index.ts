@@ -1,5 +1,5 @@
 import { StageInput, StageResult, ErrorCodes, Message } from '@conversation-engine/core-types';
-import { SessionStore } from '@conversation-engine/session-store';
+import { SessionStore, CLIENT_SESSION_RE } from '@conversation-engine/session-store';
 
 export interface Stage4Deps {
   sessionStore: SessionStore;
@@ -20,10 +20,18 @@ export async function execute(input: StageInput, deps: Stage4Deps): Promise<Stag
     return { success: false, errorCode: ErrorCodes.ERR_INTERNAL, error: { stage: 'stage-4-context', errorCode: ErrorCodes.ERR_INTERNAL, message: 'No sessionId provided', retryable: false } };
   }
 
-  const session = await deps.sessionStore.loadSession(context.tenantId, context.sessionId);
+  let session = await deps.sessionStore.loadSession(context.tenantId, context.sessionId);
 
   if (!session) {
-    return { success: false, errorCode: ErrorCodes.ERR_SESSION_STORE_UNAVAILABLE, error: { stage: 'stage-4-context', errorCode: ErrorCodes.ERR_SESSION_STORE_UNAVAILABLE, message: 'Session not found', retryable: true } };
+    if (!CLIENT_SESSION_RE.test(context.sessionId)) {
+      return { success: false, errorCode: ErrorCodes.ERR_INTERNAL, error: { stage: 'stage-4-context', errorCode: ErrorCodes.ERR_INTERNAL, message: 'Session not found', retryable: false } };
+    }
+
+    try {
+      session = await deps.sessionStore.createSession(context.tenantId, context.configVersion || 1, 1440, context.sessionId);
+    } catch (err: any) {
+      return { success: false, errorCode: ErrorCodes.ERR_INTERNAL, error: { stage: 'stage-4-context', errorCode: ErrorCodes.ERR_INTERNAL, message: err?.message || 'Invalid sessionId format', retryable: false } };
+    }
   }
 
   let rawData: any;

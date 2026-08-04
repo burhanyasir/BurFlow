@@ -35,8 +35,18 @@ describe('stage-4-context', () => {
     expect(ctx.sessionState!.version).toBe(1);
   });
 
-  it('fails for missing session', async () => {
-    const ctx = makeContext({ tenantId: 't1', sessionId: 'nonexistent' });
+  it('creates a session for a valid client-generated sessionId when none exists', async () => {
+    const clientSessionId = 'session_12345abcde';
+    const ctx = makeContext({ tenantId: 't1', sessionId: clientSessionId });
+    const result = await execute({ context: ctx, signal: new AbortController().signal }, { sessionStore: store });
+    expect(result.success).toBe(true);
+    expect(ctx.sessionState).toBeDefined();
+    expect(ctx.sessionState!.sessionId).toBe(clientSessionId);
+    expect(ctx.sessionState!.version).toBe(1);
+  });
+
+  it('rejects malformed session ids without creating a session', async () => {
+    const ctx = makeContext({ tenantId: 't1', sessionId: 'bad/session' });
     const result = await execute({ context: ctx, signal: new AbortController().signal }, { sessionStore: store });
     expect(result.success).toBe(false);
   });
