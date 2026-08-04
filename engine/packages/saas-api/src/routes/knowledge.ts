@@ -231,12 +231,14 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         status: status?.status || 'queued',
         queuedAt: status?.queuedAt,
         crawlOptions: { maxDepth: crawlDepth, maxPages: crawlPages },
+        warning: null,
       });
     } catch (err: any) {
+      createContextLogger(logger).warn({ err, tenantId: req.user?.tenantId, url }, 'Knowledge crawl failed during onboarding flow; continuing with basic widget setup');
       if (err.message?.includes('exceeds maximum')) {
-        return res.status(413).json({ error: err.message });
+        return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }
-      res.status(500).json({ error: 'Failed to enqueue URL' });
+      res.status(500).json({ error: 'Failed to enqueue URL', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
     }
   });
 

@@ -112,7 +112,7 @@ describe('streamChat', () => {
     expect(onError).toHaveBeenCalledWith('LLM failed');
   });
 
-  it('sends tenant-id and api-key headers', async () => {
+  it('sends tenant-id, api-key, widget-token, and session-id headers', async () => {
     const stream = createMockStream([]);
     const fetchFn = mockFetch({ ok: true, body: stream });
     vi.stubGlobal('fetch', fetchFn);
@@ -121,6 +121,7 @@ describe('streamChat', () => {
       apiUrl: 'http://test',
       tenantId: 't-123',
       apiKey: 'key-abc',
+      widgetToken: 'widget-token-xyz',
       sessionId: 's-456',
       onToken: vi.fn(),
       onDone: vi.fn(),
@@ -128,12 +129,33 @@ describe('streamChat', () => {
       onError: vi.fn(),
     });
 
-    expect(fetchFn).toHaveBeenCalledWith('http://test/api/chat', expect.objectContaining({
+    expect(fetchFn).toHaveBeenCalledWith('http://test/api/chat/stream', expect.objectContaining({
       headers: expect.objectContaining({
         'x-tenant-id': 't-123',
         'x-api-key': 'key-abc',
+        'x-widget-token': 'widget-token-xyz',
         'x-session-id': 's-456',
       }),
+      body: JSON.stringify({ message: '' , sessionId: 's-456' }),
+    }));
+  });
+
+  it('sends message text in request body', async () => {
+    const stream = createMockStream([]);
+    const fetchFn = mockFetch({ ok: true, body: stream });
+    vi.stubGlobal('fetch', fetchFn);
+
+    await streamChat({
+      apiUrl: 'http://test',
+      message: 'Hello widget',
+      onToken: vi.fn(),
+      onDone: vi.fn(),
+      onComplete: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    expect(fetchFn).toHaveBeenCalledWith('http://test/api/chat/stream', expect.objectContaining({
+      body: JSON.stringify({ message: 'Hello widget' }),
     }));
   });
 
@@ -204,7 +226,7 @@ describe('ChatWidget', () => {
     const msgs = widget.getMessages();
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe('assistant');
-    expect(msgs[0].content).toBe('Welcome!');
+    expect(msgs[0].content).toMatch(/I can help/i);
   });
 
   it('does not duplicate greeting on multiple opens', () => {
@@ -227,9 +249,9 @@ describe('ChatWidget', () => {
     widget.send();
 
     const msgs = widget.getMessages();
-    expect(msgs.length).toBe(2);
-    expect(msgs[0].role).toBe('user');
-    expect(msgs[0].content).toBe('Hello there');
+    expect(msgs.length).toBe(3);
+    expect(msgs[1].role).toBe('user');
+    expect(msgs[1].content).toBe('Hello there');
     expect(input.value).toBe('');
   });
 
@@ -239,7 +261,7 @@ describe('ChatWidget', () => {
     widget.toggle();
 
     widget.send();
-    expect(widget.getMessages().length).toBe(0);
+    expect(widget.getMessages().length).toBe(1);
   });
 
   it('streams response from API', async () => {
@@ -268,10 +290,10 @@ describe('ChatWidget', () => {
     await new Promise(r => setTimeout(r, 50));
 
     const msgs = widget.getMessages();
-    expect(msgs.length).toBe(2);
-    expect(msgs[1].role).toBe('assistant');
-    expect(msgs[1].content).toBe('Hello world');
-    expect(msgs[1].streaming).toBe(false);
+    expect(msgs.length).toBe(3);
+    expect(msgs[2].role).toBe('assistant');
+    expect(msgs[2].content).toBe('Hello world');
+    expect(msgs[2].streaming).toBe(false);
   });
 
   it('renders message elements in DOM', () => {
@@ -335,7 +357,7 @@ describe('ChatWidget', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
 
     expect(input.value).toBe('');
-    expect(widget.getMessages().length).toBe(2);
+    expect(widget.getMessages().length).toBe(3);
   });
 
   it('does not send on Shift+Enter', () => {
@@ -348,7 +370,7 @@ describe('ChatWidget', () => {
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true }));
 
     expect(input.value).toBe('Test');
-    expect(widget.getMessages().length).toBe(0);
+    expect(widget.getMessages().length).toBe(1);
   });
 
   it('shows unread badge when closed and message arrives', async () => {

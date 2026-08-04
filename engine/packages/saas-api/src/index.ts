@@ -8,6 +8,7 @@ import {
   ConversationRepository, MessageRepository, UsageRepository,
   KnowledgeBaseRepository, KbDocumentRepository, OnboardingProgressRepository,
   WidgetConfigRepository, RefreshTokenRepository, AnalyticsRepository,
+  generateId,
   SubscriptionRepository, InvoiceRepository, PaymentRepository,
   BillingEventRepository,
   UnansweredQuestionRepository, UnansweredQuestionClusterRepository,
@@ -107,11 +108,13 @@ if (SENDGRID_API_KEY) {
 }
 
 const rawCorsOrigin = process.env.CORS_ORIGIN || '';
-const CORS_ORIGIN: string[] | false = rawCorsOrigin
-  ? rawCorsOrigin.split(',').map(s => s.trim()).filter(Boolean)
-  : false;
-if (CORS_ORIGIN && !Array.isArray(CORS_ORIGIN)) {
-  throw new Error('CORS_ORIGIN must be a comma-separated list of origins, or false');
+const CORS_ORIGIN: string[] | false | true = rawCorsOrigin === '*'
+  ? true
+  : rawCorsOrigin
+    ? rawCorsOrigin.split(',').map(s => s.trim()).filter(Boolean)
+    : false;
+if (CORS_ORIGIN && !Array.isArray(CORS_ORIGIN) && CORS_ORIGIN !== true) {
+  throw new Error('CORS_ORIGIN must be a comma-separated list of origins, "*", or false');
 } else if (!CORS_ORIGIN && process.env.NODE_ENV === 'production') {
   logger.warn('CORS_ORIGIN not set — API will reject all cross-origin requests. Set CORS_ORIGIN to a comma-separated list of allowed origins.');
 }
@@ -265,7 +268,7 @@ app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conver
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
 app.use('/api/knowledge-bases', auth, tenantGuard, createKnowledgeBaseRoutes(kbRepo, docRepo));
 const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo);
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider));
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/billing', createBillingWebhookRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo));

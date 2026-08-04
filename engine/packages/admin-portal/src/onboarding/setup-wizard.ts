@@ -4,6 +4,8 @@ import { getOnboardingProgress, setOnboardingProgress } from './store';
 import type { OnboardingStepId } from './types';
 import { toast } from '../core/toast';
 
+const KNOWLEDGE_FALLBACK_WARNING = 'Website scan did not complete; the widget will continue with a basic setup.';
+
 interface WizardCallbacks {
   onComplete: () => void;
   onClose: () => void;
@@ -358,24 +360,34 @@ export class SetupWizard extends Component {
           // Logo upload is placeholder - skip validation
           break;
         case 'knowledge_source': {
-          if (this.knowledgeMode === 'upload') {
-            const content = (this.el.querySelector('#wizard-knowledge') as HTMLTextAreaElement)?.value?.trim();
-            if (!content) { toast.error('Please enter document content'); return false; }
-            await this.api.post('/api/knowledge/upload', { filename: 'Onboarding Document.txt', sourceType: 'text', content });
-          } else if (this.knowledgeMode === 'crawl') {
-            const url = (this.el.querySelector('#wizard-crawl-url') as HTMLInputElement)?.value?.trim();
-            if (!url) { toast.error('Please enter a URL to crawl'); return false; }
-            await this.api.post('/api/knowledge/crawl', { url, maxDepth: 2, maxPages: 10 });
-          } else if (this.knowledgeMode === 'faq') {
-            const content = (this.el.querySelector('#wizard-faq') as HTMLTextAreaElement)?.value?.trim();
-            if (!content) { toast.error('Please enter FAQ content'); return false; }
-            await this.api.post('/api/knowledge/upload/faq', { filename: undefined, content });
-          } else {
-            toast.error('Please select a knowledge source type');
-            return false;
+          let ingestionWarning = '';
+          try {
+            if (this.knowledgeMode === 'upload') {
+              const content = (this.el.querySelector('#wizard-knowledge') as HTMLTextAreaElement)?.value?.trim();
+              if (!content) { toast.error('Please enter document content'); return false; }
+              await this.api.post('/api/knowledge/upload', { filename: 'Onboarding Document.txt', sourceType: 'text', content });
+            } else if (this.knowledgeMode === 'crawl') {
+              const url = (this.el.querySelector('#wizard-crawl-url') as HTMLInputElement)?.value?.trim();
+              if (!url) { toast.error('Please enter a URL to crawl'); return false; }
+              await this.api.post('/api/knowledge/crawl', { url, maxDepth: 2, maxPages: 10 });
+            } else if (this.knowledgeMode === 'faq') {
+              const content = (this.el.querySelector('#wizard-faq') as HTMLTextAreaElement)?.value?.trim();
+              if (!content) { toast.error('Please enter FAQ content'); return false; }
+              await this.api.post('/api/knowledge/upload/faq', { filename: undefined, content });
+            } else {
+              toast.error('Please select a knowledge source type');
+              return false;
+            }
+
+            try { await this.api.post('/api/knowledge/publish'); } catch { /* not critical */ }
+          } catch (err: any) {
+            ingestionWarning = KNOWLEDGE_FALLBACK_WARNING;
+            console.warn('onboarding.knowledge_ingestion_fallback', {
+              error: err?.message || 'Unknown onboarding knowledge-ingestion error',
+              mode: this.knowledgeMode,
+            });
+            toast.warning(ingestionWarning);
           }
-          // Optionally publish
-          try { await this.api.post('/api/knowledge/publish'); } catch { /* not critical */ }
           break;
         }
         case 'widget_install': {

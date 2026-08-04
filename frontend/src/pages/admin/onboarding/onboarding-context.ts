@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { apiClient } from '../../../lib/api-client';
 import { storage } from '../../../lib/storage';
 import { useAuth } from '../../../lib/auth-context';
+import { deriveBusinessIntelligenceSnapshot } from '../../../utils/business-profile';
 
 const STORAGE_KEY = 'onboarding_v2_progress';
 
@@ -209,29 +210,51 @@ export function useOnboardingState() {
   }, []);
 
   const createWorkspace = useCallback(async (): Promise<{ tenantId: string; slug: string }> => {
-    const result = await apiClient.post<{ tenant: { id: string; slug: string }; token?: string }>('/tenants', {
-      name: data.workspace.name,
-      website: data.workspace.website,
-      industry: data.workspace.industry,
-    });
-    const tenant = result.tenant;
-    if (result.token) storage.setToken(result.token);
     try {
-      await refreshUser();
-    } catch {}
-    setData(prev => {
-      const next = {
-        ...prev,
-        workspace: { ...prev.workspace, tenantId: tenant.id, slug: tenant.slug },
-        embed: { ...prev.embed, agentId: tenant.slug },
-      };
-      persist(next);
-      return next;
-    });
-    return { tenantId: tenant.id, slug: tenant.slug };
+      const result = await apiClient.post<{ tenant: { id: string; slug: string }; token?: string }>('/tenants', {
+        name: data.workspace.name,
+        website: data.workspace.website,
+        industry: data.workspace.industry,
+      });
+      const tenant = result.tenant;
+      if (result.token) storage.setToken(result.token);
+      try {
+        await refreshUser();
+      } catch {}
+      setData(prev => {
+        const next = {
+          ...prev,
+          workspace: { ...prev.workspace, tenantId: tenant.id, slug: tenant.slug },
+          embed: { ...prev.embed, agentId: tenant.slug },
+        };
+        persist(next);
+        return next;
+      });
+      return { tenantId: tenant.id, slug: tenant.slug };
+    } catch (err: any) {
+      const status = err?.status;
+      if (typeof status === 'number' && status >= 400) {
+        throw err;
+      }
+      const fallbackTenantId = `local-${Date.now()}`;
+      const fallbackSlug = (data.workspace.name || 'local-workspace').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'local-workspace';
+      setData(prev => {
+        const next = {
+          ...prev,
+          workspace: { ...prev.workspace, tenantId: fallbackTenantId, slug: fallbackSlug },
+          embed: { ...prev.embed, agentId: fallbackSlug },
+        };
+        persist(next);
+        return next;
+      });
+      return { tenantId: fallbackTenantId, slug: fallbackSlug };
+    }
   }, [data.workspace.name, data.workspace.website, data.workspace.industry, persist, refreshUser]);
 
   const restoreWorkspace = useCallback(async (): Promise<void> => {
+    const token = storage.getToken();
+    if (!token) return;
+
     try {
       const result = await apiClient.get<{ tenants: Array<{ id: string; name: string; slug: string; autoCreated?: boolean }> }>('/tenants');
       const tenants = result.tenants || [];
@@ -253,7 +276,24 @@ export function useOnboardingState() {
         persist(next);
         return next;
       });
-    } catch {}
+    } catch (err: any) {
+      const status = err?.status;
+      if (typeof status === 'number' && status >= 400) {
+        throw err;
+      }
+
+      const fallbackTenantId = `local-${Date.now()}`;
+      const fallbackSlug = 'local-workspace';
+      setData(prev => {
+        const next = {
+          ...prev,
+          workspace: { ...prev.workspace, tenantId: fallbackTenantId, slug: fallbackSlug },
+          embed: { ...prev.embed, agentId: fallbackSlug },
+        };
+        persist(next);
+        return next;
+      });
+    }
   }, [persist, refreshUser]);
 
   const uploadFile = useCallback(async (file: File): Promise<void> => {
@@ -273,7 +313,7 @@ export function useOnboardingState() {
       });
       updateFileStatus(file.name, {
         status: 'uploaded',
-        sourceId: (result as any).sourceId || (result as any).id || 'unknown',
+        sourceId: (result as any).documentId || (result as any).sourceId || (result as any).id || 'unknown',
         progress: 100,
       });
       if ((result as any).knowledgeBaseId) {
@@ -293,14 +333,17 @@ export function useOnboardingState() {
   const submitFaqs = useCallback(async (): Promise<void> => {
     if (!data.knowledge.faqs.trim()) return;
     const faqLines = data.knowledge.faqs.split('\n').filter(l => l.trim());
-    await apiClient.post('/knowledge/upload/faq', { faqs: faqLines, knowledgeBaseId: data.knowledge.knowledgeBaseId });
-  }, [data.knowledge.faqs, data.knowledge.knowledgeBaseId]);
+    await apiClient.post('/knowledge/upload/faq', {
+      filename: 'faq.txt',
+      content: faqLines.join('\n'),
+    });
+  }, [data.knowledge.faqs]);
 
   const crawlWebsites = useCallback(async (): Promise<void> => {
     for (const url of data.knowledge.websites) {
-      await apiClient.post('/knowledge/crawl', { url, knowledgeBaseId: data.knowledge.knowledgeBaseId });
+      await apiClient.post('/knowledge/crawl', { url, maxDepth: 2, maxPages: 10 });
     }
-  }, [data.knowledge.websites, data.knowledge.knowledgeBaseId]);
+  }, [data.knowledge.websites]);
 
   const checkProcessingStatus = useCallback(async (): Promise<{ completed: boolean; statuses: Record<string, string> }> => {
     const result = await apiClient.get<{ sources: Array<{ id: string; status: string }> }>('/knowledge/sources');
@@ -321,8 +364,25 @@ export function useOnboardingState() {
     return { completed: allReady, statuses };
   }, [persist]);
 
+  const getBusinessProfile = useCallback(() => {
+    return deriveBusinessIntelligenceSnapshot({
+      businessName: data.workspace.name,
+      industry: data.workspace.industry,
+      knowledge: {
+        files: data.knowledge.files,
+        websites: data.knowledge.websites,
+        faqs: data.knowledge.faqs,
+        uploaded: data.knowledge.uploaded,
+      },
+      widgetInstalled: data.embed.widgetVerified,
+      hasConversations: data.testMessages.length > 0,
+      totalDocs: data.knowledge.files.length,
+      totalSessions: data.testMessages.length,
+    });
+  }, [data.workspace.name, data.workspace.industry, data.knowledge.files, data.knowledge.websites, data.knowledge.faqs, data.knowledge.uploaded, data.embed.widgetVerified, data.testMessages.length]);
+
   const generateWidgetToken = useCallback(async (): Promise<string> => {
-    const result = await apiClient.post<{ token: string }>('/widget/token', { agentId: data.embed.agentId });
+    const result = await apiClient.post<{ token: string }>('/widget/token');
     const token = result.token;
     setData(prev => {
       const next = { ...prev, embed: { ...prev.embed, widgetToken: token } };
@@ -334,19 +394,18 @@ export function useOnboardingState() {
 
   const updateWidgetConfig = useCallback(async (): Promise<void> => {
     await apiClient.put('/widget/config', {
-      agentId: data.embed.agentId,
       primaryColor: data.custom.primaryColor,
       position: data.custom.position,
-      welcomeMessage: data.custom.welcomeMessage,
-      placeholder: data.custom.placeholder,
+      greeting: data.custom.welcomeMessage,
+      launcherText: data.custom.placeholder,
       suggestedQuestions: data.custom.suggestedQuestions,
       logo: data.custom.logo,
+      businessProfile: getBusinessProfile(),
     });
-  }, [data.embed.agentId, data.custom]);
+  }, [data.custom, getBusinessProfile]);
 
   const getWidgetSnippet = useCallback(async (): Promise<string> => {
-    const result = await apiClient.get<{ snippet: string }>(`/widget/snippet?token=${data.embed.widgetToken}`);
-    const snippet = result.snippet;
+    const snippet = await apiClient.getText(`/widget/snippet?token=${data.embed.widgetToken}`);
     setData(prev => {
       const next = { ...prev, embed: { ...prev.embed, snippet } };
       persist(next);
@@ -356,8 +415,8 @@ export function useOnboardingState() {
   }, [data.embed.widgetToken, persist]);
 
   const verifyInstallation = useCallback(async (): Promise<boolean> => {
-    const result = await apiClient.post<{ active: boolean }>('/widget/verify', { token: data.embed.widgetToken });
-    const active = result.active;
+    const result = await apiClient.post<{ valid: boolean }>('/widget/verify', { token: data.embed.widgetToken });
+    const active = Boolean(result.valid);
     setData(prev => {
       const next = { ...prev, embed: { ...prev.embed, widgetVerified: active } };
       persist(next);
@@ -368,12 +427,11 @@ export function useOnboardingState() {
 
   const sendTestMessage = useCallback(async (message: string): Promise<ChatMessage> => {
     addTestMessage({ role: 'user', content: message });
-    const result = await apiClient.post<{ reply: string }>('/chat', {
+    const result = await apiClient.post<{ response?: string }>('/chat', {
       message,
       sessionId: 'onboarding-test',
-      agentId: data.embed.agentId,
     });
-    const reply: ChatMessage = { role: 'assistant', content: result.reply || "I'm not sure how to respond to that. Could you try asking something else?" };
+    const reply: ChatMessage = { role: 'assistant', content: result.response || "I'm not sure how to respond to that. Could you try asking something else?" };
     addTestMessage(reply);
     return reply;
   }, [addTestMessage, data.embed.agentId]);
@@ -393,6 +451,7 @@ export function useOnboardingState() {
       currentStep: 9,
       businessType: data.workspace.industry,
       primaryWebsite: data.workspace.website,
+      businessProfile: getBusinessProfile(),
       demoDataLoaded: true,
       widgetInstalled: data.embed.widgetVerified,
       completedAt: new Date().toISOString(),
@@ -402,7 +461,7 @@ export function useOnboardingState() {
       persist(next);
       return next;
     });
-  }, [persist, data.completedSteps, data.workspace.industry, data.workspace.website, data.embed.widgetVerified]);
+  }, [getBusinessProfile, persist, data.completedSteps, data.workspace.industry, data.workspace.website, data.embed.widgetVerified]);
 
   return {
     data,
@@ -415,7 +474,7 @@ export function useOnboardingState() {
     submitFaqs, crawlWebsites, checkProcessingStatus,
     generateWidgetToken, updateWidgetConfig, getWidgetSnippet,
     verifyInstallation, sendTestMessage,
-    seedDemoData, completeOnboarding,
+    getBusinessProfile, seedDemoData, completeOnboarding,
   };
 }
 

@@ -1,5 +1,6 @@
-import { ChevronLeft, Search, Bell, ChevronDown, LogOut, Settings, User, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronDown, LogOut, Settings, Sparkles } from 'lucide-react';
 import { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { cn } from '../../utils/cn';
 
 export interface NavItem {
@@ -64,6 +65,9 @@ export function DashboardSidebar({
   items, onNavigate, workspaceName, planName, userName, userEmail, usageLabel, usagePercent = 0, onUpgrade, onLogout, onSettings, onProfile, className,
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+
+  const getIsActive = (item: NavItem) => item.active ?? (item.href ? location.pathname === item.href || location.pathname.startsWith(`${item.href}/`) : false);
 
   return (
     <>
@@ -105,29 +109,32 @@ export function DashboardSidebar({
 
         {/* Nav items */}
         <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
-          {items.map((item, i) => (
-            <button
-              key={i}
-              onClick={() => onNavigate?.(item)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition text-left',
-                item.active
-                  ? 'wine-gradient text-white shadow-sm'
-                  : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground',
-              )}
-            >
+          {items.map((item, i) => {
+            const isActive = getIsActive(item);
+            return (
+              <button
+                key={i}
+                onClick={() => onNavigate?.(item)}
+                className={cn(
+                  'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition text-left',
+                  isActive
+                    ? 'wine-gradient text-white shadow-sm'
+                    : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground',
+                )}
+              >
               {item.icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center">{item.icon}</span>}
               {!collapsed && <span className="flex-1 truncate">{item.label}</span>}
               {!collapsed && item.badge && (
                 <span className={cn(
                   'inline-flex h-5 items-center rounded-full px-1.5 text-[10px] font-medium',
-                  item.active ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-muted-foreground',
+                  isActive ? 'bg-white/20 text-white' : 'bg-white/[0.06] text-muted-foreground',
                 )}>
                   {item.badge}
                 </span>
               )}
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </nav>
 
         {/* Usage bar */}
@@ -189,13 +196,13 @@ export function DashboardSidebar({
                   onClick={() => { onNavigate?.(item); setCollapsed(true); }}
                   className={cn(
                     'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition text-left',
-                    item.active ? 'wine-gradient text-white' : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground',
+                    getIsActive(item) ? 'wine-gradient text-white' : 'text-muted-foreground hover:bg-white/[0.04] hover:text-foreground',
                   )}
                 >
                   {item.icon && <span className="flex h-5 w-5 shrink-0 items-center justify-center">{item.icon}</span>}
                   <span className="flex-1 truncate">{item.label}</span>
                   {item.badge && (
-                    <span className={cn('inline-flex h-5 items-center rounded-full px-1.5 text-[10px] font-medium', item.active ? 'bg-white/20 text-white' : 'bg-white/[0.06]')}>
+                    <span className={cn('inline-flex h-5 items-center rounded-full px-1.5 text-[10px] font-medium', getIsActive(item) ? 'bg-white/20 text-white' : 'bg-white/[0.06]')}>
                       {item.badge}
                     </span>
                   )}

@@ -8,6 +8,9 @@ export type { WidgetConfig, ChatMessage, StreamEvent, StreamClientOptions } from
 export function initChatWidget(config: WidgetConfig): ChatWidget {
   const widget = new ChatWidget(config);
   widget.mount();
+  if (typeof window !== 'undefined') {
+    (window as any).__CURRENT_WIDGET = widget;
+  }
   return widget;
 }
 
@@ -15,6 +18,7 @@ declare global {
   interface Window {
     ChatWidget: typeof ChatWidget;
     initChatWidget: typeof initChatWidget;
+    __CURRENT_WIDGET?: ChatWidget;
   }
 }
 
@@ -57,7 +61,8 @@ if (typeof window !== 'undefined') {
       position: (scriptEl.getAttribute('data-position') as WidgetConfig['position']) || undefined,
     };
     if (config.apiUrl) {
-      initChatWidget(config);
+      const widget = initChatWidget(config);
+      (window as any).__CURRENT_WIDGET = widget;
     }
   }
 }

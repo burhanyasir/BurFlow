@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { PremiumCard, PremiumCardContent, PremiumCardHeader, PremiumCardTitle } from '../../../components/premium/PremiumCard';
 import { MetricCard } from '../../../components/premium/MetricCard';
 import { Badge } from '../../../components/premium/Badge';
-import { DashboardSkeleton, Skeleton } from '../../../components/premium/Skeleton';
+import { DashboardSkeleton } from '../../../components/premium/Skeleton';
 import { EmptyState } from '../../../components/premium/EmptyState';
-import { AppLayout } from '../../../layouts/AppLayout';
+import { DashboardLayout, DashboardContent } from '../../../components/dashboard';
+import { useAuth } from '../../../lib/auth-context';
 import { useSessions, useAnalytics } from '../../../hooks/useConversationIntelligence';
 import { useOnboarding } from '../../../hooks/useOnboarding';
+import { fetchWithAuth } from '../../../lib/api-client';
 import { cn } from '../../../utils/cn';
 import type { SidebarItem } from '../../../layouts/Sidebar';
 
@@ -29,6 +31,13 @@ const ONBOARDING_NAV_ITEMS: SidebarItem[] = [
   { label: 'Onboarding', href: '/dashboard/onboarding' },
 ];
 
+function formatDate(value?: string) {
+  if (!value) return 'Not set yet';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Not set yet';
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
 interface KnowledgeSource {
   name: string;
   citationCount: number;
@@ -46,6 +55,17 @@ interface Recommendation {
   message: string;
   href: string;
   severity: 'info' | 'warning' | 'error';
+}
+
+interface BusinessIntelligenceReport {
+  productsAndServices: string[];
+  pricingPosition: string;
+  idealCustomer: string;
+  conversionIssues: string[];
+  trustIssues: string[];
+  missingContent: string[];
+  recommendedImprovements: string[];
+  salesOpportunity: string;
 }
 
 function getLast7Days(): string[] {
@@ -140,8 +160,9 @@ function RecommendationCard({ recommendation, onClick }: { recommendation: Recom
   );
 }
 
-export default function ExecutiveDashboard() {
+export default function DashboardPage() {
   const navigate = useNavigate();
+  const { user, tenant, logout } = useAuth();
   const { data: analyticsData, loading: analyticsLoading } = useAnalytics();
   const { data: sessionsData, loading: sessionsLoading } = useSessions(200, 0);
   const { progress, dashboard, loading: onboardingLoading } = useOnboarding();
@@ -153,11 +174,17 @@ export default function ExecutiveDashboard() {
   const loadExternal = useCallback(async () => {
     try {
       const [monRes, subRes] = await Promise.allSettled([
-        fetch('/api/admin/knowledge/monitoring'),
-        fetch('/api/billing/current'),
+        fetchWithAuth('/api/admin/knowledge/monitoring'),
+        fetchWithAuth('/api/billing/current'),
       ]);
-      if (monRes.status === 'fulfilled') setMonitoring(await monRes.value.json());
-      if (subRes.status === 'fulfilled') setSubscription(await subRes.value.json());
+      if (monRes.status === 'fulfilled') {
+        const body = await monRes.value.json();
+        setMonitoring(body);
+      }
+      if (subRes.status === 'fulfilled') {
+        const body = await subRes.value.json();
+        setSubscription(body);
+      }
     } catch {
     } finally {
       setLoading(false);
@@ -196,9 +223,11 @@ export default function ExecutiveDashboard() {
 
   const usageThisMonth = subscription?.usageThisMonth ?? totalSessions;
   const usageLimit = subscription?.usageLimit ?? 1000;
-  const workspaceName = subscription?.companyName || subscription?.workspaceName || 'Workspace';
+  const workspaceName = subscription?.companyName || subscription?.workspaceName || tenant?.name || 'Workspace';
   const planName = subscription?.planName || 'Free';
   const planTrial = subscription?.onTrial || false;
+  const usagePercent = usageLimit > 0 ? Math.round((usageThisMonth / usageLimit) * 100) : 0;
+
 
   const last7Days = useMemo(() => getLast7Days(), []);
   const dailyCounts = useMemo(() => countByDay(sessions, last7Days), [sessions, last7Days]);
@@ -281,6 +310,61 @@ export default function ExecutiveDashboard() {
 
   const hasData = totalSessions > 0 || totalDocs > 0;
 
+  const businessProfile = progress?.businessProfile as Record<string, any> | undefined;
+  const businessProfileSummary = useMemo(() => {
+    const industry = (businessProfile?.industry as string) || progress?.businessType || 'your market';
+    const website = progress?.primaryWebsite || 'your website';
+    const companyName = (businessProfile?.businessName as string) || workspaceName;
+    const knowledgeLabel = totalDocs > 0
+      ? `${totalDocs} source${totalDocs === 1 ? '' : 's'} indexed`
+      : 'knowledge is still being prepared';
+    const widgetLabel = dashboard?.widgetInstalled ? 'installed and ready to engage visitors' : 'pending installation';
+    const conversationLabel = totalSessions > 0
+      ? `${totalSessions} conversations captured`
+      : 'waiting for the first visitor conversation';
+    return `${companyName} has a working profile for ${industry}. ${knowledgeLabel}, the widget is ${widgetLabel}, and ${conversationLabel}.`;
+  }, [dashboard?.widgetInstalled, businessProfile?.businessName, businessProfile?.industry, progress?.businessType, progress?.primaryWebsite, totalDocs, totalSessions, workspaceName]);
+
+  const profileScores = useMemo(() => ({
+    intelligence: typeof businessProfile?.intelligenceScore === 'number' ? businessProfile.intelligenceScore : 0,
+    conversion: typeof businessProfile?.conversionScore === 'number' ? businessProfile.conversionScore : 0,
+    trust: typeof businessProfile?.trustScore === 'number' ? businessProfile.trustScore : 0,
+  }), [businessProfile]);
+
+  const intelligenceReport = useMemo<BusinessIntelligenceReport>(() => {
+    const productsAndServices = (businessProfile?.productsAndServices as string[] | undefined) || (totalDocs > 0 ? ['Core offering', 'Support and onboarding guidance'] : ['Core offering']);
+    const pricingPosition = (businessProfile?.pricingModel as string | undefined) || (totalSessions > 0 ? 'Positioned around guided next steps and demo conversion' : 'Needs clearer pricing or offer framing');
+    const idealCustomer = (businessProfile?.idealCustomer as string | undefined) || (progress?.businessType ? `Visitors evaluating ${progress.businessType} solutions` : 'Prospective buyers who need guidance');
+    const salesOpportunity = (businessProfile?.recommendedNextAction as string | undefined) || (totalSessions > 0 ? 'Turn the first conversations into booked demos by guiding each visitor to a concrete next step.' : 'A stronger first-contact path should increase demo conversion as soon as the widget engages visitors.');
+
+    return {
+      productsAndServices,
+      pricingPosition,
+      idealCustomer,
+      conversionIssues: totalSessions > 0 ? ['Some visitors still need stronger CTAs and clearer pricing cues'] : ['No visitor conversations yet; conversion path is still unproven'],
+      trustIssues: totalDocs > 0 ? ['Trust improves when the site clearly explains the offer and next steps'] : ['Knowledge coverage needs to be strengthened to inspire confidence'],
+      missingContent: businessProfile?.missingWebsiteContent as string[] | undefined || (totalDocs > 0 ? ['Pricing clarity', 'Product comparison guidance'] : ['Core offer summary', 'Pricing clarity']),
+      recommendedImprovements: [
+        'Add clear pricing and comparison cues to the widget prompts',
+        'Surface the best next step in the dashboard and widget',
+        'Strengthen the website scan inputs with higher-signal documents',
+      ],
+      salesOpportunity,
+    };
+  }, [businessProfile, progress?.businessType, totalDocs, totalSessions]);
+
+  const profileItems = useMemo(() => [
+    { label: 'Industry', value: (businessProfile?.industry as string) || progress?.businessType || 'Pending', accent: 'bg-[rgba(168,36,75,0.16)] text-white' },
+    { label: 'Knowledge', value: totalDocs > 0 ? `${totalDocs} sources` : 'Adding sources', accent: 'bg-[rgba(58,111,240,0.16)] text-white' },
+    { label: 'Widget', value: dashboard?.widgetInstalled ? 'Live' : 'Setup needed', accent: 'bg-[rgba(61,220,151,0.16)] text-white' },
+  ], [businessProfile?.industry, dashboard?.widgetInstalled, progress?.businessType, totalDocs]);
+
+  const recommendedNextAction = useMemo(() => {
+    if (!dashboard?.widgetInstalled) return 'Install the widget to start turning visitors into real conversations.';
+    if (totalSessions === 0) return 'Let the widget engage a few visitors first, then review the first real questions it handles.';
+    return 'Review the newest conversations and strengthen the knowledge base around the topics visitors ask about most.';
+  }, [dashboard?.widgetInstalled, totalSessions]);
+
   const handleNavigate = (item: SidebarItem) => {
     if (item.href) navigate(item.href);
   };
@@ -288,10 +372,17 @@ export default function ExecutiveDashboard() {
   const isOnboardingComplete = progress?.onboardingStatus === 'completed';
 
   return (
-    <AppLayout
+    <DashboardLayout
       sidebarItems={isOnboardingComplete ? NAV_ITEMS : ONBOARDING_NAV_ITEMS}
       onNavigate={handleNavigate}
-      workspaceName="Conversation Engine"
+      workspaceName={workspaceName}
+      planName={planTrial ? 'Trial' : planName}
+      userName={user?.name}
+      userEmail={user?.email}
+      usagePercent={usagePercent}
+      onUpgrade={() => navigate('/dashboard/billing')}
+      onLogout={logout}
+      onSettings={() => navigate('/dashboard/settings')}
     >
       <div className="premium-layout min-h-full p-4 md:p-6 space-y-6" aria-label="Executive Dashboard">
         {isBusy ? (
@@ -353,6 +444,58 @@ export default function ExecutiveDashboard() {
               </PremiumCardContent>
             </PremiumCard>
 
+            <PremiumCard variant="glass" padding="lg">
+              <PremiumCardContent>
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-[rgba(255,255,255,0.5)]">Business profile snapshot</p>
+                    <h2 className="mt-2 text-xl font-semibold text-white">Here is what BurFlow learned about {workspaceName}</h2>
+                    <p className="mt-3 max-w-2xl text-sm leading-7 text-[rgba(255,255,255,0.72)]">{businessProfileSummary}</p>
+                    {businessProfile && (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        {[
+                          { label: 'AI readiness', value: `${profileScores.intelligence}%`, accent: 'bg-[rgba(61,220,151,0.16)] text-white' },
+                          { label: 'Conversion confidence', value: `${profileScores.conversion}%`, accent: 'bg-[rgba(58,111,240,0.16)] text-white' },
+                          { label: 'Trust strength', value: `${profileScores.trust}%`, accent: 'bg-[rgba(168,36,75,0.16)] text-white' },
+                        ].map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3">
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">{item.label}</p>
+                            <div className={cn('mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', item.accent)}>
+                              {item.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      {profileItems.map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3">
+                          <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">{item.label}</p>
+                          <div className={cn('mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', item.accent)}>
+                            {item.value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.16)] p-4">
+                    <p className="text-[11px] uppercase tracking-[0.24em] text-[rgba(255,255,255,0.5)]">Recommended next move</p>
+                    <p className="mt-3 text-sm leading-7 text-[rgba(255,255,255,0.82)]">{recommendedNextAction}</p>
+                    <div className="mt-4 space-y-2 text-sm text-[rgba(255,255,255,0.7)]">
+                      <div className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.04)] px-3 py-2">
+                        <span>Last update</span>
+                        <span className="font-medium text-white">{formatDate(progress?.updatedAt)}</span>
+                      </div>
+                      <div className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.04)] px-3 py-2">
+                        <span>Grounded answers</span>
+                        <span className="font-medium text-white">{dashboard?.groundedAnswerRate ? `${Math.round(dashboard.groundedAnswerRate * 100)}%` : 'Pending'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </PremiumCardContent>
+            </PremiumCard>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" aria-label="Key metrics">
               <MetricCard icon="&#x1F4AC;" label="Conversations" value={totalSessions.toLocaleString()} onClick={() => navigate('/dashboard/conversations')} />
               <MetricCard
@@ -393,6 +536,33 @@ export default function ExecutiveDashboard() {
             </div>
 
             <div className="grid grid-cols-1 xl:grid-cols-3 gap-4" aria-label="Charts and recommendations">
+              <PremiumCard variant="elevated" padding="md">
+                <PremiumCardHeader>
+                  <PremiumCardTitle>Business Intelligence Report</PremiumCardTitle>
+                  <Badge variant="premium" size="sm">Beta</Badge>
+                </PremiumCardHeader>
+                <PremiumCardContent>
+                  <div className="space-y-3 text-sm text-[rgba(255,255,255,0.78)]">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Products & services</p>
+                      <p className="mt-1">{intelligenceReport.productsAndServices.join(', ')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Pricing position</p>
+                      <p className="mt-1">{intelligenceReport.pricingPosition}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Ideal customer</p>
+                      <p className="mt-1">{intelligenceReport.idealCustomer}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Sales opportunity</p>
+                      <p className="mt-1">{intelligenceReport.salesOpportunity}</p>
+                    </div>
+                  </div>
+                </PremiumCardContent>
+              </PremiumCard>
+
               <PremiumCard variant="elevated" padding="md">
                 <PremiumCardHeader>
                   <PremiumCardTitle>Conversations &mdash; Last 7 Days</PremiumCardTitle>
@@ -528,6 +698,6 @@ export default function ExecutiveDashboard() {
           </>
         )}
       </div>
-    </AppLayout>
+    </DashboardLayout>
   );
 }

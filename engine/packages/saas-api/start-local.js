@@ -1,5 +1,5 @@
-process.env.JWT_SECRET = process.env.JWT_SECRET || 'local-dev-jwt-secret-1234567890123456789012345678901234567890';
-process.env.WIDGET_SECRET = process.env.WIDGET_SECRET || 'local-dev-widget-secret-1234567890123456789012345678901234567890';
+process.env.JWT_SECRET = process.env.JWT_SECRET;
+process.env.WIDGET_SECRET = process.env.WIDGET_SECRET;
 process.env.APP_URL = process.env.APP_URL || 'http://localhost:5178';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.CORS_ORIGIN = '*';

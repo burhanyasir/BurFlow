@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dev Widget Test</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; background: #f8fafc; color: #111827; }
+      .banner { padding: 1rem; background: #0f172a; color: white; }
+      .container { padding: 1rem; max-width: 900px; width: 100%; margin: 0 auto; }
+      .warning { color: #b91c1c; }
+      .note { color: #4b5563; margin-top: 0.5rem; }
+      code { background: #e2e8f0; padding: 0.15rem 0.3rem; border-radius: 4px; }
+      pre { background: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    </style>
+  </head>
+  <body>
+    <section class="banner">
+      <h1>Dev Widget Test</h1>
+      <p class="note">This page is a local dev-only fixture. It is not part of the real landing pages.</p>
+    </section>
+    <div class="container">
+      <p>
+        Provide a widget token via the <code>token</code> URL parameter. Example:
+      </p>
+      <pre>http://127.0.0.1:5173/dev-widget-test.html?token=YOUR_TOKEN_HERE</pre>
+      <p class="warning">
+        This token is for local dev testing only. Do not commit it into frontend source.
+      </p>
+      <p class="note">
+        The widget script is loaded from <code>/widget/widget.js</code> and authenticated with <code>x-widget-token</code>.
+      </p>
+      <p class="note">
+        The widget backend API is forced to <code>http://127.0.0.1:3457</code> for local dev verification.
+      </p>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (!token) {
+        const alertEl = document.createElement('div');
+        alertEl.className = 'container warning';
+        alertEl.innerHTML = '<p>No token provided. Add <code>?token=&lt;widget-token&gt;</code> to the URL.</p>';
+        document.body.appendChild(alertEl);
+      } else {
+        const style = document.createElement('link');
+        style.rel = 'stylesheet';
+        style.href = '/widget/styles.css';
+        document.head.appendChild(style);
+
+        const script = document.createElement('script');
+        script.src = `/widget/widget.js?token=${encodeURIComponent(token)}`;
+        script.async = false;
+        script.defer = false;
+        document.body.appendChild(script);
+
+        script.onload = () => {
+          if (window.initChatWidget) {
+            window.initChatWidget({
+              apiUrl: 'http://127.0.0.1:3457',
+              widgetToken: token,
+            });
+          }
+        };
+      }
+    </script>
+  </body>
+</html>

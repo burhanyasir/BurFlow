@@ -41,10 +41,10 @@ export function createOnboardingRoutes(
   router.put('/progress', auth, requireJsonObject, (req: Request, res: Response) => {
     if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
     try {
-      const { completedSteps, skippedSteps, currentStep, completionPercentage, onboardingStatus, businessType, primaryWebsite, demoDataLoaded, widgetInstalled, firstSuccessfulConversation, completedAt } = req.body;
+      const { completedSteps, skippedSteps, currentStep, completionPercentage, onboardingStatus, businessType, primaryWebsite, businessProfile, demoDataLoaded, widgetInstalled, firstSuccessfulConversation, completedAt } = req.body;
       const progress = onboardingRepo.update(req.user.tenantId!, {
         completedSteps, skippedSteps, currentStep, completionPercentage, onboardingStatus,
-        businessType, primaryWebsite, demoDataLoaded, widgetInstalled, firstSuccessfulConversation, completedAt,
+        businessType, primaryWebsite, businessProfile, demoDataLoaded, widgetInstalled, firstSuccessfulConversation, completedAt,
       });
       res.json({ progress });
     } catch (err: any) {

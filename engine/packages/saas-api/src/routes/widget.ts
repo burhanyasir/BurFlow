@@ -24,6 +24,7 @@ function signWidgetToken(encoded: string): string {
 export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string): Router {
   const router = Router();
   const widgetAuth = jwtSecret ? authMiddleware(jwtSecret) : undefined;
+  const LOCAL_DEMO_TENANT = 'demo-tenant';
 
   function generateWidgetToken(tenantId: string): string {
     const payload: WidgetTokenPayload = {
@@ -35,6 +36,21 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const sig = signWidgetToken(encoded);
     return `${encoded}.${sig}`;
+  }
+
+  function getDemoWidgetConfig(): Record<string, unknown> {
+    return {
+      theme: 'light',
+      position: 'bottom-right',
+      primaryColor: '#6366f1',
+      logoUrl: undefined,
+      companyName: 'BurFlow',
+      greeting: 'Hi! I’m BurFlow. How can I help you today?',
+      launcherText: 'Start a conversation',
+      allowedDomains: [],
+      autoOpen: false,
+      autoOpenDelay: 3,
+    };
   }
 
   function verifyWidgetToken(token: string): { tenantId: string } | null {
@@ -119,6 +135,10 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       }
       const config = widgetConfigRepo.get(tenantId);
       if (!config) {
+        if (tenantId === LOCAL_DEMO_TENANT) {
+          const demoConfig = getDemoWidgetConfig();
+          return res.json(demoConfig);
+        }
         return res.status(404).json({ error: 'Widget not configured' });
       }
       const origin = req.get('Origin') || req.get('Referer') || '';
@@ -144,6 +164,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         companyName: config.companyName,
         greeting: config.greeting,
         launcherText: config.launcherText,
+        businessProfile: config.businessProfile,
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
       });

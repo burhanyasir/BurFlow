@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useOnboardingState, STEPS } from './onboarding-context';
+import { useAuth } from '../../../lib/auth-context';
 import { useToast } from '../../../components/ui/Toast';
 import { Step1Welcome } from './steps/Step1Welcome';
 import { Step2Workspace } from './steps/Step2Workspace';
@@ -14,15 +15,15 @@ import { Button } from '../../../components/ui/Button';
 
 function HelpPanel({ stepId }: { stepId: string }) {
   const tips: Record<string, string> = {
-    welcome: 'Click "Get Started" to begin setting up your AI chatbot. The entire process takes about 10 minutes.',
-    workspace: 'Your workspace is where all your chatbot data lives. Use your company name so customers recognize it.',
-    knowledge: 'Upload your business documents (PDF, DOCX, TXT, MD) or add your website URL. The chatbot learns from these to answer customer questions accurately.',
-    processing: 'Your files are being processed — the system extracts text, splits it into chunks, and builds search indexes. This usually takes 30-60 seconds per file.',
-    customize: 'Match the chatbot\'s look and feel to your brand. Choose colors, set the position, and write a welcome message that reflects your brand voice.',
-    embed: 'Copy the code snippet and paste it into your website just before the closing </body> tag. Your chatbot will appear within seconds.',
-    verify: 'After adding the snippet to your site, click Verify. The system checks if the widget loads and responds correctly.',
-    'first-chat': 'Send a test message to your live chatbot. Try asking a question your customers would ask to make sure it responds correctly.',
-    success: 'Congratulations! Your chatbot is live. Explore the dashboard to manage conversations, add more knowledge, and track performance.',
+    welcome: 'Start by teaching BurFlow about your website so it can act as your AI sales agent from day one.',
+    workspace: 'Your workspace is where BurFlow learns your brand, offers, and conversion goals so it can qualify and assist visitors.',
+    knowledge: 'Start with a website scan for your core product and service information. Add documents later as an optional layer of supporting knowledge.',
+    processing: 'BurFlow is indexing your site and preparing a sales-focused knowledge graph for answers, recommendations, and lead capture.',
+    customize: 'Tune the widget to match your brand and guide visitors toward the right next step.',
+    embed: 'Copy the snippet and place it on your site so BurFlow can start engaging visitors immediately.',
+    verify: 'After adding the snippet, verify that the widget is live and responding correctly.',
+    'first-chat': 'Try a real sales question to see how BurFlow handles discovery, qualification, and handoff.',
+    success: 'Your BurFlow sales agent is now ready to assist visitors, capture leads, and guide buying conversations.',
   };
 
   return (
@@ -48,10 +49,13 @@ export function OnboardingPage() {
   const isLastStep = state.data.currentStep >= STEPS.length - 1;
   const isFirstStep = state.data.currentStep === 0;
 
+  const { isAuthenticated, loading: authLoading } = useAuth();
+
   useEffect(() => {
-    state.restoreWorkspace();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!authLoading && isAuthenticated) {
+      state.restoreWorkspace();
+    }
+  }, [authLoading, isAuthenticated, state.restoreWorkspace]);
 
   const renderStep = () => {
     switch (state.data.currentStep) {
@@ -72,7 +76,7 @@ export function OnboardingPage() {
         processing={state.data.processing}
         onCheckStatus={state.checkProcessingStatus}
       />;
-      case 4: return <Step5Customize data={state.data.custom} onChange={state.updateCustom} />;
+      case 4: return <Step5Customize data={state.data.custom} businessProfile={state.getBusinessProfile()} onChange={state.updateCustom} />;
       case 5: return <Step6Embed
         agentId={state.data.embed.agentId}
         widgetToken={state.data.embed.widgetToken}
@@ -89,6 +93,7 @@ export function OnboardingPage() {
       case 7: return <Step8FirstChat
         agentId={state.data.embed.agentId}
         messages={state.data.testMessages}
+        businessProfile={state.getBusinessProfile()}
         onSend={state.sendTestMessage}
       />;
       case 8: return <Step9Success
@@ -135,7 +140,7 @@ export function OnboardingPage() {
       <div className="sticky top-0 z-10 bg-white border-b border-[var(--color-neutral-100)]">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-bold text-[var(--color-neutral-900)]">Conversation Engine</span>
+            <span className="text-lg font-bold text-[var(--color-neutral-900)]">BurFlow</span>
             <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--color-accent-100)] text-[var(--color-accent-700)] font-medium">Onboarding</span>
           </div>
           {state.data.currentStep > 1 && state.data.currentStep < 9 && (

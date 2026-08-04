@@ -1,9 +1,11 @@
 import { StreamClientOptions, StreamEvent } from './types';
 
 export async function streamChat(options: StreamClientOptions): Promise<void> {
-  const { apiUrl, tenantId, apiKey, widgetToken, sessionId, onToken, onDone, onComplete, onError, signal } = options;
+  const { apiUrl, tenantId, apiKey, widgetToken, sessionId, message, onToken, onDone, onComplete, onError, signal } = options;
 
-  const body: Record<string, string> = {};
+  const body: Record<string, string> = {
+    message: message || '',
+  };
   if (sessionId) body.sessionId = sessionId;
 
   const headers: Record<string, string> = {
@@ -16,7 +18,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
 
   let response: Response;
   try {
-    response = await fetch(`${apiUrl}/api/chat`, {
+    response = await fetch(`${apiUrl}/api/chat/stream`, {
       method: 'POST',
       headers,
       body: JSON.stringify(body),
@@ -38,6 +40,24 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
     return;
   }
 
+  const headersObj = response.headers as Headers | { get?: (name: string) => string | null } | undefined;
+  const contentType = headersObj && typeof headersObj.get === 'function' ? headersObj.get('content-type') || '' : '';
+  if (contentType.includes('application/json')) {
+    try {
+      const data = await response.json();
+      if (data.response) {
+        onComplete(data.response, data.turnId || '');
+      }
+      if (options.onUiState) {
+        options.onUiState(data.uiState, data.cta);
+      }
+      return;
+    } catch (err: any) {
+      onError(err.message || 'Failed to parse JSON response');
+      return;
+    }
+  }
+
   const reader = response.body?.getReader();
   if (!reader) {
     onError('No response body');
@@ -52,15 +72,17 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
       const { done, value } = await reader.read();
       if (done) break;
 
-      buffer += decoder.decode(value, { stream: true });
+      const chunk = decoder.decode(value, { stream: true });
+      if (!chunk) continue;
+      buffer += chunk;
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
 
       for (const line of lines) {
         const trimmed = line.trim();
-        if (!trimmed || !trimmed.startsWith('data: ')) continue;
+        if (!trimmed || !trimmed.startsWith('data:')) continue;
 
-        const data = trimmed.slice(6);
+        const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
           return;
         }
@@ -76,6 +98,9 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
               break;
             case 'complete':
               onComplete(event.fullContent || '', event.turnId || '');
+              break;
+            case 'ui_state':
+              if (options.onUiState) options.onUiState(event.uiState, event.cta);
               break;
             case 'error':
               onError(event.error || 'Unknown error');

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JwtPayload, verifyApiKey } from '@conversation-engine/saas-core';
+import { JwtPayload, verifyApiKey, TenantRepository } from '@conversation-engine/saas-core';
 import type { ApiKeyRepository } from '@conversation-engine/saas-core';
 import { createHmac, timingSafeEqual } from 'crypto';
 
@@ -21,7 +21,7 @@ declare global {
   }
 }
 
-const WIDGET_SECRET: string = process.env.WIDGET_SECRET ?? 'development-widget-secret-do-not-use-in-production';
+const WIDGET_SECRET: string = process.env.WIDGET_SECRET || 'development-widget-secret-do-not-use-in-production';
 
 function signWidgetToken(encoded: string): string {
   return createHmac('sha256', WIDGET_SECRET).update(encoded).digest('hex');
@@ -69,7 +69,7 @@ export function authMiddleware(secret: string) {
   };
 }
 
-export function publicChatAuth(secret: string, apiKeyRepo?: ApiKeyRepository) {
+export function publicChatAuth(secret: string, apiKeyRepo?: ApiKeyRepository, tenantRepo?: TenantRepository) {
   return (req: Request, res: Response, next: NextFunction) => {
     // Try JWT Bearer first (admin dashboard users)
     const authHeader = req.headers.authorization;
@@ -87,7 +87,16 @@ export function publicChatAuth(secret: string, apiKeyRepo?: ApiKeyRepository) {
     if (widgetToken) {
       const result = verifyWidgetToken(widgetToken);
       if (result) {
-        req.tenantId = result.tenantId;
+        let tenantId = result.tenantId;
+        if (tenantId === 'demo-tenant' && tenantRepo) {
+          const demoTenant = tenantRepo.findBySlug('demo-tenant')
+            || tenantRepo.findBySlugLike('%demo%')
+            || tenantRepo.findByNameLike('%Demo%');
+          if (demoTenant) {
+            tenantId = demoTenant.id;
+          }
+        }
+        req.tenantId = tenantId;
         return next();
       }
     }
