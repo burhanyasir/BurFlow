@@ -1568,7 +1568,7 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
     objections: memory.objectionsHandled,
     qualificationState: memory.qualificationCollected,
     repeatedPhraseCount: 0,
-    topics: memory.topicsExplained.map(t => t.topic),
+    topics: memory.topicsExplained.flatMap(t => Array(t.count).fill(t.topic)),
     companySize: memory.companySize,
     industry: memory.industry,
     useCase: memory.useCase,

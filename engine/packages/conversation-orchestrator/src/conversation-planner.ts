@@ -12,6 +12,8 @@ import {
 import { ConversationStage, BuyerRole } from './types';
 import { ConversationIntelligenceResult } from './conversation-intelligence-types';
 import { FunnelStage } from './types';
+
+export { CustomerIntent, ConversationGoal, DiscernedTopic, FunnelStageExtended };
 import {
   GREETING_PATTERNS,
   FAREWELL_PATTERNS,

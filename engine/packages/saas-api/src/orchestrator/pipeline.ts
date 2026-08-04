@@ -111,10 +111,6 @@ export function executePipeline(input: PipelineInput): PipelineResult {
     stateManager.addPendingTopic(state, topic);
   }
 
-  if (policyDecision.buyingSignalDetected) {
-    state.buyingIntentScore = Math.min(100, state.buyingIntentScore + 25);
-  }
-
   // Step 5: Build brain input with full conversation context
   const brainInput = buildBrainInput(message, state, policyDecision, tenantId, kbProvider);
 

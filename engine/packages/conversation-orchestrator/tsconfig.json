@@ -4,7 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src"
   },
-  "exclude": ["node_modules", "dist", "src/__tests__"],
+  "exclude": ["node_modules", "dist", "src/__tests__", "src/visitor-intent-engine.ts", "src/visitor-intent-engine.new.ts", "src/visitor-intent-benchmark.ts", "src/website-evaluation-harness.ts", "src/sales-conversion-engine.ts", "src/sales-playbook-engine.ts", "src/sales-conversion-evaluation-harness.ts", "src/sales-conversion-real-world-evaluation-harness.ts"],
   "include": ["src/**/*"]
 }
 

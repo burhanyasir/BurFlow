@@ -603,3 +603,102 @@ describe('DbKnowledgeBaseProvider', () => {
     }
   });
 });
+
+// ═══════════════════════════════════ Claim 7 — buyingIntentScore double-count ═══════════════════════════════════
+describe('Claim 7 — buyingIntentScore increments exactly +25 per buying signal', () => {
+  it('processPolicyEngine adds +25, not +50', () => {
+    const state = createInitialState(sid(), tenant, policy);
+    expect(state.buyingIntentScore).toBe(0);
+    processPolicyEngine('I want to buy now', state, { handled: false, strategy: 'answer' });
+    expect(state.buyingIntentScore).toBe(25);
+  });
+
+  it('executePipeline adds +25 total across the full pipeline', () => {
+    const sessionId = sid();
+    const r = pip(sessionId, 'I want to sign up');
+    expect(r.state.buyingIntentScore).toBe(25);
+  });
+
+  it('two consecutive buying messages add +25 each (+50 total)', () => {
+    const s = sid();
+    pip(s, 'I want to buy');
+    const after1 = stateManager.get(s);
+    expect(after1!.buyingIntentScore).toBe(25);
+    pip(s, 'sign me up');
+    const after2 = stateManager.get(s);
+    expect(after2!.buyingIntentScore).toBe(50);
+  });
+});
+
+// ═══════════════════════════════════ Claim 4 — fromLegacyMemory topic count ═══════════════════════════════════
+describe('Claim 4 — fromLegacyMemory reconstructs real topic counts', () => {
+  it('fromLegacyMemory does NOT flatten counts to 1', () => {
+    const legacy = {
+      turns: [] as any[],
+      persona: 'professional' as any,
+      funnelStage: 'discovery' as any,
+      buyingIntentDetected: false,
+      objections: [] as any[],
+      qualificationState: {} as any,
+      repeatedPhraseCount: 0,
+      topics: ['features', 'features', 'features', 'pricing', 'pricing'],
+      companySize: undefined,
+      industry: undefined,
+      useCase: undefined,
+      monthlyConversations: undefined,
+      currentHelpdesk: undefined,
+      budget: undefined,
+      decisionTimeline: undefined,
+    };
+
+    const { fromLegacyMemory } = require('@conversation-engine/conversation-orchestrator');
+    const memory = fromLegacyMemory(legacy);
+
+    const featuresRecord = memory.topicsExplained.find((t: any) => t.topic === 'features');
+    const pricingRecord = memory.topicsExplained.find((t: any) => t.topic === 'pricing');
+
+    expect(featuresRecord!.count).toBe(3);
+    expect(pricingRecord!.count).toBe(2);
+  });
+
+  it('prepareLegacyMemory produces repeated entries matching counts', () => {
+    const { processConversationBrain } = require('@conversation-engine/conversation-orchestrator');
+
+    const legacy = {
+      turns: [
+        { message: 'hi', response: 'hello', polarity: 0, frustration: 0, urgency: 0, timestamp: Date.now() },
+      ],
+      persona: 'professional' as any,
+      funnelStage: 'discovery' as any,
+      buyingIntentDetected: false,
+      objections: [] as any[],
+      qualificationState: {} as any,
+      repeatedPhraseCount: 0,
+      topics: ['features', 'features', 'pricing'],
+      companySize: undefined,
+      industry: undefined,
+      useCase: undefined,
+      monthlyConversations: undefined,
+      currentHelpdesk: undefined,
+      budget: undefined,
+      decisionTimeline: undefined,
+    };
+
+    const brainInput = {
+      message: 'what else about features?',
+      responseText: '',
+      legacyMemory: legacy,
+      tenantId: tenant,
+    };
+
+    const result = processConversationBrain(brainInput);
+
+    const featuresRecord = result.memory.topicsExplained.find((t: any) => t.topic === 'features');
+    const pricingRecord = result.memory.topicsExplained.find((t: any) => t.topic === 'pricing');
+
+    expect(featuresRecord).toBeDefined();
+    expect(pricingRecord).toBeDefined();
+    expect(featuresRecord!.count).toBe(2);
+    expect(pricingRecord!.count).toBeGreaterThanOrEqual(1);
+  });
+});
