@@ -17,7 +17,12 @@ export function createConversationRoutes(conversationRepo: ConversationRepositor
   router.get('/', (req: Request, res: Response) => {
     if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
     const { page, limit } = parsePagination(req.query, { page: 1, limit: 20, maxLimit: 200 });
-    const result = conversationRepo.listByTenant(req.user.tenantId, page, limit);
+    const status = req.query.status as string | undefined;
+    const validStatuses = ['active', 'ended', 'escalated'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
+    }
+    const result = conversationRepo.listByTenant(req.user.tenantId, page, limit, status);
     res.json(result);
   });
 

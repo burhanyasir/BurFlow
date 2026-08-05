@@ -96,6 +96,16 @@ export class TenantRepository {
     return row ? this.mapRow(row) : null;
   }
 
+  findBySlugLike(pattern: string): Tenant | null {
+    const row = this.db.prepare('SELECT * FROM tenants WHERE slug LIKE ? LIMIT 1').get(pattern) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findByNameLike(pattern: string): Tenant | null {
+    const row = this.db.prepare('SELECT * FROM tenants WHERE name LIKE ? LIMIT 1').get(pattern) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
   findByOwner(ownerId: string): Tenant[] {
     const rows = this.db.prepare('SELECT * FROM tenants WHERE owner_id = ?').all(ownerId) as any[];
     return rows.map(r => this.mapRow(r));
@@ -217,12 +227,18 @@ export class ConversationRepository {
     return row ? this.mapRow(row) : null;
   }
 
-  listByTenant(tenantId: string, page = 1, limit = 20): { conversations: Conversation[]; total: number } {
-    const total = (this.db.prepare('SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ?').get(tenantId) as any).c;
+  listByTenant(tenantId: string, page = 1, limit = 20, status?: string): { conversations: (Conversation & { lastMessage?: string })[]; total: number } {
+    let whereClause = 'WHERE c.tenant_id = ?';
+    const params: any[] = [tenantId];
+    if (status) {
+      whereClause += ' AND c.status = ?';
+      params.push(status);
+    }
+    const total = (this.db.prepare(`SELECT COUNT(*) as c FROM conversations c ${whereClause}`).get(...params) as any).c;
     const rows = this.db.prepare(
-      'SELECT * FROM conversations WHERE tenant_id = ? ORDER BY started_at DESC LIMIT ? OFFSET ?'
-    ).all(tenantId, limit, (page - 1) * limit) as any[];
-    return { conversations: rows.map(r => this.mapRow(r)), total };
+      `SELECT c.*, (SELECT m.content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1) as last_message FROM conversations c ${whereClause} ORDER BY c.started_at DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, (page - 1) * limit) as any[];
+    return { conversations: rows.map(r => ({ ...this.mapRow(r), lastMessage: r.last_message || undefined })), total };
   }
 
   endConversation(id: string): Conversation | null {
@@ -465,6 +481,7 @@ export class OnboardingProgressRepository {
     onboardingStatus?: OnboardingStatus;
     businessType?: string;
     primaryWebsite?: string;
+    businessProfile?: Record<string, unknown>;
     demoDataLoaded?: boolean;
     widgetInstalled?: boolean;
     firstSuccessfulConversation?: string;
@@ -479,6 +496,7 @@ export class OnboardingProgressRepository {
     if (data.onboardingStatus !== undefined) { sets.push('onboarding_status = ?'); vals.push(data.onboardingStatus); }
     if (data.businessType !== undefined) { sets.push('business_type = ?'); vals.push(data.businessType); }
     if (data.primaryWebsite !== undefined) { sets.push('primary_website = ?'); vals.push(data.primaryWebsite); }
+    if (data.businessProfile !== undefined) { sets.push('business_profile = ?'); vals.push(JSON.stringify(data.businessProfile)); }
     if (data.demoDataLoaded !== undefined) { sets.push('demo_data_loaded = ?'); vals.push(data.demoDataLoaded ? 1 : 0); }
     if (data.widgetInstalled !== undefined) { sets.push('widget_installed = ?'); vals.push(data.widgetInstalled ? 1 : 0); }
     if (data.firstSuccessfulConversation !== undefined) { sets.push('first_successful_conversation = ?'); vals.push(data.firstSuccessfulConversation); }
@@ -526,7 +544,7 @@ export class OnboardingProgressRepository {
     const progress = this.get(tenantId);
     const docCount = (this.db.prepare('SELECT COUNT(*) as c FROM kb_documents WHERE tenant_id = ? AND status = ?').get(tenantId, 'published') as any)?.c || 0;
     const convToday = (this.db.prepare("SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND date(started_at) = date('now')").get(tenantId) as any)?.c || 0;
-    const avgConf = (this.db.prepare('SELECT COALESCE(AVG(confidence), 0) as c FROM messages WHERE tenant_id = ? AND role = ?').get(tenantId, 'assistant') as any)?.c || 0;
+    const avgConf = (this.db.prepare('SELECT COALESCE(AVG(avg_confidence), 0) as c FROM conversation_insights WHERE tenant_id = ?').get(tenantId) as any)?.c || 0;
     const totalAnswers = (this.db.prepare("SELECT COUNT(*) as c FROM messages WHERE tenant_id = ? AND role = 'assistant'").get(tenantId) as any)?.c || 0;
     const groundedAnswers = (this.db.prepare("SELECT COUNT(*) as c FROM messages m WHERE m.tenant_id = ? AND m.role = 'assistant' AND m.safety_flags IS NOT NULL").get(tenantId) as any)?.c || 0;
     const firstUnanswered = this.db.prepare('SELECT question FROM unanswered_questions WHERE tenant_id = ? ORDER BY created_at ASC LIMIT 1').get(tenantId) as any;
@@ -571,6 +589,7 @@ export class OnboardingProgressRepository {
       onboardingStatus: row.onboarding_status || 'not_started',
       businessType: row.business_type,
       primaryWebsite: row.primary_website,
+      businessProfile: row.business_profile ? JSON.parse(row.business_profile) : undefined,
       demoDataLoaded: !!row.demo_data_loaded,
       widgetInstalled: !!row.widget_installed,
       firstSuccessfulConversation: row.first_successful_conversation,
@@ -616,6 +635,7 @@ export class WidgetConfigRepository {
     if (data.allowedDomains) { cols.push('allowed_domains'); vals.push(JSON.stringify(data.allowedDomains)); }
     if (data.autoOpen !== undefined) { cols.push('auto_open'); vals.push(data.autoOpen ? 1 : 0); }
     if (data.autoOpenDelay) { cols.push('auto_open_delay'); vals.push(data.autoOpenDelay); }
+    if (data.businessProfile !== undefined) { cols.push('business_profile'); vals.push(JSON.stringify(data.businessProfile)); }
     if (data.customCss) { cols.push('custom_css'); vals.push(data.customCss); }
     this.db.prepare(`INSERT INTO widget_configs (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`).run(...vals);
     return this.get(tenantId)!;
@@ -630,6 +650,7 @@ export class WidgetConfigRepository {
       launcherText: row.launcher_text,
       allowedDomains: JSON.parse(row.allowed_domains || '[]'),
       autoOpen: !!row.auto_open, autoOpenDelay: row.auto_open_delay,
+      businessProfile: row.business_profile ? JSON.parse(row.business_profile) : undefined,
       customCss: row.custom_css,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
