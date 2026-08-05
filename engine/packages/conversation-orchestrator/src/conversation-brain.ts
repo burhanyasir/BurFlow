@@ -1616,6 +1616,16 @@ const groqClient3 = process.env.GROQ_API_KEY_3
   ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 8000 })
   : null;
 
+// Provider 7: Groq Account 4
+const groqClient4 = process.env.GROQ_API_KEY_4
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 8000 })
+  : null;
+
+// Provider 8: Groq Account 5
+const groqClient5 = process.env.GROQ_API_KEY_5
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 8000 })
+  : null;
+
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   if (!anthropicClient) throw new Error('Anthropic not configured');
   const response = await anthropicClient.messages.create({
@@ -1672,6 +1682,8 @@ async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.Mes
     { name: 'Groq-1', call: () => groqClient ? callGroq(groqClient, systemPrompt, messages) : Promise.reject(new Error('Groq-1 not configured')) },
     { name: 'Groq-2', call: () => groqClient2 ? callGroq(groqClient2, systemPrompt, messages) : Promise.reject(new Error('Groq-2 not configured')) },
     { name: 'Groq-3', call: () => groqClient3 ? callGroq(groqClient3, systemPrompt, messages) : Promise.reject(new Error('Groq-3 not configured')) },
+    { name: 'Groq-4', call: () => groqClient4 ? callGroq(groqClient4, systemPrompt, messages) : Promise.reject(new Error('Groq-4 not configured')) },
+    { name: 'Groq-5', call: () => groqClient5 ? callGroq(groqClient5, systemPrompt, messages) : Promise.reject(new Error('Groq-5 not configured')) },
   ];
 
   for (const provider of providers) {
