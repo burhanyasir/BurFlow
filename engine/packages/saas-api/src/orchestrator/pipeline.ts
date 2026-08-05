@@ -28,6 +28,9 @@ export interface PipelineResult {
   isRapportHandled: boolean;
   traceId: string;
   latencyMs: number;
+  quickReplies: any[];
+  uiState: any;
+  cta: any;
 }
 
 const TRACE_LOG = true;
@@ -63,6 +66,35 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
 
     stateManager.recordTurn(state, message, rapportResult.response, []);
 
+    // Generate quickReplies for rapport responses
+    const rapportBrainInput = {
+      message,
+      responseText: rapportResult.response,
+      legacyMemory: {
+        turns: [{ message, response: rapportResult.response, polarity: 0, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+        turnCount: state.turnCount,
+        persona: state.knownFacts.industry || 'small_business',
+        funnelStage: state.stage,
+        buyingIntentDetected: state.buyingIntentScore > 30,
+        buyingIntentPhrase: state.knownFacts.buyingIntentPhrase || '',
+        objections: state.knownFacts.objections,
+        qualificationState: { completed: false, questionsAskedCount: 0 },
+        repeatedPhraseCount: state.repeatedQuestionCount,
+        topics: [],
+        industry: state.knownFacts.industry || undefined,
+        useCase: state.knownFacts.useCase || undefined,
+      },
+      tenantId,
+      knowledgeBaseProvider: kbProvider,
+    };
+    let rapportQuickReplies: any[] = [];
+    let rapportUiState: any = { buttons: [], suggestedActions: [] };
+    try {
+      const rapportBrainOutput = await brainFunction(rapportBrainInput);
+      rapportQuickReplies = rapportBrainOutput?.quickReplies || [];
+      rapportUiState = rapportBrainOutput?.uiState || rapportUiState;
+    } catch {}
+
     const latencyMs = Date.now() - startTime;
     return {
       response: rapportResult.response,
@@ -86,6 +118,9 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       isRapportHandled: true,
       traceId,
       latencyMs,
+      quickReplies: rapportQuickReplies,
+      uiState: rapportUiState,
+      cta: null,
     };
   }
 
@@ -133,6 +168,9 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       isRapportHandled: false,
       traceId,
       latencyMs: Date.now() - startTime,
+      quickReplies: [],
+      uiState: { buttons: [], suggestedActions: [] },
+      cta: null,
     };
   }
 
@@ -182,6 +220,9 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     isRapportHandled: false,
     traceId,
     latencyMs,
+    quickReplies: brainOutput?.quickReplies || [],
+    uiState: brainOutput?.uiState || { buttons: [], suggestedActions: [] },
+    cta: brainOutput?.cta || null,
   };
 }
 

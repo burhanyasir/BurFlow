@@ -99,6 +99,9 @@ export function createChatRoutes(
         composition,
         policy,
         latencyMs,
+        quickReplies,
+        uiState,
+        cta,
       } = pipelineResult;
 
       messageRepo.create({
@@ -131,6 +134,9 @@ export function createChatRoutes(
             composition,
             policy,
             latencyMs,
+            quickReplies,
+            uiState,
+            cta,
           });
         }
 
@@ -143,7 +149,7 @@ export function createChatRoutes(
         for (const chunk of chunkText(finalResponse)) {
           writeSseEvent(res, { type: 'token', content: chunk });
         }
-        writeSseEvent(res, { type: 'ui_state', composition, policy });
+        writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta });
         writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId });
         writeSseEvent(res, { type: 'done', finishReason: 'stop' });
         return res.end();
@@ -161,6 +167,9 @@ export function createChatRoutes(
         composition,
         policy,
         latencyMs,
+        quickReplies,
+        uiState,
+        cta,
       });
     } catch (err: any) {
       console.log(`[TRACE:${traceId}] UNHANDLED EXCEPTION: ${err.message}`);
