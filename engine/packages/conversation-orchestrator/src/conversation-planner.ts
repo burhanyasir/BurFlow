@@ -76,6 +76,7 @@ const WHO_MADE_PATTERNS = /(who (made|created|built) you|who are you|where.*from
 const BUYING_SIGNAL_REGEX = /\b(buy|purchase|sign up|subscribe|get started|start\s+(a\s+|the\s+|my\s+|your\s+|our\s+|free\s+)?trial|free\s+trial|try it|ready to buy|sign me up|book demo|buy now|take my money|let'?s do( it)?$|how do i start|where do i begin|want\s+.*trial)\b/i;
 const PRICING_SIGNAL_REGEX = /\b(pric(?:e|ing|es)|cost|how much|what (do|does) (you|it) (cost|charge))\b/i;
 const DEMO_SIGNAL_REGEX = /\b(book|schedule|set up) (a |the |)(demo|calls?|meeting|appointment)\b/i;
+const BARE_BOOKING_INTENT_REGEX = /\b(i('d| would)? like to|want to|let'?s|can we|shall we|could we) (book|schedule|set up|arrange|plan|organize)\b/i;
 const GROWTH_SIGNAL_REGEX = /\b(enterprise|upgrade|scale|grow)\b/i;
 const COMMITMENT_SIGNAL_REGEX = /\b(moving forward|ready to|let'?s go)\b/i;
 const PROCUREMENT_SIGNAL_REGEX = /\b(proposal|quote|contract|agreement|order)\b/i;
@@ -83,7 +84,7 @@ const COMPARISON_SIGNAL_REGEX = /\b(compare|competitor|alternative|versus|vs)\b/
 const VALUE_SIGNAL_REGEX = /\b(reduce (ticket|support|cost)|improve (response|satisfaction|csat))\b/i;
 
 const SIGNAL_REGEXES = [
-  BUYING_SIGNAL_REGEX, PRICING_SIGNAL_REGEX, DEMO_SIGNAL_REGEX,
+  BUYING_SIGNAL_REGEX, PRICING_SIGNAL_REGEX, DEMO_SIGNAL_REGEX, BARE_BOOKING_INTENT_REGEX,
   GROWTH_SIGNAL_REGEX, COMMITMENT_SIGNAL_REGEX, PROCUREMENT_SIGNAL_REGEX,
   COMPARISON_SIGNAL_REGEX, VALUE_SIGNAL_REGEX,
 ];

@@ -160,7 +160,7 @@ describe('Incomplete messages',()=>{
 
 // ═══════════════════════════════════ 19. TYPO — 10 ═══════════════════════════════════
 describe('Typo-heavy messages',()=>{
-  it.each([['How much does ti cost?',['pricing']],['I need hepl with settup',null],['Teel me about feautres',null],['Is this SECURE?',['security']],['cAN I book a demo?',['walkthrough']],['I wnat to sign up',null]] as [string,string[]|null])('"%s"',(m,t)=>{const c=createInitialState(sid(),tenant,policy);const r=processPolicyEngine(m,c,{handled:false,strategy:'answer'});if(t)for(const x of t)expect(r.detectedTopics).toContain(x);expect(r.strategy).toBeTruthy();});
+  it.each([['How much does ti cost?',['pricing']],['I need hepl with settup',null],['Teel me about feautres',null],['Is this SECURE?',['security']],['cAN I book a demo?',['features','pricing']],['I wnat to sign up',null]] as [string,string[]|null])('"%s"',(m,t)=>{const c=createInitialState(sid(),tenant,policy);const r=processPolicyEngine(m,c,{handled:false,strategy:'answer'});if(t)for(const x of t)expect(r.detectedTopics).toContain(x);expect(r.strategy).toBeTruthy();});
 });
 
 // ═══════════════════════════════════ 20. FULL CONV FLOWS — 30 ═══════════════════════════════════

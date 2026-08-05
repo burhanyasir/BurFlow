@@ -143,6 +143,11 @@ export function processPolicyEngine(
     strategy = 'clarify';
     priority = STRATEGY_PRIORITY.clarify;
   }
+  // Priority 2.5 — booking (when buying signal detected, skip trust-building)
+  else if (buyingSignalDetected && state.buyingIntentScore >= 25) {
+    strategy = 'booking';
+    priority = STRATEGY_PRIORITY.booking;
+  }
   // Priority 3 — trust building
   else if (state.trustScore < 30 && state.turnCount > 1) {
     strategy = 'trust_building';
@@ -152,11 +157,6 @@ export function processPolicyEngine(
   else if (canQualify(state, buyingSignalDetected)) {
     strategy = 'qualify';
     priority = STRATEGY_PRIORITY.qualify;
-  }
-  // Priority 5 — booking
-  else if (buyingSignalDetected && state.buyingIntentScore >= 60) {
-    strategy = 'booking';
-    priority = STRATEGY_PRIORITY.booking;
   }
   // Priority 6 — CTA
   else if (canShowCTA(state, buyingSignalDetected)) {
@@ -188,9 +188,9 @@ function detectTopics(message: string): string[] {
   if (lower.includes('secure') || lower.includes('security') || lower.includes('soc') || lower.includes('compliance') || lower.includes('trust') || lower.includes('hipaa')) topics.push('security');
   if (lower.includes('integrat') || lower.includes('connect') || lower.includes('api') || lower.includes('slack')) topics.push('integrations');
   if (lower.includes('automate') || lower.includes('workflow') || lower.includes('efficiency')) topics.push('features');
-  if (lower.includes('walk') || lower.includes('demo') || lower.includes('show') || lower.includes('how it works')) topics.push('walkthrough');
+  if (lower.includes('walk') || lower.includes('show') || lower.includes('how it works')) topics.push('walkthrough');
   if (topics.length === 0 && detectBuyingSignal(message)) topics.push('features', 'pricing');
-  if (topics.length === 0) topics.push('walkthrough');
+  if (topics.length === 0) topics.push('features');
   return topics;
 }
 
