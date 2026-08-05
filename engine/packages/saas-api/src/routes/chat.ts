@@ -10,6 +10,19 @@ import { DEFAULT_TENANT_POLICY } from '../orchestrator/types';
 
 const logger = createLogger('saas-api:chat');
 
+function writeSseEvent(res: Response, event: Record<string, any>) {
+  res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function chunkText(text: string, size = 24): string[] {
+  if (!text) return [];
+  const chunks: string[] = [];
+  for (let index = 0; index < text.length; index += size) {
+    chunks.push(text.slice(index, index + size));
+  }
+  return chunks;
+}
+
 export function createChatRoutes(
   conversationRepo: ConversationRepository,
   messageRepo: MessageRepository,
@@ -19,16 +32,16 @@ export function createChatRoutes(
   const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
 
-  router.post('/', requireJsonObject, (req: Request, res: Response) => {
+  const handleChatRequest = (req: Request, res: Response, stream = false) => {
     const startTime = Date.now();
     const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
-      const { message, sessionId } = req.body as ChatRequest;
+      const { message, sessionId } = req.body as { message: string; sessionId?: string };
       const tenantId = req.tenantId;
 
       console.log(`[TRACE:${traceId}] === CHAT REQUEST ===`);
       console.log(`[TRACE:${traceId}] tenantId: ${tenantId}`);
-      console.log(`[TRACE:${traceId}] message: "${message?.substring(0,100)}"`);
+      console.log(`[TRACE:${traceId}] message: "${message?.substring(0, 100)}"`);
       console.log(`[TRACE:${traceId}] sessionId: ${sessionId}`);
 
       const errors = [
@@ -61,7 +74,6 @@ export function createChatRoutes(
       const period = new Date().toISOString().slice(0, 7);
       usageRepo.incrementMessages(tenantId!, period);
 
-      // ── Phase 10: Conversation Intelligence Orchestrator ────────────
       const brainFn = (input: any) => processConversationBrain(input);
       const pipelineResult = executePipeline({
         message,
@@ -77,9 +89,18 @@ export function createChatRoutes(
         },
       });
 
-      const { response: finalResponse, strategy, mood, trustScore, buyingIntentScore, stage, state: orchState, composition, policy: policyDec, isRapportHandled, traceId: orchTrace, latencyMs } = pipelineResult;
+      const {
+        response: finalResponse,
+        strategy,
+        mood,
+        trustScore,
+        buyingIntentScore,
+        stage,
+        composition,
+        policy,
+        latencyMs,
+      } = pipelineResult;
 
-      // Persist user + assistant messages
       messageRepo.create({
         conversationId: conversation.id,
         tenantId: tenantId!,
@@ -91,11 +112,44 @@ export function createChatRoutes(
       conversationRepo.incrementMessageCount(conversation.id);
       conversationRepo.incrementMessageCount(conversation.id);
 
-      console.log(`[TRACE:${traceId}] Pipeline strategy=${strategy} mood=${mood} trust=${trustScore} buying=${buyingIntentScore} stage=${stage} compLag=${composition.leakageDetected ? 'LEAK' : 'clean'}`);
+      console.log(`[TRACE:${traceId}] Pipeline strategy=${strategy} mood=${mood} trust=${trustScore} buying=${buyingIntentScore} stage=${stage}`);
 
       (logger as any).info({ event: 'chat_message', tenantId, conversationId: conversation.id, latencyMs, strategy, mood, trustScore }, 'Chat message processed');
 
-      res.json({
+      if (stream) {
+        const acceptHeader = String(req.headers.accept || '');
+        if (acceptHeader.includes('application/json')) {
+          return res.json({
+            response: finalResponse,
+            sessionId: convSessionId,
+            conversationId: conversation.id,
+            strategy,
+            mood,
+            trustScore,
+            buyingIntentScore,
+            stage,
+            composition,
+            policy,
+            latencyMs,
+          });
+        }
+
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+        res.setHeader('X-Accel-Buffering', 'no');
+        res.flushHeaders?.();
+
+        for (const chunk of chunkText(finalResponse)) {
+          writeSseEvent(res, { type: 'token', content: chunk });
+        }
+        writeSseEvent(res, { type: 'ui_state', composition, policy });
+        writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId });
+        writeSseEvent(res, { type: 'done', finishReason: 'stop' });
+        return res.end();
+      }
+
+      return res.json({
         response: finalResponse,
         sessionId: convSessionId,
         conversationId: conversation.id,
@@ -104,16 +158,20 @@ export function createChatRoutes(
         trustScore,
         buyingIntentScore,
         stage,
-        cta: null,
+        composition,
+        policy,
         latencyMs,
       });
     } catch (err: any) {
       console.log(`[TRACE:${traceId}] UNHANDLED EXCEPTION: ${err.message}`);
       console.log(`[TRACE:${traceId}] Stack: ${err.stack}`);
       createContextLogger(logger).error({ err }, 'Chat failed');
-      res.status(500).json({ error: 'Failed to process message' });
+      return res.status(500).json({ error: 'Failed to process message' });
     }
-  });
+  };
+
+  router.post('/', requireJsonObject, (req: Request, res: Response) => handleChatRequest(req, res, false));
+  router.post('/stream', requireJsonObject, (req: Request, res: Response) => handleChatRequest(req, res, true));
 
   return router;
 }

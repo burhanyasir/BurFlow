@@ -2060,7 +2060,7 @@ function validateMomentum(
     const key = ctx.split(':')[0].trim().toLowerCase();
     return key && lower.includes(key);
   });
-  const topicRefMatch = memory.topicsExplained.some(t => lower.includes(t.topic.toLowerCase()));
+  const topicRefMatch = memory.topicsExplained.some(t => typeof t.topic === 'string' && lower.includes(t.topic.toLowerCase()));
   const referencedContext = userCtxMatch || topicRefMatch || relevantFacts.buyingIntent !== null;
   if (!referencedContext) weakPoints.push('no_context_ref');
 

@@ -1,4 +1,4 @@
-import { OrchestratorState, Strategy } from './types';
+import { OrchestratorState, Strategy, ConversationStage } from './types';
 import { stateManager } from './state-manager';
 import { processRapportRepair } from './rapport-repair';
 import { processPolicyEngine, PolicyDecision } from './policy-engine';
@@ -157,7 +157,9 @@ export function executePipeline(input: PipelineInput): PipelineResult {
   if (brainOutput && brainOutput.legacyMemory) {
     const updated = brainOutput.legacyMemory;
     stateManager.recordTurn(state, message, finalResponse, state.ledger.questionsAnswered);
-    stateManager.addPendingTopic(state, updated.topics || []);
+    for (const t of (updated.topics || [])) {
+      stateManager.addPendingTopic(state, t);
+    }
     if (updated.funnelStage) state.stage = updated.funnelStage;
   } else {
     stateManager.recordTurn(state, message, finalResponse, state.ledger.questionsAnswered);
@@ -183,8 +185,8 @@ export function executePipeline(input: PipelineInput): PipelineResult {
   };
 }
 
-function mapStrategyToStage(strategy: Strategy): string {
-  const map: Record<string, string> = {
+function mapStrategyToStage(strategy: Strategy): ConversationStage {
+  const map: Record<string, ConversationStage> = {
     greeting: 'greeting',
     repair_confusion: 'discovery',
     answer: 'discovery',
@@ -196,8 +198,6 @@ function mapStrategyToStage(strategy: Strategy): string {
     objection_handling: 'objection_handling',
     buying_discussion: 'buying_discussion',
     booking: 'closing',
-    action_execution: 'action_execution',
-    cta: 'closing',
     human_handoff: 'human_handoff',
     close_conversation: 'finished',
   };
