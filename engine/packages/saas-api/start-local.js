@@ -7,6 +7,8 @@ process.env.ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 process.env.GEMINI_API_KEY_1 = process.env.GEMINI_API_KEY_1 || '';
 process.env.GEMINI_API_KEY_2 = process.env.GEMINI_API_KEY_2 || '';
 process.env.GROQ_API_KEY = process.env.GROQ_API_KEY || '';
+process.env.GROQ_API_KEY_2 = process.env.GROQ_API_KEY_2 || '';
+process.env.GROQ_API_KEY_3 = process.env.GROQ_API_KEY_3 || '';
 if (!process.env.GEMINI_API_KEY_1 && !process.env.GEMINI_API_KEY_2 && !process.env.ANTHROPIC_API_KEY) {
   console.warn('[startup] No LLM API keys configured — brain will use fallback responses');
 }

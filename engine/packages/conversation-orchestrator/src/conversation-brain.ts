@@ -1606,6 +1606,16 @@ const groqClient = process.env.GROQ_API_KEY
   ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 8000 })
   : null;
 
+// Provider 5: Groq Account 2
+const groqClient2 = process.env.GROQ_API_KEY_2
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 8000 })
+  : null;
+
+// Provider 6: Groq Account 3
+const groqClient3 = process.env.GROQ_API_KEY_3
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 8000 })
+  : null;
+
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   if (!anthropicClient) throw new Error('Anthropic not configured');
   const response = await anthropicClient.messages.create({
@@ -1637,7 +1647,7 @@ async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, mess
   return result.response.text().trim();
 }
 
-async function callGroq(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   if (!groqClient) throw new Error('Groq not configured');
   const groqMessages = messages.map(m => ({
     role: m.role as 'user' | 'assistant',
@@ -1659,7 +1669,9 @@ async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.Mes
     { name: 'Anthropic', call: () => callAnthropic(systemPrompt, messages) },
     { name: 'Gemini-1', call: () => geminiClient1 ? callGemini(geminiClient1, systemPrompt, messages) : Promise.reject(new Error('Gemini-1 not configured')) },
     { name: 'Gemini-2', call: () => geminiClient2 ? callGemini(geminiClient2, systemPrompt, messages) : Promise.reject(new Error('Gemini-2 not configured')) },
-    { name: 'Groq', call: () => callGroq(systemPrompt, messages) },
+    { name: 'Groq-1', call: () => groqClient ? callGroq(groqClient, systemPrompt, messages) : Promise.reject(new Error('Groq-1 not configured')) },
+    { name: 'Groq-2', call: () => groqClient2 ? callGroq(groqClient2, systemPrompt, messages) : Promise.reject(new Error('Groq-2 not configured')) },
+    { name: 'Groq-3', call: () => groqClient3 ? callGroq(groqClient3, systemPrompt, messages) : Promise.reject(new Error('Groq-3 not configured')) },
   ];
 
   for (const provider of providers) {
@@ -1989,6 +2001,7 @@ CRITICAL RULES — MUST FOLLOW:
 1. Intent Override: Explicit intent signals (e.g., "i want to book", "let's schedule", "i want to buy", "talk to sales") MUST take precedence over keyword/topic matching. Never route an action request to product feature facts or documentation.
 2. Booking Context: Interpret "book" or "demo" in user requests as an explicit action to schedule a live sales meeting/calendar call, NOT as a search for technical documentation, sandbox environments, or setup guides.
 3. Strategy Routing: Set strategy to booking (with ctaType: "schedule_demo") whenever the visitor expresses intent to meet, demo, or buy. Set strategy to answer ONLY when the visitor asks an informational question without requesting an action.
+4. Never start responses with phrases like "For [persona] teams, this is especially relevant" or similar filler openers. Get straight to the answer.
 
 BUSINESS KNOWLEDGE:
 ${businessContext}
