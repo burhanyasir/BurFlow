@@ -20,6 +20,7 @@ import {
   UptimeRepository, SecurityStatusRepository, IncidentRepository,
   ComplianceDocumentRepository, DpaRepository, SubprocessorRepository,
   TopicResponseTemplateRepository,
+  HandoffRequestRepository,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth } from './middleware/auth';
@@ -173,6 +174,7 @@ const complianceRepo = new ComplianceDocumentRepository(db);
 const dpaRepo = new DpaRepository(db);
 const subprocessorRepo = new SubprocessorRepository(db);
 const topicResponseRepo = new TopicResponseTemplateRepository(db);
+const handoffRepo = new HandoffRequestRepository(db);
 
 const app = express();
 
@@ -261,6 +263,68 @@ app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET));
 // Protected routes
 const auth = authMiddleware(JWT_SECRET);
 const tenantGuard = requireTenant(tenantRepo);
+
+// Widget handoff route (uses widget token auth like /api/chat)
+const widgetHandoffAuth = publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo);
+app.post('/api/widget/handoff', widgetHandoffAuth, (req: Request, res: Response) => {
+  try {
+    const tenantId = req.tenantId;
+    if (!tenantId) return res.status(401).json({ error: 'Tenant context required' });
+    const { sessionId, visitorEmail, message } = req.body;
+    if (!sessionId || typeof sessionId !== 'string') {
+      return res.status(400).json({ error: 'sessionId is required' });
+    }
+    const conv = conversationRepo.findBySession(tenantId, sessionId);
+    if (conv) {
+      conversationRepo.updateStatus(conv.id, 'escalated');
+    }
+    const handoff = handoffRepo.create({
+      tenantId,
+      sessionId,
+      visitorEmail: visitorEmail || undefined,
+      conversationSummary: message || undefined,
+    });
+    res.json({ success: true, message: 'Your request has been received. Someone will reach out shortly.', handoffId: handoff.id });
+  } catch (err: any) {
+    createContextLogger(logger).error({ err }, 'Handoff request failed');
+    res.status(500).json({ error: 'Failed to submit handoff request' });
+  }
+});
+
+// Get handoff info for a conversation (for owner panel)
+app.get('/api/conversations/:id/handoff', auth, tenantGuard, (req: Request, res: Response) => {
+  try {
+    const tenantId = req.tenantId!;
+    const conv = conversationRepo.findById(req.params.id);
+    if (!conv || conv.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    const handoff = handoffRepo.findBySession(conv.sessionId);
+    res.json({ handoff: handoff || null });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch handoff info' });
+  }
+});
+
+// Conversation resolve route (for owner panel)
+app.patch('/api/conversations/:id/resolve', auth, tenantGuard, (req: Request, res: Response) => {
+  try {
+    const tenantId = req.tenantId!;
+    const conv = conversationRepo.findById(req.params.id);
+    if (!conv || conv.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+    conversationRepo.updateStatus(conv.id, 'ended');
+    const handoff = handoffRepo.findBySession(conv.sessionId);
+    if (handoff && handoff.status === 'pending') {
+      handoffRepo.resolve(handoff.id, req.user?.sub || 'owner');
+    }
+    res.json({ success: true });
+  } catch (err: any) {
+    createContextLogger(logger).error({ err }, 'Failed to resolve conversation');
+    res.status(500).json({ error: 'Failed to resolve conversation' });
+  }
+});
 
 app.use('/api/tenants', auth, tenantGuard, enforceTenantAccess(), createTenantRoutes(tenantRepo, userRepo));
 app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRepo, tenantRepo, auditLogRepo));

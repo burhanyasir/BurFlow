@@ -123,18 +123,17 @@ export function buildBusinessGreeting(profile: BusinessContextLike = {}): string
   const industryLabel = profile.industry || profile.businessType || 'business';
   const productHint = profile.products?.[0] || profile.services?.[0] || 'offerings';
   const pricingHint = profile.pricingModel || 'plans';
-  const valueHint = profile.valuePropositions?.[0] || 'clear, outcome-focused guidance';
 
   let greeting = '';
 
   if (/saas|software|technology|platform/i.test(industryLabel)) {
-    greeting = `Hi! I can help you compare ${pricingHint.toLowerCase()}, explain ${productHint.toLowerCase()}, or recommend the best option for ${companyName}.`;
+    greeting = `Hey there! 👋 I know everything about ${companyName}'s products and pricing. Ask me anything — I'll give you a straight answer, not a sales pitch.`;
   } else if (/agency|consult|marketing|creative|design/i.test(industryLabel)) {
-    greeting = `Welcome! I can recommend the right service for ${companyName} and help you book a consultation around ${productHint.toLowerCase()}.`;
+    greeting = `Hey there! 👋 I can walk you through ${companyName}'s services and help you find the right fit. What are you looking for?`;
   } else if (/restaurant|food|cafe|hotel|hospitality/i.test(industryLabel)) {
-    greeting = `Welcome! I can help you explore ${productHint.toLowerCase()}, availability, or the best next step for ${companyName}.`;
+    greeting = `Hey there! 👋 I can help you explore ${companyName}'s menu, availability, or the best next step. What would you like to know?`;
   } else {
-    greeting = `Welcome! I can help you understand ${productHint.toLowerCase()} and guide you toward the best next step for ${companyName}.`;
+    greeting = `Hey there! 👋 I'm your guide to ${companyName}. I can explain our ${productHint.toLowerCase()}, compare ${pricingHint.toLowerCase()}, or point you to the right next step. What are you curious about?`;
   }
 
   if (profile.faqs?.length || profile.contactDetails?.length) {
@@ -143,13 +142,7 @@ export function buildBusinessGreeting(profile: BusinessContextLike = {}): string
     greeting = `${greeting} I can also ${faqPart} and ${contactPart}.`;
   }
 
-  if (profile.trustSignals?.length) {
-    greeting = `${greeting} I’ll frame the guidance around ${profile.trustSignals[0].toLowerCase()}.`;
-  }
 
-  if (profile.valuePropositions?.length) {
-    greeting = `${greeting} The experience is designed around ${valueHint.toLowerCase()}.`;
-  }
 
   return greeting;
 }
@@ -311,16 +304,16 @@ export function deriveSuggestedActions(message: string, previousActions: SmartBu
   return baseActions.filter((action) => !seen.has(action.label.toLowerCase())).slice(0, 4);
 }
 
-const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widgetToken' | 'sessionId'>> & { tenantId?: string; apiKey?: string; widgetToken?: string; sessionId?: string } = {
+const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widgetToken' | 'sessionId' | 'businessProfile'>> & { tenantId?: string; apiKey?: string; widgetToken?: string; sessionId?: string; businessProfile?: Record<string, unknown> } = {
   apiUrl: '',
   tenantId: undefined as any,
   apiKey: undefined as any,
   sessionId: undefined as any,
   widgetToken: undefined as any,
   title: 'BurFlow Sales Agent',
-  subtitle: 'AI website sales & demo assistant',
+  subtitle: 'Your smart buying assistant',
   primaryColor: '#3B82F6',
-  greeting: '👋 I already understand this website. I can help visitors find the right product, plan, or next step in just a minute.',
+  greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
   position: 'bottom-right',
   companyName: '',
   launcherText: 'Talk to BurFlow',
@@ -358,8 +351,12 @@ export class ChatWidget {
   private uiState: ConversationUIState | null = null;
   private cta: Record<string, unknown> | null = null;
   private unreadBadge: HTMLSpanElement | null = null;
+  private preOpenPanelEl: HTMLDivElement | null = null;
   private configLoadPromise: Promise<void> | null = null;
   private suggestionHistory: SmartButton[] = [];
+  private preOpenDismissed = false;
+  private handoffEl: HTMLDivElement | null = null;
+  private handoffShown = false;
 
   constructor(config: WidgetConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -367,14 +364,30 @@ export class ChatWidget {
     this.businessProfile = this.deriveBusinessProfileFromConfig();
   }
 
+  private injectStyles(): void {
+    if (document.getElementById('cw-widget-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'cw-widget-styles';
+    style.textContent = `
+      @keyframes cw-blink { 0%,100%{opacity:1} 50%{opacity:0} }
+      @keyframes cw-pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+      @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+      @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
+      .cw-bubble:hover { transform:scale(1.08) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
+      .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
+      .cw-input:focus { border-color:#818CF8 !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
+    `;
+    document.head.appendChild(style);
+  }
+
   mount(): void {
     if (this.container) return;
+    this.injectStyles();
     this.createBubble();
     this.createChatWindow();
     if (this.config.widgetToken) {
       this.configLoadPromise = this.fetchRemoteConfig();
     }
-    this.renderInitialActions();
   }
 
   unmount(): void {
@@ -413,6 +426,68 @@ export class ChatWidget {
 
     document.body.appendChild(bubble);
     this.bubbleEl = bubble;
+
+    this.createPreOpenPanel();
+  }
+
+  private createPreOpenPanel(): void {
+    const panel = document.createElement('div');
+    panel.className = 'cw-preopen-panel';
+    const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
+    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;flex-direction:column;gap:6px;max-width:320px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);`;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);color:#fff;padding:14px 16px;border-radius:16px 16px 0 0;font-size:13px;font-weight:600;letter-spacing:0.02em;';
+    header.textContent = this.config.launcherText || 'Ask me anything';
+    panel.appendChild(header);
+
+    const list = document.createElement('div');
+    list.style.cssText = 'background:#fff;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 16px 16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);';
+
+    const questions = this.config.suggestedActions?.slice(0, 4) || [
+      { id: 'pricing', label: 'Pricing', action: 'send_text' as const, payload: 'Show me pricing' },
+      { id: 'products', label: 'Products', action: 'send_text' as const, payload: 'What products do you offer?' },
+      { id: 'demo', label: 'Book a Demo', action: 'send_text' as const, payload: 'I want to book a demo' },
+      { id: 'faq', label: 'FAQ', action: 'send_text' as const, payload: 'What are the most common questions?' },
+    ];
+
+    questions.forEach((q, i) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.style.cssText = `width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;transition:background 0.15s ease;${i < questions.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}`;
+      const icons = ['💰', '📦', '📅', '❓'];
+      item.innerHTML = `<span style="font-size:15px;flex-shrink:0">${icons[i] || '💬'}</span><span style="flex:1;line-height:1.4">${q.label || q.payload}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
+      item.addEventListener('mouseenter', () => { item.style.background = '#F9FAFB'; });
+      item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
+      item.addEventListener('click', () => {
+        this.dismissPreOpenPanel();
+        if (!this.isOpen) this.toggle();
+        setTimeout(() => {
+          this.inputEl!.value = q.payload || q.label;
+          this.send();
+        }, 100);
+      });
+      list.appendChild(item);
+    });
+
+    panel.appendChild(list);
+    document.body.appendChild(panel);
+    this.preOpenPanelEl = panel;
+
+    setTimeout(() => this.showPreOpenPanel(), 1500);
+  }
+
+  private showPreOpenPanel(): void {
+    if (this.preOpenDismissed || this.isOpen || !this.preOpenPanelEl) return;
+    this.preOpenPanelEl.style.display = 'flex';
+    this.preOpenDismissed = true;
+    setTimeout(() => this.dismissPreOpenPanel(), 12000);
+  }
+
+  private dismissPreOpenPanel(): void {
+    if (this.preOpenPanelEl) {
+      this.preOpenPanelEl.style.display = 'none';
+    }
   }
 
   private createChatWindow(): void {
@@ -427,6 +502,8 @@ export class ChatWidget {
     this.actionPanel = this.createActionPanel();
     container.appendChild(this.actionPanel);
     container.appendChild(this.createInputArea());
+    this.handoffEl = this.createHandoffArea();
+    container.appendChild(this.handoffEl);
 
     document.body.appendChild(container);
     this.container = container;
@@ -435,7 +512,7 @@ export class ChatWidget {
   private createHeader(): HTMLDivElement {
     const header = document.createElement('div');
     header.className = 'cw-header';
-    header.style.cssText = `background:${this.config.primaryColor};color:#fff;padding:16px;display:flex;align-items:center;justify-content:space-between;border-radius:12px 12px 0 0;`;
+    header.style.cssText = `background:linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:20px 20px 0 0;`;
 
     const info = document.createElement('div');
     const title = document.createElement('div');
@@ -464,7 +541,7 @@ export class ChatWidget {
   private createMessagesArea(): HTMLDivElement {
     const el = document.createElement('div');
     el.className = 'cw-messages';
-    el.style.cssText = 'flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:300px;max-height:400px;background:#F9FAFB;';
+    el.style.cssText = 'flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:300px;max-height:400px;background:#F8F9FB;';
     return el;
   }
 
@@ -478,13 +555,13 @@ export class ChatWidget {
   private createInputArea(): HTMLDivElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'cw-input-area';
-    wrapper.style.cssText = 'padding:12px;border-top:1px solid #E5E7EB;display:flex;gap:8px;align-items:flex-end;background:#fff;border-radius:0 0 18px 18px;';
+    wrapper.style.cssText = 'padding:14px 16px;border-top:1px solid #E8ECF1;display:flex;gap:10px;align-items:flex-end;background:#fff;border-radius:0 0 20px 20px;';
 
     const textarea = document.createElement('textarea');
     textarea.className = 'cw-input';
     textarea.placeholder = 'Ask about pricing, products, or demos...';
     textarea.rows = 1;
-    textarea.style.cssText = 'flex:1;resize:none;border:1px solid #D1D5DB;border-radius:12px;padding:10px 12px;font-size:14px;font-family:inherit;outline:none;max-height:120px;min-height:44px;line-height:1.4;';
+    textarea.style.cssText = 'flex:1;resize:none;border:1.5px solid #E0E4EB;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;outline:none;max-height:120px;min-height:44px;line-height:1.4;transition:border-color 0.15s ease,box-shadow 0.15s ease;background:#F8F9FB;';
     textarea.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -500,7 +577,7 @@ export class ChatWidget {
     const sendBtn = document.createElement('button');
     sendBtn.className = 'cw-send';
     sendBtn.setAttribute('aria-label', 'Send message');
-    sendBtn.style.cssText = `background:${this.config.primaryColor};color:#fff;border:none;border-radius:12px;width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 10px 20px rgba(59,130,246,0.16);`;
+    sendBtn.style.cssText = `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:14px;width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px rgba(99,102,241,0.3);transition:transform 0.15s ease,box-shadow 0.15s ease;`;
     sendBtn.innerHTML = this.getSendIconSvg();
     sendBtn.addEventListener('click', () => this.send());
     this.sendBtnEl = sendBtn;
@@ -510,17 +587,79 @@ export class ChatWidget {
     return wrapper;
   }
 
+  private createHandoffArea(): HTMLDivElement {
+    const el = document.createElement('div');
+    el.className = 'cw-handoff';
+    el.style.cssText = 'padding:0 16px 12px;display:none;background:#fff;border-radius:0 0 20px 20px;';
+    return el;
+  }
+
+  private updateHandoffVisibility(): void {
+    if (!this.handoffEl || this.handoffShown) return;
+    const userMessages = this.messages.filter(m => m.role === 'user').length;
+    if (userMessages >= 3) {
+      this.handoffEl.style.display = 'block';
+      this.handoffEl.innerHTML = `
+        <button class="cw-handoff-link" style="background:none;border:none;color:#6366f1;font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
+          Talk to a human
+        </button>`;
+      this.handoffEl.querySelector('.cw-handoff-link')?.addEventListener('click', () => this.showHandoffForm());
+    }
+  }
+
+  private showHandoffForm(): void {
+    if (!this.handoffEl) return;
+    this.handoffShown = true;
+    this.handoffEl.innerHTML = `
+      <div style="padding:8px 0;">
+        <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">Leave your email and we'll reach out shortly.</p>
+        <div style="display:flex;gap:8px;">
+          <input type="email" class="cw-handoff-email" placeholder="you@company.com" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
+          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
+        </div>
+      </div>`;
+    this.handoffEl.querySelector('.cw-handoff-submit')?.addEventListener('click', () => this.submitHandoff());
+    this.handoffEl.querySelector('.cw-handoff-email')?.addEventListener('keydown', (e) => {
+      if ((e as KeyboardEvent).key === 'Enter') this.submitHandoff();
+    });
+  }
+
+  private async submitHandoff(): Promise<void> {
+    if (!this.handoffEl) return;
+    const emailInput = this.handoffEl.querySelector('.cw-handoff-email') as HTMLInputElement | null;
+    const email = emailInput?.value.trim();
+    if (!email || !email.includes('@')) {
+      if (emailInput) emailInput.style.borderColor = '#EF4444';
+      return;
+    }
+    try {
+      const res = await fetch(`${this.config.apiUrl}/api/widget/handoff`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(this.config.widgetToken ? { 'x-widget-token': this.config.widgetToken } : {}) },
+        body: JSON.stringify({ sessionId: this.config.sessionId, visitorEmail: email, message: 'Visitor requested human assistance' }),
+      });
+      if (res.ok) {
+        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#059669;padding:8px 0;">✓ Request sent. Someone will email you at ${email} within a few hours.</p>`;
+      } else {
+        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">Something went wrong. Please try again.</p>`;
+      }
+    } catch {
+      this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">Network error. Please try again.</p>`;
+    }
+  }
+
   toggle(): void {
     this.isOpen = !this.isOpen;
+    this.dismissPreOpenPanel();
     if (!this.container) return;
     this.container.style.display = this.isOpen ? 'flex' : 'none';
     if (this.isOpen) {
+      this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
       this.unreadCount = 0;
       this.updateBadge();
       this.inputEl?.focus();
       if (this.messages.length === 0) {
         this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
-        this.renderInitialActions();
       }
       this.renderUiState();
       this.scrollToBottom();
@@ -609,6 +748,7 @@ export class ChatWidget {
       this.unreadCount++;
       this.updateBadge();
     }
+    this.updateHandoffVisibility();
     return msg;
   }
 
@@ -622,9 +762,9 @@ export class ChatWidget {
     const bubble = document.createElement('div');
     bubble.className = 'cw-message-bubble';
     const isUser = msg.role === 'user';
-    bubble.style.cssText = `max-width:84%;padding:12px 14px;border-radius:16px;font-size:14px;line-height:1.6;word-wrap:break-word;box-shadow:${isUser ? 'none' : '0 8px 20px rgba(15, 23, 42, 0.06)'};${isUser
-      ? `background:${this.config.primaryColor};color:#fff;border-bottom-right-radius:6px;`
-      : 'background:#fff;color:#111827;border:1px solid #E5E7EB;border-bottom-left-radius:6px;'
+    bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;box-shadow:${isUser ? 'none' : '0 2px 12px rgba(15, 23, 42, 0.06)'};${isUser
+      ? `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;`
+      : 'background:#fff;color:#1F2937;border:1px solid #E8ECF1;border-bottom-left-radius:6px;'
     }`;
 
     const content = document.createElement('div');
@@ -984,12 +1124,12 @@ export class ChatWidget {
 
   private getBubbleStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:20px;${pos}width:60px;height:60px;border-radius:50%;background:${this.config.primaryColor};color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 16px 40px rgba(15, 23, 42, 0.2);z-index:999999;transition:transform 0.2s ease, box-shadow 0.2s ease;`;
+    return `position:fixed;bottom:20px;${pos}width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);`;
   }
 
   private getContainerStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:96px;${pos}width:392px;max-width:calc(100vw - 24px);height:620px;max-height:calc(100vh - 24px);background:#fff;border-radius:18px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.18);z-index:999998;display:flex;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    return `position:fixed;bottom:96px;${pos}width:400px;max-width:calc(100vw - 24px);height:620px;max-height:calc(100vh - 24px);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {
@@ -1057,7 +1197,9 @@ export class ChatWidget {
       }
     }
     if (this.container) {
+      const currentDisplay = this.container.style.display;
       this.container.style.cssText = this.getContainerStyles();
+      if (currentDisplay) this.container.style.display = currentDisplay;
     }
   }
 
@@ -1073,13 +1215,6 @@ export class ChatWidget {
       if (!response.ok) return;
       const remoteConfig = await response.json();
       this.applyRemoteConfig(remoteConfig);
-      if (remoteConfig.autoOpen) {
-        window.setTimeout(() => {
-          if (!this.isOpen) {
-            this.toggle();
-          }
-        }, (remoteConfig.autoOpenDelay || 3) * 1000);
-      }
     } catch {
       // Ignore fetch failures and continue with default config
     }

@@ -16,6 +16,7 @@ export {
   UptimeRepository, SecurityStatusRepository, IncidentRepository,
   ComplianceDocumentRepository, DpaRepository, SubprocessorRepository,
   TopicResponseTemplateRepository,
+  HandoffRequestRepository,
 } from './db/repositories';
 export {
   hashPassword, comparePassword, generateToken, verifyToken,
@@ -43,5 +44,6 @@ export type {
   ComplianceDocument, DpaDocument, Subprocessor,
   TopicResponseTemplate,
 } from './types';
+export type { HandoffRequest } from './db/repositories';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';
 export type { PaddlePlanConfig, PlanLimits } from './paddle';

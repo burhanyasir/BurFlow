@@ -37,6 +37,17 @@ interface Message {
   createdAt: string;
 }
 
+interface HandoffRequest {
+  id: string;
+  sessionId: string;
+  visitorEmail?: string;
+  conversationSummary?: string;
+  status: 'pending' | 'resolved';
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
 interface ConversationsResponse {
   conversations: Conversation[];
   total: number;
@@ -108,6 +119,8 @@ export default function ConversationDashboard() {
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [handoff, setHandoff] = useState<HandoffRequest | null>(null);
+  const [resolving, setResolving] = useState(false);
   const pageSize = 20;
 
   const workspaceName = tenant?.name || 'Conversation Engine';
@@ -142,10 +155,28 @@ export default function ConversationDashboard() {
     }
   }, []);
 
-  const handleRowClick = useCallback((conv: Conversation) => {
+  const handleRowClick = useCallback(async (conv: Conversation) => {
     setSelectedConv(conv);
+    setHandoff(null);
     fetchMessages(conv.id);
+    try {
+      const data = await apiClient.get<{ handoff: HandoffRequest | null }>(`/conversations/${conv.id}/handoff`);
+      setHandoff(data.handoff);
+    } catch { /* no handoff */ }
   }, [fetchMessages]);
+
+  const handleResolve = useCallback(async () => {
+    if (!selectedConv || resolving) return;
+    setResolving(true);
+    try {
+      await apiClient.patch(`/conversations/${selectedConv.id}/resolve`, {});
+      setSelectedConv({ ...selectedConv, status: 'ended' });
+      setHandoff(null);
+      fetchConversations();
+    } catch { /* ignore */ } finally {
+      setResolving(false);
+    }
+  }, [selectedConv, resolving, fetchConversations]);
 
   const handleFilterChange = useCallback((filter: FilterStatus) => {
     setActiveFilter(filter);
@@ -191,9 +222,24 @@ export default function ConversationDashboard() {
               </div>
 
               {selectedConv.status === 'escalated' && (
-                <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3">
-                  <p className="text-xs font-semibold text-orange-400">Handoff Requested</p>
-                  <p className="text-xs text-orange-300/70 mt-1">This visitor is waiting for a human agent.</p>
+                <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-orange-400">Needs Human</p>
+                  {handoff?.visitorEmail && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-orange-300/70">Email:</span>
+                      <span className="text-orange-200 font-medium">{handoff.visitorEmail}</span>
+                    </div>
+                  )}
+                  {handoff?.conversationSummary && (
+                    <p className="text-xs text-orange-300/70">{handoff.conversationSummary}</p>
+                  )}
+                  <button
+                    onClick={handleResolve}
+                    disabled={resolving}
+                    className="mt-2 w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition disabled:opacity-50"
+                  >
+                    {resolving ? 'Resolving...' : 'Mark Resolved'}
+                  </button>
                 </div>
               )}
 

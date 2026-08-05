@@ -251,6 +251,16 @@ export class ConversationRepository {
     this.db.prepare('UPDATE conversations SET message_count = message_count + 1 WHERE id = ?').run(id);
   }
 
+  updateStatus(id: string, status: string): Conversation | null {
+    if (status === 'ended' || status === 'escalated') {
+      this.db.prepare('UPDATE conversations SET status = ?, ended_at = ? WHERE id = ?')
+        .run(status, new Date().toISOString(), id);
+    } else {
+      this.db.prepare('UPDATE conversations SET status = ? WHERE id = ?').run(status, id);
+    }
+    return this.findById(id);
+  }
+
   private mapRow(row: any): Conversation {
     return {
       id: row.id, tenantId: row.tenant_id, sessionId: row.session_id,
@@ -1889,6 +1899,69 @@ export class TopicResponseTemplateRepository {
       id: row.id, tenantId: row.tenant_id, topic: row.topic, depth: row.depth,
       answer: row.answer, sources: row.sources,
       createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+}
+
+export interface HandoffRequest {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+  visitorEmail?: string;
+  conversationSummary?: string;
+  status: 'pending' | 'resolved';
+  createdAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+}
+
+export class HandoffRequestRepository {
+  constructor(private db: Database.Database) {}
+
+  create(data: { tenantId: string; sessionId: string; visitorEmail?: string; conversationSummary?: string }): HandoffRequest {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(
+      'INSERT INTO handoff_requests (id, tenant_id, session_id, visitor_email, conversation_summary, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.tenantId, data.sessionId, data.visitorEmail || null, data.conversationSummary || null, 'pending', now);
+    return this.findById(id)!;
+  }
+
+  findById(id: string): HandoffRequest | null {
+    const row = this.db.prepare('SELECT * FROM handoff_requests WHERE id = ?').get(id) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findBySession(sessionId: string): HandoffRequest | null {
+    const row = this.db.prepare('SELECT * FROM handoff_requests WHERE session_id = ? ORDER BY created_at DESC LIMIT 1').get(sessionId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  listByTenant(tenantId: string, status?: string): HandoffRequest[] {
+    let sql = 'SELECT * FROM handoff_requests WHERE tenant_id = ?';
+    const params: any[] = [tenantId];
+    if (status) {
+      sql += ' AND status = ?';
+      params.push(status);
+    }
+    sql += ' ORDER BY created_at DESC';
+    const rows = this.db.prepare(sql).all(...params) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  resolve(id: string, resolvedBy: string): HandoffRequest | null {
+    this.db.prepare(
+      "UPDATE handoff_requests SET status = 'resolved', resolved_at = ?, resolved_by = ? WHERE id = ?"
+    ).run(new Date().toISOString(), resolvedBy, id);
+    return this.findById(id);
+  }
+
+  private mapRow(row: any): HandoffRequest {
+    return {
+      id: row.id, tenantId: row.tenant_id, sessionId: row.session_id,
+      visitorEmail: row.visitor_email, conversationSummary: row.conversation_summary,
+      status: row.status, createdAt: row.created_at,
+      resolvedAt: row.resolved_at, resolvedBy: row.resolved_by,
     };
   }
 }

@@ -156,6 +156,7 @@ function migrate(db: Database.Database): void {
       onboarding_status TEXT DEFAULT 'not_started',
       business_type TEXT,
       primary_website TEXT,
+      business_profile TEXT,
       demo_data_loaded INTEGER DEFAULT 0,
       widget_installed INTEGER DEFAULT 0,
       first_successful_conversation TEXT,
@@ -177,6 +178,7 @@ function migrate(db: Database.Database): void {
       allowed_domains TEXT DEFAULT '[]',
       auto_open INTEGER DEFAULT 0,
       auto_open_delay INTEGER DEFAULT 3,
+      business_profile TEXT,
       custom_css TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -225,6 +227,7 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN skipped_steps TEXT NOT NULL DEFAULT '[]';`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN completion_percentage INTEGER DEFAULT 0;`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN onboarding_status TEXT DEFAULT 'not_started' CHECK (onboarding_status IN ('not_started','in_progress','completed','skipped'));`); } catch {}
+  try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN business_profile TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN first_successful_conversation TEXT;`); } catch {}
 
   // Paddle billing tables
@@ -582,5 +585,22 @@ function migrate(db: Database.Database): void {
       UNIQUE(tenant_id, topic, depth)
     );
     CREATE INDEX IF NOT EXISTS idx_trt_tenant_topic ON topic_response_templates(tenant_id, topic);
+  `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS handoff_requests (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL,
+      visitor_email TEXT,
+      conversation_summary TEXT,
+      status TEXT DEFAULT 'pending' CHECK (status IN ('pending','resolved')),
+      created_at TEXT NOT NULL,
+      resolved_at TEXT,
+      resolved_by TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_handoff_tenant ON handoff_requests(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_handoff_status ON handoff_requests(status);
+    CREATE INDEX IF NOT EXISTS idx_handoff_session ON handoff_requests(session_id);
   `);
 }
