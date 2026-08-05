@@ -1584,6 +1584,7 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
 
 import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import Groq from 'groq-sdk';
 
 // Provider 1: Anthropic (Claude Haiku)
 const anthropicClient = process.env.ANTHROPIC_API_KEY
@@ -1598,6 +1599,11 @@ const geminiClient1 = process.env.GEMINI_API_KEY_1
 // Provider 3: Gemini Account 2  
 const geminiClient2 = process.env.GEMINI_API_KEY_2
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY_2)
+  : null;
+
+// Provider 4: Groq (Llama)
+const groqClient = process.env.GROQ_API_KEY
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 8000 })
   : null;
 
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
@@ -1631,11 +1637,29 @@ async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, mess
   return result.response.text().trim();
 }
 
+async function callGroq(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  if (!groqClient) throw new Error('Groq not configured');
+  const groqMessages = messages.map(m => ({
+    role: m.role as 'user' | 'assistant',
+    content: typeof m.content === 'string' ? m.content : m.content.map(b => 'text' in b ? b.text : '').join(''),
+  }));
+  const response = await groqClient.chat.completions.create({
+    model: 'llama-3.1-8b-instant',
+    max_tokens: 300,
+    messages: [
+      { role: 'system' as const, content: systemPrompt },
+      ...groqMessages,
+    ],
+  });
+  return response.choices[0]?.message?.content?.trim() || '';
+}
+
 async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   const providers = [
     { name: 'Anthropic', call: () => callAnthropic(systemPrompt, messages) },
     { name: 'Gemini-1', call: () => geminiClient1 ? callGemini(geminiClient1, systemPrompt, messages) : Promise.reject(new Error('Gemini-1 not configured')) },
     { name: 'Gemini-2', call: () => geminiClient2 ? callGemini(geminiClient2, systemPrompt, messages) : Promise.reject(new Error('Gemini-2 not configured')) },
+    { name: 'Groq', call: () => callGroq(systemPrompt, messages) },
   ];
 
   for (const provider of providers) {
