@@ -32,7 +32,7 @@ export interface PipelineResult {
 
 const TRACE_LOG = true;
 
-export function executePipeline(input: PipelineInput): PipelineResult {
+export async function executePipeline(input: PipelineInput): Promise<PipelineResult> {
   const startTime = Date.now();
   const { message, sessionId, tenantId, brainFunction, policy, knowledgeBaseProvider: kbProvider } = input;
   const traceId = `${sessionId.slice(-8)}-${Date.now() % 10000}`;
@@ -117,7 +117,7 @@ export function executePipeline(input: PipelineInput): PipelineResult {
   // Step 6: Call frozen Conversation Engine
   let brainOutput: any;
   try {
-    brainOutput = brainFunction(brainInput);
+    brainOutput = await brainFunction(brainInput);
   } catch (err: any) {
     console.log(`[ORCH:${traceId}] Brain threw: ${err.message}`);
     return {

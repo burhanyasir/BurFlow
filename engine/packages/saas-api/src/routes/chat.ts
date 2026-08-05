@@ -32,7 +32,7 @@ export function createChatRoutes(
   const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
 
-  const handleChatRequest = (req: Request, res: Response, stream = false) => {
+  const handleChatRequest = async (req: Request, res: Response, stream = false) => {
     const startTime = Date.now();
     const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
@@ -74,8 +74,8 @@ export function createChatRoutes(
       const period = new Date().toISOString().slice(0, 7);
       usageRepo.incrementMessages(tenantId!, period);
 
-      const brainFn = (input: any) => processConversationBrain(input);
-      const pipelineResult = executePipeline({
+      const brainFn = async (input: any) => processConversationBrain(input);
+      const pipelineResult = await executePipeline({
         message,
         sessionId: convSessionId,
         tenantId: tenantId!,

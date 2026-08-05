@@ -19,7 +19,7 @@ const okBrain = fakeBrain('Here is the information you need.');
 const tenant = 'reg-tenant';
 const policy = { qualification: { enabled: true, trustThreshold: 20, maxQuestions: 2, requiresBuyingSignal: false, turnsBetweenQuestions: 2 }, cta: { enabled: true, minimumTrust: 30, requiresValueFirst: true } };
 function sid() { return `r${Date.now()}-${Math.random().toString(36).slice(2,5)}`; }
-function pip(sessionId: string, msg: string, brain = noopBrain) { return executePipeline({ message: msg, sessionId, tenantId: tenant, brainFunction: brain, policy }); }
+async function pip(sessionId: string, msg: string, brain = noopBrain) { return executePipeline({ message: msg, sessionId, tenantId: tenant, brainFunction: brain, policy }); }
 
 // ═══════════════════════════════════ 1. GREETINGS — 25 ═══════════════════════════════════
 describe('Greetings', () => {
@@ -146,16 +146,16 @@ describe('Interruptions',()=>{
 
 // ═══════════════════════════════════ 17. TOPIC SWITCHING — 15 ═══════════════════════════════════
 describe('Topic switching',()=>{
-  it('features→pricing',()=>{const s=sid();pip(s,'How does ticketing work?',fakeBrain('AI.'));const r=pip(s,'What do you charge?');expect(r.strategy).toBe('answer');expect(r.policy.detectedTopics).toContain('pricing');});
-  it('pricing→security',()=>{const s=sid();pip(s,'How much?',fakeBrain('$99.'));const r=pip(s,'Is this SOC2 compliant?');expect(r.strategy).toBe('trust_building');expect(r.policy.detectedTopics).toContain('security');});
-  it('features→integration',()=>{const s=sid();pip(s,'How does automation work?',fakeBrain('AI.'));const r=pip(s,'Does it integrate with Slack?');expect(r.policy.detectedTopics).toContain('integrations');});
-  it('features→pricing→security',()=>{const s=sid();pip(s,'How does ticketing work?',fakeBrain('AI.'));pip(s,'How much?',fakeBrain('$99.'));const r=pip(s,'Is my data safe?');expect(r.strategy).toBe('trust_building');});
-  it('security→competitor→buyingSignal',()=>{const s=sid();pip(s,'Is this GDPR compliant?',fakeBrain('Yes.'));const r=pip(s,'How do you compare to Zendesk?');expect(r.policy.buyingSignalDetected).toBe(true);});
+  it('features→pricing',async()=>{const s=sid();await pip(s,'How does ticketing work?',fakeBrain('AI.'));const r=await pip(s,'What do you charge?');expect(r.strategy).toBe('answer');expect(r.policy.detectedTopics).toContain('pricing');});
+  it('pricing→security',async()=>{const s=sid();await pip(s,'How much?',fakeBrain('$99.'));const r=await pip(s,'Is this SOC2 compliant?');expect(r.strategy).toBe('trust_building');expect(r.policy.detectedTopics).toContain('security');});
+  it('features→integration',async()=>{const s=sid();await pip(s,'How does automation work?',fakeBrain('AI.'));const r=await pip(s,'Does it integrate with Slack?');expect(r.policy.detectedTopics).toContain('integrations');});
+  it('features→pricing→security',async()=>{const s=sid();await pip(s,'How does ticketing work?',fakeBrain('AI.'));await pip(s,'How much?',fakeBrain('$99.'));const r=await pip(s,'Is my data safe?');expect(r.strategy).toBe('trust_building');});
+  it('security→competitor→buyingSignal',async()=>{const s=sid();await pip(s,'Is this GDPR compliant?',fakeBrain('Yes.'));const r=await pip(s,'How do you compare to Zendesk?');expect(r.policy.buyingSignalDetected).toBe(true);});
 });
 
 // ═══════════════════════════════════ 18. INCOMPLETE — 10 ═══════════════════════════════════
 describe('Incomplete messages',()=>{
-  it.each(['Hello?','Hi...','I need...','Just...','The thing...','Yeah but...','So...','Umm','...','?'])('"%s"→no crash',(m)=>{const s=sid();const r=pip(s,m);expect(r.state.turnCount).toBe(1);});
+  it.each(['Hello?','Hi...','I need...','Just...','The thing...','Yeah but...','So...','Umm','...','?'])('"%s"→no crash',async(m)=>{const s=sid();const r=await pip(s,m);expect(r.state.turnCount).toBe(1);});
 });
 
 // ═══════════════════════════════════ 19. TYPO — 10 ═══════════════════════════════════
@@ -165,51 +165,51 @@ describe('Typo-heavy messages',()=>{
 
 // ═══════════════════════════════════ 20. FULL CONV FLOWS — 30 ═══════════════════════════════════
 describe('Full conversation flows',()=>{
-  it('happy path: greeting→feature→pricing→CTA',()=>{
-    const s=sid();const r1=pip(s,'Hi');expect(r1.isRapportHandled).toBe(true);expect(r1.strategy).toBe('greeting');expect(r1.state.stage).toBe('greeting');expect(r1.state.turnCount).toBe(1);
-    const r2=pip(s,'How does your automation work?',fakeBrain('AI automation.'));expect(r2.strategy).toBe('answer');expect(r2.state.stage).toBe('discovery');expect(r2.state.turnCount).toBe(2);
-    const r3=pip(s,'What features do you have?',fakeBrain('Ticketing, routing, analytics.'));expect(r3.strategy).toBe('answer');expect(r3.state.turnCount).toBe(3);
-    const r4=pip(s,'How much does it cost?',fakeBrain('$99/month.'));expect(r4.strategy).toBe('answer');expect(r4.policy.buyingSignalDetected).toBe(true);
-    const r5=pip(s,'I want to sign up',fakeBrain('Great!'));expect(r5.policy.buyingSignalDetected).toBe(true);expect(r5.state.turnCount).toBe(5);
+  it('happy path: greeting→feature→pricing→CTA',async()=>{
+    const s=sid();const r1=await pip(s,'Hi');expect(r1.isRapportHandled).toBe(true);expect(r1.strategy).toBe('greeting');expect(r1.state.stage).toBe('greeting');expect(r1.state.turnCount).toBe(1);
+    const r2=await pip(s,'How does your automation work?',fakeBrain('AI automation.'));expect(r2.strategy).toBe('answer');expect(r2.state.stage).toBe('discovery');expect(r2.state.turnCount).toBe(2);
+    const r3=await pip(s,'What features do you have?',fakeBrain('Ticketing, routing, analytics.'));expect(r3.strategy).toBe('answer');expect(r3.state.turnCount).toBe(3);
+    const r4=await pip(s,'How much does it cost?',fakeBrain('$99/month.'));expect(r4.strategy).toBe('answer');expect(r4.policy.buyingSignalDetected).toBe(true);
+    const r5=await pip(s,'I want to sign up',fakeBrain('Great!'));expect(r5.policy.buyingSignalDetected).toBe(true);expect(r5.state.turnCount).toBe(5);
   });
-  it('objection recovery: greeting→objection→answer',()=>{
-    const s=sid();pip(s,'Hello');
-    const r2=pip(s,'This is too expensive',fakeBrain(''));expect(r2.strategy).toBe('objection_handling');
-    const r3=pip(s,'Can you justify the cost?',fakeBrain('Proven ROI.'));expect(r3.strategy).toBe('answer');
+  it('objection recovery: greeting→objection→answer',async()=>{
+    const s=sid();await pip(s,'Hello');
+    const r2=await pip(s,'This is too expensive',fakeBrain(''));expect(r2.strategy).toBe('objection_handling');
+    const r3=await pip(s,'Can you justify the cost?',fakeBrain('Proven ROI.'));expect(r3.strategy).toBe('answer');
   });
-  it('skeptical: greeting→skepticism→answer→pricing',()=>{
-    const s=sid();pip(s,'Hi');
-    const r2=pip(s,'I doubt it works',fakeBrain(''));expect(r2.isRapportHandled).toBe(true);expect(r2.strategy).toBe('trust_building');
-    const r3=pip(s,'Show me features',fakeBrain('AI routing.'));expect(r3.strategy).toBe('answer');
+  it('skeptical: greeting→skepticism→answer→pricing',async()=>{
+    const s=sid();await pip(s,'Hi');
+    const r2=await pip(s,'I doubt it works',fakeBrain(''));expect(r2.isRapportHandled).toBe(true);expect(r2.strategy).toBe('trust_building');
+    const r3=await pip(s,'Show me features',fakeBrain('AI routing.'));expect(r3.strategy).toBe('answer');
   });
-  it('support: greeting→error→resolve→thanks',()=>{
-    const s=sid();pip(s,'Hi');
-    const r2=pip(s,'Error logging in',fakeBrain('Help.'));expect(r2.state.turnCount).toBe(2);
-    const r3=pip(s,'Thanks fixed it',fakeBrain('Great!'));expect(r3.state.turnCount).toBe(3);
+  it('support: greeting→error→resolve→thanks',async()=>{
+    const s=sid();await pip(s,'Hi');
+    const r2=await pip(s,'Error logging in',fakeBrain('Help.'));expect(r2.state.turnCount).toBe(2);
+    const r3=await pip(s,'Thanks fixed it',fakeBrain('Great!'));expect(r3.state.turnCount).toBe(3);
   });
-  it('multi-objection: x3→question',()=>{
-    const s=sid();pip(s,'Hi');
-    pip(s,'Too expensive',fakeBrain(''));
-    pip(s,'We already use Intercom',fakeBrain(''));
-    const r4=pip(s,'Switching is too complex',fakeBrain(''));
+  it('multi-objection: x3→question',async()=>{
+    const s=sid();await pip(s,'Hi');
+    await pip(s,'Too expensive',fakeBrain(''));
+    await pip(s,'We already use Intercom',fakeBrain(''));
+    const r4=await pip(s,'Switching is too complex',fakeBrain(''));
     expect(r4.strategy).toBeTruthy();
-    const r5=pip(s,'Can you prove this works?',fakeBrain('Yes.'));expect(r5.strategy).toBe('answer');
+    const r5=await pip(s,'Can you prove this works?',fakeBrain('Yes.'));expect(r5.strategy).toBe('answer');
   });
-  it('churn: frustration→anger→repair→answer',()=>{
-    const s=sid();pip(s,'Hi');
-    const r2=pip(s,'This is ridiculous',fakeBrain(''));expect(r2.isRapportHandled).toBe(true);expect(r2.mood).toBe('frustrated');
-    const r3=pip(s,'I am furious',fakeBrain(''));expect(r3.isRapportHandled).toBe(true);expect(r3.mood).toBe('angry');
-    const r4=pip(s,'OK fine, how do I fix this?',fakeBrain('Solution.'));expect(r4.strategy).toBe('answer');
+  it('churn: frustration→anger→repair→answer',async()=>{
+    const s=sid();await pip(s,'Hi');
+    const r2=await pip(s,'This is ridiculous',fakeBrain(''));expect(r2.isRapportHandled).toBe(true);expect(r2.mood).toBe('frustrated');
+    const r3=await pip(s,'I am furious',fakeBrain(''));expect(r3.isRapportHandled).toBe(true);expect(r3.mood).toBe('angry');
+    const r4=await pip(s,'OK fine, how do I fix this?',fakeBrain('Solution.'));expect(r4.strategy).toBe('answer');
   });
-  it('never qualifies on turn 0/1',()=>{const s=sid();expect(pip(s,'Tell me about features',fakeBrain('AI.')).policy.canQualify).toBe(false);expect(pip(s,'What about pricing?',fakeBrain('$99.')).policy.canQualify).toBe(false);});
+  it('never qualifies on turn 0/1',async()=>{const s=sid();expect((await pip(s,'Tell me about features',fakeBrain('AI.'))).policy.canQualify).toBe(false);expect((await pip(s,'What about pricing?',fakeBrain('$99.'))).policy.canQualify).toBe(false);});
   it('detects industries',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('We run an ecommerce store',c,{handled:false,strategy:'answer'}).detectedIndustry).toBe('ecommerce');const c2=createInitialState(sid(),tenant,policy);const r2=processPolicyEngine('Our healthcare clinic needs HIPAA',c2,{handled:false,strategy:'answer'});expect(r2.detectedIndustry).toBe('healthcare');expect(r2.detectedTopics).toContain('security');});
   it('detects use cases',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('Reduce support tickets',c,{handled:false,strategy:'answer'}).detectedUseCase).toBe('reduce support tickets');const c2=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('Faster response times',c2,{handled:false,strategy:'answer'}).detectedUseCase).toBe('faster response times');});
-  it('accumulates summary',()=>{const s=sid();pip(s,'Hi');pip(s,'How does it work?',fakeBrain('AI.'));pip(s,'Pricing?',fakeBrain('$99.'));const st=stateManager.get(s);expect(st).toBeTruthy();if(st){expect(st.conversationSummary.length).toBeGreaterThan(0);expect(st.conversationSummary).toContain('User:');expect(st.conversationSummary).toContain('Bot:');}});
+  it('accumulates summary',async()=>{const s=sid();await pip(s,'Hi');await pip(s,'How does it work?',fakeBrain('AI.'));await pip(s,'Pricing?',fakeBrain('$99.'));const st=stateManager.get(s);expect(st).toBeTruthy();if(st){expect(st.conversationSummary.length).toBeGreaterThan(0);expect(st.conversationSummary).toContain('User:');expect(st.conversationSummary).toContain('Bot:');}});
   it('all caps processed',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('HOW DOES THIS WORK?',c,{handled:false,strategy:'answer'}).strategy).toBe('answer');});
-  it('numbers-only no crash',()=>{const s=sid();const r=pip(s,'12345',okBrain);expect(r.response).toBeTruthy();expect(r.state.turnCount).toBe(1);});
-  it('special chars no crash',()=>{const s=sid();const r=pip(s,'@#$%^&*()',okBrain);expect(r.response).toBeTruthy();});
-  it('long message no crash',()=>{const s=sid();const r=pip(s,'I need help. '.repeat(50),okBrain);expect(r.response).toBeTruthy();expect(r.state.turnCount).toBe(1);});
-  it('no internal leakage',()=>{const s=sid();for(let i=0;i<5;i++){const r=pip(s,'How does X work?',fakeBrain('X does Y.'));expect(r.response).not.toMatch(/pipeline|brain|embedding|routing|prompting|system prompt|funnel stage|buying intent|orchestrat/i);}});
+  it('numbers-only no crash',async()=>{const s=sid();const r=await pip(s,'12345',okBrain);expect(r.response).toBeTruthy();expect(r.state.turnCount).toBe(1);});
+  it('special chars no crash',async()=>{const s=sid();const r=await pip(s,'@#$%^&*()',okBrain);expect(r.response).toBeTruthy();});
+  it('long message no crash',async()=>{const s=sid();const r=await pip(s,'I need help. '.repeat(50),okBrain);expect(r.response).toBeTruthy();expect(r.state.turnCount).toBe(1);});
+  it('no internal leakage',async()=>{const s=sid();for(let i=0;i<5;i++){const r=await pip(s,'How does X work?',fakeBrain('X does Y.'));expect(r.response).not.toMatch(/pipeline|brain|embedding|routing|prompting|system prompt|funnel stage|buying intent|orchestrat/i);}});
 });
 
 // ═══════════════════════════════════ 21. LEAKAGE — 16 ═══════════════════════════════════
@@ -275,7 +275,7 @@ describe('Mood-based tone',()=>{
   it('strips cheerful when frustrated',()=>{const c=createInitialState(sid(),tenant,policy);c.mood='frustrated';expect(composeResponse('That is great. The answer is yes.',c,'').text).not.toMatch(/\bgreat\b/i);});
   it('strips cheerful when angry',()=>{const c=createInitialState(sid(),tenant,policy);c.mood='angry';expect(composeResponse('That is fantastic!',c,'').text).not.toMatch(/\bfantastic\b/i);});
   it('allows cheerful when positive',()=>{const c=createInitialState(sid(),tenant,policy);c.mood='positive';expect(composeResponse('That is great.',c,'').text).toContain('great');});
-  it('handles confused mood',()=>{const s=sid();expect(pip(s,"I don't understand",noopBrain).mood).toBe('confused');});
+  it('handles confused mood',async()=>{const s=sid();expect((await pip(s,"I don't understand",noopBrain)).mood).toBe('confused');});
   it('handles humorous',()=>{expect(processRapportRepair('lol',createInitialState(sid(),tenant,policy)).mood).toBe('humorous');});
   it('sets appreciative',()=>{const c=createInitialState(sid(),tenant,policy);c.turnCount=1;processRapportRepair('That is helpful, thanks!',c);expect(c.mood).toBe('appreciative');});
   it('handles hesitant',()=>{const c=createInitialState(sid(),tenant,policy);c.turnCount=2;const r=processRapportRepair('Maybe, I am not sure',c);expect(r.handled).toBe(true);});
@@ -285,43 +285,43 @@ describe('Mood-based tone',()=>{
 // ═══════════════════════════════════ 29. STATE TRANSITIONS — 12 ═══════════════════════════════════
 describe('State transitions',()=>{
   it('initial state',()=>{const c=createInitialState(sid(),tenant,policy);expect(c.stage).toBe('greeting');expect(c.mood).toBe('neutral');expect(c.trustScore).toBe(20);expect(c.buyingIntentScore).toBe(0);expect(c.turnCount).toBe(0);});
-  it('greeting→greeting stage',()=>{expect(pip(sid(),'Hi').stage).toBe('greeting');});
-  it('answer→discovery',()=>{const s=sid();pip(s,'Hi');expect(pip(s,'How does it work?',fakeBrain('It works.')).stage).toBe('discovery');});
+  it('greeting→greeting stage',async()=>{expect((await pip(sid(),'Hi')).stage).toBe('greeting');});
+  it('answer→discovery',async()=>{const s=sid();await pip(s,'Hi');expect((await pip(s,'How does it work?',fakeBrain('It works.'))).stage).toBe('discovery');});
   it('trust_building→evaluation',()=>{const c=createInitialState(sid(),tenant,policy);c.turnCount=2;c.trustScore=10;expect(processPolicyEngine('How secure is this?',c,{handled:false,strategy:'answer'}).strategy).toBe('trust_building');});
-  it('no backward transition',()=>{const s=sid();pip(s,'Hi');pip(s,'How does it work?',fakeBrain('It works.'));pip(s,'Tell me more',fakeBrain('More.'));expect(pip(s,'Hi again').stage).not.toBe('greeting');});
-  it('repair_confusion→discovery',()=>{const s=sid();pip(s,'Hi');expect(pip(s,"I don't understand",noopBrain).stage).toBe('discovery');});
+  it('no backward transition',async()=>{const s=sid();await pip(s,'Hi');await pip(s,'How does it work?',fakeBrain('It works.'));await pip(s,'Tell me more',fakeBrain('More.'));expect((await pip(s,'Hi again')).stage).not.toBe('greeting');});
+  it('repair_confusion→discovery',async()=>{const s=sid();await pip(s,'Hi');expect((await pip(s,"I don't understand",noopBrain)).stage).toBe('discovery');});
   it('educate→education',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.topicsCovered.push('features');c.turnCount=3;expect(processPolicyEngine('Interesting',c,{handled:false,strategy:'answer'}).strategy).toBe('educate');});
 });
 
 // ═══════════════════════════════════ 30. EDGE CASES — 15 ═══════════════════════════════════
 describe('Edge cases',()=>{
-  it('empty msg no crash',()=>{const s=sid();const r=pip(s,'',okBrain);expect(r.state.turnCount).toBe(1);});
-  it('whitespace no crash',()=>{const s=sid();const r=pip(s,'   ',okBrain);expect(r.state.turnCount).toBe(1);});
-  it('null brain returns policy-strategy response',()=>{const s=sid();const r=executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>null,policy});expect(r.strategy).toBe('answer');});
-  it('brain error returns fallback',()=>{const s=sid();const r=executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).toContain('rephrase');expect(r.strategy).toBe('repair_confusion');});
-  it('repeated same message',()=>{const s=sid();pip(s,'How does it work?',okBrain);const r2=pip(s,'How does it work?',okBrain);expect(r2.response).toBeTruthy();});
-  it('unicode handled',()=>{expect(pip(sid(),'Cómo funciona?',okBrain).response).toBeTruthy();});
-  it('emoji handled',()=>{const s=sid();const r=pip(s,'👋 Hi there!');expect(r.isRapportHandled).toBe(false);});
-  it('HTML no crash',()=>{expect(pip(sid(),'<script>alert("xss")</script>',okBrain).response).toBeTruthy();});
-  it('SQL injection no crash',()=>{expect(pip(sid(),"'; DROP TABLE users; --",okBrain).response).toBeTruthy();});
-  it('URL handled',()=>{expect(pip(sid(),'Check https://example.com',okBrain).response).toBeTruthy();});
+  it('empty msg no crash',async()=>{const s=sid();const r=await pip(s,'',okBrain);expect(r.state.turnCount).toBe(1);});
+  it('whitespace no crash',async()=>{const s=sid();const r=await pip(s,'   ',okBrain);expect(r.state.turnCount).toBe(1);});
+  it('null brain returns policy-strategy response',async()=>{const s=sid();const r=await executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>null,policy});expect(r.strategy).toBe('answer');});
+  it('brain error returns fallback',async()=>{const s=sid();const r=await executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).toContain('rephrase');expect(r.strategy).toBe('repair_confusion');});
+  it('repeated same message',async()=>{const s=sid();await pip(s,'How does it work?',okBrain);const r2=await pip(s,'How does it work?',okBrain);expect(r2.response).toBeTruthy();});
+  it('unicode handled',async()=>{expect((await pip(sid(),'Cómo funciona?',okBrain)).response).toBeTruthy();});
+  it('emoji handled',async()=>{const s=sid();const r=await pip(s,'👋 Hi there!');expect(r.isRapportHandled).toBe(false);});
+  it('HTML no crash',async()=>{expect((await pip(sid(),'<script>alert("xss")</script>',okBrain)).response).toBeTruthy();});
+  it('SQL injection no crash',async()=>{expect((await pip(sid(),"'; DROP TABLE users; --",okBrain)).response).toBeTruthy();});
+  it('URL handled',async()=>{expect((await pip(sid(),'Check https://example.com',okBrain)).response).toBeTruthy();});
   it('short reply not rapport',()=>{const c=createInitialState(sid(),tenant,policy);c.turnCount=2;expect(processRapportRepair('OK',c).handled).toBe(false);});
   it('punctuation not rapport',()=>{expect(processRapportRepair('!!!',createInitialState(sid(),tenant,policy)).handled).toBe(false);});
-  it('state isolated',()=>{const s1=sid();pip(s1,'How?',fakeBrain('Answer.'));const r2=pip(sid(),'Hi');expect(r2.isRapportHandled).toBe(true);expect(r2.state.turnCount).toBe(1);});
+  it('state isolated',async()=>{const s1=sid();await pip(s1,'How?',fakeBrain('Answer.'));const r2=await pip(sid(),'Hi');expect(r2.isRapportHandled).toBe(true);expect(r2.state.turnCount).toBe(1);});
 });
 
 // ═══════════════════════════════════ 31. PIPELINE INTEGRITY — 10 ═══════════════════════════════════
 describe('Pipeline integrity',()=>{
-  it('response non-empty',()=>{expect(pip(sid(),'How?',okBrain).response.length).toBeGreaterThan(0);});
-  it('ends with punctuation',()=>{expect(pip(sid(),'Hi',noopBrain).response).toMatch(/[.!?]$/);});
-  it('all fields present',()=>{const r=pip(sid(),'How?',okBrain);['response','strategy','mood','trustScore','buyingIntentScore','stage','state','composition','policy'].forEach(k=>expect(r).toHaveProperty(k));expect(r).toHaveProperty('traceId');expect(r).toHaveProperty('latencyMs');});
+  it('response non-empty',async()=>{expect((await pip(sid(),'How?',okBrain)).response.length).toBeGreaterThan(0);});
+  it('ends with punctuation',async()=>{expect((await pip(sid(),'Hi',noopBrain)).response).toMatch(/[.!?]$/);});
+  it('all fields present',async()=>{const r=await pip(sid(),'How?',okBrain);['response','strategy','mood','trustScore','buyingIntentScore','stage','state','composition','policy'].forEach(k=>expect(r).toHaveProperty(k));expect(r).toHaveProperty('traceId');expect(r).toHaveProperty('latencyMs');});
   it('trustScore capped',()=>{const c=createInitialState(sid(),tenant,policy);for(let i=0;i<20;i++)c.trustScore=Math.min(100,c.trustScore+10);expect(c.trustScore).toBe(100);});
   it('buyingScore capped',()=>{const c=createInitialState(sid(),tenant,policy);for(let i=0;i<10;i++)c.buyingIntentScore=Math.min(100,c.buyingIntentScore+25);expect(c.buyingIntentScore).toBe(100);});
-  it('turnCount increments',()=>{const s=sid();for(let i=0;i<5;i++)pip(s,`M${i}`,fakeBrain(`R${i}`));expect(stateManager.get(s)?.turnCount).toBe(5);});
-  it('latency non-negative',()=>{expect(pip(sid(),'How?',okBrain).latencyMs).toBeGreaterThanOrEqual(0);});
-  it('detects buying on first msg',()=>{expect(pip(sid(),'How much?',fakeBrain('$99.')).policy.buyingSignalDetected).toBe(true);});
-  it('strips leakage from complex brain',()=>{const leaky=fakeBrain('Based on intent classification and pipeline routing, the conversation brain detected a buying intent. Our orchestrator decided to answer.');const r=pip(sid(),'How?',leaky);expect(r.response).not.toMatch(/intent classification|pipeline routing|conversation brain|orchestrator/);});
-  it('traceId set',()=>{const r=pip(sid(),'Hi');expect(r.traceId).toBeTruthy();expect(r.traceId.length).toBeGreaterThan(5);});
+  it('turnCount increments',async()=>{const s=sid();for(let i=0;i<5;i++)await pip(s,`M${i}`,fakeBrain(`R${i}`));expect(stateManager.get(s)?.turnCount).toBe(5);});
+  it('latency non-negative',async()=>{expect((await pip(sid(),'How?',okBrain)).latencyMs).toBeGreaterThanOrEqual(0);});
+  it('detects buying on first msg',async()=>{expect((await pip(sid(),'How much?',fakeBrain('$99.'))).policy.buyingSignalDetected).toBe(true);});
+  it('strips leakage from complex brain',async()=>{const leaky=fakeBrain('Based on intent classification and pipeline routing, the conversation brain detected a buying intent. Our orchestrator decided to answer.');const r=await pip(sid(),'How?',leaky);expect(r.response).not.toMatch(/intent classification|pipeline routing|conversation brain|orchestrator/);});
+  it('traceId set',async()=>{const r=await pip(sid(),'Hi');expect(r.traceId).toBeTruthy();expect(r.traceId.length).toBeGreaterThan(5);});
 });
 
 // ═══════════════════════════════════ 32. NO REPEATED QUAL/CTA — 10 ═══════════════════════════════════
@@ -392,43 +392,43 @@ describe('Knowledge features',()=>{
   it('"website crawling" handled as answer',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('Does it support website crawling?',c,{handled:false,strategy:'answer'}).strategy).toBe('answer');});
   it('"PDFs" handled as answer',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('Can I import PDFs?',c,{handled:false,strategy:'answer'}).strategy).toBe('answer');});
   it('"FAQs" handled as answer',()=>{const c=createInitialState(sid(),tenant,policy);expect(processPolicyEngine('Can I add FAQs?',c,{handled:false,strategy:'answer'}).strategy).toBe('answer');});
-  it('no crash when brain returns knowledge content',()=>{const s=sid();const r=pip(s,'How do I upload documents?',fakeBrain('Go to settings > upload.'));expect(r.response).toBeTruthy();});
+  it('no crash when brain returns knowledge content',async()=>{const s=sid();const r=await pip(s,'How do I upload documents?',fakeBrain('Go to settings > upload.'));expect(r.response).toBeTruthy();});
 });
 
 // ═══════════════════════════════════ 40. CONVERSATION FLOW — 12 ═══════════════════════════════════
 describe('Conversation flow',()=>{
-  it('follow-up question uses same session',()=>{const s=sid();pip(s,'How does it work?',fakeBrain('AI.'));const r=pip(s,'And pricing?',fakeBrain('$99.'));expect(r.state.turnCount).toBe(2);expect(r.strategy).toBe('answer');});
-  it('interruption "never mind" passes through',()=>{const s=sid();pip(s,'How does it feature X?',fakeBrain('X works.'));const r=pip(s,'Never mind, what about Y?',fakeBrain('Y works.'));expect(r.strategy).toBe('answer');});
-  it('changing mind from pricing to security',()=>{const s=sid();pip(s,'How much?',fakeBrain('$99.'));const r=pip(s,'Actually, is it secure?',fakeBrain('Yes.'));expect(r.strategy).toBe('trust_building');});
-  it('returning to previous topic after interruption',()=>{const s=sid();pip(s,'How does automation work?',fakeBrain('AI.'));pip(s,'What about security?',fakeBrain('Encrypted.'));const r=pip(s,'Going back to automation...',fakeBrain('AI automation.'));expect(r.state.turnCount).toBe(3);});
-  it('saying "ok" after answer continues conversation',()=>{const s=sid();pip(s,'How does it work?',fakeBrain('AI.'));const r=pip(s,'OK',fakeBrain('Great.'));expect(r.response).toBeTruthy();});
-  it('saying "got it" after explanation',()=>{const s=sid();pip(s,'Explain features',fakeBrain('Features.'));const r=pip(s,'Got it',fakeBrain('Great.'));expect(r.response).toBeTruthy();});
-  it('multiple rapid questions processed',()=>{const s=sid();const r1=pip(s,'Pricing?',fakeBrain('$99.'));expect(r1.strategy).toBe('answer');const r2=pip(s,'Security?',fakeBrain('Encrypted.'));expect(r2.strategy).toBe('trust_building');});
-  it('no crash on multi-line messages',()=>{const s=sid();const r=pip(s,"Line1\nLine2\nLine3",okBrain);expect(r.response).toBeTruthy();});
-  it('topic: greeting→feature→pricing→qualify flow',()=>{const s=sid();pip(s,'Hi');pip(s,'Tell me about ticketing',fakeBrain('Ticketing.'));pip(s,'How much?',fakeBrain('$99.'));const r4=pip(s,'Tell me more',fakeBrain('More.'));expect(r4.response).toBeTruthy();});
-  it('pipeline state tracks user message',()=>{const s=sid();const r=pip(s,'Hello world',okBrain);expect(r.state.lastUserMessage).toBe('Hello world');});
-  it('pipeline state tracks bot response',()=>{const s=sid();const r=pip(s,'Hi',noopBrain);expect(r.state.lastBotMessage).toBeTruthy();});
-  it('no crash on repeated "?"',()=>{const s=sid();const r=pip(s,'?????',okBrain);expect(r.response).toBeTruthy();});
+  it('follow-up question uses same session',async()=>{const s=sid();await pip(s,'How does it work?',fakeBrain('AI.'));const r=await pip(s,'And pricing?',fakeBrain('$99.'));expect(r.state.turnCount).toBe(2);expect(r.strategy).toBe('answer');});
+  it('interruption "never mind" passes through',async()=>{const s=sid();await pip(s,'How does it feature X?',fakeBrain('X works.'));const r=await pip(s,'Never mind, what about Y?',fakeBrain('Y works.'));expect(r.strategy).toBe('answer');});
+  it('changing mind from pricing to security',async()=>{const s=sid();await pip(s,'How much?',fakeBrain('$99.'));const r=await pip(s,'Actually, is it secure?',fakeBrain('Yes.'));expect(r.strategy).toBe('trust_building');});
+  it('returning to previous topic after interruption',async()=>{const s=sid();await pip(s,'How does automation work?',fakeBrain('AI.'));await pip(s,'What about security?',fakeBrain('Encrypted.'));const r=await pip(s,'Going back to automation...',fakeBrain('AI automation.'));expect(r.state.turnCount).toBe(3);});
+  it('saying "ok" after answer continues conversation',async()=>{const s=sid();await pip(s,'How does it work?',fakeBrain('AI.'));const r=await pip(s,'OK',fakeBrain('Great.'));expect(r.response).toBeTruthy();});
+  it('saying "got it" after explanation',async()=>{const s=sid();await pip(s,'Explain features',fakeBrain('Features.'));const r=await pip(s,'Got it',fakeBrain('Great.'));expect(r.response).toBeTruthy();});
+  it('multiple rapid questions processed',async()=>{const s=sid();const r1=await pip(s,'Pricing?',fakeBrain('$99.'));expect(r1.strategy).toBe('answer');const r2=await pip(s,'Security?',fakeBrain('Encrypted.'));expect(r2.strategy).toBe('trust_building');});
+  it('no crash on multi-line messages',async()=>{const s=sid();const r=await pip(s,"Line1\nLine2\nLine3",okBrain);expect(r.response).toBeTruthy();});
+  it('topic: greeting→feature→pricing→qualify flow',async()=>{const s=sid();await pip(s,'Hi');await pip(s,'Tell me about ticketing',fakeBrain('Ticketing.'));await pip(s,'How much?',fakeBrain('$99.'));const r4=await pip(s,'Tell me more',fakeBrain('More.'));expect(r4.response).toBeTruthy();});
+  it('pipeline state tracks user message',async()=>{const s=sid();const r=await pip(s,'Hello world',okBrain);expect(r.state.lastUserMessage).toBe('Hello world');});
+  it('pipeline state tracks bot response',async()=>{const s=sid();const r=await pip(s,'Hi',noopBrain);expect(r.state.lastBotMessage).toBeTruthy();});
+  it('no crash on repeated "?"',async()=>{const s=sid();const r=await pip(s,'?????',okBrain);expect(r.response).toBeTruthy();});
 });
 
 // ═══════════════════════════════════ 41. MEMORY EXPANDED — 8 ═══════════════════════════════════
 describe('Memory expanded',()=>{
   it('previously answered question not re-asked',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.questionsAnswered.push('How does it work?');c.ledger.topicsCovered.push('features');c.turnCount=3;c.trustScore=50;c.turnsSinceLastQualification=3;const r=processPolicyEngine('How does it work?',c,{handled:false,strategy:'answer'});expect(r.strategy).toBe('answer');});
-  it('previously answered question noted in ledger',()=>{const s=sid();pip(s,'How does it work?',fakeBrain('AI.'));const state=stateManager.get(s);expect(state?.ledger.questionsAnswered.length).toBeGreaterThanOrEqual(0);});
+  it('previously answered question noted in ledger',async()=>{const s=sid();await pip(s,'How does it work?',fakeBrain('AI.'));const state=stateManager.get(s);expect(state?.ledger.questionsAnswered.length).toBeGreaterThanOrEqual(0);});
   it('previous objection remembered in ledger',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.objectionsEncountered.push('too expensive');expect(c.ledger.objectionsEncountered).toContain('too expensive');});
   it('previous trust signal recorded',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.trustSignalsShown.push('SOC2 cert');expect(c.ledger.trustSignalsShown).toContain('SOC2 cert');});
   it('multiple objections accumulated',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.objectionsEncountered.push('too expensive');c.ledger.objectionsEncountered.push('already use competitor');expect(c.ledger.objectionsEncountered.length).toBe(2);});
   it('previous CTAs tracked',()=>{const c=createInitialState(sid(),tenant,policy);c.ledger.ctasShown.push('book demo');expect(c.ledger.ctasShown.length).toBe(1);});
   it('max 2 qualification attempts tracked',()=>{const c=createInitialState(sid(),tenant,policy);c.qualificationAttempts=0;expect(c.qualificationAttempts).toBe(0);c.qualificationAttempts=2;expect(c.qualificationAttempts).toBe(2);});
-  it('turnCount persists across messages',()=>{const s=sid();pip(s,'A',fakeBrain('R1'));pip(s,'B',fakeBrain('R2'));pip(s,'C',fakeBrain('R3'));const state=stateManager.get(s);expect(state?.turnCount).toBe(3);});
+  it('turnCount persists across messages',async()=>{const s=sid();await pip(s,'A',fakeBrain('R1'));await pip(s,'B',fakeBrain('R2'));await pip(s,'C',fakeBrain('R3'));const state=stateManager.get(s);expect(state?.turnCount).toBe(3);});
 });
 
 // ═══════════════════════════════════ 42. NO GENERIC FALLBACK — 4 ═══════════════════════════════════
 describe('No generic fallback loops',()=>{
-  it('empty brain returns policy-strategy response',()=>{const s=sid();const r=executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>null,policy});expect(r.strategy).toBeTruthy();});
-  it('brain error returns fallback once, not loop',()=>{const s=sid();const r=executePipeline({message:'How?',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('fail');},policy});expect(r.response).toContain('rephrase');expect(r.strategy).toBe('repair_confusion');});
-  it('repeated empty brain does not loop',()=>{const s=sid();const r1=pip(s,'How?',fakeBrain(''));expect(typeof r1.response).toBe('string');const r2=pip(s,'How?',fakeBrain(''));expect(typeof r2.response).toBe('string');});
-  it('fallback response is safe',()=>{const s=sid();const r=executePipeline({message:'Crash',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).not.toMatch(/internal|error|exception|undefined|null/i);});
+  it('empty brain returns policy-strategy response',async()=>{const s=sid();const r=await executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>null,policy});expect(r.strategy).toBeTruthy();});
+  it('brain error returns fallback once, not loop',async()=>{const s=sid();const r=await executePipeline({message:'How?',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('fail');},policy});expect(r.response).toContain('rephrase');expect(r.strategy).toBe('repair_confusion');});
+  it('repeated empty brain does not loop',async()=>{const s=sid();const r1=await pip(s,'How?',fakeBrain(''));expect(typeof r1.response).toBe('string');const r2=await pip(s,'How?',fakeBrain(''));expect(typeof r2.response).toBe('string');});
+  it('fallback response is safe',async()=>{const s=sid();const r=await executePipeline({message:'Crash',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).not.toMatch(/internal|error|exception|undefined|null/i);});
 });
 
 // ═══════════════════════════════════ 43. BUYING SIGNALS — SHARED FUNCTION 40 ══════════════════
@@ -475,7 +475,7 @@ describe('Knowledge base provider', () => {
     expect(dp.getTopicResponse('pricing', 't1', 99)).toBeNull();
   });
 
-  it('custom provider response used by real brain (knowledgeBaseProvider on BrainInput)', () => {
+  it('custom provider response used by real brain (knowledgeBaseProvider on BrainInput)', async () => {
     const CUSTOM_ANSWER = 'This is our custom feature description.';
     class CustomProvider implements KnowledgeBaseProvider {
       getTopicResponse(topic: DiscernedTopic, _tid: string, _depth: number) {
@@ -497,11 +497,11 @@ describe('Knowledge base provider', () => {
         repeatedPhraseCount: 0,
       },
     };
-    const output = processConversationBrain(brainInput as any);
+    const output = await processConversationBrain(brainInput as any);
     expect(output.responseText).toContain(CUSTOM_ANSWER);
   });
 
-  it('real brain falls back to TOPIC_RESPONSE_TEMPLATES when provider returns null', () => {
+  it('real brain falls back to TOPIC_RESPONSE_TEMPLATES when provider returns null', async () => {
     class NullProvider implements KnowledgeBaseProvider {
       getTopicResponse() { return null; }
       getAvailableTopics() { return []; }
@@ -519,12 +519,12 @@ describe('Knowledge base provider', () => {
         repeatedPhraseCount: 0,
       },
     };
-    const output = processConversationBrain(brainInput as any);
+    const output = await processConversationBrain(brainInput as any);
     // Should contain default hardcoded content
     expect(output.responseText).toContain('$49/month');
   });
 
-  it('real brain works without knowledgeBaseProvider (backward compat)', () => {
+  it('real brain works without knowledgeBaseProvider (backward compat)', async () => {
     const brainInput = {
       message: 'Tell me about features',
       responseText: '',
@@ -536,7 +536,7 @@ describe('Knowledge base provider', () => {
         repeatedPhraseCount: 0,
       },
     };
-    const output = processConversationBrain(brainInput as any);
+    const output = await processConversationBrain(brainInput as any);
     expect(output.responseText).toBeTruthy();
     expect(output.responseText).toContain('workflow automation');
   });
@@ -559,9 +559,9 @@ describe('Regression locks', () => {
     expect(r.mood).toBe('appreciative');
   });
 
-  it('"worried about security" pipeline response is appropriate regardless of strategy label', () => {
+  it('"worried about security" pipeline response is appropriate regardless of strategy label', async () => {
     const s = sid();
-    const r = executePipeline({ message: "I'm worried about security", sessionId: s, tenantId: tenant, brainFunction: processConversationBrain, policy });
+    const r = await executePipeline({ message: "I'm worried about security", sessionId: s, tenantId: tenant, brainFunction: processConversationBrain, policy });
     expect(r.response).toMatch(/data|secure|protect|encrypt|isolated/i);
   });
 });
@@ -613,18 +613,18 @@ describe('Claim 7 — buyingIntentScore increments exactly +25 per buying signal
     expect(state.buyingIntentScore).toBe(25);
   });
 
-  it('executePipeline adds +25 total across the full pipeline', () => {
+  it('executePipeline adds +25 total across the full pipeline', async () => {
     const sessionId = sid();
-    const r = pip(sessionId, 'I want to sign up');
+    const r = await pip(sessionId, 'I want to sign up');
     expect(r.state.buyingIntentScore).toBe(25);
   });
 
-  it('two consecutive buying messages add +25 each (+50 total)', () => {
+  it('two consecutive buying messages add +25 each (+50 total)', async () => {
     const s = sid();
-    pip(s, 'I want to buy');
+    await pip(s, 'I want to buy');
     const after1 = stateManager.get(s);
     expect(after1!.buyingIntentScore).toBe(25);
-    pip(s, 'sign me up');
+    await pip(s, 'sign me up');
     const after2 = stateManager.get(s);
     expect(after2!.buyingIntentScore).toBe(50);
   });
@@ -661,7 +661,7 @@ describe('Claim 4 — fromLegacyMemory reconstructs real topic counts', () => {
     expect(pricingRecord!.count).toBe(2);
   });
 
-  it('prepareLegacyMemory produces repeated entries matching counts', () => {
+  it('prepareLegacyMemory produces repeated entries matching counts', async () => {
     const { processConversationBrain } = require('@conversation-engine/conversation-orchestrator');
 
     const legacy = {
@@ -691,7 +691,7 @@ describe('Claim 4 — fromLegacyMemory reconstructs real topic counts', () => {
       tenantId: tenant,
     };
 
-    const result = processConversationBrain(brainInput);
+    const result = await processConversationBrain(brainInput);
 
     const featuresRecord = result.memory.topicsExplained.find((t: any) => t.topic === 'features');
     const pricingRecord = result.memory.topicsExplained.find((t: any) => t.topic === 'pricing');

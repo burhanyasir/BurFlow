@@ -1582,7 +1582,16 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
   };
 }
 
-export function processConversationBrain(input: BrainInput): BrainOutput {
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropicClient = process.env.ANTHROPIC_API_KEY
+  ? new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+      timeout: 8000,
+    })
+  : null;
+
+export async function processConversationBrain(input: BrainInput): Promise<BrainOutput> {
   const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider } = input;
 
   const memory = fromLegacyMemory(legacyMemory);
@@ -1862,8 +1871,63 @@ buyingIntentDetected: memory.buyingIntentDetected,
   const relevantFacts = computeRelevantKnownFacts(memory, strategy, message);
   const newTopics = discernTopics(message);
 
-  // Strategy-first response building (replaces generic template enrichment)
-  let enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+  // Strategy-first response building — LLM-powered
+  let enrichedResponse: string;
+  if (anthropicClient) {
+    try {
+      const tenantIdForLLM = tenantId || 'default';
+      const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
+      const knowledgeSections = availableTopics.map(topic => {
+        const entry = kbProvider?.getTopicResponse(topic, tenantIdForLLM, 0);
+        return entry ? `### ${topic}\n${entry.answer}` : null;
+      }).filter(Boolean).join('\n\n');
+
+      const businessContext = knowledgeSections ||
+        'No specific business knowledge available. Be helpful and ask clarifying questions.';
+
+      const turns = legacyMemory.turns || [];
+      const recentTurns = turns.slice(-8);
+      const messages: Anthropic.MessageParam[] = [];
+      for (const turn of recentTurns) {
+        if (turn.message) messages.push({ role: 'user', content: turn.message });
+        if (turn.response) messages.push({ role: 'assistant', content: turn.response });
+      }
+      messages.push({ role: 'user', content: message });
+
+      const systemPrompt = `You are an AI sales agent for a real business.
+Answer visitor questions using ONLY the business knowledge below.
+Be concise (under 100 words), conversational, and helpful.
+Never invent pricing, features, or policies not listed below.
+
+BUSINESS KNOWLEDGE:
+${businessContext}
+
+Respond with ONLY a JSON object — no markdown, no explanation:
+{
+  "responseText": "your response to the visitor"
+}`;
+
+      const response = await anthropicClient.messages.create({
+        model: 'claude-haiku-4-5',
+        max_tokens: 300,
+        system: systemPrompt,
+        messages,
+      });
+
+      const text = response.content
+        .filter((c): c is Anthropic.TextBlock => c.type === 'text')
+        .map(c => c.text).join('').trim()
+        .replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+
+      const parsed = JSON.parse(text);
+      enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
+    } catch (error) {
+      console.error('[brain] LLM call failed:', error instanceof Error ? error.message : error);
+      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+    }
+  } else {
+    enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+  }
 
   enrichedResponse = enforceContinuity(enrichedResponse, memory, newTopics);
 
