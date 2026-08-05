@@ -1583,13 +1583,75 @@ function prepareLegacyMemory(memory: ConversationMemoryData): ConversationIntell
 }
 
 import Anthropic from '@anthropic-ai/sdk';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Provider 1: Anthropic (Claude Haiku)
 const anthropicClient = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
-      timeout: 8000,
-    })
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 8000 })
   : null;
+
+// Provider 2: Gemini Account 1
+const geminiClient1 = process.env.GEMINI_API_KEY_1
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY_1)
+  : null;
+
+// Provider 3: Gemini Account 2  
+const geminiClient2 = process.env.GEMINI_API_KEY_2
+  ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY_2)
+  : null;
+
+async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  if (!anthropicClient) throw new Error('Anthropic not configured');
+  const response = await anthropicClient.messages.create({
+    model: 'claude-haiku-4-5',
+    max_tokens: 300,
+    system: systemPrompt,
+    messages,
+  });
+  return response.content
+    .filter((c): c is Anthropic.TextBlock => c.type === 'text')
+    .map(c => c.text).join('').trim();
+}
+
+async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  const model = client.getGenerativeModel({ 
+    model: 'gemini-1.5-flash',
+    systemInstruction: systemPrompt,
+  });
+  
+  // Build Gemini chat history (all turns except the last user message)
+  const history = messages.slice(0, -1).map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content as string }],
+  }));
+  
+  const chat = model.startChat({ history });
+  const lastMessage = messages[messages.length - 1];
+  const result = await chat.sendMessage(lastMessage.content as string);
+  return result.response.text().trim();
+}
+
+async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  const providers = [
+    { name: 'Anthropic', call: () => callAnthropic(systemPrompt, messages) },
+    { name: 'Gemini-1', call: () => geminiClient1 ? callGemini(geminiClient1, systemPrompt, messages) : Promise.reject(new Error('Gemini-1 not configured')) },
+    { name: 'Gemini-2', call: () => geminiClient2 ? callGemini(geminiClient2, systemPrompt, messages) : Promise.reject(new Error('Gemini-2 not configured')) },
+  ];
+
+  for (const provider of providers) {
+    try {
+      const result = await provider.call();
+      console.log(`[brain] LLM response from ${provider.name}`);
+      return result;
+    } catch (error: unknown) {
+      const status = (error as { status?: number })?.status;
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[brain] ${provider.name} failed (${status || 'no status'}): ${message} — trying next provider`);
+    }
+  }
+  
+  throw new Error('All LLM providers failed');
+}
 
 export async function processConversationBrain(input: BrainInput): Promise<BrainOutput> {
   const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider } = input;
@@ -1873,7 +1935,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
 
   // Strategy-first response building — LLM-powered
   let enrichedResponse: string;
-  if (anthropicClient) {
+  if (anthropicClient || geminiClient1 || geminiClient2) {
     try {
       const tenantIdForLLM = tenantId || 'default';
       const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
@@ -1912,19 +1974,9 @@ Respond with ONLY a JSON object — no markdown, no explanation:
   "responseText": "your response to the visitor"
 }`;
 
-      const response = await anthropicClient.messages.create({
-        model: 'claude-haiku-4-5',
-        max_tokens: 300,
-        system: systemPrompt,
-        messages,
-      });
-
-      const text = response.content
-        .filter((c): c is Anthropic.TextBlock => c.type === 'text')
-        .map(c => c.text).join('').trim()
-        .replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
-
-      const parsed = JSON.parse(text);
+      const text = await callLLMWithFallback(systemPrompt, messages);
+      const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      const parsed = JSON.parse(cleaned);
       enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
     } catch (error: unknown) {
       const status = (error as { status?: number })?.status;

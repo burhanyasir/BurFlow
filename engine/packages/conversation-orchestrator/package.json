@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "@conversation-engine/core-types": "*"
+    "@conversation-engine/core-types": "*",
+    "@google/generative-ai": "^0.24.1"
   }
 }
