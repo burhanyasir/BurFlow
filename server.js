@@ -480,35 +480,23 @@ app.get("/api/agency/widget/:subdomain", (req, res) => {
   res.json(widget);
 });
 
-app.use(express.static(path.join(__dirname, "public"), { index: false }));
+app.use(express.static(path.join(__dirname, "frontend", "dist"), { index: false }));
 
-app.get("/landing", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "landing.html"));
-});
-app.get("/industries", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "industries.html"));
-});
-app.get("/install", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "install.html"));
-});
-app.get("/demo", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "demo.html"));
-});
-app.get("/sales", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "sales.html"));
-});
-app.get("/docs", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "docs.html"));
-});
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "landing.html"));
-});
-app.get("/admin", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "admin.html"));
-});
+// Legacy routes — serve the React SPA (client-side routing handles the rest)
+const spaIndex = path.join(__dirname, "frontend", "dist", "index.html");
+app.get("/landing", (req, res) => res.sendFile(spaIndex));
+app.get("/industries", (req, res) => res.sendFile(spaIndex));
+app.get("/install", (req, res) => res.sendFile(spaIndex));
+app.get("/demo", (req, res) => res.sendFile(spaIndex));
+app.get("/sales", (req, res) => res.sendFile(spaIndex));
+app.get("/docs", (req, res) => res.sendFile(spaIndex));
+app.get("/admin", (req, res) => res.sendFile(spaIndex));
+app.get("/", (req, res) => res.sendFile(spaIndex));
 
+// All other non-API routes → React SPA catch-all
 app.get("*", (req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "public", "landing.html"));
+  if (req.path.startsWith("/api/")) return res.status(404).json({ error: "Not found" });
+  res.sendFile(spaIndex);
 });
 
 app.listen(PORT, () => {
