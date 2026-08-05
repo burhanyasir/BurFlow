@@ -357,6 +357,13 @@ export class ChatWidget {
   private preOpenDismissed = false;
   private handoffEl: HTMLDivElement | null = null;
   private handoffShown = false;
+  private placeholderInterval: ReturnType<typeof setInterval> | null = null;
+  private readonly placeholders = ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
+  private boundDismissPreOpen = (e: Event) => {
+    if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
+      this.dismissPreOpenPanel();
+    }
+  };
 
   constructor(config: WidgetConfig) {
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -373,7 +380,8 @@ export class ChatWidget {
       @keyframes cw-pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
       @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
       @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
-      .cw-bubble:hover { transform:scale(1.08) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
+      @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(99,102,241,0.6),0 2px 12px rgba(0,0,0,0.15)} }
+      .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
       .cw-input:focus { border-color:#818CF8 !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
     `;
@@ -392,6 +400,7 @@ export class ChatWidget {
 
   unmount(): void {
     this.abort();
+    if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
     this.container = null;
@@ -412,6 +421,11 @@ export class ChatWidget {
     icon.className = 'cw-bubble-icon';
     icon.innerHTML = this.getChatIconSvg();
     bubble.appendChild(icon);
+
+    const label = document.createElement('span');
+    label.className = 'cw-bubble-label';
+    label.textContent = 'Chat with us';
+    bubble.appendChild(label);
 
     const badge = document.createElement('span');
     badge.className = 'cw-bubble-badge';
@@ -434,47 +448,40 @@ export class ChatWidget {
     const panel = document.createElement('div');
     panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
-    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;flex-direction:column;gap:6px;max-width:320px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);`;
+    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
 
-    const header = document.createElement('div');
-    header.style.cssText = 'background:linear-gradient(135deg,#1e1b4b 0%,#312e81 100%);color:#fff;padding:14px 16px;border-radius:16px 16px 0 0;font-size:13px;font-weight:600;letter-spacing:0.02em;';
-    header.textContent = this.config.launcherText || 'Ask me anything';
-    panel.appendChild(header);
+    const firstQ = this.config.suggestedActions?.[0];
+    const question = firstQ?.payload || firstQ?.label || 'What products do you offer?';
 
-    const list = document.createElement('div');
-    list.style.cssText = 'background:#fff;border:1px solid #E5E7EB;border-top:none;border-radius:0 0 16px 16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);';
+    const card = document.createElement('div');
+    card.style.cssText = 'padding:14px 16px;';
+    card.innerHTML = `
+      <p style="font-size:12px;color:#6B7280;margin:0 0 6px;">Suggested question</p>
+      <p style="font-size:13px;color:#1F2937;margin:0;font-weight:500;line-height:1.4;">${question}</p>
+    `;
+    panel.appendChild(card);
 
-    const questions = this.config.suggestedActions?.slice(0, 4) || [
-      { id: 'pricing', label: 'Pricing', action: 'send_text' as const, payload: 'Show me pricing' },
-      { id: 'products', label: 'Products', action: 'send_text' as const, payload: 'What products do you offer?' },
-      { id: 'demo', label: 'Book a Demo', action: 'send_text' as const, payload: 'I want to book a demo' },
-      { id: 'faq', label: 'FAQ', action: 'send_text' as const, payload: 'What are the most common questions?' },
-    ];
-
-    questions.forEach((q, i) => {
-      const item = document.createElement('button');
-      item.type = 'button';
-      item.style.cssText = `width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;cursor:pointer;font-size:13px;color:#374151;display:flex;align-items:center;gap:10px;transition:background 0.15s ease;${i < questions.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}`;
-      const icons = ['💰', '📦', '📅', '❓'];
-      item.innerHTML = `<span style="font-size:15px;flex-shrink:0">${icons[i] || '💬'}</span><span style="flex:1;line-height:1.4">${q.label || q.payload}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>`;
-      item.addEventListener('mouseenter', () => { item.style.background = '#F9FAFB'; });
-      item.addEventListener('mouseleave', () => { item.style.background = 'transparent'; });
-      item.addEventListener('click', () => {
-        this.dismissPreOpenPanel();
-        if (!this.isOpen) this.toggle();
+    panel.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.dismissPreOpenPanel();
+      if (!this.isOpen) this.toggle();
+      if (firstQ?.payload) {
         setTimeout(() => {
-          this.inputEl!.value = q.payload || q.label;
-          this.send();
-        }, 100);
-      });
-      list.appendChild(item);
+          if (this.inputEl) { this.inputEl.value = firstQ.payload!; this.send(); }
+        }, 150);
+      }
     });
 
-    panel.appendChild(list);
     document.body.appendChild(panel);
     this.preOpenPanelEl = panel;
 
-    setTimeout(() => this.showPreOpenPanel(), 1500);
+    setTimeout(() => {
+      if (!this.preOpenDismissed && !this.isOpen) {
+        panel.style.display = 'block';
+      }
+    }, 2000);
+    setTimeout(() => this.dismissPreOpenPanel(), 12000);
+    document.addEventListener('click', this.boundDismissPreOpen);
   }
 
   private showPreOpenPanel(): void {
@@ -515,16 +522,22 @@ export class ChatWidget {
     header.style.cssText = `background:linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:20px 20px 0 0;`;
 
     const info = document.createElement('div');
+    info.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    const dot = document.createElement('span');
+    dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#34D399;flex-shrink:0;box-shadow:0 0 8px rgba(52,211,153,0.5);';
+    info.appendChild(dot);
+    const textWrap = document.createElement('div');
     const title = document.createElement('div');
     title.style.cssText = 'font-weight:600;font-size:15px;';
     title.textContent = this.config.title || this.config.companyName || '';
     this.headerTitleEl = title;
-    info.appendChild(title);
+    textWrap.appendChild(title);
     const subtitle = document.createElement('div');
-    subtitle.style.cssText = 'font-size:12px;opacity:0.85;margin-top:2px;';
-    subtitle.textContent = this.config.subtitle;
+    subtitle.style.cssText = 'font-size:11px;opacity:0.75;margin-top:1px;';
+    subtitle.textContent = 'AI Sales Assistant';
     this.headerSubtitleEl = subtitle;
-    info.appendChild(subtitle);
+    textWrap.appendChild(subtitle);
+    info.appendChild(textWrap);
     header.appendChild(info);
 
     const closeBtn = document.createElement('button');
@@ -555,13 +568,24 @@ export class ChatWidget {
   private createInputArea(): HTMLDivElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'cw-input-area';
-    wrapper.style.cssText = 'padding:14px 16px;border-top:1px solid #E8ECF1;display:flex;gap:10px;align-items:flex-end;background:#fff;border-radius:0 0 20px 20px;';
+    wrapper.style.cssText = 'padding:0 16px 0;border-top:1px solid #E8ECF1;background:#fff;border-radius:0 0 20px 20px;';
+
+    const inputRow = document.createElement('div');
+    inputRow.style.cssText = 'display:flex;gap:10px;align-items:flex-end;padding:14px 0 0;';
 
     const textarea = document.createElement('textarea');
     textarea.className = 'cw-input';
-    textarea.placeholder = 'Ask about pricing, products, or demos...';
+    textarea.placeholder = this.placeholders[0];
     textarea.rows = 1;
     textarea.style.cssText = 'flex:1;resize:none;border:1.5px solid #E0E4EB;border-radius:14px;padding:12px 14px;font-size:14px;font-family:inherit;outline:none;max-height:120px;min-height:44px;line-height:1.4;transition:border-color 0.15s ease,box-shadow 0.15s ease;background:#F8F9FB;';
+
+    let phIdx = 0;
+    this.placeholderInterval = setInterval(() => {
+      if (document.activeElement !== textarea && !textarea.value) {
+        phIdx = (phIdx + 1) % this.placeholders.length;
+        textarea.placeholder = this.placeholders[phIdx];
+      }
+    }, 3000);
     textarea.addEventListener('keydown', (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -582,8 +606,15 @@ export class ChatWidget {
     sendBtn.addEventListener('click', () => this.send());
     this.sendBtnEl = sendBtn;
 
-    wrapper.appendChild(textarea);
-    wrapper.appendChild(sendBtn);
+    inputRow.appendChild(textarea);
+    inputRow.appendChild(sendBtn);
+    wrapper.appendChild(inputRow);
+
+    const footer = document.createElement('div');
+    footer.style.cssText = 'padding:6px 0 10px;text-align:center;';
+    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Powered by <b style="color:#6366f1;">BurFlow</b></span>';
+    wrapper.appendChild(footer);
+
     return wrapper;
   }
 
@@ -757,15 +788,22 @@ export class ChatWidget {
     const el = document.createElement('div');
     el.className = `cw-message cw-message-${msg.role}`;
     el.setAttribute('data-message-id', msg.id);
-    el.style.cssText = `display:flex;${msg.role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start'};`;
+    el.style.cssText = `display:flex;${msg.role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start'};position:relative;`;
 
     const bubble = document.createElement('div');
     bubble.className = 'cw-message-bubble';
     const isUser = msg.role === 'user';
-    bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;box-shadow:${isUser ? 'none' : '0 2px 12px rgba(15, 23, 42, 0.06)'};${isUser
-      ? `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;`
-      : 'background:#fff;color:#1F2937;border:1px solid #E8ECF1;border-bottom-left-radius:6px;'
+    bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;${isUser
+      ? `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;`
+      : 'background:#F3F4F6;color:#1F2937;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
     }`;
+
+    if (!isUser) {
+      const icon = document.createElement('span');
+      icon.style.cssText = 'margin-right:6px;opacity:0.6;font-size:12px;';
+      icon.textContent = '✨';
+      bubble.appendChild(icon);
+    }
 
     const content = document.createElement('div');
     content.className = 'cw-message-content';
@@ -780,6 +818,15 @@ export class ChatWidget {
     }
 
     el.appendChild(bubble);
+
+    const ts = document.createElement('div');
+    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    ts.textContent = time;
+    ts.style.cssText = `font-size:10px;color:#9CA3AF;margin-top:4px;opacity:0;transition:opacity 0.15s ease;${isUser ? 'text-align:right;padding-right:4px;' : 'text-align:left;padding-left:26px;'}`;
+    el.appendChild(ts);
+    el.addEventListener('mouseenter', () => { ts.style.opacity = '1'; });
+    el.addEventListener('mouseleave', () => { ts.style.opacity = '0'; });
+
     this.messagesEl.appendChild(el);
   }
 
@@ -832,7 +879,7 @@ export class ChatWidget {
       const buttonContainer = document.createElement('div');
       buttonContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
       const visibleButtons = this.getContextualButtons(buttonGroup);
-      visibleButtons.slice(0, 6).forEach((button) => {
+      visibleButtons.slice(0, 3).forEach((button) => {
         buttonContainer.appendChild(this.createActionButton(button));
       });
       this.actionPanel.appendChild(buttonContainer);
@@ -1124,16 +1171,19 @@ export class ChatWidget {
 
   private getBubbleStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:20px;${pos}width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 50%,#a855f7 100%);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);`;
+    return `position:fixed;bottom:20px;${pos}height:52px;padding:0 22px;border-radius:26px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
   }
 
   private getContainerStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:96px;${pos}width:400px;max-width:calc(100vw - 24px);height:620px;max-height:calc(100vh - 24px);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    if (typeof window !== 'undefined' && window.innerWidth < 640) {
+      return `position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    }
+    return `position:fixed;bottom:88px;${pos}width:400px;max-width:calc(100vw - 24px);height:620px;max-height:calc(100vh - 24px);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {
-    return `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+    return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
   }
 
   private getSendIconSvg(): string {
