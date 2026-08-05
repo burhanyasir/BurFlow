@@ -1,5 +1,5 @@
 import { createLogger } from '@conversation-engine/logger';
-import { KnowledgePipeline } from '@conversation-engine/knowledge-pipeline';
+import { KnowledgePipeline, WebsiteCrawler } from '@conversation-engine/knowledge-pipeline';
 import { KnowledgeAdminStore } from './knowledge-admin-store';
 
 const logger = createLogger('knowledge-worker');
@@ -75,35 +75,38 @@ export class KnowledgeWorker {
   private async processItem(row: any): Promise<void> {
     const { document_id: documentId, tenant_id: tenantId, source_type: sourceType, original_name: originalName } = row;
 
-    const stored = this.contentStore.get(documentId);
-    if (!stored) {
-      logger.warn({ documentId }, 'No content registered for queued document');
-      return;
-    }
-
     try {
       this.adminStore.upsertDocument({
         documentId,
         tenantId,
         originalName,
         sourceType,
-        title: originalName.replace(/\.\w+$/, ''),
+        title: sourceType === 'url' ? new URL(originalName).hostname : originalName.replace(/\.\w+$/, ''),
         status: 'processing',
       });
 
-      const result = await this.pipeline.processDocument(documentId, stored.content, stored.chunkingConfig, stored.embeddingConfig);
+      if (sourceType === 'url') {
+        await this.processUrlItem(documentId, tenantId, originalName);
+      } else {
+        const stored = this.contentStore.get(documentId);
+        if (!stored) {
+          logger.warn({ documentId }, 'No content registered for queued document');
+          return;
+        }
+        const result = await this.pipeline.processDocument(documentId, stored.content, stored.chunkingConfig, stored.embeddingConfig);
 
-      this.adminStore.upsertDocument({
-        documentId,
-        tenantId,
-        originalName,
-        sourceType,
-        title: originalName.replace(/\.\w+$/, ''),
-        status: 'published',
-        chunkCount: result.chunks.length,
-      });
+        this.adminStore.upsertDocument({
+          documentId,
+          tenantId,
+          originalName,
+          sourceType,
+          title: originalName.replace(/\.\w+$/, ''),
+          status: 'published',
+          chunkCount: result.chunks.length,
+        });
 
-      logger.info({ documentId, tenantId, chunks: result.chunks.length, knowledgeVersion: result.knowledgeVersion }, 'Document processed successfully');
+        logger.info({ documentId, tenantId, chunks: result.chunks.length, knowledgeVersion: result.knowledgeVersion }, 'Document processed successfully');
+      }
     } catch (err: any) {
       logger.error({ documentId, tenantId, err: err.message }, 'Document processing failed');
 
@@ -112,13 +115,51 @@ export class KnowledgeWorker {
         tenantId,
         originalName,
         sourceType,
-        title: originalName.replace(/\.\w+$/, ''),
-        status: 'failed',
+        title: sourceType === 'url' ? new URL(originalName).hostname : originalName.replace(/\.\w+$/, ''),
+        status: 'warning',
         error: err.message,
       });
     } finally {
       this.contentStore.delete(documentId);
     }
+  }
+
+  private async processUrlItem(documentId: string, tenantId: string, url: string): Promise<void> {
+    const crawler = new WebsiteCrawler();
+    const CRAWL_TIMEOUT_MS = 30_000;
+
+    const crawlPromise = crawler.crawl(url, tenantId, { maxDepth: 2, maxPages: 10, respectRobotsTxt: true, useSitemap: true });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Crawl timed out after ${CRAWL_TIMEOUT_MS}ms`)), CRAWL_TIMEOUT_MS)
+    );
+
+    const docs = await Promise.race([crawlPromise, timeoutPromise]);
+
+    if (!docs || docs.length === 0) {
+      throw new Error(`No content could be crawled from ${url}`);
+    }
+
+    logger.info({ documentId, tenantId, url, pages: docs.length }, 'Crawl completed, processing documents');
+
+    for (const doc of docs) {
+      try {
+        await this.pipeline.processParsedDocument(documentId, doc);
+      } catch (err: any) {
+        logger.warn({ documentId, tenantId, url: doc.metadata?.sourceUrl, err: err.message }, 'Failed to process crawled page, continuing');
+      }
+    }
+
+    this.adminStore.upsertDocument({
+      documentId,
+      tenantId,
+      originalName: url,
+      sourceType: 'url',
+      title: new URL(url).hostname,
+      status: 'published',
+      chunkCount: docs.length,
+    });
+
+    logger.info({ documentId, tenantId, url, pages: docs.length }, 'URL crawl processed successfully');
   }
 
   getStatus(): { running: boolean; activeJobs: number; queuedCount: number } {

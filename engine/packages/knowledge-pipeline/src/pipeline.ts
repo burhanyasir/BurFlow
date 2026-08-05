@@ -167,6 +167,65 @@ export class KnowledgePipeline {
     }
   }
 
+  async processParsedDocument(documentId: string, parsed: ParsedDocument, chunkingConfig?: Partial<ChunkingConfig>, embeddingConfig?: Partial<EmbeddingConfig>): Promise<{ chunks: Chunk[]; knowledgeVersion: number }> {
+    const acquired = this.db.prepare(
+      "UPDATE knowledge_queue SET status = 'processing', updated_at = ? WHERE document_id = ? AND status IN ('queued', 'failed')"
+    ).run(new Date().toISOString(), documentId);
+
+    if (acquired.changes === 0) {
+      const row = this.db.prepare('SELECT status FROM knowledge_queue WHERE document_id = ?').get(documentId) as any;
+      if (!row) throw new Error(`Document ${documentId} not found in queue`);
+      if (row.status === 'published') {
+        const published = this.db.prepare('SELECT knowledge_version FROM knowledge_snapshots WHERE tenant_id = (SELECT tenant_id FROM knowledge_queue WHERE document_id = ?) ORDER BY knowledge_version DESC LIMIT 1').get(documentId) as any;
+        return { chunks: [], knowledgeVersion: published?.knowledge_version || 0 };
+      }
+      throw new Error(`Document ${documentId} is already being processed (status: ${row.status})`);
+    }
+
+    try {
+      this.updateStatus(documentId, 'normalizing');
+      const normalized = await this.normalizer.normalize(parsed);
+      this.updateStatus(documentId, 'chunking');
+      const chunks = await this.chunker.chunk(normalized, chunkingConfig);
+      this.updateStatus(documentId, 'embedding');
+      const embedded = await this.embedder.embed(chunks, embeddingConfig);
+      this.updateStatus(documentId, 'indexed');
+
+      await this.vectorStore.deleteByDocument(documentId, parsed.tenantId);
+
+      const records: VectorRecord[] = embedded.map(e => ({
+        chunkId: e.chunk.chunkId,
+        tenantId: e.chunk.tenantId,
+        documentId: e.chunk.documentId,
+        knowledgeVersion: 0,
+        embeddingVersion: this.embedder.embeddingVersion,
+        embeddingModel: this.embedder.model,
+        chunkingVersion: chunkingConfig?.chunkingVersion || '1.0.0',
+        embedding: e.embedding,
+        metadata: { ...e.chunk.metadata, content: e.chunk.content, sectionPath: e.chunk.sectionPath, position: e.chunk.position },
+        deleted: false,
+      }));
+
+      await this.vectorStore.upsert(records);
+
+      const snapshot = await this.publisher.publish(
+        parsed.tenantId,
+        chunks,
+        this.embedder.embeddingVersion,
+        this.embedder.model,
+        chunkingConfig?.chunkingVersion || '1.0.0',
+      );
+
+      this.updateStatus(documentId, 'published');
+
+      return { chunks, knowledgeVersion: snapshot.knowledgeVersion };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.updateStatus(documentId, 'failed', message);
+      throw err;
+    }
+  }
+
   private updateStatus(documentId: string, status: DocumentStatus, error?: string): void {
     this.db.prepare(
       'UPDATE knowledge_queue SET status = ?, error = ?, updated_at = ? WHERE document_id = ?'
