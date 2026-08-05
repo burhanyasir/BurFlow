@@ -1016,7 +1016,8 @@ function buildTopicResponse(topic: DiscernedTopic, memory: ConversationMemoryDat
 
   // Try per-tenant knowledge base first
   if (kbProvider && tenantId) {
-    const depth = record ? Math.min(record.count, 4) : 0;
+    const fallbackTemplates = TOPIC_RESPONSE_TEMPLATES[topic] || [];
+    const depth = record ? Math.min(record.count, Math.max(fallbackTemplates.length - 1, 1)) : 0;
     const kbEntry = kbProvider.getTopicResponse(topic, tenantId, isCompleted ? 0 : depth);
     if (kbEntry) {
       return kbEntry.answer;
