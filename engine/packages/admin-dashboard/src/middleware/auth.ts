@@ -42,8 +42,10 @@ function simpleDevAuthenticate(secret = 'dev') {
 
 export function authenticate() : MiddlewareFn {
   if (saasAuth && typeof saasAuth.authMiddleware === 'function') {
-    // Use JWT secret from env if present
-    const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET || 'development-admin-secret';
+    const secret = process.env.ADMIN_JWT_SECRET || process.env.JWT_SECRET;
+    if (!secret) {
+      throw new Error('JWT_SECRET must be set — refusing to start with a fallback secret');
+    }
     return saasAuth.authMiddleware(secret);
   }
   return simpleDevAuthenticate();

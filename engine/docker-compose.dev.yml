@@ -12,7 +12,7 @@ services:
       - PORT=3457
       - NODE_ENV=development
       - LOG_LEVEL=debug
-      - JWT_SECRET=dev-jwt-secret-change-in-production
+      - JWT_SECRET=burflow-local-dev-secret-change-in-production-2024
       - CORS_ORIGIN=*
       - DB_PATH=/data/saas.db
       - APP_URL=http://localhost:5173

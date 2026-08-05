@@ -3,6 +3,8 @@ node_modules/
 dist/
 .env
 .env.*
+!.env.example
+engine/packages/saas-api/.env.local
 *.log
 npm-debug.log*
 pnpm-debug.log*

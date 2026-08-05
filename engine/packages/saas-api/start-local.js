@@ -1,5 +1,22 @@
-process.env.JWT_SECRET = process.env.JWT_SECRET;
-process.env.WIDGET_SECRET = process.env.WIDGET_SECRET;
+const fs = require('fs');
+const path = require('path');
+
+// Load .env.local first (single source of truth for local dev secrets)
+const envLocalPath = path.join(__dirname, '.env.local');
+if (fs.existsSync(envLocalPath)) {
+  const lines = fs.readFileSync(envLocalPath, 'utf8').split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eqIdx = trimmed.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = trimmed.slice(0, eqIdx).trim();
+    const val = trimmed.slice(eqIdx + 1).trim();
+    if (!process.env[key]) process.env[key] = val;
+  }
+  console.log('[startup] Loaded .env.local');
+}
+
 process.env.APP_URL = process.env.APP_URL || 'http://localhost:5178';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 process.env.CORS_ORIGIN = '*';
