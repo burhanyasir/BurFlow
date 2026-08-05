@@ -1926,8 +1926,10 @@ Respond with ONLY a JSON object — no markdown, no explanation:
 
       const parsed = JSON.parse(text);
       enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
-    } catch (error) {
-      console.error('[brain] LLM call failed:', error instanceof Error ? error.message : error);
+    } catch (error: unknown) {
+      const status = (error as { status?: number })?.status;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[brain] LLM call failed:', { status, message, tenantId: input.tenantId });
       enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
     }
   } else {
