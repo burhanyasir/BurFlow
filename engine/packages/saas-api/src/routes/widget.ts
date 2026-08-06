@@ -16,9 +16,14 @@ interface WidgetTokenPayload {
 }
 
 const WIDGET_SECRET: string = process.env.WIDGET_SECRET ?? 'development-widget-secret-do-not-use-in-production';
+const LEGACY_WIDGET_SECRETS = [
+  'development-widget-secret-do-not-use-in-production',
+  'dev-widget-secret',
+  'local-dev-widget-secret-1234567890123456789012345678901234567890',
+];
 
-function signWidgetToken(encoded: string): string {
-  return createHmac('sha256', WIDGET_SECRET).update(encoded).digest('hex');
+function signWidgetToken(encoded: string, secret: string = WIDGET_SECRET): string {
+  return createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
 export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string): Router {
@@ -57,15 +62,19 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     try {
       const [encoded, sig] = token.split('.');
       if (!sig) return null;
-      const expected = signWidgetToken(encoded);
-      const sigBuf = Buffer.from(sig, 'hex');
-      const expectedBuf = Buffer.from(expected, 'hex');
-      if (sigBuf.length !== expectedBuf.length || !timingSafeEqual(sigBuf, expectedBuf)) {
-        return null;
+
+      const candidates = [WIDGET_SECRET, ...LEGACY_WIDGET_SECRETS.filter((secret) => secret !== WIDGET_SECRET)];
+      for (const secret of candidates) {
+        const expected = signWidgetToken(encoded, secret);
+        const sigBuf = Buffer.from(sig, 'hex');
+        const expectedBuf = Buffer.from(expected, 'hex');
+        if (sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf)) {
+          const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as WidgetTokenPayload;
+          if (payload.type !== 'widget' || payload.exp < Math.floor(Date.now() / 1000)) return null;
+          return { tenantId: payload.tenantId };
+        }
       }
-      const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as WidgetTokenPayload;
-      if (payload.type !== 'widget' || payload.exp < Math.floor(Date.now() / 1000)) return null;
-      return { tenantId: payload.tenantId };
+      return null;
     } catch {
       return null;
     }

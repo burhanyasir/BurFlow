@@ -28,7 +28,7 @@ export function AuthLayout({
             <div className="flex h-8 w-8 items-center justify-center rounded-lg wine-gradient">
               <Sparkles className="h-4 w-4 text-white" />
             </div>
-            Aureline
+            BurFlow
           </Link>
         </div>
 

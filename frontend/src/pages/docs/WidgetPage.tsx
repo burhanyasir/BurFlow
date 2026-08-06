@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { SectionContainer } from '../../components/ui/SectionContainer';
 import { GlassPanel } from '../../components/ui/GlassPanel';
+import { Seo } from '../../components/seo/Seo';
 
 const PLATFORMS = [
   {
@@ -96,6 +97,7 @@ const CONFIG_OPTIONS = [
 export default function WidgetPage() {
   return (
     <div className="relative min-h-screen bg-obsidian text-white">
+      <Seo title="Widget Integration" description="Embed the Conversation Engine widget on any website with a single snippet or package install." path="/docs/widget" />
       <div className="pt-20 px-4 max-w-4xl mx-auto">
         <nav className="flex items-center gap-2 text-sm text-white/50">
           <Link to="/docs" className="hover:text-white transition-colors">Docs Home</Link>

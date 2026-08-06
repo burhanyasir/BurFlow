@@ -32,7 +32,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      addToast('Welcome back!', 'success');
+      addToast('Welcome back to BurFlow.', 'success');
       navigate(from, { replace: true });
     } catch (err: any) {
       addToast(err.message || 'Login failed', 'error');

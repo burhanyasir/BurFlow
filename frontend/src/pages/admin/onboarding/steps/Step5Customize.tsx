@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Input } from '../../../../components/ui/Input';
 import { Textarea } from '../../../../components/ui/Textarea';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
 import { WIDGET_POSITIONS } from '../onboarding-context';
+import { deriveBusinessIntelligenceSnapshot } from '../../../../utils/business-profile';
 
 interface Props {
   data: {
@@ -15,13 +16,17 @@ interface Props {
     suggestedQuestions: string[];
     logo: string;
   };
+  businessProfile: ReturnType<typeof deriveBusinessIntelligenceSnapshot>;
   onChange: (field: string, value: any) => void;
 }
 
 const COLOR_PRESETS = ['#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6'];
 
-export function Step5Customize({ data, onChange }: Props) {
+export function Step5Customize({ data, businessProfile, onChange }: Props) {
   const [questionInput, setQuestionInput] = useState('');
+
+  const previewGreeting = useMemo(() => data.welcomeMessage?.trim() || businessProfile.welcomeMessage, [businessProfile, data.welcomeMessage]);
+  const previewQuestions = useMemo(() => (data.suggestedQuestions?.length ? data.suggestedQuestions : businessProfile.suggestedQuestions), [businessProfile, data.suggestedQuestions]);
 
   const addQuestion = () => {
     const q = questionInput.trim();
@@ -37,8 +42,8 @@ export function Step5Customize({ data, onChange }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl mx-auto py-4">
-      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Customize Your Widget</h2>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Match the chatbot's look and feel to your brand.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Customize the visitor experience</h2>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Pick a look and messaging that makes visitors feel confident, and steer them toward products, pricing, and demo booking.</p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <div className="space-y-5">
@@ -137,9 +142,9 @@ export function Step5Customize({ data, onChange }: Props) {
                 </div>
                 <div className="p-3 space-y-3 min-h-[120px]">
                   <div className="bg-[var(--color-neutral-50)] rounded-lg rounded-tl-none p-2.5 max-w-[80%]">
-                    <p className="text-xs text-[var(--color-neutral-700)]">{data.welcomeMessage || 'Hi there! How can I help you?'}</p>
+                    <p className="text-xs text-[var(--color-neutral-700)]">{previewGreeting}</p>
                   </div>
-                  {data.suggestedQuestions.slice(0, 2).map((q, i) => (
+                  {previewQuestions.slice(0, 2).map((q, i) => (
                     <div key={i} className="border border-[var(--color-neutral-200)] rounded-lg px-2.5 py-1.5 text-xs text-[var(--color-neutral-600)] cursor-default">
                       {q}
                     </div>

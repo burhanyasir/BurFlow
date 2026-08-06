@@ -52,10 +52,10 @@ export interface LandingFooterColumn {
 }
 
 export const BRAND = {
-  name: 'Aureline',
-  tagline: 'AI Customer Support That Never Guesses.',
-  description: 'Grounded AI answers with source citations, confidence guardrails, and human handoff. Trusted by teams that can\'t afford to guess.',
-  logo: 'A',
+  name: 'BurFlow',
+  tagline: 'AI Website Sales Agents That Never Guess.',
+  description: 'BurFlow scans your website, learns your offers, and helps visitors discover the right product, plan, or demo next step.',
+  logo: 'B',
 };
 
 export const NAV_LINKS = [
@@ -116,12 +116,12 @@ export const PLANS: LandingPlan[] = [
 ];
 
 export const FAQS: LandingFAQ[] = [
-  { question: 'How does grounded AI actually work?', answer: 'Aureline retrieves the exact passages from your documentation for every question, then generates an answer strictly from those sources. Each answer carries a citation and a confidence score so your team can trust — and verify — every response.' },
-  { question: 'What happens when the AI isn\'t confident?', answer: 'Low-confidence answers never reach your customer. Aureline routes the conversation to a human agent with full context, transcript, and suggested reply, so handoffs feel seamless.' },
+  { question: 'How does BurFlow actually work?', answer: 'BurFlow scans your website and learns from your pages, documents, and offers so it can answer product questions, qualify interest, and guide visitors toward the best next step.' },
+  { question: 'What happens when the AI isn\'t confident?', answer: 'Low-confidence answers never reach your customer. BurFlow routes the conversation to a human agent with full context, transcript, and suggested reply, so handoffs feel seamless.' },
   { question: 'Which knowledge sources can we connect?', answer: 'PDFs, help centers, Notion, Confluence, Google Drive, SharePoint, Zendesk, and any public URL. Changes sync automatically — no retraining required.' },
-  { question: 'Is Aureline secure enough for regulated industries?', answer: 'Yes. Aureline supports SSO, SCIM, audit logs, regional data residency, and signed DPAs. Enterprise deployments include dedicated infrastructure and custom SLAs.' },
-  { question: 'How long does it take to go live?', answer: 'Most teams launch a production widget within a single afternoon. Enterprise rollouts typically take 1–2 weeks including SSO, custom domains, and knowledge sync.' },
-  { question: 'Can we keep our existing helpdesk?', answer: 'Absolutely. Aureline integrates with Zendesk, Intercom, HubSpot, Freshdesk, and Front — augmenting the tools your team already uses.' },
+  { question: 'Is BurFlow secure enough for regulated industries?', answer: 'Yes. BurFlow supports SSO, SCIM, audit logs, regional data residency, and signed DPAs. Enterprise deployments include dedicated infrastructure and custom SLAs.' },
+  { question: 'How long does it take to go live?', answer: 'Most teams launch a production sales agent within a single afternoon. Enterprise rollouts typically take 1–2 weeks including SSO, custom domains, and knowledge sync.' },
+  { question: 'Can we keep our existing CRM?', answer: 'Absolutely. BurFlow can plug into your existing stack and hand off qualified leads to your team when the conversation is ready for follow-up.' },
 ];
 
 export const FOOTER_COLUMNS: LandingFooterColumn[] = [

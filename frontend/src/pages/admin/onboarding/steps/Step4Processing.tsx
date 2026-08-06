@@ -72,8 +72,16 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto py-4">
-      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Processing Knowledge</h2>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-8">We're indexing your content so the AI can answer customer questions accurately.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Preparing your sales intelligence</h2>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-4">BurFlow is building a knowledge graph from your website and documents so the widget can recommend products, answer pricing questions, and book demos.</p>
+      <div className="mb-6 rounded-2xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-50)] p-4 text-sm text-[var(--color-neutral-600)]">
+        <p className="font-semibold text-[var(--color-neutral-900)] mb-2">What we’re doing now</p>
+        <ul className="space-y-2 list-disc list-inside">
+          <li>Scanning website content and product pages</li>
+          <li>Extracting pricing, services, and customer intent</li>
+          <li>Indexing knowledge so answers stay grounded and accurate</li>
+        </ul>
+      </div>
 
       {!started && !allReady && (
         <div className="text-center py-8">

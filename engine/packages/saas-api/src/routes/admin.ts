@@ -167,7 +167,7 @@ export function createAdminRoutes(
       if (status) allDocs = allDocs.filter(d => d.status === status);
       if (q) {
         const lower = q.toLowerCase();
-        allDocs = allDocs.filter(d => (d.filename && d.filename.toLowerCase().includes(lower)) || (d.originalName && d.originalName.toLowerCase().includes(lower)));
+        allDocs = allDocs.filter(d => (d.filename && d.filename.toLowerCase().includes(lower)) || (d.sourceUrl && d.sourceUrl.toLowerCase().includes(lower)));
       }
       const docs = allDocs.slice(offset, offset + limit);
       res.json({ documents: docs, total: allDocs.length, limit, offset });

@@ -46,6 +46,7 @@ export default function WidgetDashboard() {
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [businessProfile, setBusinessProfile] = useState<Record<string, unknown> | null>(null);
   const snippet = agentId && widgetToken ? buildSnippet(activeTab, agentId, primaryColor, position, widgetToken) : '';
 
   const loadConfig = useCallback(async () => {
@@ -53,16 +54,21 @@ export default function WidgetDashboard() {
       const tenantRes = await apiClient.get<{ tenants: Array<{ id: string; slug: string }> }>('/tenants');
       const ts = tenantRes.tenants || [];
       if (ts.length > 0) {
-        const slug = ts[0].slug; setAgentId(slug);
-        const tokenRes = await apiClient.post<{ token: string }>('/widget/token', { agentId: slug });
+        const slug = ts[0].slug;
+        setAgentId(slug);
+        const tokenRes = await apiClient.post<{ token: string }>('/widget/token');
         if (tokenRes.token) {
           setWidgetToken(tokenRes.token);
-          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; welcomeMessage?: string; placeholder?: string; suggestedQuestions?: string[] }>(`/widget/config?token=${tokenRes.token}`);
+          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; suggestedQuestions?: string[]; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
           if (widgetRes.primaryColor) setPrimaryColor(widgetRes.primaryColor);
-          if (widgetRes.position) setPosition(widgetRes.position as 'right' | 'left');
-          if (widgetRes.welcomeMessage) setWelcomeMessage(widgetRes.welcomeMessage);
-          if (widgetRes.placeholder) setPlaceholder(widgetRes.placeholder);
+          if (widgetRes.position) {
+            const normalized = widgetRes.position === 'bottom-right' ? 'right' : widgetRes.position === 'bottom-left' ? 'left' : widgetRes.position;
+            setPosition(normalized as 'right' | 'left');
+          }
+          if (widgetRes.greeting) setWelcomeMessage(widgetRes.greeting);
+          if (widgetRes.launcherText) setPlaceholder(widgetRes.launcherText);
           if (widgetRes.suggestedQuestions) setSuggestedQuestions(widgetRes.suggestedQuestions);
+          if (widgetRes.businessProfile) setBusinessProfile(widgetRes.businessProfile);
         }
       }
     } catch { addToast('Failed to load widget config', 'error'); } finally { setConfigLoaded(true); }
@@ -72,7 +78,15 @@ export default function WidgetDashboard() {
 
   const handleSave = async () => {
     setSaving(true); try {
-      await apiClient.put('/widget/config', { agentId, primaryColor, position, welcomeMessage, placeholder, suggestedQuestions });
+      await apiClient.put('/widget/config', {
+        primaryColor,
+        position,
+        greeting: welcomeMessage,
+        launcherText: placeholder,
+        suggestedQuestions,
+        companyName: workspaceName,
+        businessProfile: businessProfile || undefined,
+      });
       addToast('Widget settings saved', 'success');
     } catch { addToast('Failed to save widget settings', 'error'); } finally { setSaving(false); }
   };

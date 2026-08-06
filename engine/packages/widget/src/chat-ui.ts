@@ -448,7 +448,7 @@ export class ChatWidget {
     const panel = document.createElement('div');
     panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
-    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
+    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:320px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
 
     const firstQ = this.config.suggestedActions?.[0];
     const question = firstQ?.payload || firstQ?.label || 'What products do you offer?';

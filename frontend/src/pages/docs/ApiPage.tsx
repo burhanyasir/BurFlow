@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { SectionContainer } from '../../components/ui/SectionContainer';
 import { GlassPanel } from '../../components/ui/GlassPanel';
+import { Seo } from '../../components/seo/Seo';
 
 const ENDPOINTS = [
   {
@@ -46,6 +47,7 @@ const ENDPOINTS = [
 export default function ApiPage() {
   return (
     <div className="relative min-h-screen bg-obsidian text-white">
+      <Seo title="API Reference" description="Use the Conversation Engine REST API to send chat requests, upload knowledge, and manage widgets." path="/docs/api" />
       <div className="pt-20 px-4 max-w-4xl mx-auto">
         <nav className="flex items-center gap-2 text-sm text-white/50">
           <Link to="/docs" className="hover:text-white transition-colors">Docs Home</Link>

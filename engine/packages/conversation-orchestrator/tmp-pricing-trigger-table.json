@@ -1,0 +1,30 @@
+[
+  {
+    "trigger": "pricing",
+    "falsePositives": 46,
+    "truePositives": 10,
+    "precision": "0.179",
+    "falsePositiveRate": "0.821"
+  },
+  {
+    "trigger": "price",
+    "falsePositives": 3,
+    "truePositives": 0,
+    "precision": "0.000",
+    "falsePositiveRate": "1.000"
+  },
+  {
+    "trigger": "plans",
+    "falsePositives": 1,
+    "truePositives": 0,
+    "precision": "0.000",
+    "falsePositiveRate": "1.000"
+  },
+  {
+    "trigger": "tiers",
+    "falsePositives": 1,
+    "truePositives": 0,
+    "precision": "0.000",
+    "falsePositiveRate": "1.000"
+  }
+]

@@ -1,0 +1,581 @@
+{
+  "total": 49,
+  "dupCount": 4,
+  "avgFields": 0.3469387755102041,
+  "results": [
+    {
+      "url": "https://www.hubspot.com/crm",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.atlassian.com/software/confluence",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.bestbuy.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      },
+      "error": "read ECONNRESET"
+    },
+    {
+      "url": "https://www.nike.com/w/new-releases-3n82y",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.amazon.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.walmart.com/cp/customer-service/1235",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.kaiserpermanente.org/health-wellness",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.airbnb.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.zillow.com/homes/for_sale/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.accenture.com/us-en/services/consulting/technology",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.deloitte.com/us/en/pages/consulting/solutions.html",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.mcdonalds.com/us/en-us.html",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.starbucks.com/menu",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.ford.com/cars/mustang/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      },
+      "error": "read ECONNRESET"
+    },
+    {
+      "url": "https://www.caterpillar.com/en/products/new.html",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.siemens.com/global/en/products/automation.html",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.turnerconstruction.com/projects",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.pwc.com/us/en/services.html",
+      "hitFields": [
+        "heading",
+        "content"
+      ],
+      "count": 2,
+      "fields": {
+        "title": 0,
+        "heading": 1,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.littler.com/people",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.bosch.com/products-and-services/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.homedepot.com/b/Tools/N-5yc1vZc1j0",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.booking.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.revolut.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.att.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.netflix.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.ocado.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.doordash.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.3m.com/3M/en_US/company-us/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      },
+      "error": "timeout"
+    },
+    {
+      "url": "https://www.fedex.com/en-us/home.html",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.mckinsey.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      },
+      "error": "read ECONNRESET"
+    },
+    {
+      "url": "https://www.coursera.org/",
+      "hitFields": [
+        "heading",
+        "content"
+      ],
+      "count": 2,
+      "fields": {
+        "title": 0,
+        "heading": 1,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.tiffany.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.ikea.com/us/en/",
+      "hitFields": [
+        "heading",
+        "content"
+      ],
+      "count": 2,
+      "fields": {
+        "title": 0,
+        "heading": 1,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.gopro.com/en/us/shop",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.uber.com/us/en/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.nordstrom.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.sherwin-williams.com/homeowners",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.mckesson.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.jpmorgan.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.sony.com/electronics",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.petco.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.ikea.com/us/en/rooms/",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.pepsico.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.barnesandnoble.com/",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.mcdonalds.com/us/en-us.html",
+      "hitFields": [
+        "content"
+      ],
+      "count": 1,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 1,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.vmware.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.nest.com/",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      }
+    },
+    {
+      "url": "https://www.hulu.com/welcome",
+      "hitFields": [],
+      "count": 0,
+      "fields": {
+        "title": 0,
+        "heading": 0,
+        "content": 0,
+        "meta": 0
+      },
+      "error": "read ECONNRESET"
+    },
+    {
+      "url": "https://www.pwc.com/us/en/services.html",
+      "hitFields": [
+        "heading",
+        "content"
+      ],
+      "count": 2,
+      "fields": {
+        "title": 0,
+        "heading": 1,
+        "content": 1,
+        "meta": 0
+      }
+    }
+  ]
+}

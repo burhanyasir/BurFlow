@@ -2,7 +2,7 @@ import express from 'express';
 import { runPipeline, PipelineDeps } from './pipeline';
 import { authenticateRequest, requireRole, TenantRegistryRole } from './auth';
 import { SqliteTenantRegistry } from '@conversation-engine/tenant-registry';
-import { SqliteSessionStore } from '@conversation-engine/session-store';
+import { SqliteSessionStore, isValidSessionId } from '@conversation-engine/session-store';
 import { FileConfigStore, defaultTenantConfig } from '@conversation-engine/config-store';
 import { SqliteDedupStore } from '@conversation-engine/dedup-store';
 import { EnvVault } from '@conversation-engine/secrets-vault';
@@ -44,7 +44,6 @@ if (NODE_ENV === 'production') {
 }
 
 const MESSAGE_MAX_LENGTH = 50000;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function validateChatInput(body: any): { errors: string[]; message: string; sessionId: string } {
   const errors: string[] = [];
@@ -61,8 +60,8 @@ function validateChatInput(body: any): { errors: string[]; message: string; sess
   if (sessionId !== undefined && sessionId !== null && sessionId !== '') {
     if (typeof sessionId !== 'string') {
       errors.push('sessionId must be a string');
-    } else if (!UUID_RE.test(sessionId) && process.env.NODE_ENV !== 'development') {
-      errors.push('sessionId must be a valid UUID');
+    } else if (!isValidSessionId(sessionId)) {
+      errors.push('sessionId must be a valid UUID or session_* identifier');
     }
   }
 
@@ -425,7 +424,7 @@ app.post('/api/chat', async (req, res) => {
       if (existing) {
         effectiveSessionId = providedSessionId;
       } else {
-        const session = await sessionStore.createSession(resolvedTenant, 1);
+        const session = await sessionStore.createSession(resolvedTenant, 1, 1440, providedSessionId);
         effectiveSessionId = session.sessionId;
       }
     } else {
@@ -507,6 +506,12 @@ app.post('/api/chat/stream', async (req, res) => {
     if (!resolvedSessionId) {
       const session = await sessionStore.createSession(resolvedTenant, 1);
       effectiveSessionId = session.sessionId;
+    } else {
+      const existing = await sessionStore.loadSession(resolvedTenant, resolvedSessionId);
+      if (!existing) {
+        const session = await sessionStore.createSession(resolvedTenant, 1, 1440, resolvedSessionId);
+        effectiveSessionId = session.sessionId;
+      }
     }
 
     // Run pipeline for auth, safety, and context loading (uses non-streaming provider)

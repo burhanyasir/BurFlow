@@ -462,14 +462,18 @@ export class WebsiteCrawler implements WebCrawler {
   }
 
   async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean }): Promise<ParsedDocument[]> {
-    const maxDepth = Math.min(options?.maxDepth ?? 2, 5);
-    const maxPages = Math.min(options?.maxPages ?? 10, 50);
+    const maxDepth = Math.min(options?.maxDepth ?? 2, 15);
+    const maxPages = Math.min(options?.maxPages ?? 10, 1000);
     const respectRobots = options?.respectRobotsTxt ?? true;
     const useSitemap = options?.useSitemap ?? true;
 
     if (WebsiteCrawler.isPrivateUrl(url)) {
       throw new Error('URL points to a private/internal network address');
     }
+
+    // Extract the target domain to stay on the same site
+    const initialParsed = new URL(url);
+    const targetDomain = initialParsed.hostname;
 
     const visited = new Set<string>();
     const results: ParsedDocument[] = [];
@@ -501,21 +505,22 @@ export class WebsiteCrawler implements WebCrawler {
 
     while (queue.length > 0 && results.length < maxPages) {
       const item = queue.shift()!;
-      if (visited.has(item.url)) continue;
-      if (WebsiteCrawler.isPrivateUrl(item.url)) continue;
-      visited.add(item.url);
+      console.log(`[crawl] Processing: ${item.url} (depth=${item.depth}, visited=${visited.size}, queue=${queue.length}, results=${results.length})`);
+      if (visited.has(item.url)) { console.log(`[crawl] SKIP (visited)`); continue; }
+      if (WebsiteCrawler.isPrivateUrl(item.url)) { console.log(`[crawl] SKIP (private)`); continue; }
 
       try {
         await this.rateLimit();
         const response = await fetch(item.url, { signal: AbortSignal.timeout(10000) });
-        if (!response.ok) continue;
+        if (!response.ok) { console.log(`[crawl] SKIP (HTTP ${response.status}): ${item.url}`); continue; }
 
         const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('text/html')) continue;
+        if (!contentType.includes('text/html')) { console.log(`[crawl] SKIP (not html): ${item.url}`); continue; }
 
         const html = await response.text();
         const canonical = this.extractCanonical(html) || item.url;
-        if (visited.has(canonical)) continue;
+        if (visited.has(canonical)) { console.log(`[crawl] SKIP (canonical duplicate): ${item.url} -> ${canonical}`); continue; }
+        visited.add(item.url);
         visited.add(canonical);
 
         const doc = await parser.parse(html, item.url, tenantId, { sourceUrl: item.url, canonicalUrl: canonical, crawlDepth: item.depth, fetchedAt: new Date().toISOString() });
@@ -523,15 +528,23 @@ export class WebsiteCrawler implements WebCrawler {
 
         if (item.depth < maxDepth) {
           const links = this.extractLinks(html, item.url);
+          let added = 0;
           for (const link of links) {
             if (visited.has(link) || results.length + queue.length >= maxPages) continue;
             if (WebsiteCrawler.isPrivateUrl(link)) continue;
+            // Stay on the same domain (or subdomain) as the initial URL
+            try {
+              const linkHost = new URL(link).hostname;
+              if (linkHost !== targetDomain && !linkHost.endsWith('.' + targetDomain)) continue;
+            } catch { continue; }
             if (respectRobots) {
               const allowed = await this.checkRobotsTxtCached(link, robotsCache);
-              if (!allowed) continue;
+              if (!allowed) { console.log(`[crawl] SKIP (robots disallowed): ${link}`); continue; }
             }
             queue.push({ url: link, depth: item.depth + 1 });
+            added++;
           }
+          console.log(`[crawl] ${item.url} -> ${links.length} links, ${added} added, queue=${queue.length}, results=${results.length}`);
         }
       } catch {
         continue;

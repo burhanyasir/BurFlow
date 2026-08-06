@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../../../../components/ui/Button';
 import type { OnboardingData } from '../onboarding-context';
+import { deriveBusinessIntelligenceSnapshot } from '../../../../utils/business-profile';
 
 interface Props {
   data: OnboardingData;
@@ -54,6 +55,14 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
   const [seeding, setSeeding] = useState(false);
   const [seedDone, setSeedDone] = useState(false);
 
+  const businessProfile = useMemo(() => deriveBusinessIntelligenceSnapshot({
+    businessName: data.workspace.name || 'your business',
+    industry: data.workspace.industry,
+    knowledge: data.knowledge,
+    widgetInstalled: !!data.embed.widgetToken,
+    hasConversations: data.testMessages.length > 0,
+  }), [data.knowledge, data.embed.widgetToken, data.testMessages.length, data.workspace.industry, data.workspace.name]);
+
   const handleComplete = async () => {
     setCompleting(true);
     try {
@@ -90,8 +99,31 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h1 className="text-3xl font-bold text-[var(--color-neutral-900)] mb-2">You're All Set!</h1>
-        <p className="text-base text-[var(--color-neutral-500)]">Your AI chatbot is ready to help your customers.</p>
+        <h1 className="text-3xl font-bold text-[var(--color-neutral-900)] mb-2">Your BurFlow agent is live.</h1>
+        <p className="text-base text-[var(--color-neutral-500)]">BurFlow has scanned your website and is ready to answer visitors, recommend products, and capture leads.</p>
+      </div>
+
+      <div className="bg-gradient-to-br from-[var(--color-accent-50)] to-[var(--color-neutral-50)] rounded-xl border border-[var(--color-accent-100)] p-6 mb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-5">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.24em] text-[var(--color-accent-600)]">Business intelligence snapshot</p>
+            <h3 className="text-lg font-semibold text-[var(--color-neutral-900)] mt-1">{businessProfile.businessName}</h3>
+            <p className="text-sm text-[var(--color-neutral-600)] mt-1">{businessProfile.industry} • {businessProfile.productsAndServices.join(' • ')}</p>
+          </div>
+          <div className="rounded-full bg-white/80 px-3 py-1 text-sm font-semibold text-[var(--color-accent-700)] border border-[var(--color-accent-200)]">
+            {businessProfile.intelligenceScore}% readiness
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg bg-white/70 p-3 border border-[var(--color-neutral-200)]">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-neutral-400)]">Ideal customer</p>
+            <p className="text-sm font-medium text-[var(--color-neutral-700)] mt-1">{businessProfile.idealCustomer}</p>
+          </div>
+          <div className="rounded-lg bg-white/70 p-3 border border-[var(--color-neutral-200)]">
+            <p className="text-[10px] uppercase tracking-[0.2em] text-[var(--color-neutral-400)]">Recommended next step</p>
+            <p className="text-sm font-medium text-[var(--color-neutral-700)] mt-1">{businessProfile.recommendedNextAction}</p>
+          </div>
+        </div>
       </div>
 
       <div className="bg-[var(--color-neutral-50)] rounded-xl p-6 mb-8">

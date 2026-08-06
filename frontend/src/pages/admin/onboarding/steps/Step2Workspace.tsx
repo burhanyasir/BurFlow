@@ -29,8 +29,8 @@ export function Step2Workspace({ data, onChange, onCreateWorkspace }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto py-4">
-      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Create Your Workspace</h2>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Tell us about your company so we can set up your AI chatbot workspace.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Tell BurFlow about your business</h2>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-8">These details give the agent its first working profile so it can understand your offer and guide visitors more effectively.</p>
 
       <div className="space-y-5">
         <div>
@@ -40,7 +40,7 @@ export function Step2Workspace({ data, onChange, onCreateWorkspace }: Props) {
             value={data.name}
             onChange={e => onChange('name', e.target.value)}
           />
-          <p className="text-xs text-[var(--color-neutral-400)] mt-1">Your customers will see this name on the chatbot widget.</p>
+          <p className="text-xs text-[var(--color-neutral-400)] mt-1">Your visitors will see this name on the BurFlow widget.</p>
         </div>
 
         <div>
@@ -50,7 +50,7 @@ export function Step2Workspace({ data, onChange, onCreateWorkspace }: Props) {
             value={data.website}
             onChange={e => onChange('website', e.target.value)}
           />
-          <p className="text-xs text-[var(--color-neutral-400)] mt-1">Where the chatbot will be installed. We'll use this to verify ownership.</p>
+          <p className="text-xs text-[var(--color-neutral-400)] mt-1">This website is the source of product, pricing, and qualification information for your chatbot.</p>
         </div>
 
         <div>
@@ -78,19 +78,19 @@ export function Step2Workspace({ data, onChange, onCreateWorkspace }: Props) {
         )}
 
         <div className="bg-[var(--color-neutral-50)] rounded-xl p-4 border border-[var(--color-neutral-100)]">
-          <h4 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-2">What happens next?</h4>
+          <h4 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-2">Why this matters</h4>
           <ul className="space-y-2 text-xs text-[var(--color-neutral-500)]">
             <li className="flex items-start gap-2">
               <svg className="w-4 h-4 text-[var(--color-accent-500)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-              Your workspace is created with a free Starter plan
+              This creates your workspace and gives the agent a clear identity.
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-4 h-4 text-[var(--color-accent-500)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-              You'll add your knowledge sources in the next step
+              The website URL becomes the primary source for products, pricing, and buyer intent.
             </li>
             <li className="flex items-start gap-2">
               <svg className="w-4 h-4 text-[var(--color-accent-500)] shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-              You can change your plan anytime from Billing
+              You can update or expand this later as your offer evolves.
             </li>
           </ul>
         </div>

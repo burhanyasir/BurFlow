@@ -24,8 +24,8 @@ const footerColumns = [
   {
     title: 'Platform',
     links: [
-      { label: 'API Documentation', href: '/docs' },
-      { label: 'Widget Guide', href: '/docs' },
+      { label: 'API Documentation', href: '/docs/api' },
+      { label: 'Widget Guide', href: '/docs/widget' },
       { label: 'Status', href: '/status' }
     ]
   },
@@ -86,7 +86,7 @@ export function PublicLayout({ children, className }: PublicLayoutProps) {
         <Container className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 font-bold text-lg text-[var(--color-neutral-900)] shrink-0">
             <svg className="h-7 w-7 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7v10l10 5 10-5V7l-10-5z"/></svg>
-            Conversation Engine
+            BurFlow
           </Link>
           <nav className="hidden md:flex items-center gap-1">
             {navLinks.map(link => {
@@ -192,7 +192,7 @@ export function PublicLayout({ children, className }: PublicLayoutProps) {
                 HIPAA
               </span>
             </div>
-            <p className="text-sm text-[var(--color-neutral-300)] text-center">&copy; 2026 Conversation Engine. All rights reserved. Precision Customer AI.</p>
+            <p className="text-sm text-[var(--color-neutral-300)] text-center">&copy; 2026 BurFlow. All rights reserved. AI website sales agents.</p>
           </div>
         </Container>
       </footer>

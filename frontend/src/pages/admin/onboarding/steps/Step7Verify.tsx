@@ -29,8 +29,8 @@ export function Step7Verify({ verified, snippet, onVerify }: Props) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto py-4">
-      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Verify Installation</h2>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-8">After adding the snippet to your website, click verify to check that the widget is loading correctly.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Verify widget installation</h2>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Confirm your BurFlow widget is live so it can start capturing leads, answering questions, and booking demos.</p>
 
       <div className="space-y-6">
         <div className="bg-[var(--color-neutral-50)] rounded-xl p-4 border border-[var(--color-neutral-100)]">

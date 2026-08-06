@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { EnhancedApiKeyRepository, TenantRepository, AuditLogRepository } from '@conversation-engine/saas-core';
+import type { EnhancedApiKeyRepository, TenantRepository, AuditLogRepository, EnhancedApiKey } from '@conversation-engine/saas-core';
 import {
   requireJsonObject, validateRequiredString, validateRequiredEnum,
   validationError, LABEL_MAX, validateUUID,
@@ -44,7 +44,7 @@ export function createApiKeyRoutes(
 ): Router {
   const router = Router();
   const logger = createLogger('saas-api:api-keys');
-  const safeAuditRepo = auditRepo ?? { record: () => undefined } as AuditLogRepository;
+  const safeAuditRepo = auditRepo ?? ({ record: () => undefined } as unknown as AuditLogRepository);
 
   const adminOnly = (req: Request, res: Response, next: Function) => {
     if (!req.user?.role || !['admin', 'owner'].includes(req.user.role)) {
@@ -93,7 +93,7 @@ export function createApiKeyRoutes(
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
       const { key, record } = apiKeyRepo.create(
-        req.user.tenantId, label, role || 'end-user', req.user.sub || req.user.userId || '',
+        req.user.tenantId, label, role || 'end-user', req.user.sub || '',
         expiresAt || undefined, permissions || undefined,
       );
 

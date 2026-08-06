@@ -30,14 +30,14 @@ const SCRIPTED_QA: Record<string, { answer: string; sources: string[] }> = {
 };
 
 const FALLBACK_RESPONSE = {
-  answer: 'I couldn\'t find this in the documentation, so I won\'t guess. If you\'d like, I can connect you with our team.',
+  answer: 'I don\'t want to guess. I can help you discover the right product, plan, or next step based on your website content.',
   sources: [] as string[]
 };
 
 const SUGGESTED_QUESTIONS = [
-  'What is your return policy?',
-  'How do I integrate the widget?',
-  'What are your pricing tiers?'
+  'What products do you offer?',
+  'Which plan is best for my team?',
+  'How does onboarding work?'
 ];
 
 function TypingIndicator() {
@@ -130,7 +130,7 @@ export function LiveDemoWidget() {
             <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7v10l10 5 10-5V7l-10-5z"/></svg>
           </div>
           <div>
-            <p className="text-sm font-semibold text-[var(--color-neutral-900)]">Conversation Engine</p>
+            <p className="text-sm font-semibold text-[var(--color-neutral-900)]">BurFlow</p>
             <div className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-success-500)]" />
               <span className="text-[10px] text-[var(--color-neutral-400)]">Online</span>
@@ -154,8 +154,8 @@ export function LiveDemoWidget() {
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
                 </div>
-                <p className="text-sm font-medium text-[var(--color-neutral-500)] mb-1">Ask a question to see grounding in action</p>
-                <p className="text-xs text-[var(--color-neutral-400)]">Try a suggested question below</p>
+                <p className="text-sm font-medium text-[var(--color-neutral-500)] mb-1">Ask a real sales question to see BurFlow in action</p>
+                <p className="text-xs text-[var(--color-neutral-400)]">Try a suggested product, pricing, or demo question below.</p>
               </motion.div>
             )}
           </AnimatePresence>

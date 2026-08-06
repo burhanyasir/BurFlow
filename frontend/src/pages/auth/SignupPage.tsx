@@ -85,7 +85,7 @@ export default function SignupPage() {
     setLoading(true);
     try {
       await signup(email.trim(), password, name.trim(), companyName.trim() || undefined);
-      addToast('Account created! Check your email for verification.', 'success');
+      addToast('Welcome to BurFlow. Your sales agent workspace is ready.', 'success');
       navigate('/dashboard', { replace: true });
     } catch (err: any) {
       addToast(err.message || 'Signup failed', 'error');

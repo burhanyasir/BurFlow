@@ -1,0 +1,72 @@
+[
+  {
+    "url": "https://www.shopify.com/pricing",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are ready to choose an online store platform and need a clear pricing comparison plus trust signals for security and uptime."
+  },
+  {
+    "url": "https://www.realtor.com/realestateandhomes-search",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We need pricing and trust details for home search, plus agent reliability and commission transparency."
+  },
+  {
+    "url": "https://www.honeywell.com/us/en/products",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We need pricing and trust details for safety systems and want proof of certifications and successful installations."
+  },
+  {
+    "url": "https://www.airbnb.com/s/experiences",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are comparing local experiences and need pricing transparency, host trust signals, and booking guidance."
+  },
+  {
+    "url": "https://www.johndeere.com/en/",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We need pricing for agricultural equipment and trust signals around dealer support and reliability."
+  },
+  {
+    "url": "https://www.wellsfargo.com/",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are comparing business banking services and need pricing details, trust signals, and loan support."
+  },
+  {
+    "url": "https://www.siemens.com/global/en/home.html",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are researching automation systems and need pricing estimates, trust signals, and reference projects."
+  },
+  {
+    "url": "https://www.intuit.com/",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are evaluating accounting software pricing and need trust signals around security and compliance."
+  },
+  {
+    "url": "https://www.diageo.com/en/",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are reviewing beverage suppliers and need trust signals, pricing transparency, and sustainability proof."
+  },
+  {
+    "url": "https://www.kaspersky.com/",
+    "matched": [
+      "pricing"
+    ],
+    "message": "We are comparing security software pricing and need trust signals around certifications and independent test results."
+  }
+]

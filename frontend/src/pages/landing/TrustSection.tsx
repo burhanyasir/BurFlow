@@ -11,7 +11,7 @@ const trustSignals = [
       </svg>
     ),
     title: 'Grounded responses',
-    description: 'Every answer is sourced from your documentation. No hallucination, no guessing.'
+    description: 'Every answer is sourced from your website content. No hallucination, no guessing.'
   },
   {
     category: 'Security',

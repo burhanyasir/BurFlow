@@ -10,6 +10,7 @@ export { CrossEncoderReranker, PassThroughReranker } from './retrieval/reranker'
 export { DefaultContextAssembler } from './retrieval/context-assembler';
 export { RetrievalEvaluator } from './retrieval/evaluation';
 export { KnowledgePipeline } from './pipeline';
+export { WebsiteKnowledgeEngine } from './website-knowledge-engine';
 
 export type { DocumentParser, Normalizer, Chunker, EmbeddingProvider, VectorStore, KnowledgeStore, KnowledgePublisher, Retriever, Reranker, ContextAssembler, Evaluator, WebCrawler } from './interfaces';
 export * from './types';

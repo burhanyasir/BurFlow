@@ -27,9 +27,9 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   }
 
   getAvailableTopics(tenantId: string): DiscernedTopic[] {
-    const dbTopics = this.repo.findByTenant(tenantId).map(r => r.topic);
+    const dbTopics = this.repo.findByTenant(tenantId).map(r => r.topic as DiscernedTopic);
     const defaultTopics = this.fallback.getAvailableTopics(tenantId);
-    return [...new Set([...dbTopics, ...defaultTopics])];
+    return Array.from(new Set([...dbTopics, ...defaultTopics])) as DiscernedTopic[];
   }
 
   resolveTopic(rawQuery: string, tenantId: string): DiscernedTopic | null {

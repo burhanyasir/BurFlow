@@ -65,6 +65,18 @@
     }
     window.__bswAddBubble = addBubble;
 
+    function getFriendlyReply(data) {
+      var fallback = "I’m here to help, but the assistant is temporarily unavailable. Please try again in a moment.";
+      if (!data || typeof data !== "object") return fallback;
+      var reply = data.reply || data.message || data.error;
+      if (typeof reply !== "string" || !reply.trim()) return fallback;
+      var lower = reply.toLowerCase();
+      if (lower.indexOf("error:") === 0 || lower.indexOf("tenant not found") !== -1 || lower.indexOf("not found") !== -1 || lower.indexOf("unauthorized") !== -1 || lower.indexOf("forbidden") !== -1) {
+        return fallback;
+      }
+      return reply;
+    }
+
     function sendMsg() {
       var text = field.value.trim();
       if (!text) return;
@@ -72,9 +84,12 @@
       field.value = "";
       typing.style.display = "block";
       fetch(apiUrl, { method: "POST", headers: { "Content-Type": "application/json", "x-session-id": sessionId }, body: JSON.stringify({ message: text }) })
-        .then(function (r) { return r.json(); })
-        .then(function (data) { typing.style.display = "none"; addBubble(data.reply || "Sorry, something went wrong.", "bot"); })
-        .catch(function () { typing.style.display = "none"; addBubble("Unable to reach the assistant. Please try again.", "bot"); });
+        .then(function (r) {
+          if (!r.ok) return { error: "assistant_unavailable" };
+          return r.json().catch(function () { return { error: "assistant_unavailable" }; });
+        })
+        .then(function (data) { typing.style.display = "none"; addBubble(getFriendlyReply(data), "bot"); })
+        .catch(function () { typing.style.display = "none"; addBubble("I’m here to help, but the assistant is temporarily unavailable. Please try again in a moment.", "bot"); });
     }
   }
 

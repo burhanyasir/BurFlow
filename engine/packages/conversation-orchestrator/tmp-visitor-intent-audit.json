@@ -1,0 +1,102 @@
+{
+  "totalCases": 0,
+  "failingCases": 0,
+  "metrics": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "tn": 0,
+    "precision": 0,
+    "recall": 0
+  },
+  "failingCasesDetail": [],
+  "triggerStats": {
+    "pricing": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    "price": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    "cost": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    "plans": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    "tiers": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    }
+  },
+  "ranked": [
+    {
+      "term": "pricing",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    {
+      "term": "price",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    {
+      "term": "cost",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    {
+      "term": "plans",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    },
+    {
+      "term": "tiers",
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": 0,
+      "recall": 0,
+      "failCount": 0
+    }
+  ]
+}

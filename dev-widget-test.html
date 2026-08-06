@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dev Widget Test</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+      .banner { padding: 1rem; background: #111827; color: white; }
+      .container { padding: 1rem; max-width: 800px; width: 100%; margin: 0 auto; }
+      .warning { color: #b91c1c; }
+      .note { color: #374151; margin-top: 0.5rem; }
+      code { background: #f3f4f6; padding: 0.15rem 0.3rem; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <section class="banner">
+      <h1>Dev Widget Test</h1>
+      <p class="note">This page is a local dev-only fixture. It is not part of the real landing pages.</p>
+    </section>
+    <div class="container">
+      <p>
+        Provide a widget token via the <code>token</code> URL parameter. Example:
+      </p>
+      <pre>http://127.0.0.1:5173/dev-widget-test.html?token=YOUR_TOKEN_HERE</pre>
+      <p class="warning">
+        Do not copy this token into production page source. Use this fixture only for local testing.
+      </p>
+      <p class="note">
+        The widget is loaded from <code>/widget/widget.js</code> and authenticated against the local SaaS API with <code>x-widget-token</code>.
+      </p>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+      if (!token) {
+        document.body.insertAdjacentHTML('beforeend', '<div class="container"><p class="warning">No token provided. Add <code>?token=&lt;widget-token&gt;</code> to the URL.</p></div>');
+      } else {
+        const script = document.createElement('script');
+        script.src = `/widget/widget.js?token=${encodeURIComponent(token)}`;
+        script.async = true;
+        document.body.appendChild(script);
+        const style = document.createElement('link');
+        style.rel = 'stylesheet';
+        style.href = '/widget/styles.css';
+        document.head.appendChild(style);
+      }
+    </script>
+  </body>
+</html>

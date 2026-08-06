@@ -170,6 +170,7 @@ export interface WidgetConfig {
   allowedDomains: string[];
   autoOpen: boolean;
   autoOpenDelay: number;
+  businessProfile?: Record<string, unknown>;
   customCss?: string;
   createdAt: string;
   updatedAt: string;
@@ -264,6 +265,7 @@ export interface OnboardingProgress {
   onboardingStatus: OnboardingStatus;
   businessType?: string;
   primaryWebsite?: string;
+  businessProfile?: Record<string, unknown>;
   demoDataLoaded: boolean;
   widgetInstalled: boolean;
   firstSuccessfulConversation?: string;

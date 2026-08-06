@@ -1,0 +1,64 @@
+{
+  "agg": {
+    "counts": {
+      "explicitPricingSignal": {
+        "true": 0,
+        "false": 49
+      },
+      "purchaseMomentum": {
+        "true": 49,
+        "false": 0
+      },
+      "supportiveEvidence": {
+        "true": 49,
+        "false": 0
+      },
+      "strongFinancialContext": {
+        "true": 49,
+        "false": 0
+      },
+      "hasBudgetSignal": {
+        "true": 49,
+        "false": 0
+      },
+      "hasPlanComparisonSignal": {
+        "true": 4,
+        "false": 45
+      },
+      "hasDecisionAuthoritySignal": {
+        "true": 1,
+        "false": 48
+      },
+      "hasTimelineSignal": {
+        "true": 0,
+        "false": 49
+      },
+      "hasProcurementSignal": {
+        "true": 1,
+        "false": 48
+      },
+      "pricingReady": {
+        "true": 49,
+        "false": 0
+      }
+    }
+  },
+  "comboCounts": {
+    "0111100001": 45,
+    "0111110001": 3,
+    "0111111011": 1
+  },
+  "flipCounts": {
+    "isPricingIntent": 49,
+    "isComparisonIntent": 0,
+    "pageTypePricing": 0,
+    "hasPricingInfo": 0,
+    "hasBudgetSignal": 45,
+    "hasProcurementSignal": 0,
+    "hasPlanComparisonSignal": 0,
+    "hasDecisionAuthoritySignal": 0,
+    "hasTimelineSignal": 0,
+    "atDecisionStage": 0,
+    "isBuyingIntent": 0
+  }
+}

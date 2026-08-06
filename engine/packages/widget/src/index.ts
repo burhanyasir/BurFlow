@@ -45,24 +45,4 @@ function deriveApiUrl(): string {
 if (typeof window !== 'undefined') {
   window.ChatWidget = ChatWidget;
   window.initChatWidget = initChatWidget;
-
-  const scriptEl = document.currentScript as HTMLScriptElement | null;
-  if (scriptEl) {
-    const config: WidgetConfig = {
-      apiUrl: scriptEl.getAttribute('data-api-url') || deriveApiUrl(),
-      tenantId: scriptEl.getAttribute('data-tenant-id') || undefined,
-      apiKey: scriptEl.getAttribute('data-api-key') || undefined,
-      widgetToken: scriptEl.getAttribute('data-token') || extractWidgetToken(),
-      sessionId: scriptEl.getAttribute('data-session-id') || undefined,
-      title: scriptEl.getAttribute('data-title') || undefined,
-      subtitle: scriptEl.getAttribute('data-subtitle') || undefined,
-      primaryColor: scriptEl.getAttribute('data-primary-color') || undefined,
-      greeting: scriptEl.getAttribute('data-greeting') || undefined,
-      position: (scriptEl.getAttribute('data-position') as WidgetConfig['position']) || undefined,
-    };
-    if (config.apiUrl) {
-      const widget = initChatWidget(config);
-      (window as any).__CURRENT_WIDGET = widget;
-    }
-  }
 }

@@ -77,20 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await authClient.login(email, password);
-    storage.setToken(data.token);
-    setUser(
-      { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: true },
-      data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null,
-    );
+    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: true };
+    const tenant = data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null;
+    storage.setAuthSession(data.token, user, tenant);
+    setUser(user, tenant);
   }, [setUser]);
 
   const signup = useCallback(async (email: string, password: string, name: string, companyName?: string) => {
     const data = await authClient.signup(email, password, name, companyName);
-    storage.setToken(data.token);
-    setUser(
-      { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: false },
-      data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null,
-    );
+    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: false };
+    const tenant = data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null;
+    storage.setAuthSession(data.token, user, tenant);
+    setUser(user, tenant);
   }, [setUser]);
 
   const logout = useCallback(() => {

@@ -183,6 +183,79 @@ export interface EvaluationResult {
   emptyRetrievalRate: number;
 }
 
+export interface KnowledgeDocumentEntry {
+  documentId: string;
+  tenantId: string;
+  sourceId: string;
+  pageUrl: string;
+  title: string;
+  section: string;
+  content: string;
+  contentHash: string;
+  createdAt: string;
+  updatedAt: string;
+  confidence: number;
+  classification: string;
+}
+
+export interface KnowledgeChunkRecord {
+  chunkId: string;
+  tenantId: string;
+  version: number;
+  documentId: string;
+  pageUrl: string;
+  title: string;
+  section: string;
+  content: string;
+  contentHash: string;
+  chunkOrder: number;
+  classification: string;
+  confidence: number;
+  createdAt: string;
+}
+
+export interface KnowledgeRelationRecord {
+  relationId: string;
+  tenantId: string;
+  version: number;
+  fromChunkId: string;
+  toChunkId: string;
+  relationType: string;
+  createdAt: string;
+}
+
+export interface KnowledgeVersionRecord {
+  tenantId: string;
+  version: number;
+  sourceId: string;
+  scanVersion: string;
+  documentCount: number;
+  chunkCount: number;
+  duplicatesRemoved: number;
+  averageChunkSize: number;
+  confidenceAverage: number;
+  changedChunkCount: number;
+  unchangedChunkCount: number;
+  knowledgeFreshness: string;
+  createdAt: string;
+  statsJson: string;
+}
+
+export interface KnowledgeStats {
+  documentCount: number;
+  chunkCount: number;
+  duplicatesRemoved: number;
+  averageChunkSize: number;
+  confidenceAverage: number;
+  changedChunkCount: number;
+  unchangedChunkCount: number;
+  knowledgeFreshness: string;
+  scanVersion: string;
+  version: number;
+  tenantId: string;
+  sourceId: string;
+}
+
 export interface QueueItem {
   documentId: string;
   tenantId: string;

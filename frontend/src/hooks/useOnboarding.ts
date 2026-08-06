@@ -10,6 +10,7 @@ export interface OnboardingProgress {
   onboardingStatus: 'not_started' | 'in_progress' | 'completed' | 'skipped';
   businessType?: string;
   primaryWebsite?: string;
+  businessProfile?: Record<string, unknown>;
   demoDataLoaded: boolean;
   widgetInstalled: boolean;
   firstSuccessfulConversation?: string;

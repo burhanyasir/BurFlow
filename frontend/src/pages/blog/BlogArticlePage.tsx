@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
+import { Seo } from '../../components/seo/Seo';
 
 interface BlogArticle {
   slug: string;
@@ -194,6 +195,7 @@ export default function BlogArticlePage() {
 
   return (
     <div className="bg-[#08080A] min-h-screen">
+      <Seo title={article.title} description={article.excerpt} path={`/blog/${article.slug}`} />
       {/* ── BACK LINK ─────────────────────────────────────── */}
       <div className="mx-auto px-4 md:px-8 pt-28 md:pt-36" style={{ maxWidth: 800 }}>
         <motion.div

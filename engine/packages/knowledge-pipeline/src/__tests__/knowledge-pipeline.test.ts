@@ -11,6 +11,7 @@ import {
   KnowledgeRetriever, CrossEncoderReranker, PassThroughReranker,
   DefaultContextAssembler, RetrievalEvaluator,
   KnowledgePipeline,
+  WebsiteKnowledgeEngine,
 } from '../index';
 
 // ─── Phase 1: Parsers ────────────────────────────────────
@@ -248,6 +249,58 @@ describe('ContentNormalizer', () => {
 });
 
 // ─── Phase 3: Chunking ────────────────────────────────────
+describe('WebsiteKnowledgeEngine', () => {
+  it('builds a tenant-scoped knowledge version from website scan output', async () => {
+    const db = new Database(':memory:');
+    const engine = new WebsiteKnowledgeEngine(db);
+
+    const version = await engine.buildVersion('tenant-1', 'scan-1', {
+      scanId: 'scan-1',
+      report: {
+        businessProfile: {
+          companyName: 'BurFlow Labs',
+          website: 'https://burflow.example',
+        },
+        pages: [
+          {
+            url: 'https://burflow.example',
+            title: 'BurFlow Labs',
+            pageType: 'home',
+            score: 0.85,
+            intelligence: {
+              services: ['AI sales automation'],
+              pricing: ['Starter $49/month'],
+              contact: ['Book a demo'],
+              about: ['We help teams sell faster'],
+              faq: ['How fast can you launch?'],
+              products: ['BurFlow AI Sales Agent'],
+              features: ['Lead routing'],
+              benefits: ['Faster conversions'],
+            },
+            meta: {
+              description: 'AI website sales automation platform.',
+            },
+          },
+        ],
+      },
+    });
+
+    expect(version.version).toBe(1);
+    expect(version.documentCount).toBe(1);
+    expect(version.chunkCount).toBeGreaterThan(0);
+
+    const documents = engine.getTenantDocuments('tenant-1');
+    const chunks = engine.getTenantChunks('tenant-1', 1);
+    const relations = engine.getTenantRelations('tenant-1', 1);
+
+    expect(documents).toHaveLength(1);
+    expect(chunks.length).toBeGreaterThan(0);
+    expect(relations.length).toBeGreaterThanOrEqual(0);
+    expect(documents[0].tenantId).toBe('tenant-1');
+    expect(chunks[0].tenantId).toBe('tenant-1');
+  });
+});
+
 describe('ContentChunker', () => {
   const normalizer = new ContentNormalizer();
   const mdParser = new MarkdownParser();
