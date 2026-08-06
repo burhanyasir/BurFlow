@@ -107,6 +107,12 @@ export function OnboardingPage() {
   };
 
   const handleNext = async () => {
+    console.log('[Onboarding] handleNext clicked, step:', state.data.currentStep, 'knowledge:', {
+      files: state.data.knowledge.files.length,
+      faqs: state.data.knowledge.faqs,
+      websites: state.data.knowledge.websites,
+      completedSteps: state.data.completedSteps,
+    });
     if (state.data.currentStep === 1) {
       if (!state.data.workspace.tenantId) {
         try {
@@ -120,6 +126,8 @@ export function OnboardingPage() {
     } else if (state.data.currentStep === 2) {
       if (state.data.knowledge.files.length > 0 || state.data.knowledge.faqs.trim() || state.data.knowledge.websites.length > 0) {
         state.markStepComplete(2);
+      } else {
+        console.warn('[Onboarding] Step 2 blocked — no knowledge added');
       }
     } else if (state.data.currentStep === 4) {
       try {

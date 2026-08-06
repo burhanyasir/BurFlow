@@ -461,11 +461,12 @@ export class WebsiteCrawler implements WebCrawler {
     }
   }
 
-  async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean }): Promise<ParsedDocument[]> {
+  async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean; onProgress?: (pagesCrawled: number, queueRemaining: number) => void }): Promise<ParsedDocument[]> {
     const maxDepth = Math.min(options?.maxDepth ?? 2, 15);
     const maxPages = Math.min(options?.maxPages ?? 10, 1000);
     const respectRobots = options?.respectRobotsTxt ?? true;
     const useSitemap = options?.useSitemap ?? true;
+    const onProgress = options?.onProgress;
 
     if (WebsiteCrawler.isPrivateUrl(url)) {
       throw new Error('URL points to a private/internal network address');
@@ -525,6 +526,7 @@ export class WebsiteCrawler implements WebCrawler {
 
         const doc = await parser.parse(html, item.url, tenantId, { sourceUrl: item.url, canonicalUrl: canonical, crawlDepth: item.depth, fetchedAt: new Date().toISOString() });
         results.push(doc);
+        if (onProgress) onProgress(results.length, queue.length);
 
         if (item.depth < maxDepth) {
           const links = this.extractLinks(html, item.url);

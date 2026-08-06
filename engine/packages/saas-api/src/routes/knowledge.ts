@@ -31,6 +31,22 @@ const PROCESS_TIMEOUT_MS = 30000;
 const MAX_CRAWL_DEPTH = 10;
 const MAX_CRAWL_PAGES = 500;
 
+// In-memory crawl progress tracker keyed by tenantId
+const crawlProgressMap = new Map<string, { pagesCrawled: number; queueRemaining: number; maxPages: number; url: string; startedAt: number; done: boolean; warning?: string }>();
+
+function getCrawlProgress(tenantId: string) {
+  return crawlProgressMap.get(tenantId) || null;
+}
+
+function setCrawlProgress(tenantId: string, update: Partial<ReturnType<typeof getCrawlProgress>>) {
+  const existing = crawlProgressMap.get(tenantId);
+  if (existing) Object.assign(existing, update);
+}
+
+function clearCrawlProgress(tenantId: string) {
+  crawlProgressMap.delete(tenantId);
+}
+
 let singletonVectorStore: SqliteVectorStore | null = null;
 let singletonKnowledgeStore: SqliteKnowledgeStore | null = null;
 
@@ -200,9 +216,18 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
     }
   });
 
+  // GET /crawl/progress — Get live crawl progress for current tenant
+  router.get('/crawl/progress', (req: Request, res: Response) => {
+    if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+    const progress = getCrawlProgress(req.user.tenantId);
+    if (!progress) return res.json({ active: false });
+    res.json({ active: !progress.done, ...progress });
+  });
+
   // POST /crawl — Crawl a website URL
   router.post('/crawl', async (req: Request, res: Response) => {
     if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+    const tenantId = req.user.tenantId;
 
     const { url, maxDepth, maxPages } = req.body;
     if (!url || typeof url !== 'string') {
@@ -224,15 +249,25 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
     const crawlPages = clampInt(maxPages, 1, MAX_CRAWL_PAGES, 10);
 
     try {
+      // Initialize progress tracker
+      crawlProgressMap.set(tenantId, {
+        pagesCrawled: 0, queueRemaining: 0, maxPages: crawlPages,
+        url, startedAt: Date.now(), done: false,
+      });
+
       const crawler = new WebsiteCrawler();
-      const docs = await crawler.crawl(url, req.user.tenantId, {
+      const docs = await crawler.crawl(url, tenantId, {
         respectRobotsTxt: true,
         maxDepth: crawlDepth,
         maxPages: crawlPages,
         useSitemap: true,
+        onProgress: (pagesCrawled: number, queueRemaining: number) => {
+          setCrawlProgress(tenantId, { pagesCrawled, queueRemaining });
+        },
       });
 
       if (!docs || docs.length === 0) {
+        setCrawlProgress(tenantId, { done: true, warning: 'No readable content was found' });
         return res.status(200).json({
           documentId: null,
           status: 'no_content',
@@ -243,12 +278,14 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
       const docIds: string[] = [];
       for (const doc of docs) {
-        const docId = await pipeline.enqueue(req.user.tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
+        const docId = await pipeline.enqueue(tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
         await pipeline.processParsedDocument(docId, doc);
         docIds.push(docId);
       }
 
       const status = pipeline.getQueueStatus(docIds[0]);
+      setCrawlProgress(tenantId, { done: true, pagesCrawled: docs.length, queueRemaining: 0 });
+      setTimeout(() => clearCrawlProgress(tenantId), 30000);
       res.status(202).json({
         documentId: docIds[0],
         status: status?.status || 'published',
@@ -258,7 +295,9 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         warning: null,
       });
     } catch (err: any) {
-      createContextLogger(logger).warn({ err, tenantId: req.user?.tenantId, url }, 'Knowledge crawl failed during onboarding flow; continuing with basic widget setup');
+      setCrawlProgress(tenantId, { done: true, warning: err.message || 'Crawl failed' });
+      setTimeout(() => clearCrawlProgress(tenantId), 30000);
+      createContextLogger(logger).warn({ err, tenantId, url }, 'Knowledge crawl failed during onboarding flow; continuing with basic widget setup');
       if (err.message?.includes('exceeds maximum')) {
         return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }

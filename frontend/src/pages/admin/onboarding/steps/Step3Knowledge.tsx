@@ -14,7 +14,7 @@ interface Props {
   onUpdateFaqs: (faqs: string) => void;
   onUploadFile: (file: File) => Promise<void>;
   onSubmitFaqs: () => Promise<void>;
-  onCrawlWebsites: () => Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>>;
+  onCrawlWebsites: (onProgress?: (pages: number, remaining: number, maxPages: number) => void) => Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>>;
 }
 
 export function Step3Knowledge({
@@ -30,6 +30,7 @@ export function Step3Knowledge({
   const [crawling, setCrawling] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
   const [crawlSuccess, setCrawlSuccess] = useState<string | null>(null);
+  const [crawlProgress, setCrawlProgress] = useState<{ pages: number; remaining: number; maxPages: number } | null>(null);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -62,8 +63,12 @@ export function Step3Knowledge({
     setCrawling(true);
     setScanError(null);
     setCrawlSuccess(null);
+    setCrawlProgress(null);
     try {
-      const results = await onCrawlWebsites();
+      const results = await onCrawlWebsites((pages, remaining, maxPages) => {
+        setCrawlProgress({ pages, remaining, maxPages });
+      });
+      setCrawlProgress(null);
       const totalPages = results.reduce((sum, r) => sum + r.pagesCrawled, 0);
       const warnings = results.filter(r => r.warning).map(r => r.warning);
       if (totalPages > 0) {
@@ -79,6 +84,7 @@ export function Step3Knowledge({
       setScanError(msg);
     } finally {
       setCrawling(false);
+      setCrawlProgress(null);
     }
   };
 
@@ -156,6 +162,24 @@ export function Step3Knowledge({
               <Button size="sm" variant="secondary" onClick={handleCrawlWebsites} disabled={crawling} className="mt-2">
                 {crawling ? 'Importing…' : 'Import Websites Now'}
               </Button>
+              {crawling && crawlProgress && (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-[var(--color-accent-700)] font-medium">
+                      Importing page {crawlProgress.pages} of ~{crawlProgress.maxPages}…
+                    </span>
+                    <span className="text-[var(--color-neutral-400)] text-xs">{crawlProgress.remaining} in queue</span>
+                  </div>
+                  <Progress value={crawlProgress.maxPages > 0 ? (crawlProgress.pages / crawlProgress.maxPages) * 100 : 0} />
+                  <p className="text-xs text-[var(--color-neutral-400)]">Scanning pages and building your knowledge base. This may take a minute.</p>
+                </div>
+              )}
+              {crawling && !crawlProgress && (
+                <div className="mt-3">
+                  <p className="text-sm text-[var(--color-accent-700)] font-medium">Starting website scan…</p>
+                  <p className="text-xs text-[var(--color-neutral-400)] mt-1">Checking robots.txt and sitemap.</p>
+                </div>
+              )}
             </div>
           )}
           {scanError && (

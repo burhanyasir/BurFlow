@@ -97,7 +97,11 @@ export function useOnboardingState() {
   const [data, setData] = useState<OnboardingData>(loadSaved);
   const { refreshUser } = useAuth();
   const persist = useCallback((next: OnboardingData) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    } catch (err) {
+      console.error('[Onboarding] Failed to persist state:', err);
+    }
   }, []);
 
   const goToStep = useCallback((step: number) => {
@@ -110,9 +114,9 @@ export function useOnboardingState() {
 
   const markStepComplete = useCallback((step: number) => {
     setData(prev => {
-      if (prev.completedSteps.includes(step)) return prev;
-      const completed = [...prev.completedSteps, step];
+      const completed = prev.completedSteps.includes(step) ? prev.completedSteps : [...prev.completedSteps, step];
       const next = { ...prev, completedSteps: completed, currentStep: Math.min(step + 1, 9) };
+      console.log('[Onboarding] Step', step, 'completed, advancing to step', next.currentStep);
       persist(next);
       return next;
     });
@@ -339,14 +343,34 @@ export function useOnboardingState() {
     });
   }, [data.knowledge.faqs]);
 
-  const crawlWebsites = useCallback(async (): Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>> => {
+  const crawlWebsites = useCallback(async (onProgress?: (pages: number, remaining: number, maxPages: number) => void): Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>> => {
     const results: Array<{ url: string; pagesCrawled: number; warning?: string | null }> = [];
     for (const url of data.knowledge.websites) {
       try {
-        const res = await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
-        results.push({ url, pagesCrawled: res.pagesCrawled || 0, warning: res.warning || null });
-      } catch {
-        results.push({ url, pagesCrawled: 0, warning: 'Failed to crawl this URL' });
+        // Start polling progress in background
+        let pollTimer: ReturnType<typeof setInterval> | null = null;
+        if (onProgress) {
+          pollTimer = setInterval(async () => {
+            try {
+              const p = await apiClient.get<{ active: boolean; pagesCrawled: number; queueRemaining: number; maxPages: number }>('/knowledge/crawl/progress');
+              if (p && p.active) onProgress(p.pagesCrawled, p.queueRemaining, p.maxPages);
+            } catch {}
+          }, 1500);
+        }
+        try {
+          const res = await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
+          if (pollTimer) clearInterval(pollTimer);
+          // Final progress update
+          if (onProgress) onProgress(res.pagesCrawled || 0, 0, res.pagesCrawled || 0);
+          results.push({ url, pagesCrawled: res.pagesCrawled || 0, warning: res.warning || null });
+        } catch (err: any) {
+          if (pollTimer) clearInterval(pollTimer);
+          console.error('Crawl failed for', url, err);
+          results.push({ url, pagesCrawled: 0, warning: err?.message || 'Failed to crawl this URL' });
+        }
+      } catch (err: any) {
+        console.error('Crawl failed for', url, err);
+        results.push({ url, pagesCrawled: 0, warning: err?.message || 'Failed to crawl this URL' });
       }
     }
     return results;
