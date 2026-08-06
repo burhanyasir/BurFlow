@@ -6,7 +6,7 @@ import {
   MockEmbeddingProvider, OpenAIEmbeddingProvider,
   SqliteVectorStore, SqliteKnowledgeStore,
   KnowledgeRetriever, DefaultContextAssembler,
-  TextParser, MarkdownParser, HtmlParser, FaqParser, PdfParser, DocxParser,
+  TextParser, MarkdownParser, HtmlParser, FaqParser, PdfParser, DocxParser, WebsiteCrawler,
 } from '@conversation-engine/knowledge-pipeline';
 import { SourceType } from '@conversation-engine/knowledge-pipeline';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
@@ -224,13 +224,35 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
     const crawlPages = clampInt(maxPages, 1, MAX_CRAWL_PAGES, 10);
 
     try {
-      const docId = await pipeline.enqueue(req.user.tenantId, 'url', url, url, { crawlDepth, crawlPages });
-      const status = pipeline.getQueueStatus(docId);
+      const crawler = new WebsiteCrawler();
+      const docs = await crawler.crawl(url, req.user.tenantId, {
+        respectRobotsTxt: true,
+        maxDepth: crawlDepth,
+        maxPages: crawlPages,
+        useSitemap: true,
+      });
+
+      if (!docs || docs.length === 0) {
+        return res.status(422).json({
+          error: 'No content could be crawled from this URL',
+          warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.',
+        });
+      }
+
+      const docIds: string[] = [];
+      for (const doc of docs) {
+        const docId = await pipeline.enqueue(req.user.tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
+        await pipeline.processParsedDocument(docId, doc);
+        docIds.push(docId);
+      }
+
+      const status = pipeline.getQueueStatus(docIds[0]);
       res.status(202).json({
-        documentId: docId,
-        status: status?.status || 'queued',
+        documentId: docIds[0],
+        status: status?.status || 'published',
         queuedAt: status?.queuedAt,
         crawlOptions: { maxDepth: crawlDepth, maxPages: crawlPages },
+        pagesCrawled: docs.length,
         warning: null,
       });
     } catch (err: any) {
@@ -238,7 +260,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
       if (err.message?.includes('exceeds maximum')) {
         return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }
-      res.status(500).json({ error: 'Failed to enqueue URL', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+      res.status(500).json({ error: 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
     }
   });
 
