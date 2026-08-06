@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MTH Medical Store — Demo E-commerce</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1f2937; background: #f9fafb; }
+    
+    /* Header */
+    .header { background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 100; }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { font-size: 1.5rem; font-weight: 800; color: #a8244b; text-decoration: none; }
+    .logo span { color: #1f2937; }
+    nav { display: flex; gap: 2rem; }
+    nav a { text-decoration: none; color: #6b7280; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+    nav a:hover { color: #a8244b; }
+    .cart-btn { background: #a8244b; color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+    .cart-btn:hover { background: #8b1d3d; }
+
+    /* Hero */
+    .hero { background: linear-gradient(135deg, #a8244b 0%, #7c1a38 100%); color: white; padding: 4rem 2rem; text-align: center; }
+    .hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+    .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto 2rem; }
+    .hero-btn { background: white; color: #a8244b; border: none; padding: 0.75rem 2rem; border-radius: 10px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: transform 0.2s; }
+    .hero-btn:hover { transform: translateY(-2px); }
+
+    /* Trust Bar */
+    .trust-bar { background: white; border-bottom: 1px solid #e5e7eb; padding: 1.5rem 2rem; }
+    .trust-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; }
+    .trust-item { display: flex; align-items: center; gap: 0.5rem; color: #6b7280; font-size: 0.85rem; }
+    .trust-item svg { width: 20px; height: 20px; color: #10b981; }
+
+    /* Products */
+    .section { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+    .section-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .section-sub { color: #6b7280; margin-bottom: 2rem; }
+    .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.5rem; }
+    .product-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; transition: box-shadow 0.2s, transform 0.2s; }
+    .product-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.08); transform: translateY(-4px); }
+    .product-img { height: 200px; background: #f3f4f6; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+    .product-info { padding: 1.25rem; }
+    .product-category { font-size: 0.75rem; color: #a8244b; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+    .product-name { font-size: 1rem; font-weight: 600; margin: 0.5rem 0 0.25rem; }
+    .product-desc { font-size: 0.85rem; color: #6b7280; line-height: 1.5; margin-bottom: 1rem; }
+    .product-bottom { display: flex; align-items: center; justify-content: space-between; }
+    .product-price { font-size: 1.25rem; font-weight: 700; color: #111827; }
+    .product-price small { font-size: 0.75rem; color: #9ca3af; font-weight: 400; text-decoration: line-through; margin-left: 0.25rem; }
+    .add-btn { background: #a8244b; color: white; border: none; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: background 0.2s; }
+    .add-btn:hover { background: #8b1d3d; }
+    .badge { display: inline-block; background: #dcfce7; color: #166534; font-size: 0.7rem; font-weight: 600; padding: 0.15rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; }
+
+    /* Features */
+    .features { background: white; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 3rem 2rem; }
+    .features-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 2rem; }
+    .feature { text-align: center; }
+    .feature-icon { width: 48px; height: 48px; background: #fdf2f8; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 1.5rem; }
+    .feature h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .feature p { font-size: 0.8rem; color: #6b7280; line-height: 1.5; }
+
+    /* Testimonials */
+    .testimonials { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+    .testimonial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+    .testimonial { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; }
+    .stars { color: #f59e0b; font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .testimonial p { font-size: 0.9rem; color: #374151; line-height: 1.6; margin-bottom: 1rem; }
+    .testimonial-author { font-size: 0.8rem; font-weight: 600; color: #111827; }
+    .testimonial-role { font-size: 0.75rem; color: #9ca3af; }
+
+    /* Footer */
+    .footer { background: #111827; color: #9ca3af; padding: 3rem 2rem; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem; }
+    .footer h4 { color: white; font-size: 0.9rem; margin-bottom: 1rem; }
+    .footer p { font-size: 0.8rem; line-height: 1.6; }
+    .footer a { color: #9ca3af; text-decoration: none; font-size: 0.8rem; display: block; margin-bottom: 0.5rem; }
+    .footer a:hover { color: white; }
+    .footer-bottom { max-width: 1200px; margin: 2rem auto 0; padding-top: 1.5rem; border-top: 1px solid #374151; text-align: center; font-size: 0.75rem; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.75rem; }
+      .footer-inner { grid-template-columns: 1fr 1fr; }
+      nav { gap: 1rem; }
+      nav a { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <a href="#" class="logo">MTH<span>Store</span></a>
+      <nav>
+        <a href="#products">Products</a>
+        <a href="#about">About</a>
+        <a href="#contact">Contact</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <button class="cart-btn">🛒 Cart (0)</button>
+    </div>
+  </header>
+
+  <!-- Hero -->
+  <section class="hero">
+    <h1>Quality Healthcare, Delivered to You</h1>
+    <p>Madinah Teaching Hospital brings trusted medical supplies, wellness products, and health consultations — all in one place.</p>
+    <button class="hero-btn" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">Shop Now</button>
+  </section>
+
+  <!-- Trust Bar -->
+  <div class="trust-bar">
+    <div class="trust-inner">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span> Licensed & Certified
+      </span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+        <span> Fast Delivery
+      </span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+        <span> 24/7 Support
+      </span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <span> Secure Payments
+      </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Products -->
+  <section class="section" id="products">
+    <h2 class="section-title">Featured Products</h2>
+    <p class="section-sub">Trusted healthcare products recommended by our doctors</p>
+    <div class="products">
+      <div class="product-card">
+        <div class="product-img">🩺</div>
+        <div class="product-info">
+          <div class="product-category">Medical Equipment</div>
+          <div class="product-name">Digital Blood Pressure Monitor<span class="badge">Best Seller</span></div>
+          <div class="product-desc">Clinically validated automatic blood pressure monitor with irregular heartbeat detection.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 4,500 <small>₨ 6,200</small></div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">💊</div>
+        <div class="product-info">
+          <div class="product-category">Wellness</div>
+          <div class="product-name">Daily Multivitamin Pack</div>
+          <div class="product-desc">30-day supply of essential vitamins and minerals for overall health and immunity.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 1,200</div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🫀</div>
+        <div class="product-info">
+          <div class="product-category">Diagnostics</div>
+          <div class="product-name">Pulse Oximeter<span class="badge">New</span></div>
+          <div class="product-desc">Fingertip SpO2 and pulse rate monitor with OLED display. FDA approved.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 2,800 <small>₨ 3,500</small></div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🩹</div>
+        <div class="product-info">
+          <div class="product-category">First Aid</div>
+          <div class="product-name">Complete First Aid Kit</div>
+          <div class="product-desc">120-piece emergency kit with bandages, antiseptics, scissors, and more.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 3,200</div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🧬</div>
+        <div class="product-info">
+          <div class="product-category">Lab Tests</div>
+          <div class="product-name">Complete Blood Count (CBC)</div>
+          <div class="product-desc">Comprehensive blood screening with same-day results from our certified lab.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 800</div>
+            <button class="add-btn">Book Now</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🏥</div>
+        <div class="product-info">
+          <div class="product-category">Consultations</div>
+          <div class="product-name">Online Doctor Consultation<span class="badge">Popular</span></div>
+          <div class="product-desc">30-minute video consultation with a specialist doctor. Available 24/7.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 1,500</div>
+            <button class="add-btn">Book Now</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🌡️</div>
+        <div class="product-info">
+          <div class="product-category">Medical Equipment</div>
+          <div class="product-name">Infrared Thermometer</div>
+          <div class="product-desc">Non-contact forehead thermometer with fever alarm. Reads in 1 second.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 1,800 <small>₨ 2,400</small></div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+      <div class="product-card">
+        <div class="product-img">🧴</div>
+        <div class="product-info">
+          <div class="product-category">Personal Care</div>
+          <div class="product-name">Hand Sanitizer Bundle (6-pack)</div>
+          <div class="product-desc">70% alcohol-based sanitizers. Hospital grade. Dermatologically tested.</div>
+          <div class="product-bottom">
+            <div class="product-price">₨ 950</div>
+            <button class="add-btn">Add to Cart</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="about">
+    <div class="features-grid">
+      <div class="feature">
+        <div class="feature-icon">🏥</div>
+        <h3>Hospital Backed</h3>
+        <p>Every product is vetted by MTH's team of specialist doctors and pharmacists.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🚚</div>
+        <h3>Same-Day Delivery</h3>
+        <p>Order before 2 PM and receive your products the same day within Faisalabad.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <h3>AI Health Assistant</h3>
+        <p>Chat with our AI to get product recommendations and health advice instantly.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔒</div>
+        <h3>Secure & Private</h3>
+        <p>Your health data is encrypted and never shared with third parties.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials -->
+  <section class="testimonials">
+    <h2 class="section-title" style="text-align:center;">What Our Patients Say</h2>
+    <p class="section-sub" style="text-align:center; margin-bottom:2rem;">Trusted by thousands of families in Faisalabad</p>
+    <div class="testimonial-grid">
+      <div class="testimonial">
+        <div class="stars">★★★★★</div>
+        <p>"The blood pressure monitor I ordered was delivered in 2 hours! The quality is excellent and the AI chatbot helped me choose the right model."</p>
+        <div class="testimonial-author">Ahmad Raza</div>
+        <div class="testimonial-role">Verified Buyer</div>
+      </div>
+      <div class="testimonial">
+        <div class="stars">★★★★★</div>
+        <p>"I booked a blood test online and got the results the same evening. The convenience of MTH Store is unmatched. Highly recommended!"</p>
+        <div class="testimonial-author">Fatima Khan</div>
+        <div class="testimonial-role">Regular Customer</div>
+      </div>
+      <div class="testimonial">
+        <div class="stars">★★★★☆</div>
+        <p>"Great selection of medical supplies at reasonable prices. The chatbot answered all my questions about drug interactions. Very helpful!"</p>
+        <div class="testimonial-author">Dr. Hassan Ali</div>
+        <div class="testimonial-role">Healthcare Professional</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section (anchor for widget questions) -->
+  <section class="section" id="faq" style="background:white; border-top:1px solid #e5e7eb;">
+    <h2 class="section-title" style="text-align:center;">Frequently Asked Questions</h2>
+    <p class="section-sub" style="text-align:center; margin-bottom:2rem;">Or ask our AI assistant — click the chat button!</p>
+    <div style="max-width:700px; margin:0 auto;">
+      <details style="border-bottom:1px solid #e5e7eb; padding:1rem 0;">
+        <summary style="font-weight:600; cursor:pointer;">What are your delivery areas?</summary>
+        <p style="margin-top:0.75rem; font-size:0.9rem; color:#6b7280;">We deliver across Faisalabad city same-day, and across Pakistan within 3-5 business days via TCS/Leopard.</p>
+      </details>
+      <details style="border-bottom:1px solid #e5e7eb; padding:1rem 0;">
+        <summary style="font-weight:600; cursor:pointer;">Do you accept insurance?</summary>
+        <p style="margin-top:0.75rem; font-size:0.9rem; color:#6b7280;">Yes, we accept all major insurance providers for lab tests and consultations. Contact our support for details.</p>
+      </details>
+      <details style="border-bottom:1px solid #e5e7eb; padding:1rem 0;">
+        <summary style="font-weight:600; cursor:pointer;">What is your return policy?</summary>
+        <p style="margin-top:0.75rem; font-size:0.9rem; color:#6b7280;">Unopened products can be returned within 7 days. Lab tests and consultations are non-refundable.</p>
+      </details>
+      <details style="padding:1rem 0;">
+        <summary style="font-weight:600; cursor:pointer;">How can I book a doctor consultation?</summary>
+        <p style="margin-top:0.75rem; font-size:0.9rem; color:#6b7280;">You can book directly from our website or ask our AI assistant. We have specialists available 24/7 via video call.</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer" id="contact">
+    <div class="footer-inner">
+      <div>
+        <h4>MTH Store</h4>
+        <p>Madinah Teaching Hospital's online healthcare marketplace. Quality medical products and services, delivered with care.</p>
+        <p style="margin-top:1rem;">📍 Madina Town, Faisalabad, Pakistan</p>
+        <p>📞 +92 41 123 4567</p>
+        <p>✉️ info@mthstore.pk</p>
+      </div>
+      <div>
+        <h4>Quick Links</h4>
+        <a href="#products">Products</a>
+        <a href="#about">About Us</a>
+        <a href="#faq">FAQ</a>
+        <a href="#">Blog</a>
+      </div>
+      <div>
+        <h4>Categories</h4>
+        <a href="#">Medical Equipment</a>
+        <a href="#">Wellness & Supplements</a>
+        <a href="#">Lab Tests</a>
+        <a href="#">Consultations</a>
+      </div>
+      <div>
+        <h4>Support</h4>
+        <a href="#">Help Center</a>
+        <a href="#">Shipping Info</a>
+        <a href="#">Returns</a>
+        <a href="#">Privacy Policy</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 MTH Store — Madinah Teaching Hospital. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <!-- BurFlow Chatbot Widget -->
+  <script src="/widget/widget.js" data-token="eyJ0ZW5hbnRJZCI6InRlbmFudC0xNzg2MDA2NDkzMTYyIiwidHlwZSI6IndpZGdldCIsImlhdCI6MTc4NjAxNzMyMCwiZXhwIjoxNzg2MTAzNzIwfQ.08a7a41d03aa3ec036a363e682af521f472924ea9b6cf5e169ec69dc91d48239" data-primary-color="#A8244B" data-position="right"></script>
+
+</body>
+</html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maple Grove Dental — Family & Cosmetic Dentistry</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; color: #1f2937; background: #f9fafb; }
+
+    .header { background: white; border-bottom: 1px solid #e5e7eb; position: sticky; top: 0; z-index: 100; }
+    .header-inner { max-width: 1200px; margin: 0 auto; padding: 0 2rem; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+    .logo { font-size: 1.4rem; font-weight: 800; color: #2563eb; text-decoration: none; }
+    .logo span { color: #1f2937; }
+    nav { display: flex; gap: 2rem; }
+    nav a { text-decoration: none; color: #6b7280; font-size: 0.9rem; font-weight: 500; transition: color 0.2s; }
+    nav a:hover { color: #2563eb; }
+    .book-btn { background: #2563eb; color: white; border: none; padding: 0.5rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 0.85rem; }
+    .book-btn:hover { background: #1d4ed8; }
+
+    .hero { background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: white; padding: 4rem 2rem; text-align: center; }
+    .hero h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; }
+    .hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto 2rem; }
+    .hero-btn { background: white; color: #2563eb; border: none; padding: 0.75rem 2rem; border-radius: 10px; font-weight: 700; font-size: 1rem; cursor: pointer; transition: transform 0.2s; }
+    .hero-btn:hover { transform: translateY(-2px); }
+
+    .trust-bar { background: white; border-bottom: 1px solid #e5e7eb; padding: 1.5rem 2rem; }
+    .trust-inner { max-width: 1200px; margin: 0 auto; display: flex; justify-content: center; gap: 3rem; flex-wrap: wrap; }
+    .trust-item { display: flex; align-items: center; gap: 0.5rem; color: #6b7280; font-size: 0.85rem; }
+    .trust-item svg { width: 20px; height: 20px; color: #10b981; }
+
+    .section { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+    .section-title { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .section-sub { color: #6b7280; margin-bottom: 2rem; }
+
+    .services { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem; }
+    .service-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; transition: box-shadow 0.2s, transform 0.2s; }
+    .service-card:hover { box-shadow: 0 8px 30px rgba(0,0,0,0.08); transform: translateY(-4px); }
+    .service-icon { font-size: 2rem; margin-bottom: 0.75rem; }
+    .service-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .service-card p { font-size: 0.85rem; color: #6b7280; line-height: 1.5; }
+    .service-price { margin-top: 0.75rem; font-size: 0.9rem; font-weight: 700; color: #2563eb; }
+
+    .team { background: white; border-top: 1px solid #e5e7eb; border-bottom: 1px solid #e5e7eb; padding: 3rem 2rem; }
+    .team-grid { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; }
+    .team-card { text-align: center; }
+    .team-avatar { width: 100px; height: 100px; border-radius: 50%; background: #dbeafe; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem; font-size: 2.5rem; }
+    .team-card h3 { font-size: 1rem; font-weight: 600; }
+    .team-card .role { font-size: 0.8rem; color: #2563eb; font-weight: 500; }
+    .team-card .bio { font-size: 0.8rem; color: #6b7280; margin-top: 0.5rem; line-height: 1.5; }
+
+    .hours { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+    .hours-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+    .hours-table { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; }
+    .hours-table h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .hours-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f3f4f6; font-size: 0.85rem; }
+    .hours-row:last-child { border-bottom: none; }
+    .hours-row .day { color: #6b7280; }
+    .hours-row .time { font-weight: 600; }
+    .contact-box { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 16px; padding: 1.5rem; }
+    .contact-box h3 { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; color: #1e40af; }
+    .contact-item { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem; font-size: 0.9rem; }
+    .contact-item span.icon { font-size: 1.2rem; }
+
+    .insurance { background: white; border-top: 1px solid #e5e7eb; padding: 3rem 2rem; text-align: center; }
+    .insurance-logos { display: flex; justify-content: center; gap: 2rem; flex-wrap: wrap; margin-top: 1.5rem; }
+    .insurance-badge { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.75rem 1.5rem; font-size: 0.85rem; font-weight: 600; color: #374151; }
+
+    .testimonials { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; }
+    .testimonial-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+    .testimonial { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 1.5rem; }
+    .stars { color: #f59e0b; font-size: 0.9rem; margin-bottom: 0.75rem; }
+    .testimonial p { font-size: 0.9rem; color: #374151; line-height: 1.6; margin-bottom: 1rem; }
+    .testimonial-author { font-size: 0.8rem; font-weight: 600; color: #111827; }
+    .testimonial-role { font-size: 0.75rem; color: #9ca3af; }
+
+    .footer { background: #111827; color: #9ca3af; padding: 3rem 2rem; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 2rem; }
+    .footer h4 { color: white; font-size: 0.9rem; margin-bottom: 1rem; }
+    .footer p { font-size: 0.8rem; line-height: 1.6; }
+    .footer a { color: #9ca3af; text-decoration: none; font-size: 0.8rem; display: block; margin-bottom: 0.5rem; }
+    .footer a:hover { color: white; }
+    .footer-bottom { max-width: 1200px; margin: 2rem auto 0; padding-top: 1.5rem; border-top: 1px solid #374151; text-align: center; font-size: 0.75rem; }
+
+    @media (max-width: 768px) {
+      .hero h1 { font-size: 1.75rem; }
+      .hours-grid { grid-template-columns: 1fr; }
+      .footer-inner { grid-template-columns: 1fr 1fr; }
+      nav { gap: 1rem; }
+      nav a { font-size: 0.8rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="header-inner">
+      <a href="#" class="logo">Maple Grove <span>Dental</span></a>
+      <nav>
+        <a href="#services">Services</a>
+        <a href="#team">Doctors</a>
+        <a href="#hours">Hours</a>
+        <a href="#insurance">Insurance</a>
+      </nav>
+      <button class="book-btn">Book Appointment</button>
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>Your Smile, Our Priority</h1>
+    <p>Family-friendly dental care with advanced technology. From routine cleanings to cosmetic transformations — we make every visit comfortable.</p>
+    <button class="hero-btn" onclick="document.getElementById('services').scrollIntoView({behavior:'smooth'})">Our Services</button>
+  </section>
+
+  <div class="trust-bar">
+    <div class="trust-inner">
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span> Board Certified</span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <span> Same-Day Appointments</span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+        <span> Gentle & Caring</span>
+      </div>
+      <div class="trust-item">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+        <span> Insurance Accepted</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="section" id="services">
+    <h2 class="section-title">Our Services</h2>
+    <p class="section-sub">Comprehensive dental care for the whole family</p>
+    <div class="services">
+      <div class="service-card">
+        <div class="service-icon">🦷</div>
+        <h3>General Checkup & Cleaning</h3>
+        <p>Keep your smile healthy with regular visits. Professional cleaning and comprehensive oral exam.</p>
+        <div class="service-price">Starting at $120</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">✨</div>
+        <h3>Teeth Whitening</h3>
+        <p>Brighten your smile with our professional in-office whitening treatment. Results in one visit.</p>
+        <div class="service-price">Starting at $350</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🩹</div>
+        <h3>Dental Fillings</h3>
+        <p>Tooth-colored restorations for cavities. Natural-looking composite fillings.</p>
+        <div class="service-price">Starting at $150</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">💉</div>
+        <h3>Root Canal Treatment</h3>
+        <p>Gentle endodontic care to save your natural tooth. Painless procedure with modern techniques.</p>
+        <div class="service-price">Starting at $800</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">😁</div>
+        <h3>Invisalign Braces</h3>
+        <p>Clear aligners for a straighter smile. Virtually invisible, completely removable.</p>
+        <div class="service-price">Starting at $3,500</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">👶</div>
+        <h3>Pediatric Dentistry</h3>
+        <p>Friendly care for your little ones. Making dental visits fun for children of all ages.</p>
+        <div class="service-price">Starting at $90</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🚨</div>
+        <h3>Emergency Dental Care</h3>
+        <p>Same-day appointments when you need us most. We reserve slots for urgent cases.</p>
+        <div class="service-price">Call for pricing</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🖼️</div>
+        <h3>Dental Implants</h3>
+        <p>Permanent tooth replacement that looks and feels natural. Titanium implants by specialists.</p>
+        <div class="service-price">Starting at $2,000</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="team" id="team">
+    <div class="team-grid" style="max-width:1200px; margin:0 auto;">
+      <div class="team-card">
+        <div class="team-avatar">👩‍⚕️</div>
+        <h3>Dr. Emily Carter</h3>
+        <div class="role">Lead Dentist & Founder</div>
+        <div class="bio">15+ years of experience in general and cosmetic dentistry. University of Pennsylvania graduate.</div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar">👨‍⚕️</div>
+        <h3>Dr. Raj Patel</h3>
+        <div class="role">Orthodontist</div>
+        <div class="bio">Specialist in Invisalign and braces. Helped over 2,000 patients achieve their perfect smile.</div>
+      </div>
+      <div class="team-card">
+        <div class="team-avatar">👩‍⚕️</div>
+        <h3>Dr. Sarah Kim</h3>
+        <div class="role">Pediatric Dentist</div>
+        <div class="bio">Making dental visits fun for kids. Board-certified pediatric specialist with a gentle touch.</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hours" id="hours">
+    <div class="hours-grid">
+      <div class="hours-table">
+        <h3>Office Hours</h3>
+        <div class="hours-row"><span class="day">Monday</span><span class="time">8:00 AM – 6:00 PM</span></div>
+        <div class="hours-row"><span class="day">Tuesday</span><span class="time">8:00 AM – 6:00 PM</span></div>
+        <div class="hours-row"><span class="day">Wednesday</span><span class="time">8:00 AM – 6:00 PM</span></div>
+        <div class="hours-row"><span class="day">Thursday</span><span class="time">8:00 AM – 7:00 PM</span></div>
+        <div class="hours-row"><span class="day">Friday</span><span class="time">8:00 AM – 5:00 PM</span></div>
+        <div class="hours-row"><span class="day">Saturday</span><span class="time">9:00 AM – 2:00 PM</span></div>
+        <div class="hours-row"><span class="day">Sunday</span><span class="time">Closed</span></div>
+      </div>
+      <div class="contact-box">
+        <h3>Get in Touch</h3>
+        <div class="contact-item"><span class="icon">📍</span> 123 Maple Grove Medical Plaza, Suite 200</div>
+        <div class="contact-item"><span class="icon">📞</span> (555) 123-4567</div>
+        <div class="contact-item"><span class="icon">✉️</span> info@maplegrovedental.com</div>
+        <div class="contact-item"><span class="icon">🚨</span> Emergency line: (555) 911-DENT</div>
+        <p style="margin-top:1rem; font-size:0.8rem; color:#6b7280;">Walk-ins welcome. Online booking available 24/7.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="insurance" id="insurance">
+    <h2 class="section-title">Insurance & Payment</h2>
+    <p class="section-sub">We accept most major insurance plans</p>
+    <div class="insurance-logos">
+      <div class="insurance-badge">Delta Dental</div>
+      <div class="insurance-badge">Aetna</div>
+      <div class="insurance-badge">Cigna</div>
+      <div class="insurance-badge">MetLife</div>
+      <div class="insurance-badge">Blue Cross</div>
+      <div class="insurance-badge">United Healthcare</div>
+      <div class="insurance-badge">CareCredit Financing</div>
+    </div>
+  </section>
+
+  <section class="testimonials">
+    <h2 class="section-title" style="text-align:center;">What Our Patients Say</h2>
+    <p class="section-sub" style="text-align:center; margin-bottom:2rem;">Trusted by over 5,000 families in Maple Grove</p>
+    <div class="testimonial-grid">
+      <div class="testimonial">
+        <div class="stars">★★★★★</div>
+        <p>"Dr. Carter made my root canal completely painless. I was terrified going in, but the staff was so reassuring. Best dental experience ever!"</p>
+        <div class="testimonial-author">Jennifer M.</div>
+        <div class="testimonial-role">Patient since 2019</div>
+      </div>
+      <div class="testimonial">
+        <div class="stars">★★★★★</div>
+        <p>"My kids actually look forward to their dental visits thanks to Dr. Kim. She's amazing with children and the office is so kid-friendly."</p>
+        <div class="testimonial-author">Michael T.</div>
+        <div class="testimonial-role">Parent of 3</div>
+      </div>
+      <div class="testimonial">
+        <div class="stars">★★★★☆</div>
+        <p>"Got Invisalign here and the results are incredible. Dr. Patel walked me through every step. My teeth have never looked better!"</p>
+        <div class="testimonial-author">Amanda R.</div>
+        <div class="testimonial-role">Invisalign patient</div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <h4>Maple Grove Dental</h4>
+        <p>Family-friendly dentistry with advanced technology. Creating beautiful smiles since 2010.</p>
+        <p style="margin-top:1rem;">📍 123 Maple Grove Medical Plaza, Suite 200</p>
+        <p>📞 (555) 123-4567</p>
+      </div>
+      <div>
+        <h4>Services</h4>
+        <a href="#">General Dentistry</a>
+        <a href="#">Cosmetic Dentistry</a>
+        <a href="#">Orthodontics</a>
+        <a href="#">Pediatric Care</a>
+      </div>
+      <div>
+        <h4>Patients</h4>
+        <a href="#">New Patients</a>
+        <a href="#">Insurance</a>
+        <a href="#"> financing</a>
+        <a href="#">Patient Forms</a>
+      </div>
+      <div>
+        <h4>Connect</h4>
+        <a href="#">Facebook</a>
+        <a href="#">Instagram</a>
+        <a href="#">Google Reviews</a>
+        <a href="#">Contact Us</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 Maple Grove Dental. All rights reserved. | Privacy Policy | Terms of Service</p>
+    </div>
+  </footer>
+
+  <!-- BurFlow Chatbot Widget -->
+  <script src="/widget/widget.js" data-token="eyJ0ZW5hbnRJZCI6InRlbmFudC0xNzg2MDA2NDkzMTYyIiwidHlwZSI6IndpZGdldCIsImlhdCI6MTc4NjAxNzMyMCwiZXhwIjoxNzg2MTAzNzIwfQ.08a7a41d03aa3ec036a363e682af521f472924ea9b6cf5e169ec69dc91d48239" data-primary-color="#2563eb" data-position="right"></script>
+
+</body>
+</html>

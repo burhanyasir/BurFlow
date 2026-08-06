@@ -45,4 +45,24 @@ function deriveApiUrl(): string {
 if (typeof window !== 'undefined') {
   window.ChatWidget = ChatWidget;
   window.initChatWidget = initChatWidget;
+
+  // Auto-initialize from script tag data attributes
+  function autoInit() {
+    try {
+      const script = document.currentScript as HTMLScriptElement | null;
+      if (!script) return;
+      const token = script.getAttribute('data-token') || extractWidgetToken();
+      if (!token) return;
+      const apiUrl = script.getAttribute('data-api-url') || deriveApiUrl();
+      const primaryColor = script.getAttribute('data-primary-color') || undefined;
+      const position = script.getAttribute('data-position') as any || undefined;
+      const title = script.getAttribute('data-title') || undefined;
+      initChatWidget({ widgetToken: token, apiUrl, primaryColor, position, title });
+    } catch {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInit);
+  } else {
+    autoInit();
+  }
 }
