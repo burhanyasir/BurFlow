@@ -43,6 +43,11 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
     setChecking(false);
   }, [checking, onCheckStatus]);
 
+  // Auto-check on mount — crawl already processes inline, so sources may be published
+  useEffect(() => {
+    poll();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!started) return;
     const interval = setInterval(poll, 3000);
