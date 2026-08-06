@@ -28,6 +28,7 @@ export function Step3Knowledge({
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [crawling, setCrawling] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -60,18 +61,22 @@ export function Step3Knowledge({
     setCrawling(true);
     try {
       await onCrawlWebsites();
-    } catch {}
-    setCrawling(false);
+    } catch (error) {
+      console.error('Website crawl failed:', error);
+      setScanError('Website scan failed. Please try again or contact support if the issue persists.');
+    } finally {
+      setCrawling(false);
+    }
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto py-4">
-      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Add Knowledge Sources</h2>
-      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Upload documents, import your website, or paste FAQs. Your chatbot learns from these to answer customer questions.</p>
+      <h2 className="text-2xl font-bold text-[var(--color-neutral-900)] mb-2">Start with your website</h2>
+      <p className="text-sm text-[var(--color-neutral-500)] mb-8">Your website is the strongest source of truth. Use it as the main foundation, then add documents only when you want richer support context.</p>
 
       <div className="space-y-8">
         <div>
-          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Upload Files</h3>
+          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Supporting documents (optional)</h3>
           <div
             className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer ${dragOver ? 'border-[var(--color-accent-500)] bg-[var(--color-accent-50)]' : 'border-[var(--color-neutral-200)] hover:border-[var(--color-neutral-300)]'}`}
             onDragOver={e => { e.preventDefault(); setDragOver(true); }}
@@ -82,8 +87,8 @@ export function Step3Knowledge({
             <svg className="w-8 h-8 mx-auto mb-3 text-[var(--color-neutral-400)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
             </svg>
-            <p className="text-sm text-[var(--color-neutral-600)] mb-1">Drop files here or click to browse</p>
-            <p className="text-xs text-[var(--color-neutral-400)]">PDF, DOCX, TXT, Markdown (up to 10MB each)</p>
+            <p className="text-sm text-[var(--color-neutral-600)] mb-1">Optional: add supporting documents</p>
+            <p className="text-xs text-[var(--color-neutral-400)]">Helpful for pricing sheets, service notes, or extra FAQ context (PDF, DOCX, TXT, Markdown)</p>
             <input ref={fileInputRef} type="file" multiple accept=".pdf,.docx,.doc,.txt,.md,.markdown" className="hidden" onChange={e => handleFiles(e.target.files)} />
           </div>
 
@@ -122,7 +127,7 @@ export function Step3Knowledge({
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Import from Website</h3>
+          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Primary website scan</h3>
           <div className="flex gap-2">
             <Input placeholder="https://example.com/page" value={websiteInput} onChange={e => setWebsiteInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddWebsite(); }} className="flex-1" />
             <Button size="sm" onClick={handleAddWebsite} disabled={!websiteInput.trim()}>Add</Button>
@@ -140,11 +145,16 @@ export function Step3Knowledge({
               </Button>
             </div>
           )}
-          <p className="text-xs text-[var(--color-neutral-400)] mt-1">Enter your website URL and we'll crawl the pages for content.</p>
+          {scanError && (
+            <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+              {scanError}
+            </div>
+          )}
+          <p className="text-xs text-[var(--color-neutral-400)] mt-1">This is the fastest way to teach BurFlow about your products, services, pricing, and common buyer questions.</p>
         </div>
 
         <div>
-          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Paste FAQs</h3>
+          <h3 className="text-sm font-semibold text-[var(--color-neutral-700)] mb-3">Optional FAQs</h3>
           <Textarea
             placeholder="Q: What are your business hours?\nA: We're open Mon-Fri 9am-5pm EST.\n\nQ: Do you offer refunds?\nA: Yes, we offer a 30-day money-back guarantee."
             rows={6}

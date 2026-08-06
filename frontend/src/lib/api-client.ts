@@ -8,6 +8,20 @@ export interface ApiResponse<T = unknown> {
   [key: string]: unknown;
 }
 
+interface RequestOptions {
+  parseAs?: 'json' | 'text';
+}
+
+function inferSourceType(filename: string): string {
+  const normalized = filename.toLowerCase();
+  if (normalized.endsWith('.pdf')) return 'pdf';
+  if (normalized.endsWith('.docx') || normalized.endsWith('.doc')) return 'docx';
+  if (normalized.endsWith('.md') || normalized.endsWith('.markdown')) return 'markdown';
+  if (normalized.endsWith('.html')) return 'html';
+  if (normalized.endsWith('.faq')) return 'faq';
+  return 'text';
+}
+
 class ApiClient {
   private getHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -16,12 +30,23 @@ class ApiClient {
     return headers;
   }
 
-  private async request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  private async request<T>(method: string, path: string, body?: unknown, options: RequestOptions = {}): Promise<T> {
+    const parseAs = options.parseAs ?? 'json';
     const res = await fetch(`${API_BASE}${path}`, {
       method,
       headers: this.getHeaders(),
       body: body ? JSON.stringify(body) : undefined,
     });
+
+    if (parseAs === 'text') {
+      const text = await res.text();
+      if (!res.ok) {
+        const err = new Error(text || `Request failed (${res.status})`);
+        (err as any).status = res.status;
+        throw err;
+      }
+      return text as T;
+    }
 
     let data: any;
     try {
@@ -40,8 +65,12 @@ class ApiClient {
     return data as T;
   }
 
-  get<T = ApiResponse>(path: string) {
-    return this.request<T>('GET', path);
+  get<T = ApiResponse>(path: string, options?: RequestOptions) {
+    return this.request<T>('GET', path, undefined, options);
+  }
+
+  getText(path: string) {
+    return this.request<string>('GET', path, undefined, { parseAs: 'text' });
   }
 
   post<T = ApiResponse>(path: string, body?: unknown) {
@@ -52,11 +81,24 @@ class ApiClient {
     return this.request<T>('PUT', path, body);
   }
 
+  patch<T = ApiResponse>(path: string, body?: unknown) {
+    return this.request<T>('PATCH', path, body);
+  }
+
   delete<T = ApiResponse>(path: string) {
     return this.request<T>('DELETE', path);
   }
 
   async uploadFile(path: string, file: File, onProgress?: (pct: number) => void): Promise<ApiResponse> {
+    if (path === '/knowledge/upload') {
+      const content = await file.text();
+      return this.request<ApiResponse>('POST', path, {
+        filename: file.name,
+        sourceType: inferSourceType(file.name),
+        content,
+      });
+    }
+
     return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${API_BASE}${path}`);
