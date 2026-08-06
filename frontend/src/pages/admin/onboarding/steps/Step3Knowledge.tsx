@@ -14,7 +14,7 @@ interface Props {
   onUpdateFaqs: (faqs: string) => void;
   onUploadFile: (file: File) => Promise<void>;
   onSubmitFaqs: () => Promise<void>;
-  onCrawlWebsites: () => Promise<void>;
+  onCrawlWebsites: () => Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>>;
 }
 
 export function Step3Knowledge({
@@ -29,6 +29,7 @@ export function Step3Knowledge({
   const [submitting, setSubmitting] = useState(false);
   const [crawling, setCrawling] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [crawlSuccess, setCrawlSuccess] = useState<string | null>(null);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -59,11 +60,23 @@ export function Step3Knowledge({
   const handleCrawlWebsites = async () => {
     if (data.websites.length === 0) return;
     setCrawling(true);
+    setScanError(null);
+    setCrawlSuccess(null);
     try {
-      await onCrawlWebsites();
-    } catch (error) {
+      const results = await onCrawlWebsites();
+      const totalPages = results.reduce((sum, r) => sum + r.pagesCrawled, 0);
+      const warnings = results.filter(r => r.warning).map(r => r.warning);
+      if (totalPages > 0) {
+        setCrawlSuccess(`Successfully imported ${totalPages} page(s) from ${results.length} website(s). Your chatbot is now learning from your content.`);
+      } else if (warnings.length > 0) {
+        setScanError(`Import completed but no readable content was found: ${warnings[0]}. You can still proceed — your chatbot will use basic setup.`);
+      } else {
+        setCrawlSuccess('Website import complete. Your chatbot will use basic setup for now.');
+      }
+    } catch (error: any) {
       console.error('Website crawl failed:', error);
-      setScanError('Website scan failed. Please try again or contact support if the issue persists.');
+      const msg = error?.message || 'Website scan failed. Please try again or contact support if the issue persists.';
+      setScanError(msg);
     } finally {
       setCrawling(false);
     }
@@ -148,6 +161,11 @@ export function Step3Knowledge({
           {scanError && (
             <div className="mt-3 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
               {scanError}
+            </div>
+          )}
+          {crawlSuccess && (
+            <div className="mt-3 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
+              {crawlSuccess}
             </div>
           )}
           <p className="text-xs text-[var(--color-neutral-400)] mt-1">This is the fastest way to teach BurFlow about your products, services, pricing, and common buyer questions.</p>

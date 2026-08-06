@@ -28,8 +28,8 @@ const MAX_TOKEN_BUDGET = 32000;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 const PROCESS_TIMEOUT_MS = 30000;
-const MAX_CRAWL_DEPTH = 5;
-const MAX_CRAWL_PAGES = 50;
+const MAX_CRAWL_DEPTH = 10;
+const MAX_CRAWL_PAGES = 500;
 
 let singletonVectorStore: SqliteVectorStore | null = null;
 let singletonKnowledgeStore: SqliteKnowledgeStore | null = null;
@@ -233,9 +233,11 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
       });
 
       if (!docs || docs.length === 0) {
-        return res.status(422).json({
-          error: 'No content could be crawled from this URL',
-          warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.',
+        return res.status(200).json({
+          documentId: null,
+          status: 'no_content',
+          pagesCrawled: 0,
+          warning: 'No readable content was found on this page. The onboarding will continue with a basic setup.',
         });
       }
 
@@ -260,7 +262,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
       if (err.message?.includes('exceeds maximum')) {
         return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }
-      res.status(500).json({ error: 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+      res.status(500).json({ error: err.message || 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
     }
   });
 

@@ -479,7 +479,7 @@ export class WebsiteCrawler implements WebCrawler {
 
     if (respectRobots) {
       const allowed = await this.checkRobotsTxtCached(url, robotsCache);
-      if (!allowed) throw new Error('URL disallowed by robots.txt');
+      if (!allowed) return [];
     }
 
     // Check for sitemap.xml and use it if available
@@ -543,7 +543,7 @@ export class WebsiteCrawler implements WebCrawler {
   private lastFetchTime = 0;
   private async rateLimit(): Promise<void> {
     const now = Date.now();
-    const minInterval = 500; // max 2 requests per second
+    const minInterval = 200; // max 5 requests per second
     const wait = minInterval - (now - this.lastFetchTime);
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     this.lastFetchTime = Date.now();

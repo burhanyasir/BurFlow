@@ -339,10 +339,17 @@ export function useOnboardingState() {
     });
   }, [data.knowledge.faqs]);
 
-  const crawlWebsites = useCallback(async (): Promise<void> => {
+  const crawlWebsites = useCallback(async (): Promise<Array<{ url: string; pagesCrawled: number; warning?: string | null }>> => {
+    const results: Array<{ url: string; pagesCrawled: number; warning?: string | null }> = [];
     for (const url of data.knowledge.websites) {
-      await apiClient.post('/knowledge/crawl', { url, maxDepth: 2, maxPages: 10 });
+      try {
+        const res = await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
+        results.push({ url, pagesCrawled: res.pagesCrawled || 0, warning: res.warning || null });
+      } catch {
+        results.push({ url, pagesCrawled: 0, warning: 'Failed to crawl this URL' });
+      }
     }
+    return results;
   }, [data.knowledge.websites]);
 
   const checkProcessingStatus = useCallback(async (): Promise<{ completed: boolean; statuses: Record<string, string> }> => {
