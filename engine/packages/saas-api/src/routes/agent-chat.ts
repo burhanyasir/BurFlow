@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import {
-  ConversationRepository, MessageRepository, SessionHandoffService,
+  ConversationRepository, MessageRepository, LeadRepository, HandoffRequestRepository,
+  SessionHandoffService, Lead, HandoffRequest,
 } from '@conversation-engine/saas-core';
 import { createLogger } from '@conversation-engine/logger';
 import { MESSAGE_MAX } from '../middleware/validate';
@@ -8,6 +9,9 @@ import { MESSAGE_MAX } from '../middleware/validate';
 const logger = createLogger('saas-api:agent-chat');
 
 export const AGENT_MESSAGE_MAX = MESSAGE_MAX;
+
+/** Lead score at or above which a session is flagged for proactive takeover. */
+export const TAKEOVER_LEAD_SCORE_THRESHOLD = 60;
 
 function requireString(value: unknown, field: string): string | null {
   if (typeof value !== 'string' || value.trim().length === 0) {
@@ -28,8 +32,65 @@ export function createAgentChatRoutes(
   conversationRepo: ConversationRepository,
   messageRepo: MessageRepository,
   handoff: SessionHandoffService,
+  leadRepo?: LeadRepository,
+  handoffReqRepo?: HandoffRequestRepository,
 ): Router {
   const router = Router();
+
+  // GET /api/sessions — active sessions for the agent inbox
+  router.get('/', (req: Request, res: Response) => {
+    const tenantId = req.tenantId!;
+    const conversations = conversationRepo.listActiveByTenant(tenantId, 100);
+    const sessions = conversations.map((c) => {
+      const lead: Lead | null = leadRepo?.findBySession(tenantId, c.sessionId) ?? null;
+      const handoffReq: HandoffRequest | null = handoffReqRepo?.findBySession(c.sessionId) ?? null;
+      const pendingHandoff = handoffReq?.status === 'pending';
+      const leadScore = lead?.leadScore ?? 0;
+      const needsTakeover = c.sessionState === 'ai_managed' && (
+        leadScore >= TAKEOVER_LEAD_SCORE_THRESHOLD ||
+        lead?.qualificationStatus === 'sales_qualified' ||
+        pendingHandoff
+      );
+      return {
+        id: c.id,
+        sessionId: c.sessionId,
+        visitorName: lead?.name || undefined,
+        visitorEmail: lead?.email || undefined,
+        leadScore: lead?.leadScore ?? null,
+        qualificationStatus: lead?.qualificationStatus ?? null,
+        buyingIntent: lead?.buyingIntent ?? null,
+        sessionState: c.sessionState,
+        assignedAgentId: c.assignedAgentId,
+        takeoverAt: c.takeoverAt,
+        startedAt: c.startedAt,
+        messageCount: c.messageCount,
+        lastMessage: c.lastMessage,
+        lastActivityAt: c.lastActivityAt || c.startedAt,
+        pendingHandoff,
+        needsTakeover,
+      };
+    });
+    return res.json({ sessions, total: sessions.length });
+  });
+
+  // GET /api/sessions/:id/messages — full thread history for a session
+  router.get('/:id/messages', (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    const conversation = conversationRepo.findById(id);
+    if (!conversation || conversation.tenantId !== req.tenantId) {
+      return res.status(404).json({ error: 'Session not found' });
+    }
+
+    const { messages, total } = messageRepo.listByConversation(id, 1, 500);
+    return res.json({
+      sessionId: conversation.sessionId,
+      conversationId: conversation.id,
+      sessionState: conversation.sessionState,
+      messages,
+      total,
+    });
+  });
 
   // POST /api/sessions/:id/takeover — take control of a live session
   router.post('/:id/takeover', (req: Request, res: Response) => {

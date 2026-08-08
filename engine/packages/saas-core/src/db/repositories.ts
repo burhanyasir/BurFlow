@@ -247,6 +247,23 @@ export class ConversationRepository {
     return this.findById(id);
   }
 
+  /**
+   * Active (non-ended) conversations for the agent inbox, enriched with the
+   * last message content and its timestamp for last-activity sorting.
+   */
+  listActiveByTenant(tenantId: string, limit = 50): (Conversation & { lastMessage?: string; lastActivityAt?: string })[] {
+    const rows = this.db.prepare(
+      `SELECT c.*,
+        (SELECT m.content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1) as last_message,
+        (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1) as last_activity_at
+       FROM conversations c
+       WHERE c.tenant_id = ? AND c.status = 'active'
+       ORDER BY COALESCE(last_activity_at, c.started_at) DESC
+       LIMIT ?`
+    ).all(tenantId, limit) as any[];
+    return rows.map(r => ({ ...this.mapRow(r), lastMessage: r.last_message || undefined, lastActivityAt: r.last_activity_at || undefined }));
+  }
+
   incrementMessageCount(id: string): void {
     this.db.prepare('UPDATE conversations SET message_count = message_count + 1 WHERE id = ?').run(id);
   }

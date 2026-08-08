@@ -31,6 +31,7 @@ import ConversationDetailPage from './pages/admin/conversations/ConversationDeta
 import InsightsDashboard from './pages/admin/insights/InsightsDashboard';
 import KnowledgeDashboard from './pages/admin/knowledge/KnowledgeDashboard';
 import LeadInboxPage from './pages/admin/leads/LeadInboxPage';
+import AgentInboxPage from './pages/admin/agent/AgentInboxPage';
 import UnansweredDashboard from './pages/admin/unanswered/UnansweredDashboard';
 import WidgetDashboard from './pages/admin/widget/WidgetDashboard';
 import FollowUpQueuePage from './pages/admin/followups/FollowUpQueuePage';
@@ -87,6 +88,7 @@ function RoutesWithAnimation() {
 
         {/* Admin Dashboard Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+        <Route path="/agent" element={<ProtectedRoute><AgentInboxPage /></ProtectedRoute>} />
         <Route path="/dashboard/executive" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
         <Route path="/dashboard/conversations" element={<ProtectedRoute><ConversationDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/conversations/:id" element={<ProtectedRoute><ConversationDetailPage /></ProtectedRoute>} />
