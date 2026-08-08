@@ -27,6 +27,8 @@ export {
 } from './auth';
 export { LeadService } from './services/lead-service';
 export type { LeadServiceHooks, LeadUpsertResult, UpsertLeadInput } from './services/lead-service';
+export { WhatsAppClient, WhatsAppNotConfiguredError } from './services/whatsapp-client';
+export type { WhatsAppClientConfig, WhatsAppSendResult } from './services/whatsapp-client';
 export { SessionHandoffService, TAKEOVER_ACKNOWLEDGEMENT } from './services/session-handoff';
 export { AnalyticsService } from './services/analytics';
 export type {

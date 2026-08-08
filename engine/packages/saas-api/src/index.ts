@@ -50,6 +50,8 @@ import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
 import { createAuditRoutes } from './routes/audit';
 import { createWebhookRoutes } from './routes/webhooks';
+import { createWhatsAppRoutes } from './routes/whatsapp';
+import { WhatsAppClient } from '@conversation-engine/saas-core';
 import { createTrustRoutes } from './routes/trust';
 import { createLeadRoutes } from './routes/leads';
 import { createHardeningRoutes } from './routes/hardening';
@@ -375,6 +377,24 @@ app.use('/api/team', auth, tenantGuard, createTeamRoutes(teamMemberRepo, invitat
 
 // Audit Log
 app.use('/api/audit', auth, tenantGuard, createAuditRoutes(auditLogRepo));
+
+// ─── Omnichannel: WhatsApp Business API ──────────────────────────
+// Mounted BEFORE the protected /api/webhooks routes below — Meta's
+// webhook verification + event delivery must NOT pass auth middleware.
+const whatsappTenantId = process.env.WHATSAPP_TENANT_ID
+  || tenantRepo.findBySlug('demo-tenant')?.id
+  || 'demo-tenant';
+app.use('/api/webhooks/whatsapp', createWhatsAppRoutes({
+  conversationRepo,
+  messageRepo,
+  usageRepo,
+  kbProvider: chatKbProvider,
+  leadOptions: { leadService, webhookRepo, webhookDeliveryRepo, getNotificationConfig: (tenantId) => widgetConfigRepo.get(tenantId) },
+  whatsappClient: process.env.WHATSAPP_PHONE_NUMBER_ID && process.env.WHATSAPP_TOKEN
+    ? new WhatsAppClient({ phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID, token: process.env.WHATSAPP_TOKEN })
+    : new WhatsAppClient(),
+  tenantId: whatsappTenantId,
+}));
 
 // Webhooks
 app.use('/api/webhooks', auth, tenantGuard, createWebhookRoutes(webhookRepo, webhookDeliveryRepo, auditLogRepo));

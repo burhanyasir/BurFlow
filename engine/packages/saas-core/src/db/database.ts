@@ -51,6 +51,31 @@ function setupWalCheckpointing(db: Database.Database, dbPath: string): void {
   }
 }
 
+const LEADS_TABLE_DDL = `
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL,
+      conversation_id TEXT,
+      email TEXT,
+      phone TEXT,
+      name TEXT,
+      company TEXT,
+      qualification_status TEXT DEFAULT 'unqualified' CHECK (qualification_status IN ('unqualified','marketing_qualified','sales_qualified','disqualified')),
+      lead_score INTEGER DEFAULT 0,
+      buying_intent TEXT DEFAULT 'low' CHECK (buying_intent IN ('low','medium','high')),
+      source TEXT DEFAULT 'chat' CHECK (source IN ('chat','form','api','whatsapp')),
+      metadata TEXT DEFAULT '{}',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_leads_tenant ON leads(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_leads_session ON leads(session_id);
+    CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
+    CREATE INDEX IF NOT EXISTS idx_leads_qualification ON leads(qualification_status);
+  `;
+
 function migrate(db: Database.Database): void {
   db.exec(`
     CREATE TABLE IF NOT EXISTS users (
@@ -672,7 +697,7 @@ function migrate(db: Database.Database): void {
       qualification_status TEXT DEFAULT 'unqualified' CHECK (qualification_status IN ('unqualified','marketing_qualified','sales_qualified','disqualified')),
       lead_score INTEGER DEFAULT 0,
       buying_intent TEXT DEFAULT 'low' CHECK (buying_intent IN ('low','medium','high')),
-      source TEXT DEFAULT 'chat' CHECK (source IN ('chat','form','api')),
+      source TEXT DEFAULT 'chat' CHECK (source IN ('chat','form','api','whatsapp')),
       metadata TEXT DEFAULT '{}',
       notes TEXT,
       created_at TEXT NOT NULL,
@@ -683,6 +708,24 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
     CREATE INDEX IF NOT EXISTS idx_leads_qualification ON leads(qualification_status);
   `);
+
+  // WhatsApp channel source — rebuild the table only when a legacy DB still
+  // carries the old CHECK constraint that rejects 'whatsapp' (additive, safe).
+  try {
+    const leadDdl: string = (db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='leads'`).get() as any)?.sql || '';
+    if (leadDdl.includes('CHECK (source IN') && !leadDdl.includes('whatsapp')) {
+      db.exec(`
+        PRAGMA foreign_keys = OFF;
+        ALTER TABLE leads RENAME TO leads_legacy;
+        ${LEADS_TABLE_DDL};
+        INSERT INTO leads SELECT * FROM leads_legacy;
+        DROP TABLE leads_legacy;
+        PRAGMA foreign_keys = ON;
+      `);
+    }
+  } catch (err: any) {
+    console.warn(`[db] leads source migration skipped: ${err?.message || err}`);
+  }
 
   // Analytics query indexes (additive, safe to re-run)
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_tenant_started ON conversations(tenant_id, started_at);`); } catch {}

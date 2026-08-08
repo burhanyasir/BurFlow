@@ -491,7 +491,7 @@ export interface WebhookDelivery {
 }
 
 // ─── Leads ───────────────────────────────────────────────────
-export type LeadSource = 'chat' | 'form' | 'api';
+export type LeadSource = 'chat' | 'form' | 'api' | 'whatsapp';
 
 export type QualificationStatus = 'unqualified' | 'marketing_qualified' | 'sales_qualified' | 'disqualified';
 
