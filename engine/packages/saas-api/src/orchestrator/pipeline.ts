@@ -4,7 +4,7 @@ import { processRapportRepair } from './rapport-repair';
 import { processPolicyEngine, PolicyDecision } from './policy-engine';
 import { composeResponse, CompositionResult } from './response-composer';
 import { TenantPolicy } from './types';
-import { KnowledgeBaseProvider } from '@conversation-engine/conversation-orchestrator';
+import { KnowledgeBaseProvider, PayloadValidationError, UpstreamLLMError } from '@conversation-engine/conversation-orchestrator';
 
 export interface PipelineInput {
   message: string;
@@ -31,6 +31,7 @@ export interface PipelineResult {
   quickReplies: any[];
   uiState: any;
   cta: any;
+  leadCapture?: { email?: string; phone?: string; name?: string; company?: string } | null;
 }
 
 const TRACE_LOG = true;
@@ -89,10 +90,12 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     };
     let rapportQuickReplies: any[] = [];
     let rapportUiState: any = { buttons: [], suggestedActions: [] };
+    let rapportLeadCapture: any = null;
     try {
       const rapportBrainOutput = await brainFunction(rapportBrainInput);
       rapportQuickReplies = rapportBrainOutput?.quickReplies || [];
       rapportUiState = rapportBrainOutput?.uiState || rapportUiState;
+      rapportLeadCapture = rapportBrainOutput?.extractedLead || null;
     } catch {}
 
     const latencyMs = Date.now() - startTime;
@@ -121,6 +124,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       quickReplies: rapportQuickReplies,
       uiState: rapportUiState,
       cta: null,
+      leadCapture: rapportLeadCapture,
     };
   }
 
@@ -154,6 +158,9 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
   try {
     brainOutput = await brainFunction(brainInput);
   } catch (err: any) {
+    // Typed payload (400) and upstream LLM (502) errors must surface to the route
+    // layer instead of being masked as a graceful repair response.
+    if (err instanceof PayloadValidationError || err instanceof UpstreamLLMError) throw err;
     console.log(`[ORCH:${traceId}] Brain threw: ${err.message}`);
     return {
       response: "Let me think about that differently. Could you rephrase your question?",
@@ -223,6 +230,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     quickReplies: brainOutput?.quickReplies || [],
     uiState: brainOutput?.uiState || { buttons: [], suggestedActions: [] },
     cta: brainOutput?.cta || null,
+    leadCapture: brainOutput?.extractedLead || null,
   };
 }
 

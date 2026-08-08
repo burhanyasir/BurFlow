@@ -18,7 +18,7 @@ interface FailRec {
   turnNumber: number; failureType: string; details: string;
 }
 
-function runSim(sim, index, fails) {
+async function runSim(sim, index, fails) {
   const config = sim.configData;
   const lm = { turns: [], persona: config.personaType, funnelStage: "discovery",
     buyingIntentDetected: false, objections: [],
@@ -40,7 +40,7 @@ function runSim(sim, index, fails) {
     if (!msg) { sil++; if (sil > 3) break; continue; }
     sil = 0;
     let bo;
-    try { bo = processConversationBrain({ message: msg, responseText: "", legacyMemory: curM }); }
+    try { bo = await processConversationBrain({ message: msg, responseText: "", legacyMemory: curM }); }
     catch(e) { fails.push({conversationIndex:index,personaName:config.name,turnNumber:i+1,failureType:"Brain Error",details:e.message}); break; }
     const s = bo.strategy;
     turns = i + 1;
@@ -159,7 +159,7 @@ function computeReport(convs, fails) {
 
 describe("P6 - Customer Simulation & Stress Testing", () => {
   let report = "", convs = [], fails = [], sims = [];
-  beforeAll(() => {
+  beforeAll(async () => {
     convs = []; fails = []; sims = [];
     const jitter = (mn, mx) => Math.max(0, Math.min(1, (mn+mx)/2 + (Math.random()-0.5)*(mx-mn)*0.6));
     for (let i = 0; i < 500; i++) {
@@ -167,7 +167,7 @@ describe("P6 - Customer Simulation & Stress Testing", () => {
       const v = { ...base, traits: { patience: jitter(0.2,0.8), technicalKnowledge: jitter(0.1,0.9), budgetSensitivity: jitter(0.2,0.9), urgency: jitter(0.2,0.9), buyingIntent: jitter(0.2,0.9), skepticism: jitter(0.1,0.8), qualificationWillingness: jitter(0.2,0.9), conversationLength: Math.floor(8+Math.random()*20), objectionProbability: jitter(0.15,0.5), topicChangeProbability: jitter(0.1,0.35), shortReplyProbability: jitter(0.05,0.2), offTopicProbability: jitter(0.02,0.12), competitorComparisonProbability: jitter(0.05,0.25), humanRequestProbability: jitter(0.05,0.2) } };
       sims.push(new CustomerSimulator(v));
     }
-    for (let i = 0; i < sims.length; i++) convs.push(runSim(sims[i], i, fails));
+    for (let i = 0; i < sims.length; i++) convs.push(await runSim(sims[i], i, fails));
     report = computeReport(convs, fails);
     console.log(report);
   });

@@ -62,14 +62,14 @@ function makePlan(overrides?: Partial<ConversationPlan>): ConversationPlan {
 // ============================================================================
 
 describe('Agenda Management', () => {
-  it('starts with empty agenda for new conversation', () => {
+  it('starts with empty agenda for new conversation', async () => {
     const mem = createMemory();
     const strategy = processConversationDirector('Tell me about features', mem, makeCIResult(), makePlan({ goal: 'answer_question' }));
     expect(strategy.agenda).toBeDefined();
     expect(strategy.agenda.completedTopics).toEqual([]);
   });
 
-  it('tracks explained topics in agenda lifecycle', () => {
+  it('tracks explained topics in agenda lifecycle', async () => {
     const mem = createMemory();
     markTopicExplained(mem, 'features');
     markTopicExplained(mem, 'pricing');
@@ -81,7 +81,7 @@ describe('Agenda Management', () => {
     expect(features?.explainedCount).toBe(1);
   });
 
-  it('lists upcoming topics not yet discussed', () => {
+  it('lists upcoming topics not yet discussed', async () => {
     const mem = createMemory({ turnCount: 3 });
     markTopicExplained(mem, 'features');
     const strategy = processConversationDirector('Tell me more', mem, makeCIResult(), makePlan());
@@ -89,19 +89,19 @@ describe('Agenda Management', () => {
     expect(strategy.agenda.upcomingTopics).not.toContain('features');
   });
 
-  it('sets currentTopic from memory', () => {
+  it('sets currentTopic from memory', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 3 });
     const strategy = processConversationDirector('Tell me more about pricing', mem, makeCIResult(), makePlan());
     expect(strategy.agenda.currentTopic).toBe('pricing');
   });
 
-  it('includes new topics from message as follow-up', () => {
+  it('includes new topics from message as follow-up', async () => {
     const mem = createMemory({ turnCount: 2 });
     const strategy = processConversationDirector('What about security?', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBe('security');
   });
 
-  it('selects a planner-chosen action when available and allowed', () => {
+  it('selects a planner-chosen action when available and allowed', async () => {
     const mem = createMemory({ turnCount: 4, trustLevel: 'high' });
     const ci = makeCIResult({ buyingIntent: { hasBuyingIntent: true, confidence: 0.9 }, funnelStage: 'evaluation' });
     const plan = makePlan({ goal: 'answer_question' });
@@ -121,21 +121,21 @@ describe('Agenda Management', () => {
 // ============================================================================
 
 describe('Topic Repetition Prevention', () => {
-  it('does not propose already-explained topic as followUpTopic', () => {
+  it('does not propose already-explained topic as followUpTopic', async () => {
     const mem = createMemory({ turnCount: 5 });
     markTopicExplained(mem, 'features');
     const strategy = processConversationDirector('Tell me about pricing', mem, makeCIResult(), makePlan());
     expect(strategy.followUpTopic).not.toBe('features');
   });
 
-  it('allows re-answering a topic if user explicitly asks again', () => {
+  it('allows re-answering a topic if user explicitly asks again', async () => {
     const mem = createMemory({ turnCount: 5 });
     markTopicExplained(mem, 'features');
     const strategy = processConversationDirector('Tell me more about features', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBe('features');
   });
 
-  it('moves topic to completed when user shifts to new topic', () => {
+  it('moves topic to completed when user shifts to new topic', async () => {
     const mem = createMemory({ currentTopic: 'features', turnCount: 5 });
     markTopicExplained(mem, 'features');
     const strategy = processConversationDirector('What about pricing?', mem, makeCIResult(), makePlan());
@@ -148,7 +148,7 @@ describe('Topic Repetition Prevention', () => {
 // ============================================================================
 
 describe('Pending Question Handling', () => {
-  it('detects unanswered questions from recent turns', () => {
+  it('detects unanswered questions from recent turns', async () => {
     const mem = createMemory({ turnCount: 3 });
     mem.turns.push({
       turnNumber: 2,
@@ -164,7 +164,7 @@ describe('Pending Question Handling', () => {
     expect(strategy.pendingQuestions[0].answered).toBe(true);
   });
 
-  it('does not push qualification when pending questions exist', () => {
+  it('does not push qualification when pending questions exist', async () => {
     const mem = createMemory({ turnCount: 4 });
     mem.turns.push({
       turnNumber: 3,
@@ -179,7 +179,7 @@ describe('Pending Question Handling', () => {
     expect(strategy.qualificationQuestion).toBeNull();
   });
 
-  it('does not suggest follow-up topic when pending questions exist', () => {
+  it('does not suggest follow-up topic when pending questions exist', async () => {
     const mem = createMemory({ turnCount: 4 });
     mem.turns.push({
       turnNumber: 3,
@@ -200,7 +200,7 @@ describe('Pending Question Handling', () => {
 // ============================================================================
 
 describe('Agenda Progression', () => {
-  it('proposes next unhandled topic in order', () => {
+  it('proposes next unhandled topic in order', async () => {
     const mem = createMemory({ turnCount: 3 });
     markTopicExplained(mem, 'features');
     markTopicExplained(mem, 'pricing');
@@ -210,14 +210,14 @@ describe('Agenda Progression', () => {
     expect(strategy.agenda.upcomingTopics).not.toContain('pricing');
   });
 
-  it('resets currentTopic when user shifts topics', () => {
+  it('resets currentTopic when user shifts topics', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 5 });
     markTopicExplained(mem, 'pricing');
     const strategy = processConversationDirector('What about security?', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBe('security');
   });
 
-  it('tracks topic lifecycle through multiple turns', () => {
+  it('tracks topic lifecycle through multiple turns', async () => {
     const mem = createMemory({ turnCount: 5 });
     markTopicExplained(mem, 'features');
     markTopicExplained(mem, 'pricing');
@@ -233,13 +233,13 @@ describe('Agenda Progression', () => {
 // ============================================================================
 
 describe('Qualification Timing', () => {
-  it('does not ask qualification on first non-greeting turn', () => {
+  it('does not ask qualification on first non-greeting turn', async () => {
     const mem = createMemory({ turnCount: 1 });
     const strategy = processConversationDirector('Tell me about features', mem, makeCIResult(), makePlan({ missingQualification: ['company size'] }));
     expect(strategy.qualificationQuestion).toBeNull();
   });
 
-  it('asks qualification after enough turns when field is missing', () => {
+  it('asks qualification after enough turns when field is missing', async () => {
     const mem = createMemory({ turnCount: 4 });
     mem.turns.push(
       { turnNumber: 1, message: 'hi', response: 'hi', customerIntent: 'greeting', goal: 'build_trust', funnelStage: 'greeting', timestamp: Date.now() },
@@ -250,14 +250,14 @@ describe('Qualification Timing', () => {
     expect(strategy.qualificationQuestion).toBeTruthy();
   });
 
-  it('does not ask qualification after it is completed', () => {
+  it('does not ask qualification after it is completed', async () => {
     const mem = createMemory({ turnCount: 3, qualificationCollected: { questionsAskedCount: 6, completed: true } });
     mem.qualificationCollected.completed = true;
     const strategy = processConversationDirector('Tell me about features', mem, makeCIResult(), makePlan({ missingQualification: [] }));
     expect(strategy.qualificationQuestion).toBeNull();
   });
 
-  it('does not ask qualification twice in a row', () => {
+  it('does not ask qualification twice in a row', async () => {
     const mem = createMemory({ turnCount: 3, lastGoal: 'qualify' });
     mem.turns.push(
       { turnNumber: 1, message: 'hi', response: 'hi', customerIntent: 'greeting', goal: 'build_trust', funnelStage: 'greeting', timestamp: Date.now() },
@@ -267,7 +267,7 @@ describe('Qualification Timing', () => {
     expect(strategy.qualificationQuestion).toBeNull();
   });
 
-  it('includes qualification question text in strategy', () => {
+  it('includes qualification question text in strategy', async () => {
     const mem = createMemory({ turnCount: 4 });
     mem.turns.push(
       { turnNumber: 1, message: 'hi', response: 'hi', customerIntent: 'greeting', goal: 'build_trust', funnelStage: 'greeting', timestamp: Date.now() },
@@ -285,37 +285,37 @@ describe('Qualification Timing', () => {
 // ============================================================================
 
 describe('CTA Timing', () => {
-  it('returns none for qualification goal', () => {
+  it('returns none for qualification goal', async () => {
     const strategy = processConversationDirector('Tell me about features', createMemory({ turnCount: 2 }), makeCIResult(), makePlan({ goal: 'qualify', funnelStage: 'interest' }));
     expect(strategy.cta).toBe('none');
   });
 
-  it('returns none for finish_conversation goal', () => {
+  it('returns none for finish_conversation goal', async () => {
     const strategy = processConversationDirector('Bye', createMemory({ turnCount: 5 }), makeCIResult(), makePlan({ goal: 'finish_conversation', funnelStage: 'decision' }));
     expect(strategy.cta).toBe('none');
   });
 
-  it('returns strong for close_trial goal', () => {
+  it('returns strong for close_trial goal', async () => {
     const strategy = processConversationDirector('I want to try it', createMemory({ turnCount: 5 }), makeCIResult(), makePlan({ goal: 'close_trial', funnelStage: 'purchase_intent' }));
     expect(strategy.cta).toBe('strong');
   });
 
-  it('returns strong for schedule_demo goal', () => {
+  it('returns strong for schedule_demo goal', async () => {
     const strategy = processConversationDirector('I want a demo', createMemory({ turnCount: 5 }), makeCIResult(), makePlan({ goal: 'schedule_demo', funnelStage: 'purchase_intent' }));
     expect(strategy.cta).toBe('strong');
   });
 
-  it('returns soft for interest stage', () => {
+  it('returns soft for interest stage', async () => {
     const strategy = processConversationDirector('Tell me about features', createMemory({ turnCount: 2 }), makeCIResult(), makePlan({ funnelStage: 'interest' }));
     expect(strategy.cta).toBe('soft');
   });
 
-  it('returns strong for purchase_intent stage', () => {
+  it('returns strong for purchase_intent stage', async () => {
     const strategy = processConversationDirector('I am ready to buy', createMemory({ turnCount: 5 }), makeCIResult(), makePlan({ funnelStage: 'purchase_intent' }));
     expect(strategy.cta).toBe('strong');
   });
 
-  it('returns none for low-information early conversation', () => {
+  it('returns none for low-information early conversation', async () => {
     const strategy = processConversationDirector('Hi', createMemory({ turnCount: 1 }), makeCIResult(), makePlan({ funnelStage: 'greeting' }));
     expect(strategy.cta).toBe('none');
   });
@@ -326,7 +326,7 @@ describe('CTA Timing', () => {
 // ============================================================================
 
 describe('Loop Prevention', () => {
-  it('detects when same goal repeats 4+ times', () => {
+  it('detects when same goal repeats 4+ times', async () => {
     const mem = createMemory({ turnCount: 6 });
     for (let i = 0; i < 5; i++) {
       mem.turns.push({
@@ -344,7 +344,7 @@ describe('Loop Prevention', () => {
     expect(strategy.reasoning.some(r => r.includes('Loop'))).toBe(true);
   });
 
-  it('does not flag loop with diverse goals', () => {
+  it('does not flag loop with diverse goals', async () => {
     const mem = createMemory({ turnCount: 6 });
     const goals: ConversationGoal[] = ['build_trust', 'answer_question', 'qualify', 'advance_funnel', 'handle_objection'];
     for (let i = 0; i < 5; i++) {
@@ -362,7 +362,7 @@ describe('Loop Prevention', () => {
     expect(strategy.reasoning.some(r => r.includes('Loop'))).toBe(false);
   });
 
-  it('does not flag loop with fewer than 3 turns', () => {
+  it('does not flag loop with fewer than 3 turns', async () => {
     const mem = createMemory({ turnCount: 2 });
     const strategy = processConversationDirector('Tell me about features', mem, makeCIResult(), makePlan({ goal: 'answer_question' }));
     expect(strategy.reasoning.some(r => r.includes('Loop'))).toBe(false);
@@ -374,14 +374,14 @@ describe('Loop Prevention', () => {
 // ============================================================================
 
 describe('Reasoning', () => {
-  it('includes strategy reasoning entries', () => {
+  it('includes strategy reasoning entries', async () => {
     const mem = createMemory({ turnCount: 3 });
     const strategy = processConversationDirector('Tell me about pricing', mem, makeCIResult(), makePlan({ goal: 'answer_question' }));
     expect(strategy.reasoning.length).toBeGreaterThanOrEqual(1);
     expect(strategy.reasoning[0]).toContain('Goal');
   });
 
-  it('explains qualification decision', () => {
+  it('explains qualification decision', async () => {
     const mem = createMemory({ turnCount: 4 });
     mem.turns.push(
       { turnNumber: 1, message: 'hi', response: 'hi', customerIntent: 'greeting', goal: 'build_trust', funnelStage: 'greeting', timestamp: Date.now() },
@@ -398,13 +398,13 @@ describe('Reasoning', () => {
 // ============================================================================
 
 describe('Multi-Topic Conversations', () => {
-  it('detects multiple topics from user message', () => {
+  it('detects multiple topics from user message', async () => {
     const mem = createMemory({ turnCount: 3 });
     const strategy = processConversationDirector('Tell me about features and pricing', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBeTruthy();
   });
 
-  it('detects topic from user message', () => {
+  it('detects topic from user message', async () => {
     const mem = createMemory({ turnCount: 3 });
     const strategy = processConversationDirector('What about security?', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBe('security');
@@ -416,7 +416,7 @@ describe('Multi-Topic Conversations', () => {
 // ============================================================================
 
 describe('Returning Users', () => {
-  it('preserves agenda for returning user', () => {
+  it('preserves agenda for returning user', async () => {
     const mem = createMemory({ turnCount: 5 });
     markTopicExplained(mem, 'features');
     markTopicExplained(mem, 'pricing');
@@ -426,7 +426,7 @@ describe('Returning Users', () => {
     expect(strategy.agenda.completedTopics).not.toContain('pricing');
   });
 
-  it('handles user jumping between topics without losing agenda', () => {
+  it('handles user jumping between topics without losing agenda', async () => {
     const mem = createMemory({ currentTopic: 'features', turnCount: 8 });
     markTopicExplained(mem, 'features');
     markTopicExplained(mem, 'pricing');
@@ -440,17 +440,17 @@ describe('Returning Users', () => {
 // ============================================================================
 
 describe('Response Length', () => {
-  it('returns short for build_trust goal', () => {
+  it('returns short for build_trust goal', async () => {
     const strategy = processConversationDirector('Hi', createMemory({ turnCount: 1 }), makeCIResult(), makePlan({ goal: 'build_trust' }));
     expect(strategy.responseLength).toBe('short');
   });
 
-  it('returns short for qualify goal', () => {
+  it('returns short for qualify goal', async () => {
     const strategy = processConversationDirector('Tell me about features', createMemory({ turnCount: 2 }), makeCIResult(), makePlan({ goal: 'qualify' }));
     expect(strategy.responseLength).toBe('short');
   });
 
-  it('returns detailed for comparing intent', () => {
+  it('returns detailed for comparing intent', async () => {
     const strategy = processConversationDirector('How do you compare to Zendesk?', createMemory({ turnCount: 5 }), makeCIResult(), makePlan({ customerIntent: 'comparing', goal: 'answer_question' }));
     expect(strategy.responseLength).toBe('detailed');
   });
@@ -461,7 +461,7 @@ describe('Response Length', () => {
 // ============================================================================
 
 describe('Profile Confidence', () => {
-  it('tracks industry confidence', () => {
+  it('tracks industry confidence', async () => {
     const mem = createMemory({ industry: 'tech', turnCount: 5 });
     mem.turns.push(
       { turnNumber: 1, message: 'We are a tech company', response: 'Great', customerIntent: 'learning', goal: 'build_trust', funnelStage: 'interest', timestamp: Date.now() },
@@ -472,13 +472,13 @@ describe('Profile Confidence', () => {
     expect(strategy.profileConfidence.industry.value).toBe('tech');
   });
 
-  it('tracks persona confidence', () => {
+  it('tracks persona confidence', async () => {
     const mem = createMemory({ persona: 'enterprise', turnCount: 3 });
     const strategy = processConversationDirector('Tell me about features', mem, makeCIResult(), makePlan());
     expect(strategy.profileConfidence.persona.value).toBe('enterprise');
   });
 
-  it('shows low confidence for unset fields', () => {
+  it('shows low confidence for unset fields', async () => {
     const mem = createMemory({ turnCount: 1 });
     const strategy = processConversationDirector('Hi', mem, makeCIResult(), makePlan());
     expect(strategy.profileConfidence.companySize.value).toBeNull();
@@ -491,7 +491,7 @@ describe('Profile Confidence', () => {
 // ============================================================================
 
 describe('Deterministic Output', () => {
-  it('produces same strategy for same inputs', () => {
+  it('produces same strategy for same inputs', async () => {
     const mem = createMemory({ turnCount: 3, industry: 'tech', persona: 'startup' });
     markTopicExplained(mem, 'features');
     const ci = makeCIResult();
@@ -505,7 +505,7 @@ describe('Deterministic Output', () => {
     expect(r1.qualificationQuestion).toBe(r2.qualificationQuestion);
   });
 
-  it('produces same topicToAnswer for same topic mentions', () => {
+  it('produces same topicToAnswer for same topic mentions', async () => {
     const mem = createMemory({ turnCount: 3 });
     const r1 = processConversationDirector('Tell me about security', mem, makeCIResult(), makePlan());
     const r2 = processConversationDirector('Tell me about security', mem, makeCIResult(), makePlan());
@@ -513,7 +513,7 @@ describe('Deterministic Output', () => {
     expect(r1.topicToAnswer).toBe('security');
   });
 
-  it('produces same agenda for same memory state', () => {
+  it('produces same agenda for same memory state', async () => {
     const mem1 = createMemory({ turnCount: 5 });
     markTopicExplained(mem1, 'features');
     markTopicExplained(mem1, 'pricing');
@@ -532,14 +532,14 @@ describe('Deterministic Output', () => {
 // ============================================================================
 
 describe('Edge Cases', () => {
-  it('handles empty message without topics', () => {
+  it('handles empty message without topics', async () => {
     const mem = createMemory({ turnCount: 3 });
     const strategy = processConversationDirector('ok', mem, makeCIResult(), makePlan());
     expect(strategy.topicToAnswer).toBeDefined();
     expect(strategy.primaryGoal).toBeDefined();
   });
 
-  it('handles very long conversation without losing agenda', () => {
+  it('handles very long conversation without losing agenda', async () => {
     const mem = createMemory({ turnCount: 30 });
     const explainedTopics: DiscernedTopic[] = ['features', 'pricing', 'security', 'integrations', 'api', 'roi', 'soc2'];
     for (const t of explainedTopics) markTopicExplained(mem, t);
@@ -548,7 +548,7 @@ describe('Edge Cases', () => {
     expect(strategy.agenda.upcomingTopics.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('handles user asking about already explained topic', () => {
+  it('handles user asking about already explained topic', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 5 });
     markTopicExplained(mem, 'pricing');
     const strategy = processConversationDirector('Tell me about pricing again', mem, makeCIResult(), makePlan({ goal: 'answer_question' }));
@@ -562,8 +562,8 @@ describe('Edge Cases', () => {
 // ============================================================================
 
 describe('Brain Integration', () => {
-  it('returns strategy field in brain output', () => {
-    const result = processConversationBrain({
+  it('returns strategy field in brain output', async () => {
+    const result = await processConversationBrain({
       message: 'Tell me about features',
       responseText: 'We have AI-powered features.',
       legacyMemory: {

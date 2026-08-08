@@ -163,28 +163,32 @@ const legalReplay: ReplayDef = {
 // AUDIT RUNNER
 // ============================================================================
 
-function runAllReplays(): ConversationAudit[] {
-  return [
+async function runAllReplays(): Promise<ConversationAudit[]> {
+  return Promise.all([
     runReplayDynamic(shopifyReplay),
     runReplayDynamic(saasReplay),
     runReplayDynamic(enterpriseReplay),
     runReplayDynamic(healthcareReplay),
     runReplayDynamic(restaurantReplay),
     runReplayDynamic(legalReplay),
-  ];
+  ]);
 }
 
 describe('P5.5 - Conversation Director Compliance', () => {
-  const audits = runAllReplays();
+  let audits: ConversationAudit[];
 
-  for (const audit of audits) {
-    it(`[${audit.replayName}] achieves ≥90% Director compliance`, () => {
+  beforeAll(async () => {
+    audits = await runAllReplays();
+  });
+
+  it('produces a report and achieves ≥90% Director compliance per conversation', () => {
+    for (const audit of audits) {
       console.log(formatReport(audit));
       expect(audit.loopCount).toBe(0);
       expect(audit.repeatedTopics.length).toBe(0);
       expect(audit.compliancePct).toBeGreaterThanOrEqual(90);
-    });
-  }
+    }
+  });
 
   it('aggregate compliance across all conversations meets ≥90%', () => {
     const overallScores = audits.map(a => a.scores.overall);

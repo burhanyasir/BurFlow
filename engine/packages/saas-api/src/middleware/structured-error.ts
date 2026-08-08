@@ -76,6 +76,15 @@ export function errorHandler(err: Error, req: Request, res: Response, _next: Nex
     return;
   }
 
+  if ((err as any).type === 'entity.too.large') {
+    res.status(413).json({
+      error: 'Request body too large. Inline base64 image payloads must be under the allowed limit.',
+      code: 'PAYLOAD_TOO_LARGE',
+      requestId,
+    } as ErrorResponse);
+    return;
+  }
+
   // Unknown errors - log and don't leak details
   createContextLogger(log).error({ err, requestId }, 'Unhandled error');
 

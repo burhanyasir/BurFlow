@@ -54,6 +54,11 @@ import {
 } from './types';
 import { buttonTelemetry } from './button-telemetry';
 import { KnowledgeBaseProvider } from './knowledge-base-provider';
+import {
+  normalizeMessageContent,
+  PayloadValidationError,
+  UpstreamLLMError,
+} from './message-content';
 
 function detectSentimentPolarity(message: string): number {
   const lower = message.toLowerCase();
@@ -331,6 +336,105 @@ export interface BrainOutput {
   qualityMetrics?: QualityMetrics;
   decisionTrace?: DecisionTrace;
   debugPanel?: DebugPanel;
+  extractedLead?: { email?: string; phone?: string; name?: string; company?: string };
+}
+
+export interface ExtractedLeadFields {
+  email?: string;
+  phone?: string;
+  name?: string;
+  company?: string;
+}
+
+const LEAD_EMAIL_REGEX = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/;
+
+const LEAD_PHONE_REGEX = /(?<![\d+])(?:\+?\d{1,3}[\s.-]?)?(?:\(\d{2,4}\)[\s.-]?)?(?:\d{3}[\s.-]?\d{3}[\s.-]?\d{4}|\d{3}[\s.-]?\d{4})(?!\d)/;
+
+const LEAD_NAME_PATTERNS: RegExp[] = [
+  /\bmy name is\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})/i,
+  /\bI'?m\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})(?=\s*(?:,|\.|!|\?|$|\s+(?:from|at|working|the|and|but)))/i,
+  /\bI am\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})(?=\s*(?:,|\.|!|\?|$|\s+(?:from|at|working|the|and|but)))/i,
+  /\bcall me\s+([A-Za-z]+(?:\s+[A-Za-z]+){0,2})/i,
+];
+
+const LEAD_COMPANY_PATTERNS: RegExp[] = [
+  /\bI work at\s+([A-Za-z0-9&'.-]+(?:\s+[A-Za-z0-9&'.-]+)*)/i,
+  /\bI'?m from\s+([A-Za-z0-9&'.-]+(?:\s+[A-Za-z0-9&'.-]+)*)/i,
+];
+
+const LEAD_STOP_WORDS = new Set([
+  'the', 'a', 'an', 'this', 'that', 'and', 'but', 'for', 'with', 'from', 'at',
+  'my', 'your', 'our', 'their', 'not', 'can', 'will', 'would', 'please', 'about',
+  'just', 'want', 'need', 'thanks', 'thank', 'hello', 'hi', 'hey', 'ok', 'okay',
+  'sure', 'yes', 'no', 'i', 'we',
+]);
+
+function filterProperLeadWords(value: string): string | undefined {
+  if (!value) return undefined;
+  const words = value.trim().split(/\s+/).filter(w => w.length > 0);
+  const kept = words.filter(w => /^[A-Z]/.test(w) && !/^[A-Z]{3,}$/.test(w) && !LEAD_STOP_WORDS.has(w.toLowerCase()));
+  if (kept.length === 0) return undefined;
+  return kept.join(' ');
+}
+
+function extractLeadDetails(message: string): ExtractedLeadFields {
+  if (!message || typeof message !== 'string') return {};
+  const details: ExtractedLeadFields = {};
+
+  const emailMatch = message.match(LEAD_EMAIL_REGEX);
+  if (emailMatch) details.email = emailMatch[0].toLowerCase();
+
+  const phoneMatch = message.match(LEAD_PHONE_REGEX);
+  if (phoneMatch) {
+    const phone = phoneMatch[0].trim();
+    if (phone.replace(/[^\d]/g, '').length >= 7) details.phone = phone;
+  }
+
+  for (const pattern of LEAD_NAME_PATTERNS) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const name = filterProperLeadWords(match[1].trim().replace(/[.,!?;]+$/g, '').trim());
+      if (name) {
+        details.name = name;
+        break;
+      }
+    }
+  }
+
+  for (const pattern of LEAD_COMPANY_PATTERNS) {
+    const match = message.match(pattern);
+    if (match && match[1]) {
+      const company = filterProperLeadWords(match[1].trim().replace(/[.,!?;]+$/g, '').trim());
+      if (company) {
+        details.company = company;
+        break;
+      }
+    }
+  }
+
+  return details;
+}
+
+function mergeLeadFields(regex: ExtractedLeadFields, structured: ExtractedLeadFields | undefined | null): ExtractedLeadFields {
+  const merged: ExtractedLeadFields = { ...regex };
+  if (structured) {
+    if (structured.email) merged.email = structured.email.toLowerCase();
+    if (structured.phone) merged.phone = structured.phone;
+    if (structured.name) merged.name = structured.name;
+    if (structured.company) merged.company = structured.company;
+  }
+  return merged;
+}
+
+function parseStructuredLeadFields(parsed: any): ExtractedLeadFields | null {
+  const raw = parsed && typeof parsed === 'object' ? parsed.extractedLead : null;
+  if (!raw || typeof raw !== 'object') return null;
+  const fields: ExtractedLeadFields = {};
+  if (typeof raw.email === 'string' && raw.email.trim()) fields.email = raw.email.trim();
+  if (typeof raw.phone === 'string' && raw.phone.trim()) fields.phone = raw.phone.trim();
+  if (typeof raw.name === 'string' && raw.name.trim()) fields.name = raw.name.trim();
+  if (typeof raw.company === 'string' && raw.company.trim()) fields.company = raw.company.trim();
+  return Object.keys(fields).length > 0 ? fields : null;
 }
 
 const FOLLOW_UP_BY_GOAL: Record<ConversationGoal, string[]> = {
@@ -1586,9 +1690,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
 
-// Provider 1: Anthropic (Claude Haiku)
 const anthropicClient = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 8000 })
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 3500 })
   : null;
 
 // Provider 2: Gemini Account 1
@@ -1603,27 +1706,27 @@ const geminiClient2 = process.env.GEMINI_API_KEY_2
 
 // Provider 4: Groq (Llama)
 const groqClient = process.env.GROQ_API_KEY
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 8000 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 3500 })
   : null;
 
 // Provider 5: Groq Account 2
 const groqClient2 = process.env.GROQ_API_KEY_2
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 8000 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 3500 })
   : null;
 
 // Provider 6: Groq Account 3
 const groqClient3 = process.env.GROQ_API_KEY_3
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 8000 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 3500 })
   : null;
 
 // Provider 7: Groq Account 4
 const groqClient4 = process.env.GROQ_API_KEY_4
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 8000 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 3500 })
   : null;
 
 // Provider 8: Groq Account 5
 const groqClient5 = process.env.GROQ_API_KEY_5
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 8000 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 3500 })
   : null;
 
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
@@ -1674,18 +1777,33 @@ async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.
   return response.choices[0]?.message?.content?.trim() || '';
 }
 
+const LLM_PROVIDER_TIMEOUT_MS = 3500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${ms}ms`));
+    }, ms);
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   const providers = [
-    { name: 'Anthropic', call: () => callAnthropic(systemPrompt, messages) },
-    { name: 'Gemini-1', call: () => geminiClient1 ? callGemini(geminiClient1, systemPrompt, messages) : Promise.reject(new Error('Gemini-1 not configured')) },
-    { name: 'Gemini-2', call: () => geminiClient2 ? callGemini(geminiClient2, systemPrompt, messages) : Promise.reject(new Error('Gemini-2 not configured')) },
-    { name: 'Groq-1', call: () => groqClient ? callGroq(groqClient, systemPrompt, messages) : Promise.reject(new Error('Groq-1 not configured')) },
-    { name: 'Groq-2', call: () => groqClient2 ? callGroq(groqClient2, systemPrompt, messages) : Promise.reject(new Error('Groq-2 not configured')) },
-    { name: 'Groq-3', call: () => groqClient3 ? callGroq(groqClient3, systemPrompt, messages) : Promise.reject(new Error('Groq-3 not configured')) },
-    { name: 'Groq-4', call: () => groqClient4 ? callGroq(groqClient4, systemPrompt, messages) : Promise.reject(new Error('Groq-4 not configured')) },
-    { name: 'Groq-5', call: () => groqClient5 ? callGroq(groqClient5, systemPrompt, messages) : Promise.reject(new Error('Groq-5 not configured')) },
+    { name: 'Anthropic', call: () => anthropicClient ? withTimeout(callAnthropic(systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Anthropic') : Promise.reject(new Error('Anthropic not configured')) },
+    { name: 'Gemini-1', call: () => geminiClient1 ? withTimeout(callGemini(geminiClient1, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-1') : Promise.reject(new Error('Gemini-1 not configured')) },
+    { name: 'Gemini-2', call: () => geminiClient2 ? withTimeout(callGemini(geminiClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-2') : Promise.reject(new Error('Gemini-2 not configured')) },
+    { name: 'Groq-1', call: () => groqClient ? withTimeout(callGroq(groqClient, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-1') : Promise.reject(new Error('Groq-1 not configured')) },
+    { name: 'Groq-2', call: () => groqClient2 ? withTimeout(callGroq(groqClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-2') : Promise.reject(new Error('Groq-2 not configured')) },
+    { name: 'Groq-3', call: () => groqClient3 ? withTimeout(callGroq(groqClient3, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-3') : Promise.reject(new Error('Groq-3 not configured')) },
+    { name: 'Groq-4', call: () => groqClient4 ? withTimeout(callGroq(groqClient4, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-4') : Promise.reject(new Error('Groq-4 not configured')) },
+    { name: 'Groq-5', call: () => groqClient5 ? withTimeout(callGroq(groqClient5, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-5') : Promise.reject(new Error('Groq-5 not configured')) },
   ];
 
+  const failures: string[] = [];
   for (const provider of providers) {
     try {
       const result = await provider.call();
@@ -1694,14 +1812,16 @@ async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.Mes
     } catch (error: unknown) {
       const status = (error as { status?: number })?.status;
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[brain] ${provider.name} failed (${status || 'no status'}): ${message} — trying next provider`);
+      const stack = error instanceof Error ? (error.stack || '') : '';
+      failures.push(`${provider.name} (status=${status || 'no status'}): ${message}`);
+      console.error(`[brain] ${provider.name} FAILED (status=${status || 'no status'}) — trying next provider.\n  message: ${message}\n  stack: ${stack || '(no stack trace available)'}`);
     }
   }
   
-  throw new Error('All LLM providers failed');
+  throw new Error(`All LLM providers failed.\n${failures.join('\n')}`);
 }
 
-export async function processConversationBrain(input: BrainInput): Promise<BrainOutput> {
+async function processConversationBrainInner(input: BrainInput): Promise<BrainOutput> {
   const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider } = input;
 
   const memory = fromLegacyMemory(legacyMemory);
@@ -1763,6 +1883,7 @@ export async function processConversationBrain(input: BrainInput): Promise<Brain
         validation: { valid: true, issues: [] },
         ciResult,
         orchestratorResult: ciResult as any,
+        extractedLead: extractLeadDetails(message),
       };
     }
   }
@@ -1801,6 +1922,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
         memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
+        extractedLead: extractLeadDetails(message),
       };
     }
   }
@@ -1855,6 +1977,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       responseText: finalResponse, cta: sCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
       memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
       validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
+      extractedLead: extractLeadDetails(message),
     };
   }
 
@@ -1888,6 +2011,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         responseText: greetingResponse, cta: gCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
         memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'small_talk', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+        extractedLead: extractLeadDetails(message),
       };
     }
   }
@@ -1983,7 +2107,8 @@ buyingIntentDetected: memory.buyingIntentDetected,
 
   // Strategy-first response building — LLM-powered
   let enrichedResponse: string;
-  if (anthropicClient || geminiClient1 || geminiClient2) {
+  let structuredLeadFields: ExtractedLeadFields | null = null;
+  if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5) {
     try {
       const tenantIdForLLM = tenantId || 'default';
       const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
@@ -1992,52 +2117,80 @@ buyingIntentDetected: memory.buyingIntentDetected,
         return entry ? `### ${topic}\n${entry.answer}` : null;
       }).filter(Boolean).join('\n\n');
 
-      const businessContext = knowledgeSections ||
-        'No specific business knowledge available. Be helpful and ask clarifying questions.';
+      const crawledKnowledge = kbProvider?.getBusinessKnowledge?.(tenantIdForLLM) || '';
+
+      let businessContext = '';
+      if (crawledKnowledge) {
+        businessContext = `WEBSITE CONTENT (use this to answer questions about this specific business — it is the primary source of truth):\n${crawledKnowledge}`;
+      } else if (knowledgeSections) {
+        businessContext = knowledgeSections;
+      } else {
+        businessContext = 'No specific business knowledge available. Be helpful and ask clarifying questions.';
+      }
 
       const turns = legacyMemory.turns || [];
       const recentTurns = turns.slice(-8);
       const messages: Anthropic.MessageParam[] = [];
       for (const turn of recentTurns) {
-        if (turn.message) messages.push({ role: 'user', content: turn.message });
-        if (turn.response) messages.push({ role: 'assistant', content: turn.response });
+        if (turn.message) {
+          try {
+            messages.push({ role: 'user', content: normalizeMessageContent(turn.message) });
+          } catch { messages.push({ role: 'user', content: '' }); }
+        }
+        if (turn.response) {
+          try {
+            messages.push({ role: 'assistant', content: normalizeMessageContent(turn.response) });
+          } catch { messages.push({ role: 'assistant', content: '' }); }
+        }
       }
-      messages.push({ role: 'user', content: message });
+      messages.push({ role: 'user', content: normalizeMessageContent(message) });
 
-      const systemPrompt = `You are an AI sales agent for a real business.
-Answer visitor questions using ONLY the business knowledge below.
-Be concise (under 100 words), conversational, and helpful.
+      const systemPrompt = `You are a helpful assistant for a real business. Answer visitor questions using ONLY the business knowledge below.
+Be concise (under 100 words), conversational, and genuinely helpful.
 Never invent pricing, features, or policies not listed below.
+If you don't know something, say so honestly and offer to connect them with someone who can help.
 
-PRICING FACTS (always use these exact numbers, never invent alternatives):
-- Starter plan: $29/month, up to 3 agents, core automation and standard integrations
-- Professional plan: $79/month, growing teams, advanced analytics, custom roles, priority support
-- Enterprise plan: custom pricing, SSO, dedicated support, custom contracts
-Never quote pricing figures that differ from the PRICING FACTS section above.
+CRITICAL RULES:
+1. Answer the question directly first. No filler openers like "For teams, this is especially relevant."
+2. Use the specific business information below — don't give generic answers.
+3. If the visitor asks about pricing, services, or products, reference the actual business details provided.
+4. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
+5. Be warm and helpful, not pushy.
 
-CRITICAL RULES — MUST FOLLOW:
-1. Intent Override: Explicit intent signals (e.g., "i want to book", "let's schedule", "i want to buy", "talk to sales") MUST take precedence over keyword/topic matching. Never route an action request to product feature facts or documentation.
-2. Booking Context: Interpret "book" or "demo" in user requests as an explicit action to schedule a live sales meeting/calendar call, NOT as a search for technical documentation, sandbox environments, or setup guides.
-3. Strategy Routing: Set strategy to booking (with ctaType: "schedule_demo") whenever the visitor expresses intent to meet, demo, or buy. Set strategy to answer ONLY when the visitor asks an informational question without requesting an action.
-4. Never start responses with phrases like "For [persona] teams, this is especially relevant" or similar filler openers. Get straight to the answer.
+LEAD CAPTURE:
+If the visitor shares contact details or company info in this message (email, phone, their name, or company), extract them into the "extractedLead" object. Leave fields null when not provided. Never invent contact details.
 
 BUSINESS KNOWLEDGE:
 ${businessContext}
 
 Respond with ONLY a JSON object — no markdown, no explanation:
 {
-  "responseText": "your response to the visitor"
+  "responseText": "your response to the visitor",
+  "extractedLead": {
+    "email": "visitor email or null",
+    "phone": "visitor phone or null",
+    "name": "visitor name or null",
+    "company": "visitor company or null"
+  }
 }`;
 
       const text = await callLLMWithFallback(systemPrompt, messages);
       const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
       const parsed = JSON.parse(cleaned);
       enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
+      structuredLeadFields = parseStructuredLeadFields(parsed);
     } catch (error: unknown) {
-      const status = (error as { status?: number })?.status;
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[brain] LLM call failed:', { status, message, tenantId: input.tenantId });
-      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+      const err = error as { status?: number; message?: string; provider?: string };
+      const status = err.status;
+      const messageStr = error instanceof Error ? error.message : String(error);
+      console.error('[brain] LLM call failed:', { status, message: messageStr, tenantId: input.tenantId });
+
+      // Invalid payload (bad message content) must surface as a 400 to the caller.
+      if (error instanceof PayloadValidationError) throw error;
+
+      // Total upstream exhaustion (all providers rejected / failed / serialization):
+      // surface as 502 Bad Gateway so the route does not mask upstream failures.
+      throw new UpstreamLLMError(messageStr || 'Upstream LLM service unavailable', { status });
     }
   } else {
     enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
@@ -2202,7 +2355,72 @@ funnelStage: ciResult.funnelStage,
     qualityMetrics: computeQualityMetrics(memory),
     decisionTrace,
     debugPanel: buildDebugPanel(memory, plan, ciResult, quickReplies, nextBestAction, momentum),
+    extractedLead: mergeLeadFields(extractLeadDetails(message), structuredLeadFields),
   };
+}
+
+const BRAIN_HARD_CEILING_MS = 5000;
+
+function buildTimeoutFallback(input: BrainInput): BrainOutput {
+  const memory = fromLegacyMemory(input.legacyMemory);
+  const ciResult = buildMinimalCIResult(memory, input.message);
+  memory.turnCount++;
+  const updatedLegacy: ConversationIntelligenceMemory = {
+    ...input.legacyMemory,
+    turns: [...input.legacyMemory.turns, { message: input.message, response: '', polarity: 0, frustration: 0.1, urgency: 0.1, timestamp: Date.now() }],
+    topics: memory.topicsExplained.map(t => t.topic),
+    qualificationState: { ...memory.qualificationCollected },
+    objections: memory.objectionsHandled,
+    persona: ciResult.persona?.persona ?? 'unknown',
+    lastGoal: memory.lastGoal,
+    lastGoalStreak: memory.lastGoalStreak,
+  };
+  return {
+    responseText: 'Thanks for your patience — let me look that up for you. Could you repeat your question while I pull the details?',
+    cta: { primaryCTA: 'none' as CTAType, label: '', link: '' },
+    quickReplies: [],
+    uiState: { buttons: [], suggestedActions: [] },
+    memory,
+    legacyMemory: updatedLegacy,
+    plan: {
+      customerIntent: 'information' as CustomerIntent,
+      funnelStage: memory.funnelStage,
+      conversationStage: memory.currentStage || 'greeting',
+      buyerRole: memory.buyerRole || 'unknown',
+      goal: 'answer_question' as ConversationGoal,
+      topicsToDiscuss: [],
+      missingQualification: [],
+    },
+    validation: { valid: true, issues: [] },
+    ciResult,
+    orchestratorResult: ciResult as any,
+    extractedLead: extractLeadDetails(input.message),
+  };
+}
+
+export async function processConversationBrain(input: BrainInput): Promise<BrainOutput> {
+  let timer: NodeJS.Timeout | undefined;
+  const ceiling = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`processConversationBrain exceeded ${BRAIN_HARD_CEILING_MS}ms ceiling`));
+    }, BRAIN_HARD_CEILING_MS);
+  });
+
+  try {
+    return await Promise.race([processConversationBrainInner(input), ceiling]);
+  } catch (error: unknown) {
+    // Typed client-side payload errors (400) and upstream LLM failures (502) must
+    // propagate to the HTTP layer instead of being masked as a 200 fallback.
+    if (error instanceof PayloadValidationError || error instanceof UpstreamLLMError) throw error;
+
+    // Anything else (e.g. the 5s ceiling timeout) gets a graceful fallback so the
+    // visitor still receives a response and the process never terminates.
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[brain] ${message} — returning graceful fallback response`);
+    return buildTimeoutFallback(input);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // ============================================================

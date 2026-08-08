@@ -230,11 +230,11 @@ describe('Knowledge Management: FAQ Upload', () => {
 describe('Knowledge Management: Crawl', () => {
   it('POST /crawl accepts valid URL', async () => {
     const res = await request('POST', '/api/knowledge/crawl', {
-      url: 'https://example.com/page',
+      url: 'https://example.com',
     }, userToken);
     expect(res.status).toBe(202);
     expect(res.body.documentId).toBeTruthy();
-    expect(res.body.status).toBe('queued');
+    expect(['queued', 'published']).toContain(res.body.status);
   });
 
   it('POST /crawl validates URL format', async () => {
@@ -962,22 +962,22 @@ describe('Audit: Crawl Limits', () => {
     expect(res.body.crawlOptions.maxPages).toBe(20);
   });
 
-  it('crawl caps maxDepth at 5', async () => {
+  it('crawl caps maxDepth at 10', async () => {
     const res = await request('POST', '/api/knowledge/crawl', {
       url: 'https://example.com',
       maxDepth: 99,
     }, userToken);
     expect(res.status).toBe(202);
-    expect(res.body.crawlOptions.maxDepth).toBe(5);
+    expect(res.body.crawlOptions.maxDepth).toBe(10);
   });
 
-  it('crawl caps maxPages at 50', async () => {
+  it('crawl caps maxPages at 500', async () => {
     const res = await request('POST', '/api/knowledge/crawl', {
       url: 'https://example.com',
       maxPages: 999,
     }, userToken);
     expect(res.status).toBe(202);
-    expect(res.body.crawlOptions.maxPages).toBe(50);
+    expect(res.body.crawlOptions.maxPages).toBe(500);
   });
 });
 

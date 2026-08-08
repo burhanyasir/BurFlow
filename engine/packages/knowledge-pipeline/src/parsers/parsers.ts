@@ -453,8 +453,18 @@ export class WebsiteCrawler implements WebCrawler {
     try {
       const url = new URL(urlStr);
       const hostname = url.hostname;
-      if (WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(hostname))) return true;
-      if (hostname === '[::1]') return true;
+      const isDev = process.env.NODE_ENV === 'development';
+      if (/^localhost$/i.test(hostname)) return !isDev;
+      if (hostname === '[::1]') return !isDev;
+      if (/^127\./.test(hostname)) return !isDev;
+      if (/^10\./.test(hostname)) return true;
+      if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) return true;
+      if (/^192\.168\./.test(hostname)) return true;
+      if (/^169\.254\./.test(hostname)) return true;
+      if (/^0\./.test(hostname)) return true;
+      if (/^fc00:/i.test(hostname)) return true;
+      if (/^fd[0-9a-f]{2}:/i.test(hostname)) return true;
+      if (/^fe80:/i.test(hostname)) return true;
       return false;
     } catch {
       return true;

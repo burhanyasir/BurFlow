@@ -6,12 +6,16 @@ import {
   fuzzyResolveTopic,
 } from '@conversation-engine/conversation-orchestrator';
 import { TopicResponseTemplateRepository } from '@conversation-engine/saas-core';
+import type Database from 'better-sqlite3';
 
 export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   private fallback: KnowledgeBaseProvider;
+  private crawledChunksCache = new Map<string, { text: string; ts: number }>();
+  private CACHE_TTL = 60_000;
 
   constructor(
     private repo: TopicResponseTemplateRepository,
+    private db?: Database.Database,
     fallback?: KnowledgeBaseProvider,
   ) {
     this.fallback = fallback || new DefaultKnowledgeBaseProvider();
@@ -35,5 +39,34 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   resolveTopic(rawQuery: string, tenantId: string): DiscernedTopic | null {
     const available = this.getAvailableTopics(tenantId);
     return fuzzyResolveTopic(rawQuery, available);
+  }
+
+  getBusinessKnowledge(tenantId: string): string {
+    if (!this.db) return '';
+    const cached = this.crawledChunksCache.get(tenantId);
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL) return cached.text;
+
+    try {
+      const rows = this.db.prepare(
+        `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
+      ).all(tenantId) as Array<{ chunk_data: string }>;
+      if (!rows.length) return '';
+
+      // Each chunk_data is a JSON array of chunks
+      const allChunks = rows.flatMap(r => {
+        try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
+      });
+      if (!allChunks.length) return '';
+
+      const parts = allChunks.map(chunk => {
+        const title = chunk.title || chunk.document_id || '';
+        return title ? `[${title}] ${chunk.content}` : chunk.content;
+      });
+      const text = parts.join('\n\n');
+      this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
+      return text;
+    } catch {
+      return '';
+    }
   }
 }

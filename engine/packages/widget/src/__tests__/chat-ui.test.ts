@@ -34,7 +34,7 @@ describe('deriveSuggestedActions', () => {
   it('builds a business-aware greeting from the existing profile', () => {
     const greeting = buildBusinessGreeting({ companyName: 'Northstar Labs', industry: 'SaaS', businessType: 'saas', products: ['AI onboarding', 'Revenue analytics'] });
     expect(greeting).toContain('Northstar Labs');
-    expect(greeting.toLowerCase()).toContain('plans');
+    expect(greeting.toLowerCase()).toContain('pricing');
   });
 
   it('derives a sales-oriented profile from widget config and suggested actions', () => {
@@ -142,7 +142,7 @@ describe('deriveSuggestedActions', () => {
       {
         name: 'SaaS',
         profile: { companyName: 'Northstar Labs', industry: 'SaaS', businessType: 'saas', products: ['AI onboarding'], pricingModel: 'annual plans', valuePropositions: ['Fast deployment'], targetAudience: ['ops leaders'], faqs: ['How long does setup take?'], contactDetails: ['hello@northstar.com'], trustSignals: ['SOC 2 ready'], sourceUrls: { pricing: 'https://northstar.example/pricing' } },
-        expectedGreeting: 'plans',
+        expectedGreeting: 'pricing',
         expectedCardTitle: 'best-fit plan',
         expectedCta: 'Book Demo',
       },
@@ -177,7 +177,7 @@ describe('deriveSuggestedActions', () => {
       {
         name: 'Real Estate',
         profile: { companyName: 'Northline Realty', industry: 'Real Estate', businessType: 'real estate', products: ['Listing automation'], pricingModel: 'flexible tiers', valuePropositions: ['Faster follow-up'], targetAudience: ['agents'], faqs: ['Do you support MLS?'], contactDetails: ['agents@northline.com'], trustSignals: ['Built for brokers'], sourceUrls: { about: 'https://northline.example/about' } },
-        expectedGreeting: 'best next step',
+        expectedGreeting: 'right next step',
         expectedCardTitle: 'about',
         expectedCta: 'Contact Sales',
       },

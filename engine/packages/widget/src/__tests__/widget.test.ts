@@ -168,6 +168,59 @@ describe('streamChat', () => {
 
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it('calls onHumanTakeover for JSON responses with humanTakeover flag', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name === 'content-type' ? 'application/json' : null) },
+      json: vi.fn().mockResolvedValue({ response: 'Thanks — a human will reply shortly.', humanTakeover: true }),
+    }));
+
+    const onHumanTakeover = vi.fn();
+    await streamChat({
+      apiUrl: 'http://test',
+      onToken: vi.fn(),
+      onDone: vi.fn(),
+      onComplete: vi.fn(),
+      onHumanTakeover,
+      onError: vi.fn(),
+    });
+
+    expect(onHumanTakeover).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onHumanTakeover for SSE complete events with the flag', async () => {
+    const stream = createMockStream([
+      { type: 'complete', fullContent: 'A human is here.', turnId: 't1', humanTakeover: true },
+      { type: 'done', finishReason: 'handoff' },
+    ]);
+    vi.stubGlobal('fetch', mockFetch({ ok: true, body: stream }));
+
+    const onHumanTakeover = vi.fn();
+    await streamChat({
+      apiUrl: 'http://test',
+      onToken: vi.fn(),
+      onDone: vi.fn(),
+      onComplete: vi.fn(),
+      onHumanTakeover,
+      onError: vi.fn(),
+    });
+
+    expect(onHumanTakeover).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not call onHumanTakeover without the flag', async () => {
+    const stream = createMockStream([
+      { type: 'complete', fullContent: 'Hello', turnId: 't1' },
+    ]);
+    vi.stubGlobal('fetch', mockFetch({ ok: true, body: stream }));
+
+    const onHumanTakeover = vi.fn();
+    await streamChat({ apiUrl: 'http://test', onToken: vi.fn(), onDone: vi.fn(), onComplete: vi.fn(), onHumanTakeover, onError: vi.fn() });
+
+    expect(onHumanTakeover).not.toHaveBeenCalled();
+  });
 });
 
 // ─── ChatWidget Tests ───────────────────────────────────
@@ -226,7 +279,7 @@ describe('ChatWidget', () => {
     const msgs = widget.getMessages();
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe('assistant');
-    expect(msgs[0].content).toMatch(/I can help/i);
+    expect(msgs[0].content).toMatch(/Hey there!/i);
   });
 
   it('does not duplicate greeting on multiple opens', () => {
@@ -237,6 +290,103 @@ describe('ChatWidget', () => {
     widget.toggle();
 
     expect(widget.getMessages().length).toBe(1);
+  });
+
+  it('renders starter option chips on first open', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Welcome!' });
+    widget.mount();
+    widget.toggle();
+
+    const chips = document.querySelectorAll('.cw-starter-chip');
+    expect(chips.length).toBe(3);
+    const labels = Array.from(chips).map((c) => c.textContent);
+    expect(labels).toContain('Show me pricing');
+    expect(labels).toContain('How does it work?');
+    expect(labels).toContain('Book a demo');
+  });
+
+  it('fades out starter chips once the conversation sends a message', async () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+    expect(document.querySelector('.cw-starter-chips')).toBeTruthy();
+
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'Hello';
+    widget.send();
+    await new Promise((r) => setTimeout(r, 300));
+
+    expect(document.querySelector('.cw-starter-chips')).toBeNull();
+  });
+
+  it('sends the starter prompt when a chip is clicked', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'token', content: 'Sure!' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', fullContent: 'Sure!', turnId: 't1' })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+
+    const pricingChip = Array.from(document.querySelectorAll('.cw-starter-chip')).find(
+      (c) => c.textContent === 'Show me pricing'
+    ) as HTMLButtonElement;
+    expect(pricingChip).toBeTruthy();
+    pricingChip.click();
+
+    await new Promise((r) => setTimeout(r, 50));
+    const msgs = widget.getMessages();
+    expect(msgs[1].role).toBe('user');
+    expect(msgs[1].content).toBe('Show me pricing');
+  });
+
+  it('uses custom starterOptions from config', () => {
+    widget = new ChatWidget({
+      apiUrl: 'http://test',
+      greeting: 'Welcome!',
+      starterOptions: ['Tell me about your pricing', 'Book a consultation', 'View case studies'],
+    });
+    widget.mount();
+    widget.toggle();
+
+    const chips = document.querySelectorAll('.cw-starter-chip');
+    expect(chips.length).toBe(3);
+    const labels = Array.from(chips).map((c) => c.textContent);
+    expect(labels).toContain('Tell me about your pricing');
+    expect(labels).toContain('Book a consultation');
+    expect(labels).toContain('View case studies');
+  });
+
+  it('renders starter chips with capsule/pill styling', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hi!' });
+    widget.mount();
+    widget.toggle();
+
+    const chip = document.querySelector('.cw-starter-chip') as HTMLElement;
+    expect(chip).toBeTruthy();
+    expect(chip.style.borderRadius).toBe('9999px');
+    expect(chip.style.display).toBe('inline-flex');
+    expect(chip.style.padding).toBe('6px 14px');
+    expect(chip.style.fontSize).toBe('13px');
+    expect(chip.style.border).toContain('1px solid');
+  });
+
+  it('attaches starter chips inside the first assistant message bubble', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hello!' });
+    widget.mount();
+    widget.toggle();
+
+    const bubble = document.querySelector('.cw-message-assistant .cw-message-bubble');
+    expect(bubble).toBeTruthy();
+    const chipsInside = bubble!.querySelectorAll('.cw-starter-chip');
+    expect(chipsInside.length).toBe(3);
   });
 
   it('adds user message on send', () => {
@@ -334,7 +484,7 @@ describe('ChatWidget', () => {
     widget.mount();
 
     const bubble = document.querySelector('.cw-bubble') as HTMLElement;
-    expect(bubble.style.background).toBe('rgb(255, 0, 0)');
+    expect(bubble.style.background).toMatch(/linear-gradient/);
   });
 
   it('sets custom title and subtitle', () => {
@@ -344,7 +494,7 @@ describe('ChatWidget', () => {
 
     const header = document.querySelector('.cw-header')!;
     expect(header.textContent).toContain('Support');
-    expect(header.textContent).toContain('Ask us anything');
+    expect(header.textContent).toContain('AI Sales Assistant');
   });
 
   it('clears input on Enter key (not Shift+Enter)', () => {
@@ -410,5 +560,54 @@ describe('ChatWidget', () => {
     widget.toggle(); // open
 
     expect((widget as any).unreadCount).toBe(0);
+  });
+
+  it('shows live takeover banner when stream reports humanTakeover', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', fullContent: 'Thanks for your message — a human is reading it now.', turnId: 't1', humanTakeover: true })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'I need urgent help';
+    widget.send();
+    await new Promise(r => setTimeout(r, 50));
+
+    const banner = document.querySelector('.cw-takeover');
+    expect(banner).toBeTruthy();
+    expect(banner!.style.display).toBe('block');
+    expect(banner!.textContent).toContain('A human agent is now assisting');
+  });
+
+  it('does not show takeover banner without the flag', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', fullContent: 'Hello there', turnId: 't1' })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'Hi';
+    widget.send();
+    await new Promise(r => setTimeout(r, 50));
+
+    expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
   });
 });

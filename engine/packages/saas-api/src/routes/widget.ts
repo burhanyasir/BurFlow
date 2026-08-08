@@ -174,6 +174,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         greeting: config.greeting,
         launcherText: config.launcherText,
         businessProfile: config.businessProfile,
+        starterOptions: config.starterOptions,
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
       });

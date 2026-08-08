@@ -81,6 +81,8 @@ export interface TenantApiKey {
   revokedAt?: string;
 }
 
+export type SessionState = 'ai_managed' | 'human_takeover' | 'closed';
+
 export interface Conversation {
   id: string;
   tenantId: string;
@@ -90,6 +92,9 @@ export interface Conversation {
   endedAt?: string;
   messageCount: number;
   status: 'active' | 'ended' | 'escalated';
+  sessionState: SessionState;
+  assignedAgentId?: string;
+  takeoverAt?: string;
 }
 
 export interface Message {
@@ -171,7 +176,11 @@ export interface WidgetConfig {
   autoOpen: boolean;
   autoOpenDelay: number;
   businessProfile?: Record<string, unknown>;
+  starterOptions?: string[];
   customCss?: string;
+  notificationEmail?: string;
+  slackWebhookUrl?: string;
+  notifyThreshold?: 'all' | 'sales_qualified_only';
   createdAt: string;
   updatedAt: string;
 }
@@ -448,7 +457,7 @@ export interface ApiKeyUsageStats {
 }
 
 // ─── Webhooks ─────────────────────────────────────────────────
-export type WebhookEvent = 'conversation.created' | 'conversation.completed' | 'escalation.created' | 'unanswered.created' | 'feedback.received';
+export type WebhookEvent = 'conversation.created' | 'conversation.completed' | 'escalation.created' | 'unanswered.created' | 'feedback.received' | 'lead.captured' | 'lead.qualified';
 
 export interface Webhook {
   id: string;
@@ -478,6 +487,32 @@ export interface WebhookDelivery {
   nextRetryAt?: string;
   createdAt: string;
   completedAt?: string;
+}
+
+// ─── Leads ───────────────────────────────────────────────────
+export type LeadSource = 'chat' | 'form' | 'api';
+
+export type QualificationStatus = 'unqualified' | 'marketing_qualified' | 'sales_qualified' | 'disqualified';
+
+export type BuyingIntentLevel = 'low' | 'medium' | 'high';
+
+export interface Lead {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+  conversationId?: string;
+  email?: string;
+  phone?: string;
+  name?: string;
+  company?: string;
+  qualificationStatus: QualificationStatus;
+  leadScore: number;
+  buyingIntent: BuyingIntentLevel;
+  source: LeadSource;
+  metadata?: Record<string, unknown>;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ─── Trust Center ─────────────────────────────────────────────

@@ -316,7 +316,8 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
   position: 'bottom-right',
   companyName: '',
-  launcherText: 'Talk to BurFlow',
+  launcherText: 'Chat with us',
+  starterOptions: [],
   suggestedActions: [
     { id: 'pricing', label: 'Pricing', action: 'send_text', payload: 'Show me pricing', variant: 'secondary', category: 'plans' },
     { id: 'products', label: 'Best Fit', action: 'send_text', payload: 'Which option fits our needs best?', variant: 'secondary', category: 'guidance' },
@@ -357,6 +358,8 @@ export class ChatWidget {
   private preOpenDismissed = false;
   private handoffEl: HTMLDivElement | null = null;
   private handoffShown = false;
+  private takeoverEl: HTMLDivElement | null = null;
+  private takeoverShown = false;
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
   private readonly placeholders = ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
   private boundDismissPreOpen = (e: Event) => {
@@ -448,28 +451,34 @@ export class ChatWidget {
     const panel = document.createElement('div');
     panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
-    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:320px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
+    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
 
-    const firstQ = this.config.suggestedActions?.[0];
-    const question = firstQ?.payload || firstQ?.label || 'What products do you offer?';
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:12px 16px 6px;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#6B7280;';
+    header.textContent = 'Suggested questions';
+    panel.appendChild(header);
 
-    const card = document.createElement('div');
-    card.style.cssText = 'padding:14px 16px;';
-    card.innerHTML = `
-      <p style="font-size:12px;color:#6B7280;margin:0 0 6px;">Suggested question</p>
-      <p style="font-size:13px;color:#1F2937;margin:0;font-weight:500;line-height:1.4;">${question}</p>
-    `;
-    panel.appendChild(card);
-
-    panel.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.dismissPreOpenPanel();
-      if (!this.isOpen) this.toggle();
-      if (firstQ?.payload) {
+    const options = this.config.starterOptions?.length
+      ? this.config.starterOptions
+      : ['Show me pricing', 'How does it work?', 'Book a demo'];
+    options.forEach((text, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = `padding:8px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;${i < options.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}transition:background 0.15s ease;`;
+      const pill = document.createElement('span');
+      pill.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;border-radius:9999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:500;white-space:nowrap;';
+      pill.textContent = text;
+      row.appendChild(pill);
+      row.addEventListener('mouseenter', () => { row.style.background = '#F9FAFB'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; });
+      row.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dismissPreOpenPanel();
+        if (!this.isOpen) this.toggle();
         setTimeout(() => {
-          if (this.inputEl) { this.inputEl.value = firstQ.payload!; this.send(); }
+          if (this.inputEl) { this.inputEl.value = text; this.send(); }
         }, 150);
-      }
+      });
+      panel.appendChild(row);
     });
 
     document.body.appendChild(panel);
@@ -509,6 +518,8 @@ export class ChatWidget {
     this.actionPanel = this.createActionPanel();
     container.appendChild(this.actionPanel);
     container.appendChild(this.createInputArea());
+    this.takeoverEl = this.createTakeoverArea();
+    container.appendChild(this.takeoverEl);
     this.handoffEl = this.createHandoffArea();
     container.appendChild(this.handoffEl);
 
@@ -554,7 +565,7 @@ export class ChatWidget {
   private createMessagesArea(): HTMLDivElement {
     const el = document.createElement('div');
     el.className = 'cw-messages';
-    el.style.cssText = 'flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;min-height:300px;max-height:400px;background:#F8F9FB;';
+    el.style.cssText = 'flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;background:#F8F9FB;overscroll-behavior:contain;';
     return el;
   }
 
@@ -616,6 +627,27 @@ export class ChatWidget {
     wrapper.appendChild(footer);
 
     return wrapper;
+  }
+
+  private createTakeoverArea(): HTMLDivElement {
+    const el = document.createElement('div');
+    el.className = 'cw-takeover';
+    el.style.cssText = 'display:none;padding:0 16px 12px;background:#EEF2FF;border-top:1px solid #E0E7FF;';
+    return el;
+  }
+
+  private showTakeoverBanner(): void {
+    if (!this.takeoverEl || this.takeoverShown) return;
+    this.takeoverShown = true;
+    this.takeoverEl.style.display = 'block';
+    this.takeoverEl.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
+        <span style="font-size:14px;flex-shrink:0;">👤</span>
+        <div>
+          <p style="margin:0;font-size:12px;font-weight:600;color:#312E81;">A human agent is now assisting</p>
+          <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">Your conversation has been handed to our team. Replies will come from a real person shortly.</p>
+        </div>
+      </div>`;
   }
 
   private createHandoffArea(): HTMLDivElement {
@@ -689,10 +721,15 @@ export class ChatWidget {
       this.unreadCount = 0;
       this.updateBadge();
       this.inputEl?.focus();
-      if (this.messages.length === 0) {
+      const isFirstOpen = this.messages.length === 0;
+      if (isFirstOpen) {
         this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
       }
-      this.renderUiState();
+      if (isFirstOpen) {
+        this.renderInitialActions();
+      } else {
+        this.renderUiState();
+      }
       this.scrollToBottom();
     }
   }
@@ -703,6 +740,24 @@ export class ChatWidget {
 
     this.inputEl!.value = '';
     this.inputEl!.style.height = 'auto';
+    this.clearUiState();
+    this.fadeOutStarterChips();
+    this.addMessage({ role: 'user', content: text });
+    this.streamResponse(text);
+  }
+
+  private fadeOutStarterChips(): void {
+    if (!this.messagesEl) return;
+    const chips = this.messagesEl.querySelector('.cw-starter-chips') as HTMLElement | null;
+    if (!chips) return;
+    chips.style.opacity = '0';
+    chips.style.transition = 'opacity 0.25s ease';
+    setTimeout(() => chips.remove(), 250);
+  }
+
+  private sendStarterPrompt(text: string): void {
+    if (!text || this.isStreaming) return;
+    this.fadeOutStarterChips();
     this.clearUiState();
     this.addMessage({ role: 'user', content: text });
     this.streamResponse(text);
@@ -736,6 +791,9 @@ export class ChatWidget {
         this.uiState = uiState || null;
         this.cta = cta || null;
         this.renderUiState();
+      },
+      onHumanTakeover: () => {
+        this.showTakeoverBanner();
       },
       onComplete: (fullContent) => {
         if (fullContent) assistantMsg.content = fullContent;
@@ -895,21 +953,45 @@ export class ChatWidget {
 
   private renderInitialActions(): void {
     this.suggestionHistory = [];
-    const greetingText = this.getWelcomeMessage();
-    const initialButtons = deriveSuggestedActions(greetingText, this.suggestionHistory);
-    this.suggestionHistory = [...this.suggestionHistory, ...initialButtons];
-    if (this.actionPanel) {
-      this.actionPanel.innerHTML = '';
-      this.actionPanel.style.display = 'flex';
-      const buttonContainer = document.createElement('div');
-      buttonContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
-      const categoryHeader = document.createElement('div');
-      categoryHeader.textContent = 'Recommended next steps';
-      categoryHeader.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:#6B7280;';
-      this.actionPanel.appendChild(categoryHeader);
-      initialButtons.forEach((button) => buttonContainer.appendChild(this.createActionButton(button)));
-      this.actionPanel.appendChild(buttonContainer);
+    if (!this.messagesEl) return;
+    const existing = this.messagesEl.querySelector('.cw-starter-chips');
+    if (existing) existing.remove();
+
+    const starters = this.config.starterOptions?.length
+      ? this.config.starterOptions
+      : ['Show me pricing', 'How does it work?', 'Book a demo'];
+
+    const chipWrap = document.createElement('div');
+    chipWrap.className = 'cw-starter-chips';
+    chipWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 4px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);';
+
+    starters.forEach((text) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'cw-starter-chip';
+      chip.textContent = text;
+      chip.style.cssText = 'display:inline-flex;align-items:center;padding:6px 14px;border:1px solid #E5E7EB;border-radius:9999px;background:#F9FAFB;color:#374151;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:background 0.15s ease,color 0.15s ease,border-color 0.15s ease;white-space:nowrap;';
+      chip.addEventListener('mouseenter', () => {
+        chip.style.background = '#EEF2FF';
+        chip.style.color = '#4338CA';
+        chip.style.borderColor = '#C7D2FE';
+      });
+      chip.addEventListener('mouseleave', () => {
+        chip.style.background = '#F9FAFB';
+        chip.style.color = '#374151';
+        chip.style.borderColor = '#E5E7EB';
+      });
+      chip.addEventListener('click', () => this.sendStarterPrompt(text));
+      chipWrap.appendChild(chip);
+    });
+
+    const firstAssistantBubble = this.messagesEl.querySelector('.cw-message-assistant .cw-message-bubble');
+    if (firstAssistantBubble) {
+      firstAssistantBubble.appendChild(chipWrap);
+    } else {
+      this.messagesEl.appendChild(chipWrap);
     }
+    this.scrollToBottom();
   }
 
   private getContextualButtons(buttonGroup: SmartButton[]): SmartButton[] {
@@ -1179,7 +1261,7 @@ export class ChatWidget {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
       return `position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
     }
-    return `position:fixed;bottom:88px;${pos}width:400px;max-width:calc(100vw - 24px);height:620px;max-height:calc(100vh - 24px);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    return `position:fixed;bottom:88px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(650px, 85vh);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {

@@ -7,7 +7,7 @@ import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validateRequiredString, validationError } from '../middleware/validate';
 import crypto from 'crypto';
 
-const VALID_WEBHOOK_EVENTS: WebhookEvent[] = ['conversation.created', 'conversation.completed', 'escalation.created', 'unanswered.created', 'feedback.received'];
+const VALID_WEBHOOK_EVENTS: WebhookEvent[] = ['conversation.created', 'conversation.completed', 'escalation.created', 'unanswered.created', 'feedback.received', 'lead.captured', 'lead.qualified'];
 const logger = createLogger('saas-api:webhooks');
 
 export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo: WebhookDeliveryRepository, auditRepo: AuditLogRepository): Router {

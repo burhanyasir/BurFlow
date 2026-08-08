@@ -8,9 +8,10 @@ import {
   KnowledgeRetriever, DefaultContextAssembler,
   TextParser, MarkdownParser, HtmlParser, FaqParser, PdfParser, DocxParser, WebsiteCrawler,
 } from '@conversation-engine/knowledge-pipeline';
-import { SourceType } from '@conversation-engine/knowledge-pipeline';
+import { SourceType, ParsedDocument } from '@conversation-engine/knowledge-pipeline';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { validateId, validationError, validateRequiredString, LABEL_MAX } from '../middleware/validate';
+import Groq from 'groq-sdk';
 
 const logger = createLogger('saas-api:knowledge');
 
@@ -73,13 +74,14 @@ function isValidPrivateUrl(urlStr: string): boolean {
   try {
     const url = new URL(urlStr);
     const hostname = url.hostname;
-    if (/^127\./.test(hostname)) return false;
+    const isDev = process.env.NODE_ENV === 'development';
+    if (/^localhost$/i.test(hostname)) return isDev;
+    if (hostname === '[::1]') return isDev;
+    if (/^127\./.test(hostname)) return isDev;
     if (/^10\./.test(hostname)) return false;
     if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) return false;
     if (/^192\.168\./.test(hostname)) return false;
     if (/^169\.254\./.test(hostname)) return false;
-    if (/^localhost$/i.test(hostname)) return false;
-    if (hostname === '[::1]') return false;
     if (/^fc00:/i.test(hostname)) return false;
     if (/^fd[0-9a-f]{2}:/i.test(hostname)) return false;
     if (/^fe80:/i.test(hostname)) return false;
@@ -93,6 +95,92 @@ function clampInt(value: unknown, min: number, max: number, defaultValue: number
   const n = parseInt(String(value), 10);
   if (isNaN(n)) return defaultValue;
   return Math.max(min, Math.min(max, n));
+}
+
+function generateStarterOptionsFallback(docs: ParsedDocument[]): string[] {
+  const options: string[] = [];
+  const urls = docs.map(d => (d.metadata?.sourceUrl as string || '').toLowerCase());
+  const titles = docs.map(d => (d.title || '').toLowerCase());
+
+  const hasPricing = urls.some(u => u.includes('pricing')) || titles.some(t => t.includes('pricing'));
+  const hasProducts = urls.some(u => u.includes('product')) || titles.some(t => t.includes('product'));
+  const hasContact = urls.some(u => u.includes('contact')) || titles.some(t => t.includes('contact'));
+  const hasFaq = urls.some(u => u.includes('faq') || u.includes('question')) || titles.some(t => t.includes('faq') || t.includes('question'));
+  const hasDemo = urls.some(u => u.includes('demo') || u.includes('trial')) || titles.some(t => t.includes('demo') || t.includes('trial'));
+  const hasAbout = urls.some(u => u.includes('about')) || titles.some(t => t.includes('about'));
+
+  if (hasPricing) options.push('Show me pricing');
+  if (hasProducts) options.push('What products do you offer?');
+  if (hasDemo) options.push('Can I try a demo?');
+  if (hasFaq) options.push('Frequently asked questions');
+  if (hasContact) options.push('How can I contact you?');
+  if (hasAbout) options.push('Tell me about your company');
+
+  if (options.length < 3) {
+    const defaults = ['How does it work?', 'Book a demo', 'What are your services?'];
+    for (const d of defaults) {
+      if (options.length >= 3) break;
+      if (!options.includes(d)) options.push(d);
+    }
+  }
+
+  return options.slice(0, 3);
+}
+
+const LLM_STARTER_OPTIONS_TIMEOUT_MS = 8000;
+
+async function generateStarterOptionsWithLLM(docs: ParsedDocument[], tenantId: string): Promise<string[]> {
+  const groqKey = process.env.GROQ_API_KEY;
+  if (!groqKey) return generateStarterOptionsFallback(docs);
+
+  const snippets: string[] = [];
+  for (const doc of docs.slice(0, 5)) {
+    const text = (doc.content || '').slice(0, 600);
+    const title = doc.title || '';
+    if (title || text) snippets.push(`Page: ${title}\n${text}`);
+  }
+  if (snippets.length === 0) return generateStarterOptionsFallback(docs);
+
+  const contentSummary = snippets.join('\n---\n').slice(0, 3000);
+
+  const systemPrompt = `You are generating 3 concise chat widget starter questions for a business website.
+The questions should be high-intent, specific to the business type, and written in natural customer language.
+Return ONLY a JSON array of exactly 3 short strings, no explanation. Each question should be under 8 words.
+Examples by industry:
+- E-commerce: ["Track my order", "What's your return policy?", "Do you offer free shipping?"]
+- Dental clinic: ["Book a cleaning", "Do you accept insurance?", "Emergency appointments available?"]
+- SaaS: ["Compare pricing plans", "Schedule a demo", "Do you have an API?"]
+- Restaurant: ["Make a reservation", "View the menu", "Do you deliver?"]`;
+
+  try {
+    const groq = new Groq({ apiKey: groqKey, timeout: LLM_STARTER_OPTIONS_TIMEOUT_MS });
+    const response = await groq.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Here is content from the business website:\n\n${contentSummary}` },
+      ],
+      temperature: 0.3,
+      max_tokens: 200,
+    });
+
+    const raw = response.choices?.[0]?.message?.content || '';
+    const match = raw.match(/\[[\s\S]*\]/);
+    if (!match) return generateStarterOptionsFallback(docs);
+
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed) || parsed.length < 2) return generateStarterOptionsFallback(docs);
+
+    const cleaned = parsed
+      .filter((s: unknown) => typeof s === 'string' && s.trim().length > 0)
+      .map((s: string) => s.trim())
+      .slice(0, 3);
+
+    return cleaned.length >= 2 ? cleaned : generateStarterOptionsFallback(docs);
+  } catch (err: any) {
+    createContextLogger(logger).warn({ err, tenantId }, 'LLM starter options generation failed; using fallback');
+    return generateStarterOptionsFallback(docs);
+  }
 }
 
 function createPipeline(deps: KnowledgeRouteDeps): KnowledgePipeline {
@@ -285,6 +373,14 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
       const status = pipeline.getQueueStatus(docIds[0]);
       setCrawlProgress(tenantId, { done: true, pagesCrawled: docs.length, queueRemaining: 0 });
+
+      const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
+      try {
+        const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
+        const widgetConfigRepo = new WidgetConfigRepository(deps.db);
+        widgetConfigRepo.upsert(tenantId, { starterOptions });
+      } catch { /* ignore — starterOptions are best-effort */ }
+
       setTimeout(() => clearCrawlProgress(tenantId), 30000);
       res.status(202).json({
         documentId: docIds[0],

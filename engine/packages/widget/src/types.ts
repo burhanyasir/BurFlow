@@ -13,6 +13,7 @@ export interface WidgetConfig {
   launcherText?: string;
   suggestedActions?: SmartButton[];
   businessProfile?: Record<string, unknown>;
+  starterOptions?: string[];
 }
 
 export interface ChatMessage {
@@ -55,6 +56,7 @@ export interface StreamEvent {
   error?: string;
   uiState?: ConversationUIState;
   cta?: Record<string, unknown>;
+  humanTakeover?: boolean;
 }
 
 export interface StreamClientOptions {
@@ -68,6 +70,7 @@ export interface StreamClientOptions {
   onDone: (finishReason: string) => void;
   onComplete: (fullContent: string, turnId: string) => void;
   onUiState?: (uiState: ConversationUIState | undefined, cta?: Record<string, unknown>) => void;
+  onHumanTakeover?: () => void;
   onError: (error: string) => void;
   signal?: AbortSignal;
 }

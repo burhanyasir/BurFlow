@@ -7,6 +7,8 @@
   ],
   "scripts": {
     "build": "tsc -b",
+    "build:all": "tsc -b && npm run build --workspace=@conversation-engine/saas-core && npm run build --workspace=@conversation-engine/conversation-orchestrator && npm run build --workspace=@conversation-engine/widget && npm run build --workspace=@conversation-engine/saas-api",
+    "typecheck": "npm run build:all",
     "clean": "tsc -b --clean",
     "test": "vitest run",
     "test:watch": "vitest",

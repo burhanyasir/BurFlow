@@ -186,7 +186,7 @@ function WidgetEmbedLoader() {
           position: 'bottom-right',
           primaryColor: '#6366f1',
           greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
-          launcherText: 'Ask me anything',
+          launcherText: 'Chat with us',
           title: 'BurFlow AI Assistant',
           subtitle: 'Your smart buying assistant',
           suggestedActions: [

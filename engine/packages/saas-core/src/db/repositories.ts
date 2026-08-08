@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus } from '../types';
+import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState } from '../types';
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
@@ -211,8 +211,8 @@ export class ConversationRepository {
     const id = generateId();
     const now = new Date().toISOString();
     this.db.prepare(
-      'INSERT INTO conversations (id, tenant_id, session_id, started_at, status) VALUES (?, ?, ?, ?, ?)'
-    ).run(id, tenantId, sessionId, now, 'active');
+      'INSERT INTO conversations (id, tenant_id, session_id, started_at, status, session_state) VALUES (?, ?, ?, ?, ?, ?)'
+    ).run(id, tenantId, sessionId, now, 'active', 'ai_managed');
     return this.findById(id)!;
   }
 
@@ -261,11 +261,33 @@ export class ConversationRepository {
     return this.findById(id);
   }
 
+  /**
+   * Transitions the session state machine for a conversation.
+   * 'human_takeover' records the assigned agent + takeover timestamp;
+   * any other state clears the assignment and takeover timestamp.
+   */
+  setSessionState(id: string, state: SessionState, agentId?: string): Conversation | null {
+    const now = new Date().toISOString();
+    if (state === 'human_takeover') {
+      this.db.prepare(
+        'UPDATE conversations SET session_state = ?, assigned_agent_id = ?, takeover_at = ? WHERE id = ?'
+      ).run(state, agentId || null, now, id);
+    } else {
+      this.db.prepare(
+        'UPDATE conversations SET session_state = ?, assigned_agent_id = NULL, takeover_at = NULL WHERE id = ?'
+      ).run(state, id);
+    }
+    return this.findById(id);
+  }
+
   private mapRow(row: any): Conversation {
     return {
       id: row.id, tenantId: row.tenant_id, sessionId: row.session_id,
       userId: row.user_id, startedAt: row.started_at, endedAt: row.ended_at,
       messageCount: row.message_count, status: row.status,
+      sessionState: row.session_state || 'ai_managed',
+      assignedAgentId: row.assigned_agent_id || undefined,
+      takeoverAt: row.takeover_at || undefined,
     };
   }
 }
@@ -646,7 +668,11 @@ export class WidgetConfigRepository {
     if (data.autoOpen !== undefined) { cols.push('auto_open'); vals.push(data.autoOpen ? 1 : 0); }
     if (data.autoOpenDelay) { cols.push('auto_open_delay'); vals.push(data.autoOpenDelay); }
     if (data.businessProfile !== undefined) { cols.push('business_profile'); vals.push(JSON.stringify(data.businessProfile)); }
+    if (data.starterOptions !== undefined) { cols.push('starter_options'); vals.push(JSON.stringify(data.starterOptions)); }
     if (data.customCss) { cols.push('custom_css'); vals.push(data.customCss); }
+    if (data.notificationEmail) { cols.push('notification_email'); vals.push(data.notificationEmail); }
+    if (data.slackWebhookUrl) { cols.push('slack_webhook_url'); vals.push(data.slackWebhookUrl); }
+    if (data.notifyThreshold !== undefined) { cols.push('notify_threshold'); vals.push(data.notifyThreshold); }
     this.db.prepare(`INSERT INTO widget_configs (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`).run(...vals);
     return this.get(tenantId)!;
   }
@@ -661,7 +687,11 @@ export class WidgetConfigRepository {
       allowedDomains: JSON.parse(row.allowed_domains || '[]'),
       autoOpen: !!row.auto_open, autoOpenDelay: row.auto_open_delay,
       businessProfile: row.business_profile ? JSON.parse(row.business_profile) : undefined,
+      starterOptions: row.starter_options ? JSON.parse(row.starter_options) : undefined,
       customCss: row.custom_css,
+      notificationEmail: row.notification_email || undefined,
+      slackWebhookUrl: row.slack_webhook_url || undefined,
+      notifyThreshold: row.notify_threshold || 'all',
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }
@@ -1962,6 +1992,228 @@ export class HandoffRequestRepository {
       visitorEmail: row.visitor_email, conversationSummary: row.conversation_summary,
       status: row.status, createdAt: row.created_at,
       resolvedAt: row.resolved_at, resolvedBy: row.resolved_by,
+    };
+  }
+}
+
+export class LeadRepository {
+  constructor(private db: Database.Database) {}
+
+  create(data: {
+    tenantId: string;
+    sessionId: string;
+    conversationId?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
+    company?: string;
+    qualificationStatus: QualificationStatus;
+    leadScore: number;
+    buyingIntent: BuyingIntentLevel;
+    source: LeadSource;
+    metadata?: Record<string, unknown>;
+  }): Lead {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(`
+      INSERT INTO leads (id, tenant_id, session_id, conversation_id, email, phone, name, company, qualification_status, lead_score, buying_intent, source, metadata, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id, data.tenantId, data.sessionId, data.conversationId || null,
+      data.email || null, data.phone || null, data.name || null, data.company || null,
+      data.qualificationStatus, data.leadScore, data.buyingIntent, data.source,
+      JSON.stringify(data.metadata || {}), now, now,
+    );
+    return this.findById(id)!;
+  }
+
+  findById(id: string): Lead | null {
+    const row = this.db.prepare('SELECT * FROM leads WHERE id = ?').get(id) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findBySession(tenantId: string, sessionId: string): Lead | null {
+    const row = this.db.prepare('SELECT * FROM leads WHERE tenant_id = ? AND session_id = ? ORDER BY created_at DESC LIMIT 1')
+      .get(tenantId, sessionId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findByEmail(tenantId: string, email: string): Lead | null {
+    const row = this.db.prepare('SELECT * FROM leads WHERE tenant_id = ? AND email = ? ORDER BY created_at DESC LIMIT 1')
+      .get(tenantId, email) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findByTenant(tenantId: string, page = 1, limit = 20): { leads: Lead[]; total: number } {
+    const total = (this.db.prepare('SELECT COUNT(*) as c FROM leads WHERE tenant_id = ?').get(tenantId) as any).c;
+    const rows = this.db.prepare('SELECT * FROM leads WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?')
+      .all(tenantId, limit, (page - 1) * limit) as any[];
+    return { leads: rows.map(r => this.mapRow(r)), total };
+  }
+
+  update(id: string, data: Partial<{
+    sessionId: string;
+    conversationId: string;
+    email: string;
+    phone: string;
+    name: string;
+    company: string;
+    qualificationStatus: QualificationStatus;
+    leadScore: number;
+    buyingIntent: BuyingIntentLevel;
+    metadata: Record<string, unknown>;
+    notes: string;
+  }>): Lead | null {
+    const sets: string[] = ['updated_at = ?'];
+    const vals: any[] = [new Date().toISOString()];
+    if (data.sessionId !== undefined) { sets.push('session_id = ?'); vals.push(data.sessionId); }
+    if (data.conversationId !== undefined) { sets.push('conversation_id = ?'); vals.push(data.conversationId); }
+    if (data.email !== undefined) { sets.push('email = ?'); vals.push(data.email); }
+    if (data.phone !== undefined) { sets.push('phone = ?'); vals.push(data.phone); }
+    if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name); }
+    if (data.company !== undefined) { sets.push('company = ?'); vals.push(data.company); }
+    if (data.qualificationStatus !== undefined) { sets.push('qualification_status = ?'); vals.push(data.qualificationStatus); }
+    if (data.leadScore !== undefined) { sets.push('lead_score = ?'); vals.push(data.leadScore); }
+    if (data.buyingIntent !== undefined) { sets.push('buying_intent = ?'); vals.push(data.buyingIntent); }
+    if (data.metadata !== undefined) { sets.push('metadata = ?'); vals.push(JSON.stringify(data.metadata)); }
+    if (data.notes !== undefined) { sets.push('notes = ?'); vals.push(data.notes); }
+    vals.push(id);
+    this.db.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return this.findById(id);
+  }
+
+  updateLead(id: string, tenantId: string, updates: Partial<Lead>): Lead | null {
+    const existing = this.findById(id);
+    if (!existing || existing.tenantId !== tenantId) return null;
+
+    const sets: string[] = ['updated_at = ?'];
+    const vals: any[] = [new Date().toISOString()];
+    const fieldMap: [keyof Lead, string][] = [
+      ['email', 'email'],
+      ['phone', 'phone'],
+      ['name', 'name'],
+      ['company', 'company'],
+      ['qualificationStatus', 'qualification_status'],
+      ['leadScore', 'lead_score'],
+      ['buyingIntent', 'buying_intent'],
+      ['notes', 'notes'],
+    ];
+    for (const [key, col] of fieldMap) {
+      if (updates[key] !== undefined) {
+        sets.push(`${col} = ?`);
+        vals.push(updates[key] as string | number);
+      }
+    }
+    if (updates.metadata !== undefined) {
+      sets.push('metadata = ?');
+      vals.push(JSON.stringify(updates.metadata));
+    }
+    if (sets.length === 1) return existing;
+    vals.push(id, tenantId);
+    this.db.prepare(`UPDATE leads SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`).run(...vals);
+    return this.findById(id);
+  }
+
+  searchLeads(
+    tenantId: string,
+    params: {
+      status?: string;
+      minScore?: number;
+      startDate?: string;
+      endDate?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+  ): { leads: Lead[]; total: number } {
+    const page = Math.max(1, params.page || 1);
+    const limit = Math.min(Math.max(1, params.limit || 20), 100);
+    const where: string[] = ['tenant_id = ?'];
+    const vals: any[] = [tenantId];
+
+    if (params.status) {
+      where.push('qualification_status = ?');
+      vals.push(params.status);
+    }
+    if (typeof params.minScore === 'number' && !isNaN(params.minScore)) {
+      where.push('lead_score >= ?');
+      vals.push(params.minScore);
+    }
+    if (params.startDate) {
+      where.push('created_at >= ?');
+      vals.push(params.startDate.length === 10 ? `${params.startDate}T00:00:00.000Z` : params.startDate);
+    }
+    if (params.endDate) {
+      where.push('created_at <= ?');
+      vals.push(params.endDate.length === 10 ? `${params.endDate}T23:59:59.999Z` : params.endDate);
+    }
+    if (params.search) {
+      const term = `%${params.search}%`;
+      where.push('(name LIKE ? COLLATE NOCASE OR email LIKE ? COLLATE NOCASE OR company LIKE ? COLLATE NOCASE)');
+      vals.push(term, term, term);
+    }
+
+    const whereSql = where.join(' AND ');
+    const total = (this.db.prepare(`SELECT COUNT(*) as c FROM leads WHERE ${whereSql}`).get(...vals) as any).c;
+    const rows = this.db.prepare(`SELECT * FROM leads WHERE ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
+      .all(...vals, limit, (page - 1) * limit) as any[];
+    return { leads: rows.map(r => this.mapRow(r)), total };
+  }
+
+  upsertBySession(data: {
+    tenantId: string;
+    sessionId: string;
+    conversationId?: string;
+    email?: string;
+    phone?: string;
+    name?: string;
+    company?: string;
+    qualificationStatus: QualificationStatus;
+    leadScore: number;
+    buyingIntent: BuyingIntentLevel;
+    source: LeadSource;
+    metadata?: Record<string, unknown>;
+  }): { lead: Lead; isNew: boolean; qualificationChanged: boolean } {
+    const existing = this.findBySession(data.tenantId, data.sessionId);
+    if (existing) {
+      const updated = this.update(existing.id, {
+        conversationId: data.conversationId,
+        email: data.email !== undefined ? data.email : existing.email,
+        phone: data.phone !== undefined ? data.phone : existing.phone,
+        name: data.name !== undefined ? data.name : existing.name,
+        company: data.company !== undefined ? data.company : existing.company,
+        qualificationStatus: data.qualificationStatus,
+        leadScore: Math.max(existing.leadScore, data.leadScore),
+        buyingIntent: data.buyingIntent,
+        metadata: { ...(existing.metadata || {}), ...(data.metadata || {}) },
+      });
+      return {
+        lead: updated!,
+        isNew: false,
+        qualificationChanged: updated!.qualificationStatus !== existing.qualificationStatus,
+      };
+    }
+    const created = this.create(data);
+    return { lead: created, isNew: true, qualificationChanged: true };
+  }
+
+  delete(id: string, tenantId: string): boolean {
+    const result = this.db.prepare('DELETE FROM leads WHERE id = ? AND tenant_id = ?').run(id, tenantId);
+    return result.changes > 0;
+  }
+
+  private mapRow(row: any): Lead {
+    return {
+      id: row.id, tenantId: row.tenant_id, sessionId: row.session_id,
+      conversationId: row.conversation_id || undefined,
+      email: row.email || undefined, phone: row.phone || undefined,
+      name: row.name || undefined, company: row.company || undefined,
+      qualificationStatus: row.qualification_status,
+      leadScore: row.lead_score, buyingIntent: row.buying_intent,
+      source: row.source,
+      metadata: row.metadata ? JSON.parse(row.metadata) : {},
+      notes: row.notes || undefined,
+      createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }
 }

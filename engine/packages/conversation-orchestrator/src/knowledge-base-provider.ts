@@ -9,6 +9,7 @@ export interface KnowledgeBaseProvider {
   getTopicResponse(topic: DiscernedTopic, tenantId: string, depth: number): KnowledgeEntry | null;
   getAvailableTopics(tenantId: string): DiscernedTopic[];
   resolveTopic?(rawQuery: string, tenantId: string): DiscernedTopic | null;
+  getBusinessKnowledge?(tenantId: string): string;
 }
 
 export function simpleStem(word: string): string {

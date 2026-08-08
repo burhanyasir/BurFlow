@@ -142,8 +142,8 @@ const legalReplay: ReplayDef = {
 
 import { ReplayDef } from './conversation-audit';
 
-function runDetailedDiagnostic(replay: ReplayDef): void {
-  const audit = runReplayDynamic(replay);
+async function runDetailedDiagnostic(replay: ReplayDef): Promise<void> {
+  const audit = await runReplayDynamic(replay);
   console.log(`\n===== ${replay.name} =====`);
   console.log(`Compliance: ${audit.compliancePct.toFixed(1)}%`);
   
@@ -184,16 +184,16 @@ function runDetailedDiagnostic(replay: ReplayDef): void {
   }
 }
 
-function runAllDiagnostics(): void {
+async function runAllDiagnostics(): Promise<void> {
   const replays = [shopifyReplay, enterpriseReplay, healthcareReplay, restaurantReplay, legalReplay];
   for (const replay of replays) {
-    runDetailedDiagnostic(replay);
+    await runDetailedDiagnostic(replay);
   }
 }
 
 describe('P5.6 Diagnostic', () => {
-  it('produces detailed diagnostic output', () => {
-    runAllDiagnostics();
+  it('produces detailed diagnostic output', async () => {
+    await runAllDiagnostics();
     expect(true).toBe(true);
   });
 });

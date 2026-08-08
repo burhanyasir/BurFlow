@@ -69,74 +69,74 @@ function makeBrainMemory(turns: number = 1): { legacy: ConversationIntelligenceM
 }
 
 describe('EmotionalCueDetection', () => {
-  it('detects expensive concern', () => {
+  it('detects expensive concern', async () => {
     const ack = detectEmotionalCue('This is too expensive');
     expect(ack).toBe('That is completely fair to ask about.');
   });
 
-  it('detects frustration', () => {
+  it('detects frustration', async () => {
     const ack = detectEmotionalCue('I hate this, terrible experience');
     expect(ack).toBe('I appreciate you being straight with me.');
   });
 
-  it('detects confusion', () => {
+  it('detects confusion', async () => {
     const ack = detectEmotionalCue('This is confusing');
     expect(ack).toBe('Let me rephrase that more clearly.');
   });
 
-  it('detects hesitation', () => {
+  it('detects hesitation', async () => {
     const ack = detectEmotionalCue('I am worried about the cost');
     expect(ack).toContain('No pressure at all');
   });
 
-  it('detects competitor mention', () => {
+  it('detects competitor mention', async () => {
     const ack = detectEmotionalCue('We are using Zendesk instead');
     expect(ack).toBe('Good to know what you are comparing against.');
   });
 
-  it('returns null for neutral message', () => {
+  it('returns null for neutral message', async () => {
     const ack = detectEmotionalCue('What features do you have?');
     expect(ack).toBeNull();
   });
 });
 
 describe('ShortReplyIntelligence', () => {
-  it('handles "maybe"', () => {
+  it('handles "maybe"', async () => {
     const reply = handleShortReply('maybe');
     expect(reply).toBe('No rush. Anything I can clarify to help you decide?');
   });
 
-  it('handles "no"', () => {
+  it('handles "no"', async () => {
     const reply = handleShortReply('no');
     expect(reply).toBe('Fair enough. What would work better for you?');
   });
 
-  it('handles "thanks" via ending handler', () => {
+  it('handles "thanks" via ending handler', async () => {
     const ending = handleBetterEnding('thanks');
     expect(ending).toBeNull();
   });
 
-  it('handles "bye" via ending handler', () => {
+  it('handles "bye" via ending handler', async () => {
     const ending = handleBetterEnding('bye');
     expect(ending).toBeTruthy();
     expect(ending!.response).toContain('Take care');
   });
 
-  it('returns null for normal question', () => {
+  it('returns null for normal question', async () => {
     const reply = handleShortReply('What features do you offer?');
     expect(reply).toBeNull();
   });
 });
 
 describe('SmartFollowUps', () => {
-  it('asks about monthly conversations when discussing pricing', () => {
+  it('asks about monthly conversations when discussing pricing', async () => {
     const mem = createMemory({ companySize: '50', currentHelpdesk: 'Zendesk' });
     mem.topicsExplained.push({ topic: 'pricing', explainedAtTurn: 1, count: 1, phase: 'mentioned' });
     const followUp = getSmartFollowUp('Tell me about pricing', mem, {} as any);
     expect(followUp).toContain('conversations');
   });
 
-  it('asks about challenge for founder persona', () => {
+  it('asks about challenge for founder persona', async () => {
     const mem = createMemory();
     mem.topicsExplained.push({ topic: 'features', explainedAtTurn: 1, count: 1, phase: 'mentioned' });
     const followUp = getSmartFollowUp('I am the founder', mem, {} as any);
@@ -145,13 +145,13 @@ describe('SmartFollowUps', () => {
 });
 
 describe('TopicContinuity', () => {
-  it('does not add bridge when no topic change', () => {
+  it('does not add bridge when no topic change', async () => {
     const mem = createMemory({ currentTopic: 'pricing' });
     const result = enforceContinuity('Our pricing starts at $29.', mem, ['pricing']);
     expect(result).toBe('Our pricing starts at $29.');
   });
 
-  it('adds bridge when topic changes without user intent', () => {
+  it('adds bridge when topic changes without user intent', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 3 });
     mem.turns.push({ turnNumber: 1, message: 'Tell me about pricing', response: 'Here is pricing', customerIntent: 'learning', goal: 'answer_question', funnelStage: 'awareness', timestamp: 1000 });
     mem.turns.push({ turnNumber: 2, message: 'ok', response: 'sure', customerIntent: 'confirming', goal: 'none', funnelStage: 'awareness', timestamp: 2000 });
@@ -162,9 +162,9 @@ describe('TopicContinuity', () => {
 });
 
 describe('Personality Consistency', () => {
-  it('responses are confident but not overly enthusiastic', () => {
+  it('responses are confident but not overly enthusiastic', async () => {
     const { legacy } = makeBrainMemory(2);
-    const result = processConversationBrain({
+    const result = await processConversationBrain({
       message: 'Is this product good?',
       responseText: 'It is trusted by many teams.',
       legacyMemory: legacy,
@@ -175,9 +175,9 @@ describe('Personality Consistency', () => {
     }
   });
 
-  it('handles gratitude naturally', () => {
+  it('handles gratitude naturally', async () => {
     const { legacy } = makeBrainMemory(3);
-    const result = processConversationBrain({
+    const result = await processConversationBrain({
       message: 'Thanks for your help',
       responseText: 'Happy to help.',
       legacyMemory: legacy,
@@ -189,9 +189,9 @@ describe('Personality Consistency', () => {
     }
   });
 
-  it('does not restart selling after ending', () => {
+  it('does not restart selling after ending', async () => {
     const { legacy } = makeBrainMemory(3);
-    const result = processConversationBrain({
+    const result = await processConversationBrain({
       message: 'bye',
       responseText: 'Goodbye',
       legacyMemory: legacy,
@@ -201,9 +201,9 @@ describe('Personality Consistency', () => {
 });
 
 describe('Natural Acknowledgments', () => {
-  it('acknowledges greeting appropriately', () => {
+  it('acknowledges greeting appropriately', async () => {
     const legacy = makeLegacyMemory();
-    const result = processConversationBrain({
+    const result = await processConversationBrain({
       message: 'hello',
       responseText: 'Hi there!',
       legacyMemory: legacy,
@@ -211,9 +211,9 @@ describe('Natural Acknowledgments', () => {
     expect(result.responseText).toBeTruthy();
   });
 
-  it('acknowledges farewell naturally', () => {
+  it('acknowledges farewell naturally', async () => {
     const { legacy } = makeBrainMemory(3);
-    const result = processConversationBrain({
+    const result = await processConversationBrain({
       message: 'goodbye',
       responseText: 'Goodbye!',
       legacyMemory: legacy,
@@ -223,19 +223,19 @@ describe('Natural Acknowledgments', () => {
 });
 
 describe('P3 - Contextual Short Replies', () => {
-  it('contextualizes "ok" after pricing discussion', () => {
+  it('contextualizes "ok" after pricing discussion', async () => {
     const mem = createMemory({ currentTopic: 'pricing', lastGoal: 'answer_question', turnCount: 3 });
     const reply = contextualizeShortReply('ok', mem);
     expect(reply).toContain('plan');
   });
 
-  it('contextualizes "really" after pricing topic', () => {
+  it('contextualizes "really" after pricing topic', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 2 });
     const reply = contextualizeShortReply('really', mem);
     expect(reply).toContain('plans');
   });
 
-  it('returns null for first-turn short reply', () => {
+  it('returns null for first-turn short reply', async () => {
     const mem = createMemory({ turnCount: 0 });
     const reply = contextualizeShortReply('ok', mem);
     expect(reply).toBeNull();
@@ -243,25 +243,25 @@ describe('P3 - Contextual Short Replies', () => {
 });
 
 describe('P3 - Mid-Conversation Greeting', () => {
-  it('returns context-aware greeting after pricing discussion', () => {
+  it('returns context-aware greeting after pricing discussion', async () => {
     const mem = createMemory({ currentTopic: 'pricing', turnCount: 5, lastGoal: 'answer_question' });
     const greeting = handleMidConversationGreeting(mem);
     expect(greeting).toContain('pricing');
   });
 
-  it('returns null for first-turn greeting', () => {
+  it('returns null for first-turn greeting', async () => {
     const mem = createMemory({ turnCount: 0 });
     expect(handleMidConversationGreeting(mem)).toBeNull();
   });
 });
 
 describe('P3 - End-to-End Context Preservation', () => {
-  it('preserves companySize from legacy across brain calls', () => {
+  it('preserves companySize from legacy across brain calls', async () => {
     const legacy = makeLegacyMemory({ companySize: '50', industry: 'tech' });
-    const r1 = processConversationBrain({ message: 'Tell me about pricing', responseText: 'Here.', legacyMemory: legacy });
+    const r1 = await processConversationBrain({ message: 'Tell me about pricing', responseText: 'Here.', legacyMemory: legacy });
     expect(r1.memory.companySize).toBe('50');
     expect(r1.memory.industry).toBe('tech');
-    const r2 = processConversationBrain({ message: 'Tell me more', responseText: 'More.', legacyMemory: r1.legacyMemory });
+    const r2 = await processConversationBrain({ message: 'Tell me more', responseText: 'More.', legacyMemory: r1.legacyMemory });
     expect(r2.memory.companySize).toBe('50');
     expect(r2.memory.industry).toBe('tech');
   });

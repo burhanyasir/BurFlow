@@ -2,7 +2,7 @@ import { processConversationBrain } from '../conversation-brain';
 import { createMemory } from '../conversation-memory';
 
 describe('Decision Trace integration', () => {
-  it('records a decision trace per turn and emits telemetry', () => {
+  it('records a decision trace per turn and emits telemetry', async () => {
     const legacyMemory = {
       turns: [],
       persona: 'unknown',
@@ -16,7 +16,7 @@ describe('Decision Trace integration', () => {
 
     const input = { message: 'Can you tell me about pricing?', responseText: 'We have Starter, Pro and Enterprise plans.', legacyMemory } as any;
 
-    const out = processConversationBrain(input);
+    const out = await processConversationBrain(input);
 
     expect(out.memory.decisionTrace).toBeDefined();
     expect(Array.isArray(out.memory.decisionTrace)).toBe(true);

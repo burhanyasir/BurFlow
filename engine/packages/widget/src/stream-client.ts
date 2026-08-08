@@ -48,6 +48,9 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
       if (data.response) {
         onComplete(data.response, data.turnId || '');
       }
+      if (data.humanTakeover) {
+        options.onHumanTakeover?.();
+      }
       if (options.onUiState) {
         options.onUiState(data.uiState, data.cta);
       }
@@ -95,12 +98,15 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
               break;
             case 'done':
               if (event.finishReason) onDone(event.finishReason);
+              if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'complete':
               onComplete(event.fullContent || '', event.turnId || '');
+              if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'ui_state':
               if (options.onUiState) options.onUiState(event.uiState, event.cta);
+              if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'error':
               onError(event.error || 'Unknown error');

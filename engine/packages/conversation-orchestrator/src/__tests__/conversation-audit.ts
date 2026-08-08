@@ -83,7 +83,7 @@ export function generateResponseForStrategy(
   return response;
 }
 
-export function runReplayDynamic(replay: ReplayDef): ConversationAudit {
+export async function runReplayDynamic(replay: ReplayDef): Promise<ConversationAudit> {
   let legacyMemory: ConversationIntelligenceMemory = {
     turns: [],
     persona: 'unknown',
@@ -103,7 +103,7 @@ export function runReplayDynamic(replay: ReplayDef): ConversationAudit {
 
   for (let i = 0; i < replay.turns.length; i++) {
     const { message } = replay.turns[i];
-    const brainOutput = processConversationBrain({ message, responseText: '', legacyMemory });
+    const brainOutput = await processConversationBrain({ message, responseText: '', legacyMemory });
     const strategy = brainOutput.strategy;
     if (!strategy) {
       throw new Error(`[${replay.name}] No strategy at turn ${i + 1}`);
@@ -111,7 +111,7 @@ export function runReplayDynamic(replay: ReplayDef): ConversationAudit {
 
     const generatedResponse = generateResponseForStrategy(strategy, message, allTopics);
 
-    const enrichedOutput = processConversationBrain({ message, responseText: generatedResponse, legacyMemory });
+    const enrichedOutput = await processConversationBrain({ message, responseText: generatedResponse, legacyMemory });
     const enrichedStrategy = enrichedOutput.strategy;
     if (!enrichedStrategy) {
       throw new Error(`[${replay.name}] No strategy at turn ${i + 1} (enriched)`);
@@ -415,7 +415,7 @@ export function computeAggregate(turns: TurnAudit[]): AggregateScores {
   return { topicAccuracy, goalAccuracy, contextUsage, agendaProgression, ctaTiming, qualificationTiming, overall };
 }
 
-export function runReplay(replay: ReplayDef): ConversationAudit {
+export async function runReplay(replay: ReplayDef): Promise<ConversationAudit> {
   let legacyMemory: ConversationIntelligenceMemory = {
     turns: [],
     persona: 'unknown',
@@ -434,7 +434,7 @@ export function runReplay(replay: ReplayDef): ConversationAudit {
 
   for (let i = 0; i < replay.turns.length; i++) {
     const { message, responseText } = replay.turns[i];
-    const brainOutput = processConversationBrain({ message, responseText, legacyMemory });
+    const brainOutput = await processConversationBrain({ message, responseText, legacyMemory });
     const strategy = brainOutput.strategy;
     if (!strategy) {
       throw new Error(`[${replay.name}] No strategy at turn ${i + 1}`);

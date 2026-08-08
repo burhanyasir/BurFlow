@@ -21,6 +21,10 @@ import {
   ComplianceDocumentRepository, DpaRepository, SubprocessorRepository,
   TopicResponseTemplateRepository,
   HandoffRequestRepository,
+  LeadRepository,
+  LeadService,
+  AnalyticsService,
+  SessionHandoffService,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth } from './middleware/auth';
@@ -47,11 +51,15 @@ import { createTeamRoutes } from './routes/team';
 import { createAuditRoutes } from './routes/audit';
 import { createWebhookRoutes } from './routes/webhooks';
 import { createTrustRoutes } from './routes/trust';
+import { createLeadRoutes } from './routes/leads';
 import { createHardeningRoutes } from './routes/hardening';
 import { errorHandler } from './middleware/structured-error';
 import { setEmailProvider } from './services/email';
 import { SendGridEmailProvider } from './services/sendgrid-email';
 import { setRawBodyBuffer } from './routes/billing-webhooks';
+import { createAnalyticsRoutes } from './routes/analytics';
+import { createHealthRoutes } from './routes/health';
+import { createAgentChatRoutes } from './routes/agent-chat';
 
 const logger = createLogger('saas-api');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -119,7 +127,7 @@ if (CORS_ORIGIN && !Array.isArray(CORS_ORIGIN) && CORS_ORIGIN !== true) {
 } else if (!CORS_ORIGIN && process.env.NODE_ENV === 'production') {
   logger.warn('CORS_ORIGIN not set — API will reject all cross-origin requests. Set CORS_ORIGIN to a comma-separated list of allowed origins.');
 }
-const DB_PATH = process.env.DB_PATH || join(__dirname, '..', '..', '..', 'data', 'saas.db');
+const DB_PATH = process.env.DATABASE_PATH || process.env.DB_PATH || join(__dirname, '..', '..', '..', 'data', 'saas.db');
 const RATE_LIMIT_WINDOW_MS = parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10);
 const RATE_LIMIT_MAX = parseInt(process.env.RATE_LIMIT_MAX || '100', 10);
 const MAX_BODY_SIZE = process.env.MAX_BODY_SIZE || '10mb';
@@ -175,6 +183,7 @@ const dpaRepo = new DpaRepository(db);
 const subprocessorRepo = new SubprocessorRepository(db);
 const topicResponseRepo = new TopicResponseTemplateRepository(db);
 const handoffRepo = new HandoffRequestRepository(db);
+const leadRepo = new LeadRepository(db);
 
 const app = express();
 
@@ -331,8 +340,12 @@ app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRep
 app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conversationRepo, messageRepo));
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
 app.use('/api/knowledge-bases', auth, tenantGuard, createKnowledgeBaseRoutes(kbRepo, docRepo));
-const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo);
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider));
+const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, db);
+const leadService = new LeadService(leadRepo);
+// Live Human Agent Takeover / Session Handoff
+const sessionHandoff = new SessionHandoffService(conversationRepo);
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, { leadService, webhookRepo, webhookDeliveryRepo, getNotificationConfig: (tenantId) => widgetConfigRepo.get(tenantId), analyticsRepo, getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions }, sessionHandoff));
+app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/billing', createBillingWebhookRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo));
@@ -366,6 +379,13 @@ app.use('/api/audit', auth, tenantGuard, createAuditRoutes(auditLogRepo));
 // Webhooks
 app.use('/api/webhooks', auth, tenantGuard, createWebhookRoutes(webhookRepo, webhookDeliveryRepo, auditLogRepo));
 
+// Leads
+app.use('/api/leads', auth, tenantGuard, createLeadRoutes(leadRepo, webhookRepo, webhookDeliveryRepo));
+
+// Analytics
+const analyticsService = new AnalyticsService(db);
+app.use('/api/analytics', auth, tenantGuard, createAnalyticsRoutes(analyticsService));
+
 // Trust Center
 app.use('/api/trust', auth, tenantGuard, createTrustRoutes(uptimeRepo, securityRepo, incidentRepo, complianceRepo, dpaRepo, subprocessorRepo));
 
@@ -383,66 +403,12 @@ app.use('/api', createHardeningRoutes(() => [
   }},
 ]));
 
-// ─── Health Check (real dependency verification) ──────────────
-app.get('/api/health', async (_req, res) => {
-  const checks: Record<string, { status: string; latencyMs: number; error?: string }> = {};
-
-  const dbStart = performance.now();
-  try {
-    db.prepare('SELECT 1').get();
-    checks.database = { status: 'healthy', latencyMs: Math.round(performance.now() - dbStart) };
-  } catch (err: any) {
-    checks.database = { status: 'unavailable', latencyMs: Math.round(performance.now() - dbStart), error: err.message };
-  }
-
-  const allHealthy = Object.values(checks).every(c => c.status === 'healthy');
-  const status = allHealthy ? 'ok' : 'degraded';
-
-  res.status(allHealthy ? 200 : 503).json({
-    status,
-    service: 'saas-api',
-    version: process.env.APP_VERSION || '1.0.0',
-    checks,
-    uptime: Math.round(process.uptime()),
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ─── Metrics Endpoint ─────────────────────────────────────────
-app.get('/api/metrics', (_req, res) => {
-  res.json({
-    counters: {
-      'http.requests': metrics.getCounter('http.requests'),
-      'http.responses': metrics.getCounter('http.responses'),
-      'http.errors': metrics.getCounter('http.errors'),
-    },
-    histograms: {
-      'http.duration': metrics.getHistogram('http.duration'),
-    },
-    uptime: Math.round(process.uptime()),
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ─── Readiness Probe ──────────────────────────────────────────
-app.get('/api/ready', (_req, res) => {
-  const ready = db.open;
-  res.status(ready ? 200 : 503).json({
-    status: ready ? 'ready' : 'not ready',
-    service: 'saas-api',
-    timestamp: new Date().toISOString(),
-  });
-});
-
-// ─── Liveness Probe ───────────────────────────────────────────
-app.get('/api/live', (_req, res) => {
-  res.status(200).json({
-    status: 'alive',
-    service: 'saas-api',
-    uptime: Math.round(process.uptime()),
-    timestamp: new Date().toISOString(),
-  });
-});
+// ─── Liveness & Readiness Probes (Docker/Kubernetes) ───────────
+// Standardized endpoints: /health (liveness), /ready (readiness w/ DB check),
+// /live (k8s alias), /health/detailed (full dependency report).
+// Mounted at both / and /api so legacy probes keep working.
+app.use(createHealthRoutes(db));
+app.use('/api', createHealthRoutes(db));
 
 // ─── Global Error Handler ─────────────────────────────────────
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

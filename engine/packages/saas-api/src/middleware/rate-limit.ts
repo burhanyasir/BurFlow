@@ -5,8 +5,8 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-export function createRateLimit(options: { windowMs: number; max: number; keyFn?: (req: Request) => string }) {
-  const { windowMs, max, keyFn } = options;
+export function createRateLimit(options: { windowMs: number; max: number; keyFn?: (req: Request) => string; message?: string }) {
+  const { windowMs, max, keyFn, message = 'Too many requests. Please try again later.' } = options;
   const store = new Map<string, RateLimitEntry>();
 
   const cleanup = setInterval(() => {
@@ -26,7 +26,7 @@ export function createRateLimit(options: { windowMs: number; max: number; keyFn?
       if (entry.count >= max) {
         const retryAfterMs = entry.resetAt - now;
         res.setHeader('Retry-After', String(Math.ceil(retryAfterMs / 1000)));
-        return res.status(429).json({ error: 'Too many requests. Please try again later.' });
+        return res.status(429).json({ error: message });
       }
       entry.count++;
     } else {

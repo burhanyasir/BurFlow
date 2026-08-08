@@ -17,6 +17,14 @@ export * from './conversation-planner';
 export * from './conversation-validator';
 export { processConversationBrain } from './conversation-brain';
 export type { BrainInput, BrainOutput } from './conversation-brain';
+export {
+  normalizeMessageContent,
+  normalizeToNormalizedContent,
+  PayloadValidationError,
+  UpstreamLLMError,
+  ALLOWED_IMAGE_MIME_TYPES,
+} from './message-content';
+export type { NormalizedContent } from './message-content';
 export { buttonTelemetry } from './button-telemetry';
 export type { ButtonEvent, ButtonEventType } from './button-telemetry';
 export * from './knowledge-base-provider';

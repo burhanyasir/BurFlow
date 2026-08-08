@@ -9,9 +9,46 @@ export function createDatabase(dbPath: string): Database.Database {
   const db = new Database(dbPath);
   db.pragma('journal_mode = WAL');
   db.pragma('busy_timeout = 5000');
+  db.pragma('synchronous = NORMAL');
+  db.pragma('temp_store = MEMORY');
   db.pragma('foreign_keys = ON');
   migrate(db);
+  setupWalCheckpointing(db, dbPath);
   return db;
+}
+
+const WAL_CHECKPOINT_INTERVAL_MS = 15 * 60 * 1000;
+
+let walCheckpointStarted = false;
+
+function setupWalCheckpointing(db: Database.Database, dbPath: string): void {
+  if (walCheckpointStarted) return;
+  walCheckpointStarted = true;
+
+  const interval = setInterval(() => {
+    try {
+      const rows = db.pragma('wal_checkpoint(PASSIVE)') as Array<Record<string, unknown>>;
+      let hasFrames = false;
+      let busy = 0;
+      for (const row of rows) {
+        const ckpt = Number(row.ckpt ?? 0);
+        busy += Number(row.busy ?? 0);
+        if (ckpt > 0) hasFrames = true;
+      }
+      if (hasFrames) {
+        console.warn(`[db] WAL checkpoint for ${dbPath} processed frames; busy=${busy}`);
+      } else if (busy > 0) {
+        console.warn(`[db] WAL checkpoint for ${dbPath} skipped ${busy} busy frames (could not checkpoint without contention)`);
+      }
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      console.warn(`[db] WAL checkpoint failed for ${dbPath}: ${msg}`);
+    }
+  }, WAL_CHECKPOINT_INTERVAL_MS);
+
+  if (typeof interval.unref === 'function') {
+    interval.unref();
+  }
 }
 
 function migrate(db: Database.Database): void {
@@ -64,7 +101,10 @@ function migrate(db: Database.Database): void {
       started_at TEXT NOT NULL,
       ended_at TEXT,
       message_count INTEGER DEFAULT 0,
-      status TEXT DEFAULT 'active' CHECK (status IN ('active','ended','escalated'))
+      status TEXT DEFAULT 'active' CHECK (status IN ('active','ended','escalated')),
+      session_state TEXT DEFAULT 'ai_managed' CHECK (session_state IN ('ai_managed','human_takeover','closed')),
+      assigned_agent_id TEXT,
+      takeover_at TEXT
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -179,7 +219,11 @@ function migrate(db: Database.Database): void {
       auto_open INTEGER DEFAULT 0,
       auto_open_delay INTEGER DEFAULT 3,
       business_profile TEXT,
+      starter_options TEXT,
       custom_css TEXT,
+      notification_email TEXT,
+      slack_webhook_url TEXT,
+      notify_threshold TEXT DEFAULT 'all' CHECK (notify_threshold IN ('all','sales_qualified_only')),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -288,6 +332,14 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE users ADD COLUMN verification_token_expiry TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN reset_token TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE users ADD COLUMN reset_token_expiry TEXT;`); } catch {}
+
+  // Starter options column (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN starter_options TEXT;`); } catch {}
+
+  // Lead notification columns (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN notification_email TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN slack_webhook_url TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN notify_threshold TEXT DEFAULT 'all';`); } catch {}
 
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);`); } catch {}
@@ -603,4 +655,43 @@ function migrate(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_handoff_status ON handoff_requests(status);
     CREATE INDEX IF NOT EXISTS idx_handoff_session ON handoff_requests(session_id);
   `);
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS leads (
+      id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      session_id TEXT NOT NULL,
+      conversation_id TEXT,
+      email TEXT,
+      phone TEXT,
+      name TEXT,
+      company TEXT,
+      qualification_status TEXT DEFAULT 'unqualified' CHECK (qualification_status IN ('unqualified','marketing_qualified','sales_qualified','disqualified')),
+      lead_score INTEGER DEFAULT 0,
+      buying_intent TEXT DEFAULT 'low' CHECK (buying_intent IN ('low','medium','high')),
+      source TEXT DEFAULT 'chat' CHECK (source IN ('chat','form','api')),
+      metadata TEXT DEFAULT '{}',
+      notes TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_leads_tenant ON leads(tenant_id);
+    CREATE INDEX IF NOT EXISTS idx_leads_session ON leads(session_id);
+    CREATE INDEX IF NOT EXISTS idx_leads_email ON leads(email);
+    CREATE INDEX IF NOT EXISTS idx_leads_qualification ON leads(qualification_status);
+  `);
+
+  // Analytics query indexes (additive, safe to re-run)
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_tenant_started ON conversations(tenant_id, started_at);`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_messages_tenant_created ON messages(tenant_id, created_at);`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_leads_tenant_created_score ON leads(tenant_id, created_at, lead_score);`); } catch {}
+
+  // Lead notes column (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE leads ADD COLUMN notes TEXT;`); } catch {}
+
+  // Session handoff columns (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN session_state TEXT DEFAULT 'ai_managed' CHECK (session_state IN ('ai_managed','human_takeover','closed'));`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN assigned_agent_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN takeover_at TEXT;`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_tenant_session_state ON conversations(tenant_id, session_state);`); } catch {}
 }

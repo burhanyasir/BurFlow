@@ -28,9 +28,10 @@ process.env.GROQ_API_KEY_2 = process.env.GROQ_API_KEY_2 || '';
 process.env.GROQ_API_KEY_3 = process.env.GROQ_API_KEY_3 || '';
 process.env.GROQ_API_KEY_4 = process.env.GROQ_API_KEY_4 || '';
 process.env.GROQ_API_KEY_5 = process.env.GROQ_API_KEY_5 || '';
-if (!process.env.GEMINI_API_KEY_1 && !process.env.GEMINI_API_KEY_2 && !process.env.ANTHROPIC_API_KEY) {
+if (!process.env.GEMINI_API_KEY_1 && !process.env.GEMINI_API_KEY_2 && !process.env.ANTHROPIC_API_KEY && !process.env.GROQ_API_KEY) {
   console.warn('[startup] No LLM API keys configured — brain will use fallback responses');
 }
+console.log('[startup] GROQ_API_KEY set:', process.env.GROQ_API_KEY ? 'YES (length=' + process.env.GROQ_API_KEY.length + ')' : 'NO');
 const { app, logger } = require('./dist/index.js');
 const PORT = parseInt(process.env.PORT || '3457', 10);
 app.listen(PORT, () => {

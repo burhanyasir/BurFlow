@@ -1,24 +1,69 @@
-# ─── Pipeline Orchestrator ───────────────────────────────────────
-FROM node:20-alpine AS build
+# ─── Production Containerization ──────────────────────────────────
+# Multi-stage build: compiles the TypeScript monorepo, then produces a
+# minimal Alpine runner image with only production dependencies.
+#
+# Targets:
+#   runner           → saas-api server (default target)
+#   pipeline-runner  → pipeline-orchestrator server
+#
+#   docker build -t conversation-engine/saas-api:latest -f Dockerfile .
+#   docker build --target pipeline-runner -t conversation-engine/pipeline:latest -f Dockerfile .
+
+# ─── Stage 1: builder ────────────────────────────────────────────
+FROM node:20-alpine AS builder
 WORKDIR /app
+
+# Native module compilation (better-sqlite3) needs python3/make/g++
 RUN apk add --no-cache python3 make g++
+
+# Install dependencies first for optimal layer caching
 COPY package.json package-lock.json ./
 COPY packages packages/
-RUN npm ci && npm run build && npm prune --production
+RUN npm ci
 
-FROM node:20-alpine
+# Compile TypeScript across all workspaces (saas-core, saas-api,
+# conversation-orchestrator, widget, pipeline stages, ...)
+RUN npm run build:all
+
+# Drop devDependencies from the install tree
+RUN npm prune --production
+
+# ─── Stage 2: runner ─────────────────────────────────────────────
+FROM node:20-alpine AS runner
 WORKDIR /app
-RUN apk add --no-cache tini curl && addgroup -S app && adduser -S app -G app
-COPY --from=build /app/node_modules node_modules/
-COPY --from=build /app/packages packages/
-COPY --from=build /app/package.json .
-RUN mkdir -p /data && chown -R app:app /data
+
+# tini for proper PID 1 signal handling; curl for healthchecks
+RUN apk add --no-cache tini curl \
+    && addgroup -S app \
+    && adduser -S app -G app
+
 ENV NODE_ENV=production \
-    PORT=3456 \
-    DATA_DIR=/data
+    PORT=3000 \
+    DATABASE_PATH=/app/data/saas.db \
+    DATA_DIR=/app/data
+
+# Only built dist bundles + production node_modules cross the stages
+COPY --from=builder /app/node_modules node_modules/
+COPY --from=builder /app/packages packages/
+COPY --from=builder /app/package.json ./
+
+# Persistent SQLite volume mount point, owned by the non-root user
+RUN mkdir -p /app/data && chown -R app:app /app
+
 USER app
+EXPOSE 3000
+
+HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=15s \
+  CMD curl -fsS http://127.0.0.1:3000/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--"]
+CMD ["node", "packages/saas-api/dist/index.js"]
+
+# ─── Pipeline orchestrator runner ────────────────────────────────
+FROM runner AS pipeline-runner
+ENV PORT=3456 \
+    DATABASE_PATH=/app/data/pipeline.db
 EXPOSE 3456
 HEALTHCHECK --interval=15s --timeout=5s --retries=3 --start-period=10s \
-  CMD curl -f http://localhost:3456/api/healthz || exit 1
-ENTRYPOINT ["/sbin/tini", "--"]
+  CMD curl -fsS http://127.0.0.1:3456/api/healthz || exit 1
 CMD ["node", "packages/pipeline-orchestrator/dist/server.js"]

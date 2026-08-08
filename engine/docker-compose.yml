@@ -30,6 +30,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: pipeline-runner
     container_name: ce-pipeline
     expose:
       - "${PIPELINE_PORT:-3456}"
@@ -37,11 +38,11 @@ services:
       - PORT=${PIPELINE_PORT:-3456}
       - NODE_ENV=${NODE_ENV:-production}
       - LOG_LEVEL=${LOG_LEVEL:-info}
-      - DATA_DIR=/data
+      - DATA_DIR=/app/data
       - LLM_API_KEY=${LLM_API_KEY:?LLM_API_KEY is required}
       - INTERNAL_SYNC_KEY=${INTERNAL_SYNC_KEY:?INTERNAL_SYNC_KEY is required}
     volumes:
-      - pipeline-data:/data
+      - app-data:/app/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:${PIPELINE_PORT:-3456}/api/healthz"]
@@ -56,17 +57,20 @@ services:
   saas-api:
     build:
       context: .
-      dockerfile: Dockerfile.saas-api
+      dockerfile: Dockerfile
+      target: runner
     container_name: ce-saas-api
     expose:
-      - "${SAAS_PORT:-3457}"
+      - "3000"
+    ports:
+      - "${SAAS_PORT:-3457}:3000"
     environment:
-      - PORT=${SAAS_PORT:-3457}
+      - PORT=3000
       - NODE_ENV=${NODE_ENV:-production}
       - LOG_LEVEL=${LOG_LEVEL:-info}
+      - DATABASE_PATH=/app/data/saas.db
       - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
       - CORS_ORIGIN=${CORS_ORIGIN:-false}
-      - DB_PATH=/data/saas.db
       - APP_URL=${APP_URL:-https://app.yourdomain.com}
       - WIDGET_SECRET=${WIDGET_SECRET:?WIDGET_SECRET is required}
       - OPENAI_API_KEY=${OPENAI_API_KEY:?OPENAI_API_KEY is required}
@@ -75,18 +79,19 @@ services:
       - INTERNAL_SYNC_KEY=${INTERNAL_SYNC_KEY:?INTERNAL_SYNC_KEY is required}
       - PADDLE_API_KEY=${PADDLE_API_KEY:-}
       - PADDLE_WEBHOOK_SECRET=${PADDLE_WEBHOOK_SECRET:-}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY:-}
       - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
       - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
       - EMAIL_PROVIDER=${EMAIL_PROVIDER:-CONSOLE}
       - APP_VERSION=${APP_VERSION:-1.0.0}
     volumes:
-      - pipeline-data:/data
+      - app-data:/app/data
     depends_on:
       pipeline-orchestrator:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:${SAAS_PORT:-3457}/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:3000/ready"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -117,7 +122,7 @@ services:
       - app-network
 
 volumes:
-  pipeline-data:
+  app-data:
   ssl-certs:
   ssl-private:
 

@@ -4,17 +4,18 @@ services:
   saas-api:
     build:
       context: .
-      dockerfile: Dockerfile.saas-api
+      dockerfile: Dockerfile
+      target: runner
     container_name: ce-saas-api-dev
     ports:
-      - "3457:3457"
+      - "3457:3000"
     environment:
-      - PORT=3457
+      - PORT=3000
       - NODE_ENV=development
       - LOG_LEVEL=debug
       - JWT_SECRET=burflow-local-dev-secret-change-in-production-2024
       - CORS_ORIGIN=*
-      - DB_PATH=/data/saas.db
+      - DATABASE_PATH=/app/data/saas.db
       - APP_URL=http://localhost:5173
       - WIDGET_SECRET=dev-widget-secret
       - OPENAI_API_KEY=
@@ -23,16 +24,24 @@ services:
       - INTERNAL_SYNC_KEY=dev-sync-key
       - RATE_LIMIT_WINDOW_MS=60000
       - RATE_LIMIT_MAX=1000
+      - EMAIL_PROVIDER=CONSOLE
     volumes:
-      - dev-data:/data
+      - dev-data:/app/data
     depends_on:
       - pipeline-orchestrator
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   pipeline-orchestrator:
     build:
       context: .
       dockerfile: Dockerfile
+      target: pipeline-runner
     container_name: ce-pipeline-dev
     ports:
       - "3456:3456"
@@ -40,12 +49,18 @@ services:
       - PORT=3456
       - NODE_ENV=development
       - LOG_LEVEL=debug
-      - DATA_DIR=/data
+      - DATA_DIR=/app/data
       - LLM_API_KEY=
       - INTERNAL_SYNC_KEY=dev-sync-key
     volumes:
-      - dev-data:/data
+      - dev-data:/app/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3456/api/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   dev-data:

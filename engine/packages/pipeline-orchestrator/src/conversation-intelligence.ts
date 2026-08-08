@@ -75,7 +75,7 @@ export async function enrichWithConversationIntelligence(
   const session = await sessionStore.loadSession(tenantId, sessionId);
   const legacyMemory = parseIntelState(session);
 
-  const brainResult = processConversationBrain({
+  const brainResult = await processConversationBrain({
     message,
     responseText: pipelineResponse.response,
     legacyMemory,
