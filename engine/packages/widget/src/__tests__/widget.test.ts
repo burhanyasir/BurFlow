@@ -487,6 +487,48 @@ describe('ChatWidget', () => {
     expect(bubble.style.background).toMatch(/linear-gradient/);
   });
 
+  it('injects branding CSS variables for primary color', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', primaryColor: '#FF0000' });
+    widget.mount();
+
+    expect(document.documentElement.style.getPropertyValue('--cw-primary-color')).toBe('#FF0000');
+    const style = document.getElementById('cw-widget-styles')!;
+    expect(style.textContent).toContain('var(--cw-primary-color');
+  });
+
+  it('supports widgetPosition alias for launcher placement', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', widgetPosition: 'left' });
+    widget.mount();
+
+    const bubble = document.querySelector('.cw-bubble') as HTMLElement;
+    expect(bubble.style.left).toBe('20px');
+    expect(bubble.style.right).toBe('');
+  });
+
+  it('applies branding aliases from remote config', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        primaryColor: '#22C55E',
+        themeMode: 'dark',
+        widgetPosition: 'bottom-left',
+        greetingText: 'Hi from branding!',
+      }),
+    }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', widgetToken: 'tok', greeting: '' });
+    widget.mount();
+    widget.toggle();
+
+    await vi.waitFor(() => {
+      expect(document.documentElement.style.getPropertyValue('--cw-primary-color')).toBe('#22C55E');
+    });
+    const bubble = document.querySelector('.cw-bubble') as HTMLElement;
+    expect(bubble.style.left).toBe('20px');
+    expect(bubble.style.right).toBe('');
+    vi.unstubAllGlobals();
+  });
+
   it('sets custom title and subtitle', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', title: 'Support', subtitle: 'Ask us anything' });
     widget.mount();

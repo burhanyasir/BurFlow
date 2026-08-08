@@ -169,6 +169,7 @@ export interface WidgetConfig {
   position: 'bottom-right' | 'bottom-left';
   primaryColor: string;
   logoUrl?: string;
+  avatarUrl?: string;
   companyName: string;
   greeting: string;
   launcherText: string;

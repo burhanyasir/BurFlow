@@ -666,7 +666,7 @@ export class WidgetConfigRepository {
       for (const [key, value] of Object.entries(data)) {
         const col = key.replace(/[A-Z]/g, m => '_' + m.toLowerCase());
         sets.push(`${col} = ?`);
-        vals.push(typeof value === 'object' ? JSON.stringify(value) : value);
+        vals.push(typeof value === 'boolean' ? (value ? 1 : 0) : typeof value === 'object' ? JSON.stringify(value) : value);
       }
       vals.push(tenantId);
       this.db.prepare(`UPDATE widget_configs SET ${sets.join(', ')} WHERE tenant_id = ?`).run(...vals);
@@ -679,6 +679,7 @@ export class WidgetConfigRepository {
     if (data.position) { cols.push('position'); vals.push(data.position); }
     if (data.primaryColor) { cols.push('primary_color'); vals.push(data.primaryColor); }
     if (data.logoUrl) { cols.push('logo_url'); vals.push(data.logoUrl); }
+    if (data.avatarUrl) { cols.push('avatar_url'); vals.push(data.avatarUrl); }
     if (data.greeting) { cols.push('greeting'); vals.push(data.greeting); }
     if (data.launcherText) { cols.push('launcher_text'); vals.push(data.launcherText); }
     if (data.allowedDomains) { cols.push('allowed_domains'); vals.push(JSON.stringify(data.allowedDomains)); }
@@ -699,6 +700,7 @@ export class WidgetConfigRepository {
       id: row.id, tenantId: row.tenant_id,
       theme: row.theme, position: row.position,
       primaryColor: row.primary_color, logoUrl: row.logo_url,
+      avatarUrl: row.avatar_url || undefined,
       companyName: row.company_name, greeting: row.greeting,
       launcherText: row.launcher_text,
       allowedDomains: JSON.parse(row.allowed_domains || '[]'),

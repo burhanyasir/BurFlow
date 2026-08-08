@@ -313,8 +313,13 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   title: 'BurFlow Sales Agent',
   subtitle: 'Your smart buying assistant',
   primaryColor: '#3B82F6',
+  avatarUrl: undefined as any,
   greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
+  greetingText: undefined as any,
   position: 'bottom-right',
+  widgetPosition: undefined as any,
+  theme: 'light',
+  themeMode: undefined as any,
   companyName: '',
   launcherText: 'Chat with us',
   starterOptions: [],
@@ -369,9 +374,22 @@ export class ChatWidget {
   };
 
   constructor(config: WidgetConfig) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = { ...DEFAULT_CONFIG, ...this.normalizeAliases(config) };
     this.restoreSessionId();
     this.businessProfile = this.deriveBusinessProfileFromConfig();
+  }
+
+  private normalizeAliases(remote: Partial<WidgetConfig>): Partial<WidgetConfig> {
+    const merged: Partial<WidgetConfig> = { ...remote };
+    if (merged.themeMode !== undefined && merged.theme === undefined) merged.theme = merged.themeMode;
+    if (merged.widgetPosition !== undefined && merged.position === undefined) {
+      merged.position =
+        merged.widgetPosition === 'right' ? 'bottom-right'
+        : merged.widgetPosition === 'left' ? 'bottom-left'
+        : merged.widgetPosition;
+    }
+    if (merged.greetingText !== undefined && merged.greeting === undefined) merged.greeting = merged.greetingText;
+    return merged;
   }
 
   private injectStyles(): void {
@@ -384,9 +402,11 @@ export class ChatWidget {
       @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
       @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(99,102,241,0.6),0 2px 12px rgba(0,0,0,0.15)} }
+      .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#6366f1) 0%,var(--cw-primary-color,#8b5cf6) 100%) !important; }
+      .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#6366f1) 0%,var(--cw-primary-color,#8b5cf6) 100%) !important; }
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
-      .cw-input:focus { border-color:#818CF8 !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
+      .cw-input:focus { border-color:var(--cw-primary-color,#818CF8) !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
     `;
     document.head.appendChild(style);
   }
@@ -394,6 +414,7 @@ export class ChatWidget {
   mount(): void {
     if (this.container) return;
     this.injectStyles();
+    this.applyBrandingVars();
     this.createBubble();
     this.createChatWindow();
     if (this.config.widgetToken) {
@@ -410,6 +431,12 @@ export class ChatWidget {
     this.bubbleEl = null;
     this.messagesEl = null;
     this.inputEl = null;
+  }
+
+  private applyBrandingVars(): void {
+    if (typeof document === 'undefined') return;
+    const primary = this.config.primaryColor || '#3B82F6';
+    document.documentElement.style.setProperty('--cw-primary-color', primary);
   }
 
   private createBubble(): void {
@@ -1353,8 +1380,10 @@ export class ChatWidget {
   }
 
   private applyRemoteConfig(remote: Partial<WidgetConfig>): void {
-    this.config = { ...this.config, ...remote };
+    const merged = this.normalizeAliases(remote);
+    this.config = { ...this.config, ...merged };
     this.businessProfile = this.deriveBusinessProfileFromConfig();
+    this.applyBrandingVars();
     this.updateBubbleAndContainerStyles();
     this.updateHeaderText();
 

@@ -341,6 +341,9 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE widget_configs ADD COLUMN slack_webhook_url TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE widget_configs ADD COLUMN notify_threshold TEXT DEFAULT 'all';`); } catch {}
 
+  // Branding column (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN avatar_url TEXT;`); } catch {}
+
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_billing_events_paddle ON billing_events(paddle_event_id);`); } catch {}

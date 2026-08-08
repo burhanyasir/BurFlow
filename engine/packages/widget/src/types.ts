@@ -7,8 +7,13 @@ export interface WidgetConfig {
   title?: string;
   subtitle?: string;
   primaryColor?: string;
+  avatarUrl?: string;
   greeting?: string;
+  greetingText?: string;
   position?: 'bottom-right' | 'bottom-left';
+  widgetPosition?: 'bottom-right' | 'bottom-left' | 'right' | 'left';
+  theme?: 'light' | 'dark' | 'auto';
+  themeMode?: 'light' | 'dark' | 'auto';
   companyName?: string;
   launcherText?: string;
   suggestedActions?: SmartButton[];
