@@ -5,7 +5,7 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthProvider } from './lib/auth-context';
 import { PublicLayout } from './layouts/PublicLayout';
-import LandingPage from './pages/landing/LandingPageV2';
+import LandingPage from './pages/landing/LandingPageV3';
 import FeaturesPage from './pages/features/FeaturesPage';
 import PricingPage from './pages/pricing/PricingPage';
 import AboutPage from './pages/about/AboutPage';
@@ -79,7 +79,7 @@ function RoutesWithAnimation() {
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
         {/* Public Routes */}
-        <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+        <Route path="/" element={<AnimatedPage><LandingPage /></AnimatedPage>} />
         <Route path="/features" element={<PublicRoute><FeaturesPage /></PublicRoute>} />
         <Route path="/pricing" element={<PublicRoute><PricingPage /></PublicRoute>} />
         <Route path="/about" element={<PublicRoute><AboutPage /></PublicRoute>} />
