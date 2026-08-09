@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { PaddleClient, SubscriptionRepository, TenantRepository, InvoiceRepository, PaymentRepository, BillingEventRepository, PADDLE_PLANS, getPlanLimits } from '@conversation-engine/saas-core';
+import { PaddleClient, SubscriptionRepository, TenantRepository, InvoiceRepository, PaymentRepository, BillingEventRepository, PADDLE_PLANS, getPlanLimits, ConversationRepository, UsageRepository, KbDocumentRepository } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validationError, validateRequiredEnum, VALID_SUBSCRIPTION_PLANS } from '../middleware/validate';
 import type { SubscriptionPlan } from '@conversation-engine/saas-core';
@@ -13,6 +13,9 @@ export function createBillingRoutes(
   invoiceRepo: InvoiceRepository,
   paymentRepo: PaymentRepository,
   eventRepo: BillingEventRepository,
+  conversationRepo: ConversationRepository,
+  usageRepo: UsageRepository,
+  docRepo: KbDocumentRepository,
 ): Router {
   const router = Router();
 
@@ -43,6 +46,8 @@ export function createBillingRoutes(
       const daysLeftInTrial = sub?.trialEnd
         ? Math.max(0, Math.ceil((new Date(sub.trialEnd).getTime() - Date.now()) / 86400000))
         : null;
+      const conversationsUsed = conversationRepo.listByTenant(req.tenantId!, 1, 1).total;
+      const documentsUsed = docRepo.countByStatus(req.tenantId!).total;
       res.json({
         planId,
         planName: PADDLE_PLANS[planId]?.name || planId,
@@ -55,9 +60,9 @@ export function createBillingRoutes(
         onTrial: sub?.status === 'trialing' || false,
         daysLeftInTrial: sub?.trialEnd ? Math.max(0, Math.ceil((new Date(sub.trialEnd).getTime() - Date.now()) / 86400000)) : null,
         conversationsLimit: limits.conversations,
-        conversationsUsed: 0,
+        conversationsUsed,
         documentsLimit: limits.documents,
-        documentsUsed: 0,
+        documentsUsed,
         teamMembers: limits.teamMembers,
         features: PADDLE_PLANS[planId]?.features || [],
       });
@@ -74,11 +79,28 @@ export function createBillingRoutes(
         return res.status(404).json({ error: 'No subscription found' });
       }
       const limits = getPlanLimits(sub.plan);
-      const monthStr = new Date().toISOString().slice(0, 7);
+      const tenantId = req.tenantId!;
 
-      const usage = [
-        { date: monthStr + '-01', conversations: 0, messages: 0, documentsUploaded: 0 },
-      ];
+      const convByMonth = new Map(conversationRepo.countByMonth(tenantId).map(r => [r.month, r.count]));
+      const docsByMonth = new Map<string, number>();
+      for (const d of docRepo.listByTenant(tenantId)) {
+        const month = (d.createdAt || '').slice(0, 7);
+        if (month) docsByMonth.set(month, (docsByMonth.get(month) || 0) + 1);
+      }
+      const usageRecords = usageRepo.listByTenant(tenantId).records;
+
+      const usage = usageRecords.map(record => {
+        const month = record.period;
+        return {
+          date: `${month}-01`,
+          conversations: convByMonth.get(month) || 0,
+          messages: record.messagesUsed,
+          documentsUploaded: docsByMonth.get(month) || 0,
+        };
+      });
+      if (usage.length === 0) {
+        usage.push({ date: new Date().toISOString().slice(0, 7) + '-01', conversations: 0, messages: 0, documentsUploaded: 0 });
+      }
 
       res.json({ usage, plan: sub.plan, limits, subscription: sub });
     } catch (err: any) {

@@ -49,7 +49,7 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
   const router = Router();
   const auth = authMiddleware(jwtSecret);
 
-  router.post('/signup', requireJsonObject, (req: Request, res: Response) => {
+  const handleSignup = (req: Request, res: Response) => {
     try {
       const { email, password, name, companyName } = req.body;
 
@@ -104,57 +104,10 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
       logAuditEvent(log, { event: 'signup', success: false, ip: req.ip, detail: err.message });
       res.status(500).json({ error: 'Signup failed' });
     }
-  });
+  };
 
-  router.post('/register', requireJsonObject, (req: Request, res: Response) => {
-    const { email, password, name, companyName } = req.body;
-
-    const errors = [
-      validateEmail(email, 'email'),
-      validateRequiredString(name, 'name', { maxLength: NAME_MAX }),
-      validateRequiredString(password, 'password', { minLength: PASSWORD_MIN, maxLength: PASSWORD_MAX }),
-      validateOptionalString(companyName, 'companyName', { maxLength: NAME_MAX }),
-    ].filter(Boolean);
-
-    if (errors.length > 0) return validationError(res, errors as any);
-
-    const existing = userRepo.findByEmail(email);
-    if (existing) {
-      return res.status(409).json({ error: 'Email already registered' });
-    }
-
-    const { token: verificationToken, expiresAt: verificationTokenExpiry } = generateVerificationToken();
-    const user = userRepo.create({ email, password, name, verificationToken, verificationTokenExpiry });
-    const tenant = tenantRepo.create({ name: companyName || `${name}'s Organization`, ownerId: user.id });
-
-    syncConfigToPipeline(tenant.id);
-
-    const emailService = getEmailService();
-    emailService.send({
-      to: user.email,
-      subject: 'Verify your email',
-        text: `Welcome! Use this link to verify your email:\n\n${process.env.APP_URL}/verify-email?token=${verificationToken}\n\nThis link expires in 24 hours.`,
-        html: `<p>Welcome! Use this link to verify your email:</p><p><a href="${process.env.APP_URL}/verify-email?token=${verificationToken}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
-    });
-
-    const accessToken = generateToken({
-      sub: user.id,
-      email: user.email,
-      name: user.name,
-      tenantId: tenant.id,
-      role: 'owner',
-    }, jwtSecret);
-
-    const refreshResult = generateRefreshToken();
-    refreshTokenRepo.create(user.id, refreshResult.token, refreshResult.expiresAt);
-
-    res.status(201).json({
-      user: { id: user.id, email: user.email, name: user.name },
-      tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan },
-      token: accessToken,
-      refreshToken: refreshResult.token,
-    });
-  });
+  router.post('/signup', requireJsonObject, handleSignup);
+  router.post('/register', requireJsonObject, handleSignup);
 
   router.post('/login', requireJsonObject, (req: Request, res: Response) => {
     try {

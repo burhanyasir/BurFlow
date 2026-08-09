@@ -1,7 +1,9 @@
-import { type ReactNode, type HTMLAttributes } from 'react';
+import { type ReactNode, type HTMLAttributes, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { DashboardSidebar, type NavItem } from './DashboardSidebar';
 import { DashboardTopbar } from './DashboardTopbar';
+import { useAuth } from '../../lib/auth-context';
+import { isAdmin, isAdminPath } from '../../lib/rbac';
 
 export interface DashboardLayoutProps extends HTMLAttributes<HTMLDivElement> {
   sidebarItems: NavItem[];
@@ -27,10 +29,21 @@ export function DashboardLayout({
   onUpgrade, onLogout, onSettings,
   children, className, ...props
 }: DashboardLayoutProps) {
+  const { user } = useAuth();
+
+  const visibleItems = useMemo(() => {
+    if (isAdmin(user)) return sidebarItems;
+    const filterItems = (items: NavItem[]): NavItem[] =>
+      items
+        .filter(item => !item.href || !isAdminPath(item.href))
+        .map(item => (item.items ? { ...item, items: filterItems(item.items) } : item));
+    return filterItems(sidebarItems);
+  }, [sidebarItems, user]);
+
   return (
     <div className="flex min-h-screen bg-background text-foreground antialiased" {...props}>
       <DashboardSidebar
-        items={sidebarItems}
+        items={visibleItems}
         onNavigate={onNavigate}
         workspaceName={workspaceName}
         planName={planName}

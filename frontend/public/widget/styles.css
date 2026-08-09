@@ -1,0 +1,17 @@
+/*
+ * BurFlow widget default styles.
+ * The widget bundle (widget.js) renders fully with inline styles and injects
+ * a <style id="cw-widget-styles"> element at runtime, so this file only
+ * carries loading-time defaults and the brand color variable used by the
+ * embed snippet. Custom branding is applied at runtime from the tenant
+ * widget configuration.
+ */
+:root {
+  --cw-primary-color: #3b82f6;
+}
+
+.cw-bubble,
+.cw-send {
+  background: linear-gradient(135deg, var(--cw-primary-color, #6366f1) 0%, var(--cw-primary-color, #8b5cf6) 100%);
+  color: #fff;
+}

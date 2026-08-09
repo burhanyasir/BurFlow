@@ -1,0 +1,304 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import Database from 'better-sqlite3';
+import { join } from 'path';
+import { existsSync, rmSync } from 'fs';
+import {
+  createDatabase, UserRepository, TenantRepository, RefreshTokenRepository,
+  ConversationRepository, MessageRepository, UsageRepository,
+  KnowledgeBaseRepository, KbDocumentRepository, ApiKeyRepository,
+  AnalyticsRepository, SubscriptionRepository, LeadRepository,
+  HandoffRequestRepository, LeadService,
+  UnansweredQuestionRepository, UnansweredQuestionClusterRepository,
+  KnowledgeSuggestionRepository, CitationAnalyticsRepository,
+  ConversationInsightsRepository,
+} from '@conversation-engine/saas-core';
+import { authMiddleware } from '../middleware/auth';
+import { requireTenant } from '../middleware/tenant';
+import { createAuthRoutes } from '../routes/auth';
+import { createAdminRoutes } from '../routes/admin';
+import { createActivationRoutes } from '../routes/admin-activation';
+import { createChatRoutes } from '../routes/chat';
+
+// ─── Test Setup ───────────────────────────────────────────
+
+const TEST_DB = join(__dirname, '__test_admin_api__.db');
+const JWT_SECRET = 'test-secret-key-for-admin-api';
+
+let db: Database.Database;
+let userRepo: UserRepository;
+let tenantRepo: TenantRepository;
+let refreshTokenRepo: RefreshTokenRepository;
+let conversationRepo: ConversationRepository;
+let messageRepo: MessageRepository;
+let usageRepo: UsageRepository;
+let kbRepo: KnowledgeBaseRepository;
+let docRepo: KbDocumentRepository;
+let apiKeyRepo: ApiKeyRepository;
+let analyticsRepo: AnalyticsRepository;
+let subRepo: SubscriptionRepository;
+let leadRepo: LeadRepository;
+let handoffReqRepo: HandoffRequestRepository;
+let app: express.Express;
+
+function makeApp() {
+  const a = express();
+  a.use(express.json({ limit: '10mb' }));
+  a.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET));
+  const auth = authMiddleware(JWT_SECRET);
+  const tenantGuard = requireTenant(tenantRepo);
+  a.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffReqRepo));
+  a.use('/api/admin', auth, tenantGuard, createActivationRoutes(
+    new UnansweredQuestionRepository(db),
+    new UnansweredQuestionClusterRepository(db),
+    new KnowledgeSuggestionRepository(db),
+    new CitationAnalyticsRepository(db),
+    new ConversationInsightsRepository(db),
+    tenantRepo, usageRepo, subRepo, conversationRepo,
+  ));
+  const leadService = new LeadService(leadRepo);
+  a.use('/api/chat', auth, tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, undefined, { leadService }));
+  return a;
+}
+
+async function request(method: string, path: string, body?: any, token?: string) {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return new Promise<{ status: number; body: any }>((resolve) => {
+    const http = require('http');
+    const server = app.listen(0, () => {
+      const port = (server.address() as any).port;
+      const r = http.request({ hostname: '127.0.0.1', port, path, method, headers }, (res: any) => {
+        let data = '';
+        res.on('data', (c: string) => data += c);
+        res.on('end', () => {
+          server.close();
+          resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null });
+        });
+      });
+      if (body) r.write(JSON.stringify(body));
+      r.end();
+    });
+  });
+}
+
+let tenantAToken: string;
+let tenantAId: string;
+let tenantBToken: string;
+let memberToken: string;
+
+beforeAll(async () => {
+  if (existsSync(TEST_DB)) rmSync(TEST_DB);
+  db = createDatabase(TEST_DB);
+  userRepo = new UserRepository(db);
+  tenantRepo = new TenantRepository(db);
+  refreshTokenRepo = new RefreshTokenRepository(db);
+  conversationRepo = new ConversationRepository(db);
+  messageRepo = new MessageRepository(db);
+  usageRepo = new UsageRepository(db);
+  kbRepo = new KnowledgeBaseRepository(db);
+  docRepo = new KbDocumentRepository(db);
+  apiKeyRepo = new ApiKeyRepository(db);
+  analyticsRepo = new AnalyticsRepository(db);
+  subRepo = new SubscriptionRepository(db);
+  leadRepo = new LeadRepository(db);
+  handoffReqRepo = new HandoffRequestRepository(db);
+  app = makeApp();
+
+  const signupA = await request('POST', '/api/auth/signup', { email: 'admin-a@test.com', password: 'password123', name: 'Admin A', companyName: 'Admin Corp A' });
+  tenantAToken = signupA.body.token;
+  tenantAId = signupA.body.tenant.id;
+
+  const signupB = await request('POST', '/api/auth/signup', { email: 'admin-b@test.com', password: 'password123', name: 'Admin B', companyName: 'Admin Corp B' });
+  tenantBToken = signupB.body.token;
+
+  memberToken = jwt.sign(
+    { sub: 'member-user', email: 'member@test.com', name: 'Team Member', tenantId: tenantAId, role: 'member' },
+    JWT_SECRET,
+    { expiresIn: '1h' },
+  );
+
+  // Seed a conversation with messages for tenant A
+  const conv = conversationRepo.create(tenantAId, 'admin-session-1');
+  messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'user', content: 'I need help with billing', sequenceNumber: 1 });
+  messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'assistant', content: 'I can help with that', sequenceNumber: 2 });
+});
+
+afterAll(() => {
+  if (db) db.close();
+  if (existsSync(TEST_DB)) rmSync(TEST_DB);
+});
+
+// ─── Session Management ───────────────────────────────────
+
+describe('Admin session management', () => {
+  it('updates session status', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-status-session');
+    const res = await request('PUT', `/api/admin/sessions/${conv.id}/status`, { status: 'ended' }, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.status).toBe('ended');
+    expect(conversationRepo.findById(conv.id)!.endedAt).toBeTruthy();
+  });
+
+  it('rejects invalid session status', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-badstatus-session');
+    const res = await request('PUT', `/api/admin/sessions/${conv.id}/status`, { status: 'paused' }, tenantAToken);
+    expect(res.status).toBe(400);
+  });
+
+  it('assigns and clears session owner', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-owner-session');
+    const res = await request('PUT', `/api/admin/sessions/${conv.id}/owner`, { ownerId: 'agent-1' }, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.assignedAgentId).toBe('agent-1');
+
+    const clear = await request('PUT', `/api/admin/sessions/${conv.id}/owner`, { ownerId: null }, tenantAToken);
+    expect(clear.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.assignedAgentId).toBeUndefined();
+  });
+
+  it('toggles flag and archive', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-flag-session');
+    const flag = await request('PUT', `/api/admin/sessions/${conv.id}/flag`, { flagged: true }, tenantAToken);
+    expect(flag.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.flagged).toBe(true);
+
+    const archive = await request('PUT', `/api/admin/sessions/${conv.id}/archive`, { archived: true }, tenantAToken);
+    expect(archive.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.archived).toBe(true);
+  });
+
+  it('adds and lists session notes with author', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-notes-session');
+    const add = await request('POST', `/api/admin/sessions/${conv.id}/notes`, { content: 'Follow up on pricing' }, tenantAToken);
+    expect(add.status).toBe(201);
+    expect(add.body.note.authorName).toBe('Admin A');
+
+    const list = await request('GET', `/api/admin/sessions/${conv.id}/notes`, undefined, tenantAToken);
+    expect(list.status).toBe(200);
+    expect(list.body.notes).toHaveLength(1);
+    expect(list.body.notes[0].content).toBe('Follow up on pricing');
+  });
+
+  it('validates note content', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-notes-bad');
+    const res = await request('POST', `/api/admin/sessions/${conv.id}/notes`, { content: '' }, tenantAToken);
+    expect(res.status).toBe(400);
+  });
+
+  it('updates and lists session tags', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-tags-session');
+    const update = await request('PUT', `/api/admin/sessions/${conv.id}/tags`, { tags: ['urgent', 'billing'] }, tenantAToken);
+    expect(update.status).toBe(200);
+    expect(conversationRepo.findById(conv.id)!.tags).toEqual(['urgent', 'billing']);
+
+    const list = await request('GET', `/api/admin/sessions/${conv.id}/tags`, undefined, tenantAToken);
+    expect(list.status).toBe(200);
+    expect(list.body.tags).toEqual(['urgent', 'billing']);
+  });
+
+  it('rejects non-string tags', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-tags-bad');
+    const res = await request('PUT', `/api/admin/sessions/${conv.id}/tags`, { tags: [123] }, tenantAToken);
+    expect(res.status).toBe(400);
+  });
+
+  it('builds a timeline from messages, notes, and handoff', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-timeline-session');
+    messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'user', content: 'hello', sequenceNumber: 1 });
+    await request('POST', `/api/admin/sessions/${conv.id}/notes`, { content: 'Priority account' }, tenantAToken);
+    handoffReqRepo.create({ tenantId: tenantAId, sessionId: conv.sessionId });
+
+    const res = await request('GET', `/api/admin/sessions/${conv.id}/timeline`, undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    const types = res.body.timeline.map((e: any) => e.type);
+    expect(types).toContain('message');
+    expect(types).toContain('note');
+    expect(types).toContain('handoff');
+  });
+
+  it('returns 404 for cross-tenant session access', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-cross-tenant');
+    const res = await request('PUT', `/api/admin/sessions/${conv.id}/flag`, { flagged: true }, tenantBToken);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for unknown session', async () => {
+    const res = await request('PUT', '/api/admin/sessions/does-not-exist/status', { status: 'ended' }, tenantAToken);
+    expect(res.status).toBe(404);
+  });
+});
+
+// ─── Leads & Followups ────────────────────────────────────
+
+describe('Admin leads and followups', () => {
+  it('lists leads for the tenant', async () => {
+    await request('POST', '/api/chat', { message: 'Contact me at admin-lead@corp.com', sessionId: 'admin-lead-1' }, tenantAToken);
+    const res = await request('GET', '/api/admin/leads', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.leads.length).toBeGreaterThan(0);
+    expect(res.body.leads.some((l: any) => l.email === 'admin-lead@corp.com')).toBe(true);
+  });
+
+  it('lists followups excluding disqualified leads', async () => {
+    await request('POST', '/api/chat', { message: 'Reach me at admin-followup@corp.com', sessionId: 'admin-followup-1' }, tenantAToken);
+    const lead = leadRepo.findBySession(tenantAId, 'admin-followup-1')!;
+    leadRepo.updateLead(lead.id, tenantAId, { qualificationStatus: 'disqualified' });
+
+    const res = await request('GET', '/api/admin/followups', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.followups.some((l: any) => l.email === 'admin-followup@corp.com')).toBe(false);
+  });
+});
+
+// ─── Usage Metrics ────────────────────────────────────────
+
+describe('Admin usage metrics', () => {
+  it('reports real conversation and escalation counts', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-usage-session');
+    messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'user', content: 'Talk to a human', sequenceNumber: 1 });
+    conversationRepo.setSessionState(conv.id, 'human_takeover', 'agent-9');
+
+    const res = await request('GET', '/api/admin/usage/current', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.conversations).toBeGreaterThanOrEqual(4);
+    expect(res.body.humanEscalations).toBe(1);
+    expect(res.body.activeUsers).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// ─── AdminOnly Authorization Guard ────────────────────────
+
+describe('Admin activation route authorization', () => {
+  it('rejects team members (role=member) with 403', async () => {
+    const cases = [
+      'GET /api/admin/unanswered',
+      'GET /api/admin/unanswered/stats',
+      'GET /api/admin/unanswered/clusters',
+      'GET /api/admin/knowledge/suggestions',
+      'GET /api/admin/citations/overview',
+      'GET /api/admin/citations/confidence-distribution',
+      'GET /api/admin/insights/overview',
+      'GET /api/admin/insights/trend',
+      'GET /api/admin/usage/current',
+      'GET /api/admin/usage/history',
+    ];
+    for (const entry of cases) {
+      const [method, path] = entry.split(' ');
+      const res = await request(method, path, undefined, memberToken);
+      expect(res.status, `${method} ${path}`).toBe(403);
+    }
+  });
+
+  it('rejects member writes with 403', async () => {
+    const conv = conversationRepo.create(tenantAId, 'member-write-blocked');
+    const res = await request('POST', '/api/admin/unanswered/record', { conversationId: conv.id, question: 'Blocked?' }, memberToken);
+    expect(res.status).toBe(403);
+  });
+
+  it('allows owners and admins through the guard', async () => {
+    const res = await request('GET', '/api/admin/usage/current', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+  });
+});

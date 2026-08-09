@@ -83,6 +83,14 @@ export interface TenantApiKey {
 
 export type SessionState = 'ai_managed' | 'human_takeover' | 'closed';
 
+export interface SessionNote {
+  id: string;
+  authorId: string;
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
 export interface Conversation {
   id: string;
   tenantId: string;
@@ -95,6 +103,10 @@ export interface Conversation {
   sessionState: SessionState;
   assignedAgentId?: string;
   takeoverAt?: string;
+  flagged?: boolean;
+  archived?: boolean;
+  tags?: string[];
+  notes?: SessionNote[];
 }
 
 export interface Message {

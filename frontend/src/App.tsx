@@ -1,4 +1,4 @@
-import { useLocation, Navigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -17,10 +17,20 @@ import DocsPage from './pages/docs/DocsPage';
 import WidgetPage from './pages/docs/WidgetPage';
 import ApiPage from './pages/docs/ApiPage';
 import TrustCenterPage from './pages/trust/TrustCenterPage';
+import DemoPage from './pages/demo/DemoPage';
 import PrivacyPage from './pages/trust/PrivacyPage';
 import ChangelogPage from './pages/trust/ChangelogPage';
 import StatusPage from './pages/trust/StatusPage';
 import MethodologyPage from './pages/trust/MethodologyPage';
+import SecurityPage from './pages/trust/SecurityPage';
+import CompliancePage from './pages/trust/CompliancePage';
+import UptimePage from './pages/trust/UptimePage';
+import SubprocessorsPage from './pages/trust/SubprocessorsPage';
+import DpaPage from './pages/trust/DpaPage';
+import ResponsibleAIPage from './pages/trust/ResponsibleAIPage';
+import GroundedAnswersPage from './pages/trust/GroundedAnswersPage';
+import TermsPage from './pages/legal/TermsPage';
+import CookiesPage from './pages/legal/CookiesPage';
 
 import DashboardPage from './pages/admin/dashboard/DashboardPage';
 import AnalyticsDashboard from './pages/admin/analytics/AnalyticsDashboard';
@@ -38,8 +48,12 @@ import FollowUpQueuePage from './pages/admin/followups/FollowUpQueuePage';
 import SettingsPage from './pages/admin/settings/SettingsPage';
 import LoginPage from './pages/auth/LoginPage';
 import SignupPage from './pages/auth/SignupPage';
-import { ProtectedRoute } from './lib/protected-route';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import { ProtectedRoute, PublicOnlyRoute, AdminRoute } from './lib/protected-route';
 import { OnboardingPage } from './pages/admin/onboarding/OnboardingPage';
+import ExecutiveDashboard from './pages/admin/dashboard/ExecutiveDashboard';
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -77,31 +91,45 @@ function RoutesWithAnimation() {
         <Route path="/docs/widget" element={<PublicRoute><WidgetPage /></PublicRoute>} />
         <Route path="/docs/api" element={<PublicRoute><ApiPage /></PublicRoute>} />
         <Route path="/trust" element={<PublicRoute><TrustCenterPage /></PublicRoute>} />
+        <Route path="/trust/security" element={<PublicRoute><SecurityPage /></PublicRoute>} />
+        <Route path="/trust/compliance" element={<PublicRoute><CompliancePage /></PublicRoute>} />
+        <Route path="/trust/privacy" element={<PublicRoute><PrivacyPage /></PublicRoute>} />
+        <Route path="/trust/uptime" element={<PublicRoute><UptimePage /></PublicRoute>} />
+        <Route path="/trust/subprocessors" element={<PublicRoute><SubprocessorsPage /></PublicRoute>} />
+        <Route path="/trust/dpa" element={<PublicRoute><DpaPage /></PublicRoute>} />
+        <Route path="/trust/responsible-ai" element={<PublicRoute><ResponsibleAIPage /></PublicRoute>} />
+        <Route path="/trust/grounded-answers" element={<PublicRoute><GroundedAnswersPage /></PublicRoute>} />
         <Route path="/privacy" element={<PublicRoute><PrivacyPage /></PublicRoute>} />
         <Route path="/changelog" element={<PublicRoute><ChangelogPage /></PublicRoute>} />
         <Route path="/status" element={<PublicRoute><StatusPage /></PublicRoute>} />
         <Route path="/methodology" element={<PublicRoute><MethodologyPage /></PublicRoute>} />
+        <Route path="/terms" element={<PublicRoute><TermsPage /></PublicRoute>} />
+        <Route path="/cookies" element={<PublicRoute><CookiesPage /></PublicRoute>} />
+        <Route path="/demo" element={<PublicRoute><DemoPage /></PublicRoute>} />
 
         {/* Auth Routes */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
+        <Route path="/signup" element={<PublicOnlyRoute><SignupPage /></PublicOnlyRoute>} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
         {/* Admin Dashboard Routes */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
         <Route path="/agent" element={<ProtectedRoute><AgentInboxPage /></ProtectedRoute>} />
-        <Route path="/dashboard/executive" element={<ProtectedRoute><Navigate to="/dashboard" replace /></ProtectedRoute>} />
+        <Route path="/dashboard/executive" element={<ProtectedRoute><ExecutiveDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/conversations" element={<ProtectedRoute><ConversationDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/conversations/:id" element={<ProtectedRoute><ConversationDetailPage /></ProtectedRoute>} />
         <Route path="/dashboard/knowledge" element={<ProtectedRoute><KnowledgeDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/analytics" element={<ProtectedRoute><AnalyticsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/leads" element={<ProtectedRoute><LeadInboxPage /></ProtectedRoute>} />
-        <Route path="/dashboard/insights" element={<ProtectedRoute><InsightsDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/insights" element={<ProtectedRoute><AdminRoute><InsightsDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/billing" element={<ProtectedRoute><BillingDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/widget" element={<ProtectedRoute><WidgetDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/unanswered" element={<ProtectedRoute><UnansweredDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/citations" element={<ProtectedRoute><CitationDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/unanswered" element={<ProtectedRoute><AdminRoute><UnansweredDashboard /></AdminRoute></ProtectedRoute>} />
+        <Route path="/dashboard/citations" element={<ProtectedRoute><AdminRoute><CitationDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/followups" element={<ProtectedRoute><FollowUpQueuePage /></ProtectedRoute>} />
-        <Route path="/dashboard/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+        <Route path="/dashboard/settings" element={<ProtectedRoute><AdminRoute><SettingsPage /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/onboarding" element={<ProtectedRoute><OnboardingPage /></ProtectedRoute>} />
 
         {/* 404 catch-all */}

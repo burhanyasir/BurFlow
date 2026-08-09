@@ -3,12 +3,49 @@ import {
   UserRepository, TenantRepository, ConversationRepository,
   UsageRepository, KnowledgeBaseRepository, KbDocumentRepository,
   ApiKeyRepository, AnalyticsRepository, SubscriptionRepository,
-  MessageRepository,
+  MessageRepository, LeadRepository, HandoffRequestRepository,
+  SessionNote,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
-import { parsePagination } from '../middleware/validate';
+import { parsePagination, requireJsonObject, validationError, validateRequiredString, validateRequiredEnum } from '../middleware/validate';
 
 const logger = createLogger('saas-api:admin');
+
+const VALID_SESSION_STATUSES = ['active', 'ended', 'escalated'] as const;
+
+function sessionTimeline(conversation: any, messages: any[], notes: SessionNote[], handoff: any) {
+  const events: any[] = messages.map((m: any) => ({
+    type: 'message' as const,
+    role: m.role,
+    content: m.content,
+    createdAt: m.createdAt || m.sequenceNumber,
+    actor: m.role === 'user' ? 'Visitor' : 'Assistant',
+  }));
+  if (handoff) {
+    events.push({
+      type: 'handoff' as const,
+      status: handoff.status,
+      visitorEmail: handoff.visitorEmail,
+      createdAt: handoff.createdAt,
+      actor: 'System',
+      content: 'Visitor requested a human agent',
+    });
+  }
+  if (conversation.takeoverAt) {
+    events.push({
+      type: 'takeover' as const,
+      createdAt: conversation.takeoverAt,
+      actor: conversation.assignedAgentId || 'Agent',
+      content: 'Human agent took over the conversation',
+    });
+  }
+  for (const n of notes) {
+    events.push({ type: 'note' as const, createdAt: n.createdAt, actor: n.authorName, content: n.content });
+  }
+  return events.sort((a: any, b: any) =>
+    new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime()
+  );
+}
 
 export function createAdminRoutes(
   userRepo: UserRepository,
@@ -21,6 +58,8 @@ export function createAdminRoutes(
   analyticsRepo: AnalyticsRepository,
   subRepo: SubscriptionRepository,
   messageRepo: MessageRepository,
+  leadRepo: LeadRepository,
+  handoffReqRepo: HandoffRequestRepository,
 ): Router {
   const router = Router();
 
@@ -234,48 +273,167 @@ export function createAdminRoutes(
     }
   });
 
-  router.put('/sessions/:id/status', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Status updated', sessionId: req.params.id });
+  const requireSession = (req: Request, res: Response): ReturnType<ConversationRepository['findById']> | null => {
+    const conversation = conversationRepo.findById(req.params.id);
+    if (!conversation || conversation.tenantId !== req.tenantId) {
+      res.status(404).json({ error: 'Session not found' });
+      return null;
+    }
+    return conversation;
+  };
+
+  router.put('/sessions/:id/status', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const statusError = validateRequiredEnum(req.body.status, 'status', VALID_SESSION_STATUSES);
+      if (statusError) return validationError(res, [statusError]);
+      conversationRepo.updateStatus(conversation.id, req.body.status);
+      res.json({ message: 'Status updated', sessionId: conversation.id, status: req.body.status });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session status update failed');
+      res.status(500).json({ error: 'Failed to update session status' });
+    }
   });
 
-  router.put('/sessions/:id/owner', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Owner updated', sessionId: req.params.id });
+  router.put('/sessions/:id/owner', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const ownerId = req.body.ownerId;
+      if (ownerId !== null && (typeof ownerId !== 'string' || ownerId.length === 0)) {
+        return res.status(400).json({ error: 'ownerId must be a string or null' });
+      }
+      conversationRepo.updateSessionMeta(conversation.id, { assignedAgentId: ownerId });
+      res.json({ message: 'Owner updated', sessionId: conversation.id, ownerId: ownerId || null });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session owner update failed');
+      res.status(500).json({ error: 'Failed to update session owner' });
+    }
   });
 
-  router.put('/sessions/:id/flag', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Flag toggled', sessionId: req.params.id });
+  router.put('/sessions/:id/flag', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const flagged = req.body.flagged;
+      if (typeof flagged !== 'boolean') return res.status(400).json({ error: 'flagged must be a boolean' });
+      conversationRepo.updateSessionMeta(conversation.id, { flagged });
+      res.json({ message: 'Flag toggled', sessionId: conversation.id, flagged });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session flag update failed');
+      res.status(500).json({ error: 'Failed to update session flag' });
+    }
   });
 
-  router.put('/sessions/:id/archive', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Archive toggled', sessionId: req.params.id });
+  router.put('/sessions/:id/archive', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const archived = req.body.archived;
+      if (typeof archived !== 'boolean') return res.status(400).json({ error: 'archived must be a boolean' });
+      conversationRepo.updateSessionMeta(conversation.id, { archived });
+      res.json({ message: 'Archive toggled', sessionId: conversation.id, archived });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session archive update failed');
+      res.status(500).json({ error: 'Failed to update session archive' });
+    }
   });
 
-  router.post('/sessions/:id/notes', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Note added', sessionId: req.params.id });
+  router.post('/sessions/:id/notes', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const error = validateRequiredString(req.body.content, 'content', { maxLength: 4000 });
+      if (error) return validationError(res, [error]);
+      const note: SessionNote = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        authorId: req.user!.sub,
+        authorName: req.user!.name || req.user!.sub,
+        content: req.body.content,
+        createdAt: new Date().toISOString(),
+      };
+      const notes = [...(conversation.notes || []), note];
+      conversationRepo.updateSessionMeta(conversation.id, { notes });
+      res.status(201).json({ message: 'Note added', sessionId: conversation.id, note });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Add session note failed');
+      res.status(500).json({ error: 'Failed to add note' });
+    }
   });
 
   router.get('/sessions/:id/notes', adminOnly, (req: Request, res: Response) => {
-    res.json({ notes: [], sessionId: req.params.id });
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      res.json({ notes: conversation.notes || [], sessionId: conversation.id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'List session notes failed');
+      res.status(500).json({ error: 'Failed to list notes' });
+    }
   });
 
-  router.put('/sessions/:id/tags', adminOnly, (req: Request, res: Response) => {
-    res.json({ message: 'Tags updated', sessionId: req.params.id });
+  router.put('/sessions/:id/tags', adminOnly, requireJsonObject, (req: Request, res: Response) => {
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const { tags } = req.body;
+      if (!Array.isArray(tags) || tags.some(t => typeof t !== 'string' || t.length > 50)) {
+        return res.status(400).json({ error: 'tags must be an array of strings (max 50 chars each)' });
+      }
+      conversationRepo.updateSessionMeta(conversation.id, { tags });
+      res.json({ message: 'Tags updated', sessionId: conversation.id, tags });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session tags update failed');
+      res.status(500).json({ error: 'Failed to update session tags' });
+    }
   });
 
   router.get('/sessions/:id/tags', adminOnly, (req: Request, res: Response) => {
-    res.json({ tags: [], sessionId: req.params.id });
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      res.json({ tags: conversation.tags || [], sessionId: conversation.id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'List session tags failed');
+      res.status(500).json({ error: 'Failed to list tags' });
+    }
   });
 
   router.get('/sessions/:id/timeline', adminOnly, (req: Request, res: Response) => {
-    res.json({ timeline: [], sessionId: req.params.id });
+    try {
+      const conversation = requireSession(req, res);
+      if (!conversation) return;
+      const messages = (messageRepo.listByConversation(conversation.id, 1, 500).messages || []);
+      const handoff = handoffReqRepo.findBySession(conversation.sessionId);
+      res.json({ timeline: sessionTimeline(conversation, messages, conversation.notes || [], handoff), sessionId: conversation.id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Session timeline fetch failed');
+      res.status(500).json({ error: 'Failed to fetch timeline' });
+    }
   });
 
   router.get('/leads', adminOnly, (req: Request, res: Response) => {
-    res.json({ leads: [], total: 0, limit: 50, offset: 0 });
+    try {
+      const { page, limit } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+      const result = leadRepo.findByTenant(req.tenantId!, page, limit);
+      res.json({ leads: result.leads, total: result.total, limit, offset: (page - 1) * limit });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Admin leads fetch failed');
+      res.status(500).json({ error: 'Failed to fetch leads' });
+    }
   });
 
   router.get('/followups', adminOnly, (req: Request, res: Response) => {
-    res.json({ followups: [], total: 0, limit: 50, offset: 0 });
+    try {
+      const { page, limit } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
+      const result = leadRepo.findByTenant(req.tenantId!, page, limit);
+      const followups = result.leads.filter(l => l.qualificationStatus !== 'disqualified');
+      res.json({ followups, total: result.total, limit, offset: (page - 1) * limit });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Followups fetch failed');
+      res.status(500).json({ error: 'Failed to fetch followups' });
+    }
   });
 
   return router;

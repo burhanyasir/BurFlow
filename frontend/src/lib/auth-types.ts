@@ -4,6 +4,7 @@ export interface AuthUser {
   name: string;
   avatarUrl?: string;
   emailVerified?: boolean;
+  role?: string;
 }
 
 export interface AuthTenant {

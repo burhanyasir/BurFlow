@@ -100,7 +100,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
       const webhook = webhookRepo.findById(req.params.id);
       if (!webhook || webhook.tenantId !== req.tenantId) return res.status(404).json({ error: 'Webhook not found' });
       const newSecret = crypto.randomBytes(32).toString('hex');
-      webhookRepo.update(req.params.id, req.tenantId!, { url: webhook.url, events: webhook.events });
+      webhookRepo.update(req.params.id, req.tenantId!, { signingSecret: newSecret });
+      auditRepo.record(req.tenantId!, { userId: req.user!.sub, userName: req.user!.name, eventType: 'webhook.secret_regenerated', resourceType: 'webhook', resourceId: req.params.id, details: 'Webhook signing secret regenerated' });
       res.json({ signingSecret: newSecret });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Regenerate secret failed');

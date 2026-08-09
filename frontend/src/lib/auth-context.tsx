@@ -13,6 +13,17 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+function decodeTokenRole(token: string): string | undefined {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return undefined;
+    const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof json.role === 'string' ? json.role : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -39,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const applyUser = (data: any) => {
       const primaryTenant = data.tenants?.[0] || null;
       setUser(
-        { ...data.user, emailVerified: true },
+        { ...data.user, emailVerified: true, role: decodeTokenRole(token) },
         primaryTenant ? { id: primaryTenant.id, name: primaryTenant.name, slug: primaryTenant.slug, plan: primaryTenant.plan, subscriptionStatus: primaryTenant.subscriptionStatus } : null,
       );
     };
@@ -77,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const data = await authClient.login(email, password);
-    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: true };
+    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: true, role: decodeTokenRole(data.token) };
     const tenant = data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null;
     storage.setAuthSession(data.token, user, tenant);
     setUser(user, tenant);
@@ -85,7 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup = useCallback(async (email: string, password: string, name: string, companyName?: string) => {
     const data = await authClient.signup(email, password, name, companyName);
-    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: false };
+    const user = { id: data.user.id, email: data.user.email, name: data.user.name, emailVerified: false, role: decodeTokenRole(data.token) };
     const tenant = data.tenant ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan } : null;
     storage.setAuthSession(data.token, user, tenant);
     setUser(user, tenant);

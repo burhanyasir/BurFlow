@@ -322,6 +322,10 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   themeMode: undefined as any,
   companyName: '',
   launcherText: 'Chat with us',
+  logoUrl: undefined as any,
+  autoOpen: false,
+  autoOpenDelay: 3,
+  customCss: '',
   starterOptions: [],
   suggestedActions: [
     { id: 'pricing', label: 'Pricing', action: 'send_text', payload: 'Show me pricing', variant: 'secondary', category: 'plans' },
@@ -366,6 +370,8 @@ export class ChatWidget {
   private takeoverEl: HTMLDivElement | null = null;
   private takeoverShown = false;
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
+  private autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
+  private headerLogoEl: HTMLImageElement | null = null;
   private readonly placeholders = ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
   private boundDismissPreOpen = (e: Event) => {
     if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
@@ -407,6 +413,17 @@ export class ChatWidget {
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
       .cw-input:focus { border-color:var(--cw-primary-color,#818CF8) !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
+      html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
+      html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
+      html[data-cw-theme='dark'] .cw-input-area { background:#111827 !important; border-top-color:#1F2937 !important; }
+      html[data-cw-theme='dark'] .cw-action-panel { background:#0F172A !important; border-top-color:#1F2937 !important; }
+      html[data-cw-theme='dark'] .cw-input { background:#1F2937 !important; border-color:#374151 !important; color:#F3F4F6 !important; }
+      html[data-cw-theme='dark'] .cw-card { background:#1F2937 !important; border-color:#374151 !important; color:#E5E7EB !important; }
+      html[data-cw-theme='dark'] .cw-msg-user { background:var(--cw-primary-color,#6366f1) !important; color:#fff !important; }
+      html[data-cw-theme='dark'] .cw-bubble-label { color:#E5E7EB !important; }
+      html[data-cw-theme='dark'] .cw-preopen-panel { background:#1F2937 !important; border-color:#374151 !important; }
+      html[data-cw-theme='dark'] .cw-preopen-panel div { color:#E5E7EB !important; }
+      html[data-cw-theme='dark'] .cw-highlight { background: rgba(255,255,255,0.1) !important; }
     `;
     document.head.appendChild(style);
   }
@@ -425,6 +442,7 @@ export class ChatWidget {
   unmount(): void {
     this.abort();
     if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
+    if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
     this.container = null;
@@ -437,6 +455,27 @@ export class ChatWidget {
     if (typeof document === 'undefined') return;
     const primary = this.config.primaryColor || '#3B82F6';
     document.documentElement.style.setProperty('--cw-primary-color', primary);
+
+    let theme = this.config.theme || 'light';
+    if (theme === 'auto') {
+      try {
+        theme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+      } catch { theme = 'light'; }
+    }
+    document.documentElement.setAttribute('data-cw-theme', theme);
+
+    let style = document.getElementById('cw-widget-custom') as HTMLStyleElement | null;
+    const css = this.config.customCss || '';
+    if (css.trim()) {
+      if (!style) {
+        style = document.createElement('style');
+        style.id = 'cw-widget-custom';
+        document.head.appendChild(style);
+      }
+      style.textContent = css;
+    } else if (style) {
+      style.remove();
+    }
   }
 
   private createBubble(): void {
@@ -552,6 +591,14 @@ export class ChatWidget {
 
     document.body.appendChild(container);
     this.container = container;
+
+    if (this.config.autoOpen) {
+      const delayMs = Math.max(0, Math.min((this.config.autoOpenDelay ?? 3), 60)) * 1000;
+      this.autoOpenTimer = setTimeout(() => {
+        this.autoOpenTimer = null;
+        if (!this.isOpen) this.toggle();
+      }, delayMs);
+    }
   }
 
   private createHeader(): HTMLDivElement {
@@ -561,6 +608,16 @@ export class ChatWidget {
 
     const info = document.createElement('div');
     info.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    const logoUrl = this.config.logoUrl || this.config.avatarUrl;
+    if (logoUrl) {
+      const logo = document.createElement('img');
+      logo.className = 'cw-logo';
+      logo.alt = '';
+      logo.style.cssText = 'width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff;border:1px solid rgba(255,255,255,0.25);';
+      logo.src = logoUrl;
+      info.appendChild(logo);
+      this.headerLogoEl = logo;
+    }
     const dot = document.createElement('span');
     dot.style.cssText = 'width:8px;height:8px;border-radius:50%;background:#34D399;flex-shrink:0;box-shadow:0 0 8px rgba(52,211,153,0.5);';
     info.appendChild(dot);
@@ -1344,6 +1401,24 @@ export class ChatWidget {
     }
     if (this.headerSubtitleEl) {
       this.headerSubtitleEl.textContent = this.config.subtitle || '';
+    }
+    const logoUrl = this.config.logoUrl || this.config.avatarUrl;
+    if (logoUrl) {
+      if (!this.headerLogoEl) {
+        const info = this.headerTitleEl?.parentElement;
+        if (info) {
+          const logo = document.createElement('img');
+          logo.className = 'cw-logo';
+          logo.alt = '';
+          logo.style.cssText = 'width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff;border:1px solid rgba(255,255,255,0.25);';
+          info.insertBefore(logo, info.firstChild);
+          this.headerLogoEl = logo;
+        }
+      }
+      if (this.headerLogoEl) this.headerLogoEl.src = logoUrl;
+    } else if (this.headerLogoEl) {
+      this.headerLogoEl.remove();
+      this.headerLogoEl = null;
     }
   }
 

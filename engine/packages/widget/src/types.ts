@@ -16,6 +16,10 @@ export interface WidgetConfig {
   themeMode?: 'light' | 'dark' | 'auto';
   companyName?: string;
   launcherText?: string;
+  logoUrl?: string;
+  autoOpen?: boolean;
+  autoOpenDelay?: number;
+  customCss?: string;
   suggestedActions?: SmartButton[];
   businessProfile?: Record<string, unknown>;
   starterOptions?: string[];

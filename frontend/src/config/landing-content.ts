@@ -48,7 +48,7 @@ export interface LandingFAQ {
 
 export interface LandingFooterColumn {
   title: string;
-  links: string[];
+  links: { label: string; href: string }[];
 }
 
 export const BRAND = {
@@ -125,10 +125,43 @@ export const FAQS: LandingFAQ[] = [
 ];
 
 export const FOOTER_COLUMNS: LandingFooterColumn[] = [
-  { title: 'Product', links: ['Pricing', 'Documentation', 'Widget', 'Integrations'] },
-  { title: 'Company', links: ['Blog', 'Trust Center', 'Contact', 'Careers'] },
-  { title: 'Legal', links: ['Security', 'Privacy', 'Terms', 'DPA'] },
-  { title: 'Platform', links: ['Status', 'Changelog', 'API', 'Roadmap'] },
+  {
+    title: 'Product',
+    links: [
+      { label: 'Pricing', href: '/pricing' },
+      { label: 'Documentation', href: '/docs' },
+      { label: 'Widget', href: '/docs/widget' },
+      { label: 'API', href: '/docs/api' },
+    ],
+  },
+  {
+    title: 'Company',
+    links: [
+      { label: 'Blog', href: '/blog' },
+      { label: 'Trust Center', href: '/trust' },
+      { label: 'Contact', href: '/contact' },
+      { label: 'Careers', href: '/contact' },
+    ],
+  },
+  {
+    title: 'Legal',
+    links: [
+      { label: 'Security', href: '/trust/security' },
+      { label: 'Privacy', href: '/trust/privacy' },
+      { label: 'Terms', href: '/terms' },
+      { label: 'Cookies', href: '/cookies' },
+      { label: 'DPA', href: '/trust/dpa' },
+    ],
+  },
+  {
+    title: 'Platform',
+    links: [
+      { label: 'Status', href: '/status' },
+      { label: 'Changelog', href: '/changelog' },
+      { label: 'Methodology', href: '/methodology' },
+      { label: 'Integrations', href: '/docs' },
+    ],
+  },
 ];
 
 export const HERO_BADGE_TEXT = 'Grounded AI · Now with confidence scoring';

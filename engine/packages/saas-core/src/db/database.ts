@@ -129,7 +129,12 @@ function migrate(db: Database.Database): void {
       status TEXT DEFAULT 'active' CHECK (status IN ('active','ended','escalated')),
       session_state TEXT DEFAULT 'ai_managed' CHECK (session_state IN ('ai_managed','human_takeover','closed')),
       assigned_agent_id TEXT,
-      takeover_at TEXT
+      takeover_at TEXT,
+      updated_at TEXT,
+      flagged INTEGER DEFAULT 0,
+      archived INTEGER DEFAULT 0,
+      tags TEXT DEFAULT '[]',
+      notes TEXT DEFAULT '[]'
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -298,6 +303,13 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN onboarding_status TEXT DEFAULT 'not_started' CHECK (onboarding_status IN ('not_started','in_progress','completed','skipped'));`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN business_profile TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN first_successful_conversation TEXT;`); } catch {}
+
+  // Session management columns (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN updated_at TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN flagged INTEGER DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN archived INTEGER DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN tags TEXT DEFAULT '[]';`); } catch {}
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN notes TEXT DEFAULT '[]';`); } catch {}
 
   // Paddle billing tables
   db.exec(`

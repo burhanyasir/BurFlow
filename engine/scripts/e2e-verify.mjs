@@ -265,7 +265,7 @@ async function runWidgetSnippet() {
   if (!state.widgetToken) fail('No widget token');
   const res = await req('GET', `/api/widget/snippet?token=${state.widgetToken}`, { skipAuth: true });
   if (res.status !== 200) fail(`Expected 200, got ${res.status}`);
-  if (!res.body.includes('widget/loader.js')) fail('Snippet missing loader script');
+  if (!res.body.includes('widget/widget.js')) fail('Snippet missing widget script');
 }
 
 async function runWidgetVerify() {

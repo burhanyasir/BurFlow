@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState } from '../types';
+import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState, SessionNote } from '../types';
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
@@ -297,6 +297,51 @@ export class ConversationRepository {
     return this.findById(id);
   }
 
+  /**
+   * Partial update for session-management fields (flag, archive, tags, notes,
+   * agent assignment). Only the provided fields are written.
+   */
+  updateSessionMeta(
+    id: string,
+    data: { status?: Conversation['status']; assignedAgentId?: string | null; flagged?: boolean; archived?: boolean; tags?: string[]; notes?: SessionNote[] },
+  ): Conversation | null {
+    const sets: string[] = ['updated_at = ?'];
+    const vals: any[] = [new Date().toISOString()];
+    if (data.status !== undefined) {
+      sets.push('status = ?');
+      vals.push(data.status);
+      if (data.status === 'ended') { sets.push('ended_at = ?'); vals.push(new Date().toISOString()); }
+    }
+    if (data.assignedAgentId !== undefined) { sets.push('assigned_agent_id = ?'); vals.push(data.assignedAgentId); }
+    if (data.flagged !== undefined) { sets.push('flagged = ?'); vals.push(data.flagged ? 1 : 0); }
+    if (data.archived !== undefined) { sets.push('archived = ?'); vals.push(data.archived ? 1 : 0); }
+    if (data.tags !== undefined) { sets.push('tags = ?'); vals.push(JSON.stringify(data.tags)); }
+    if (data.notes !== undefined) { sets.push('notes = ?'); vals.push(JSON.stringify(data.notes)); }
+    if (sets.length === 1) return this.findById(id);
+    vals.push(id);
+    this.db.prepare(`UPDATE conversations SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return this.findById(id);
+  }
+
+  countTakeovers(tenantId: string): number {
+    return (this.db.prepare(
+      "SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND session_state = 'human_takeover'"
+    ).get(tenantId) as any)?.c || 0;
+  }
+
+  countActiveUsers(tenantId: string): number {
+    return (this.db.prepare(
+      'SELECT COUNT(DISTINCT user_id) as c FROM conversations WHERE tenant_id = ? AND user_id IS NOT NULL'
+    ).get(tenantId) as any)?.c || 0;
+  }
+
+  countByMonth(tenantId: string): Array<{ month: string; count: number }> {
+    const rows = this.db.prepare(
+      "SELECT substr(started_at, 1, 7) as month, COUNT(*) as count FROM conversations WHERE tenant_id = ? GROUP BY month ORDER BY month"
+    ).all(tenantId) as any[];
+    return rows.map(r => ({ month: r.month, count: r.count }));
+  }
+
   private mapRow(row: any): Conversation {
     return {
       id: row.id, tenantId: row.tenant_id, sessionId: row.session_id,
@@ -305,6 +350,10 @@ export class ConversationRepository {
       sessionState: row.session_state || 'ai_managed',
       assignedAgentId: row.assigned_agent_id || undefined,
       takeoverAt: row.takeover_at || undefined,
+      flagged: !!row.flagged,
+      archived: !!row.archived,
+      tags: row.tags ? JSON.parse(row.tags) : [],
+      notes: row.notes ? JSON.parse(row.notes) : [],
     };
   }
 }
@@ -1581,12 +1630,13 @@ export class WebhookRepository {
     return rows.map(r => this.mapRow(r));
   }
 
-  update(id: string, tenantId: string, data: { url?: string; events?: WebhookEvent[]; isActive?: boolean }): Webhook | null {
+  update(id: string, tenantId: string, data: { url?: string; events?: WebhookEvent[]; isActive?: boolean; signingSecret?: string }): Webhook | null {
     const sets: string[] = ['updated_at = ?'];
     const vals: any[] = [new Date().toISOString()];
     if (data.url !== undefined) { sets.push('url = ?'); vals.push(data.url); }
     if (data.events !== undefined) { sets.push('events = ?'); vals.push(JSON.stringify(data.events)); }
     if (data.isActive !== undefined) { sets.push('is_active = ?'); vals.push(data.isActive ? 1 : 0); }
+    if (data.signingSecret !== undefined) { sets.push('signing_secret = ?'); vals.push(data.signingSecret); }
     vals.push(id, tenantId);
     this.db.prepare(`UPDATE webhooks SET ${sets.join(', ')} WHERE id = ? AND tenant_id = ?`).run(...vals);
     return this.findById(id);

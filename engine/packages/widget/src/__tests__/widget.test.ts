@@ -529,6 +529,65 @@ describe('ChatWidget', () => {
     vi.unstubAllGlobals();
   });
 
+  it('applies dark theme attribute', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', theme: 'dark' });
+    widget.mount();
+
+    expect(document.documentElement.getAttribute('data-cw-theme')).toBe('dark');
+  });
+
+  it('resolves auto theme from system preference', () => {
+    document.documentElement.setAttribute('data-cw-theme', 'auto');
+    try {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: vi.fn().mockReturnValue({ matches: true }),
+      });
+    } catch {}
+    widget = new ChatWidget({ apiUrl: 'http://test', theme: 'auto' });
+    widget.mount();
+
+    expect(document.documentElement.getAttribute('data-cw-theme')).toBe('dark');
+    delete (window as any).matchMedia;
+  });
+
+  it('injects custom CSS into a dedicated style element', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', customCss: '.cw-bubble { border-radius: 4px !important; }' });
+    widget.mount();
+
+    const style = document.getElementById('cw-widget-custom') as HTMLStyleElement;
+    expect(style).toBeTruthy();
+    expect(style.textContent).toContain('.cw-bubble { border-radius: 4px !important; }');
+  });
+
+  it('does not create a custom CSS element when empty', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test' });
+    widget.mount();
+
+    expect(document.getElementById('cw-widget-custom')).toBeNull();
+  });
+
+  it('auto-opens after autoOpenDelay seconds', async () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', autoOpen: true, autoOpenDelay: 0.01 });
+    widget.mount();
+
+    expect(widget.isOpen).toBe(false);
+    await new Promise(r => setTimeout(r, 50));
+    expect(document.querySelector('.cw-container') as HTMLElement).toBeTruthy();
+    expect((document.querySelector('.cw-container') as HTMLElement).style.display).toBe('flex');
+  });
+
+  it('renders logo url in the header', () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', logoUrl: 'https://example.com/logo.png' });
+    widget.mount();
+    widget.toggle();
+
+    const logo = document.querySelector('.cw-logo') as HTMLImageElement;
+    expect(logo).toBeTruthy();
+    expect(logo.src).toBe('https://example.com/logo.png');
+  });
+
   it('sets custom title and subtitle', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', title: 'Support', subtitle: 'Ask us anything' });
     widget.mount();

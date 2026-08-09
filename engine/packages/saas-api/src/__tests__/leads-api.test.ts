@@ -150,6 +150,25 @@ describe('Lead capture via chat', () => {
     expect(payload.data.name).toBe('Mike Ross');
   });
 
+  it('persists a regenerated webhook signing secret', async () => {
+    const wh = await request('POST', '/api/webhooks', {
+      url: 'https://example.com/hooks/secret',
+      events: ['lead.captured'],
+    }, tenantAToken);
+    expect(wh.status).toBe(201);
+    const webhookId = wh.body.id;
+    const before = webhookRepo.findById(webhookId)!.signingSecret;
+
+    const res = await request('POST', `/api/webhooks/${webhookId}/regenerate-secret`, undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.signingSecret).toBeTruthy();
+    expect(res.body.signingSecret).not.toBe(before);
+    expect(webhookRepo.findById(webhookId)!.signingSecret).toBe(res.body.signingSecret);
+
+    const otherTenant = await request('POST', `/api/webhooks/${webhookId}/regenerate-secret`, undefined, tenantBToken);
+    expect(otherTenant.status).toBe(404);
+  });
+
   it('merges lead data across turns in the same session', async () => {
     await request('POST', '/api/chat', {
       message: 'My name is Alice Wonder',

@@ -64,7 +64,7 @@ export type {
   ComplianceDocument, DpaDocument, Subprocessor,
   TopicResponseTemplate,
   Lead, LeadSource, QualificationStatus, BuyingIntentLevel,
-  SessionState,
+  SessionState, SessionNote,
 } from './types';
 export type { HandoffRequest } from './db/repositories';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';

@@ -1,0 +1,3 @@
+[submodule "AI-Customer-Support-Chatbot-SaaS/demo-mode"]
+	path = AI-Customer-Support-Chatbot-SaaS/demo-mode
+	url = https://github.com/burhanyasir/ai-lead-generation-platform.git

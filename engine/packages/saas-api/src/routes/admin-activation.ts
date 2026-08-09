@@ -31,7 +31,7 @@ export function createActivationRoutes(
 
   // ── Unanswered Questions ──
 
-  router.post('/unanswered/record', (req: Request, res: Response) => {
+  router.post('/unanswered/record', adminOnly, (req: Request, res: Response) => {
     try {
       const { conversationId, question, confidence } = req.body;
       const tenantId = req.tenantId!;
@@ -43,7 +43,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/unanswered', (req: Request, res: Response) => {
+  router.get('/unanswered', adminOnly, (req: Request, res: Response) => {
     try {
       const tenantId = req.tenantId!;
       const period = req.query.period as 'today' | 'week' | 'month' | undefined;
@@ -56,7 +56,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/unanswered/stats', (req: Request, res: Response) => {
+  router.get('/unanswered/stats', adminOnly, (req: Request, res: Response) => {
     try {
       const tenantId = req.tenantId!;
       const period = req.query.period as 'today' | 'week' | 'month' | undefined;
@@ -68,7 +68,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/unanswered/clusters', (req: Request, res: Response) => {
+  router.get('/unanswered/clusters', adminOnly, (req: Request, res: Response) => {
     try {
       const clusters = clusterRepo.listByTenant(req.tenantId!);
       res.json(clusters);
@@ -78,7 +78,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.put('/unanswered/:id/resolve', (req: Request, res: Response) => {
+  router.put('/unanswered/:id/resolve', adminOnly, (req: Request, res: Response) => {
     try {
       unansweredRepo.resolve(req.params.id);
       res.json({ success: true });
@@ -90,7 +90,7 @@ export function createActivationRoutes(
 
   // ── Knowledge Suggestions ──
 
-  router.get('/knowledge/suggestions', (req: Request, res: Response) => {
+  router.get('/knowledge/suggestions', adminOnly, (req: Request, res: Response) => {
     try {
       const status = req.query.status as string | undefined;
       const suggestions = suggestionRepo.listByTenant(req.tenantId!, status);
@@ -101,7 +101,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.post('/knowledge/suggestions/generate', (req: Request, res: Response) => {
+  router.post('/knowledge/suggestions/generate', adminOnly, (req: Request, res: Response) => {
     try {
       const suggestions = suggestionRepo.generateFromClusters(req.tenantId!);
       res.json(suggestions);
@@ -111,7 +111,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.put('/knowledge/suggestions/:id/dismiss', (req: Request, res: Response) => {
+  router.put('/knowledge/suggestions/:id/dismiss', adminOnly, (req: Request, res: Response) => {
     try {
       suggestionRepo.dismiss(req.params.id);
       res.json({ success: true });
@@ -121,7 +121,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.put('/knowledge/suggestions/:id/apply', (req: Request, res: Response) => {
+  router.put('/knowledge/suggestions/:id/apply', adminOnly, (req: Request, res: Response) => {
     try {
       suggestionRepo.apply(req.params.id);
       res.json({ success: true });
@@ -133,7 +133,7 @@ export function createActivationRoutes(
 
   // ── Citation Analytics ──
 
-  router.get('/citations/overview', (req: Request, res: Response) => {
+  router.get('/citations/overview', adminOnly, (req: Request, res: Response) => {
     try {
       const overview = citationRepo.getOverview(req.tenantId!);
       res.json(overview);
@@ -143,7 +143,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/citations/confidence-distribution', (req: Request, res: Response) => {
+  router.get('/citations/confidence-distribution', adminOnly, (req: Request, res: Response) => {
     try {
       const dist = citationRepo.getConfidenceDistribution(req.tenantId!);
       res.json(dist);
@@ -155,7 +155,7 @@ export function createActivationRoutes(
 
   // ── Conversation Insights ──
 
-  router.get('/insights/overview', (req: Request, res: Response) => {
+  router.get('/insights/overview', adminOnly, (req: Request, res: Response) => {
     try {
       const days = parseInt(req.query.days as string || '30', 10);
       const overview = insightsRepo.getOverview(req.tenantId!, days);
@@ -166,7 +166,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/insights/trend', (req: Request, res: Response) => {
+  router.get('/insights/trend', adminOnly, (req: Request, res: Response) => {
     try {
       const days = parseInt(req.query.days as string || '30', 10);
       const trend = insightsRepo.getTrend(req.tenantId!, days);
@@ -179,7 +179,7 @@ export function createActivationRoutes(
 
   // ── Usage Dashboard (customer-facing) ──
 
-  router.get('/usage/current', (req: Request, res: Response) => {
+  router.get('/usage/current', adminOnly, (req: Request, res: Response) => {
     try {
       const tenantId = req.tenantId!;
       const tenant = tenantRepo.findById(tenantId);
@@ -198,6 +198,9 @@ export function createActivationRoutes(
       const limits = planLimits[tenant?.plan || 'free'] || planLimits.free;
       const pct = (used: number, limit: number) => limit > 0 ? Math.round((used / limit) * 100) : 0;
 
+      const humanEscalations = conversationRepo.countTakeovers(tenantId);
+      const activeUsers = Math.max(1, conversationRepo.countActiveUsers(tenantId) + 1);
+
       const alerts: any[] = [];
       const msgPct = pct(usage.messagesUsed, limits.messages);
       if (msgPct >= 100) alerts.push({ type: 'exceeded', metric: 'messages', used: usage.messagesUsed, limit: limits.messages, percentage: msgPct });
@@ -207,9 +210,9 @@ export function createActivationRoutes(
       res.json({
         conversations: convs.total,
         messages: usage.messagesUsed,
-        activeUsers: 0,
+        activeUsers,
         aiResponses: usage.messagesUsed,
-        humanEscalations: 0,
+        humanEscalations,
         monthlyUsage: usage.messagesUsed,
         planLimit: limits.messages,
         planUsagePct: msgPct,
@@ -222,7 +225,7 @@ export function createActivationRoutes(
     }
   });
 
-  router.get('/usage/history', (req: Request, res: Response) => {
+  router.get('/usage/history', adminOnly, (req: Request, res: Response) => {
     try {
       const result = usageRepo.listByTenant(req.tenantId!);
       res.json(result.records);
