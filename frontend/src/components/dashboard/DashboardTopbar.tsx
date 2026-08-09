@@ -10,10 +10,11 @@ export interface DashboardTopbarProps {
   onNotificationsClick?: () => void;
   userName?: string;
   className?: string;
+  workspaceSwitcher?: React.ReactNode;
 }
 
 export function DashboardTopbar({
-  breadcrumb, searchPlaceholder = 'Search conversations, documents...', onSearch, notificationCount, onNotificationsClick, className,
+  breadcrumb, searchPlaceholder = 'Search conversations, documents...', onSearch, notificationCount, onNotificationsClick, className, workspaceSwitcher,
 }: DashboardTopbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -21,6 +22,7 @@ export function DashboardTopbar({
   return (
     <header className={cn('sticky top-0 z-30 flex h-16 items-center justify-between border-b border-hairline bg-background/80 px-4 backdrop-blur-2xl lg:px-6', className)}>
       <div className="flex items-center gap-4 min-w-0">
+        {workspaceSwitcher}
         {breadcrumb && <div className="min-w-0">{breadcrumb}</div>}
       </div>
 

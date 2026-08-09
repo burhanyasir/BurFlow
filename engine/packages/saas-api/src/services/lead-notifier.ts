@@ -1,4 +1,4 @@
-import { Lead } from '@conversation-engine/saas-core';
+import { Lead, MailerService } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { getEmailService } from './email';
 
@@ -166,6 +166,93 @@ export function dispatchLeadNotifications(config: LeadNotificationConfig | null 
     dispatched += 1;
     void sendEmailNotification(config!.notificationEmail, lead).catch((err: unknown) => {
       createContextLogger(logger).error({ err }, 'Email lead notification failed');
+    });
+  }
+  return dispatched;
+}
+
+// ─── MailerService integration ─────────────────────────────
+
+export interface LeadAlertContext {
+  tenantName?: string;
+  conversationSummary?: string;
+}
+
+/**
+ * Resolves alert recipients: an explicit notification email wins (widget config
+ * or tenant.notification_email); otherwise all team member emails are used.
+ */
+export function resolveLeadNotificationRecipients(opts: { notificationEmail?: string; teamEmails?: string[] }): string[] {
+  const explicit = (opts.notificationEmail || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const candidates = explicit.length > 0 ? explicit : (opts.teamEmails || []);
+  return [...new Set(candidates.filter(Boolean))];
+}
+
+export function toLeadAlertData(lead: Lead): Record<string, string | number | undefined> {
+  return {
+    name: lead.name || undefined,
+    email: lead.email || undefined,
+    phone: lead.phone || undefined,
+    company: lead.company || undefined,
+    leadScore: lead.leadScore,
+    qualificationStatus: lead.qualificationStatus,
+    buyingIntent: lead.buyingIntent,
+    source: lead.source,
+    url: sessionUrl(lead),
+  };
+}
+
+/** Sends the instant lead-capture alert via the MailerService (SMTP/Resend/console). */
+export async function sendLeadAlertEmails(
+  mailer: MailerService,
+  recipients: string[],
+  lead: Lead,
+  context: LeadAlertContext = {},
+): Promise<void> {
+  if (recipients.length === 0) return;
+  await mailer.sendLeadAlert(recipients, {
+    tenantName: context.tenantName || 'Your workspace',
+    lead: toLeadAlertData(lead),
+    conversationSummary: context.conversationSummary,
+  });
+}
+
+/** Fire-and-forget dispatch for chat pipeline: email (MailerService) + Slack. */
+export function dispatchLeadAlerts(
+  mailer: MailerService,
+  opts: {
+    config?: LeadNotificationConfig | null;
+    tenantNotificationEmail?: string;
+    teamEmails?: string[];
+    lead: Lead;
+    tenantName?: string;
+    conversationSummary?: string;
+  },
+): number {
+  if (!opts.config || (opts.config.notifyThreshold === 'sales_qualified_only' && opts.lead.qualificationStatus !== 'sales_qualified')) {
+    return 0;
+  }
+  let dispatched = 0;
+  const recipients = resolveLeadNotificationRecipients({
+    notificationEmail: opts.config.notificationEmail || opts.tenantNotificationEmail,
+    teamEmails: opts.teamEmails,
+  });
+  if (recipients.length > 0) {
+    dispatched += recipients.length;
+    void sendLeadAlertEmails(mailer, recipients, opts.lead, {
+      tenantName: opts.tenantName,
+      conversationSummary: opts.conversationSummary,
+    }).catch((err: unknown) => {
+      createContextLogger(logger).error({ err }, 'Lead alert email failed');
+    });
+  }
+  if (opts.config.slackWebhookUrl) {
+    dispatched += 1;
+    void sendSlackNotification(opts.config.slackWebhookUrl, opts.lead).catch((err: unknown) => {
+      createContextLogger(logger).error({ err }, 'Slack lead notification failed');
     });
   }
   return dispatched;

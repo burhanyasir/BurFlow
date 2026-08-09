@@ -11,8 +11,10 @@ import {
 import {
   buildSlackBlocks, buildLeadEmailHtml, sendSlackNotification, sendEmailNotification,
   shouldNotifyLead, dispatchLeadNotifications,
+  resolveLeadNotificationRecipients, sendLeadAlertEmails, dispatchLeadAlerts,
 } from '../services/lead-notifier';
 import { setEmailProvider, EmailService, EmailPayload } from '../services/email';
+import { MailerService, MailTransport, MailMessage } from '@conversation-engine/saas-core';
 import { authMiddleware, publicChatAuth } from '../middleware/auth';
 import { requireTenant } from '../middleware/tenant';
 import { createAuthRoutes } from '../routes/auth';
@@ -214,6 +216,173 @@ describe('lead-notifier — dispatch logic', () => {
     expect(shouldNotifyLead({ slackWebhookUrl: 'https://x' }, lead)).toBe(true);
     expect(shouldNotifyLead({ notificationEmail: 'a@b.com', notifyThreshold: 'sales_qualified_only' }, makeLead({ qualificationStatus: 'unqualified' }))).toBe(false);
     expect(shouldNotifyLead({ notificationEmail: 'a@b.com', notifyThreshold: 'sales_qualified_only' }, makeLead({ qualificationStatus: 'sales_qualified' }))).toBe(true);
+  });
+});
+
+describe('lead-notifier — MailerService integration', () => {
+  class MockMailTransport implements MailTransport {
+    public sent: MailMessage[] = [];
+    async sendEmail(message: MailMessage): Promise<void> { this.sent.push(message); }
+  }
+  let transport: MockMailTransport;
+  let mailer: MailerService;
+
+  beforeEach(() => {
+    transport = new MockMailTransport();
+    mailer = new MailerService({ transport, fromEmail: 'noreply@example.com' });
+  });
+
+  it('resolves explicit notification emails over team members', () => {
+    expect(resolveLeadNotificationRecipients({ notificationEmail: 'ops@acme.com', teamEmails: ['a@x.com', 'b@x.com'] }))
+      .toEqual(['ops@acme.com']);
+    expect(resolveLeadNotificationRecipients({ notificationEmail: 'ops@acme.com, sales@acme.com', teamEmails: ['a@x.com'] }))
+      .toEqual(['ops@acme.com', 'sales@acme.com']);
+  });
+
+  it('falls back to team member emails and dedupes', () => {
+    expect(resolveLeadNotificationRecipients({ teamEmails: ['a@x.com', 'a@x.com', 'b@x.com'] }))
+      .toEqual(['a@x.com', 'b@x.com']);
+    expect(resolveLeadNotificationRecipients({})).toEqual([]);
+  });
+
+  it('sendLeadAlertEmails renders tenant name + summary into the MailerService message', async () => {
+    await sendLeadAlertEmails(mailer, ['ops@acme.com'], makeLead(), {
+      tenantName: 'Acme Widgets',
+      conversationSummary: 'Wants a demo this week.',
+    });
+    expect(transport.sent.length).toBe(1);
+    const msg = transport.sent[0];
+    expect(msg.to).toEqual(['ops@acme.com']);
+    expect(msg.subject).toContain('New Lead');
+    expect(msg.html).toContain('Acme Widgets');
+    expect(msg.html).toContain('jane@acme.com');
+    expect(msg.html).toContain('Wants a demo this week.');
+  });
+
+  it('sendLeadAlertEmails is a no-op without recipients', async () => {
+    await sendLeadAlertEmails(mailer, [], makeLead());
+    expect(transport.sent).toEqual([]);
+  });
+
+  it('dispatchLeadAlerts sends email via MailerService and Slack', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, text: async () => 'ok' });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const dispatched = dispatchLeadAlerts(mailer, {
+      config: { notificationEmail: 'ops@acme.com', slackWebhookUrl: 'https://hooks.slack.com/leads', notifyThreshold: 'all' },
+      lead: makeLead(),
+      tenantName: 'Acme Widgets',
+      conversationSummary: 'Summary here',
+    });
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(dispatched).toBe(2);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(transport.sent.length).toBe(1);
+    expect(transport.sent[0].to).toEqual(['ops@acme.com']);
+    expect(transport.sent[0].html).toContain('Summary here');
+    vi.unstubAllGlobals();
+  });
+
+  it('dispatchLeadAlerts falls back to tenant.notification_email when the widget has no email', async () => {
+    const dispatched = dispatchLeadAlerts(mailer, {
+      config: { notifyThreshold: 'all' },
+      tenantNotificationEmail: 'tenant-ops@acme.com',
+      teamEmails: ['a@x.com'],
+      lead: makeLead(),
+    });
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(dispatched).toBe(1);
+    expect(transport.sent[0].to).toEqual(['tenant-ops@acme.com']);
+  });
+
+  it('dispatchLeadAlerts uses team emails when nothing explicit is configured', async () => {
+    const dispatched = dispatchLeadAlerts(mailer, {
+      config: { notifyThreshold: 'all' },
+      teamEmails: ['a@x.com', 'b@x.com'],
+      lead: makeLead(),
+    });
+    await new Promise(r => setTimeout(r, 20));
+
+    expect(dispatched).toBe(2);
+    expect(transport.sent[0].to).toEqual(['a@x.com', 'b@x.com']);
+  });
+
+  it('dispatchLeadAlerts suppresses alerts below the sales-qualified threshold', async () => {
+    const dispatched = dispatchLeadAlerts(mailer, {
+      config: { notificationEmail: 'ops@acme.com', notifyThreshold: 'sales_qualified_only' },
+      lead: makeLead({ qualificationStatus: 'marketing_qualified' }),
+    });
+    await new Promise(r => setTimeout(r, 20));
+    expect(dispatched).toBe(0);
+    expect(transport.sent).toEqual([]);
+  });
+});
+
+describe('lead-notifier — chat route precedence', () => {
+  it('notifyLeadCaptured takes precedence over getNotificationConfig', async () => {
+    const TEST_DB = join(__dirname, '__test_lead_notifier_precedence__.db');
+    const JWT_SECRET = 'test-secret-key-for-lead-notifier-precedence';
+    const notified: string[] = [];
+
+    let db: Database.Database;
+    let server: any;
+    let port: number;
+
+    try {
+      if (existsSync(TEST_DB)) rmSync(TEST_DB);
+      db = createDatabase(TEST_DB);
+      const userRepo = new UserRepository(db);
+      const tenantRepo = new TenantRepository(db);
+      const apiKeyRepo = new ApiKeyRepository(db);
+      const refreshTokenRepo = new RefreshTokenRepository(db);
+      const conversationRepo = new ConversationRepository(db);
+      const messageRepo = new MessageRepository(db);
+      const usageRepo = new UsageRepository(db);
+      const leadRepo = new LeadRepository(db);
+      const leadService = new LeadService(leadRepo);
+
+      const app = express();
+      app.use(express.json({ limit: '10mb' }));
+      app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET));
+      const chatAuth = publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo);
+      app.use('/api/chat', chatAuth, requireTenant(tenantRepo), createChatRoutes(
+        conversationRepo, messageRepo, usageRepo, undefined,
+        {
+          leadService,
+          notifyLeadCaptured: (lead) => { notified.push(lead.email || 'no-email'); },
+          getNotificationConfig: () => ({ notificationEmail: 'legacy@acme.com' }),
+        },
+      ));
+
+      server = app.listen(0);
+      port = (server.address() as any).port;
+
+      const http = require('http');
+      const requestJson = (path: string, method: string, body?: any, authToken?: string) => new Promise<any>((resolve, reject) => {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+        const r = http.request({ hostname: '127.0.0.1', port, path, method, headers }, (res: any) => {
+          let data = '';
+          res.on('data', (c: string) => data += c);
+          res.on('end', () => resolve({ status: res.statusCode, body: JSON.parse(data) }));
+        });
+        r.on('error', reject);
+        if (body) r.write(JSON.stringify(body));
+        r.end();
+      });
+
+      const signup = await requestJson('/api/auth/signup', 'POST', { email: 'precedence@test.com', password: 'password123', name: 'P Admin', companyName: 'P Corp' });
+      const res = await requestJson('/api/chat', 'POST', { message: 'Reach me at prec@lead.io for a quote', sessionId: 'prec-session-1' }, signup.body.token);
+
+      expect(res.status).toBe(200);
+      expect(notified).toContain('prec@lead.io');
+    } finally {
+      server?.close();
+      try { db!.close(); } catch {}
+      if (existsSync(TEST_DB)) rmSync(TEST_DB);
+    }
   });
 });
 

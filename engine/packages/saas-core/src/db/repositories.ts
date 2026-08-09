@@ -75,14 +75,14 @@ export class UserRepository {
 export class TenantRepository {
   constructor(private db: Database.Database) {}
 
-  create(data: { name: string; ownerId: string }): Tenant {
+  create(data: { name: string; ownerId: string; parentTenantId?: string; customDomain?: string }): Tenant {
     const id = generateId();
     const now = new Date().toISOString();
     const slug = slugify(data.name) + '-' + id.slice(0, 6);
     const trialEnds = new Date(Date.now() + 14 * 86400000).toISOString();
     this.db.prepare(
-      'INSERT INTO tenants (id, name, slug, owner_id, trial_ends_at, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, data.name, slug, data.ownerId, trialEnds, JSON.stringify(DEFAULT_SETTINGS), now, now);
+      'INSERT INTO tenants (id, name, slug, owner_id, trial_ends_at, settings, parent_tenant_id, custom_domain, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.name, slug, data.ownerId, trialEnds, JSON.stringify(DEFAULT_SETTINGS), data.parentTenantId || null, data.customDomain || null, now, now);
     return this.findById(id)!;
   }
 
@@ -111,6 +111,33 @@ export class TenantRepository {
     return rows.map(r => this.mapRow(r));
   }
 
+  findSubTenantsByParentId(parentId: string): Tenant[] {
+    const rows = this.db.prepare('SELECT * FROM tenants WHERE parent_tenant_id = ? ORDER BY created_at ASC').all(parentId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  findByCustomDomain(domain: string): Tenant | null {
+    const row = this.db.prepare('SELECT * FROM tenants WHERE custom_domain = ?').get(domain) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  updateBranding(id: string, data: { customDomain?: string | null; whiteLabelBranding?: Record<string, unknown> }): Tenant | null {
+    const sets: string[] = [];
+    const vals: any[] = [];
+    if (data.customDomain !== undefined) { sets.push('custom_domain = ?'); vals.push(data.customDomain || null); }
+    if (data.whiteLabelBranding !== undefined) {
+      const current = this.findById(id)?.whiteLabelBranding || {};
+      sets.push('white_label_branding = ?');
+      vals.push(JSON.stringify({ ...current, ...data.whiteLabelBranding }));
+    }
+    if (sets.length === 0) return this.findById(id);
+    sets.push('updated_at = ?');
+    vals.push(new Date().toISOString());
+    vals.push(id);
+    this.db.prepare(`UPDATE tenants SET ${sets.join(', ')} WHERE id = ?`).run(...vals);
+    return this.findById(id);
+  }
+
   list(page = 1, limit = 20): { tenants: Tenant[]; total: number } {
     const total = (this.db.prepare('SELECT COUNT(*) as c FROM tenants').get() as any).c;
     const rows = this.db.prepare('SELECT * FROM tenants ORDER BY created_at DESC LIMIT ? OFFSET ?')
@@ -118,13 +145,14 @@ export class TenantRepository {
     return { tenants: rows.map(r => this.mapRow(r)), total };
   }
 
-  update(id: string, data: Partial<Pick<Tenant, 'name' | 'plan' | 'subscriptionStatus' | 'settings'>> & { paddleCustomerId?: string | null }): Tenant | null {
+  update(id: string, data: Partial<Pick<Tenant, 'name' | 'plan' | 'subscriptionStatus' | 'settings' | 'notificationEmail'>> & { paddleCustomerId?: string | null }): Tenant | null {
     const sets: string[] = [];
     const vals: any[] = [];
     if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name); }
     if (data.plan !== undefined) { sets.push('plan = ?'); vals.push(data.plan); }
     if (data.subscriptionStatus !== undefined) { sets.push('subscription_status = ?'); vals.push(data.subscriptionStatus); }
     if (data.settings !== undefined) { sets.push('settings = ?'); vals.push(JSON.stringify(data.settings)); }
+    if (data.notificationEmail !== undefined) { sets.push('notification_email = ?'); vals.push(data.notificationEmail || null); }
     if (data.paddleCustomerId !== undefined) { sets.push('paddle_customer_id = ?'); vals.push(data.paddleCustomerId); }
     if (sets.length === 0) return this.findById(id);
     sets.push('updated_at = ?');
@@ -146,6 +174,10 @@ export class TenantRepository {
       stripeCustomerId: row.stripe_customer_id, stripeSubscriptionId: row.stripe_subscription_id,
       paddleCustomerId: row.paddle_customer_id,
       trialEndsAt: row.trial_ends_at, settings: JSON.parse(row.settings || '{}'),
+      parentTenantId: row.parent_tenant_id || undefined,
+      customDomain: row.custom_domain || undefined,
+      whiteLabelBranding: row.white_label_branding ? JSON.parse(row.white_label_branding) : undefined,
+      notificationEmail: row.notification_email || undefined,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }

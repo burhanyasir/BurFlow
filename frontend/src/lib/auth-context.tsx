@@ -9,6 +9,7 @@ interface AuthContextValue extends AuthState {
   logout: () => void;
   refreshUser: () => Promise<void>;
   updateProfile: (name?: string, avatarUrl?: string) => Promise<void>;
+  switchWorkspace: (subTenantId: string) => Promise<AuthTenant | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -115,8 +116,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }));
   }, []);
 
+  const switchWorkspace = useCallback(async (subTenantId: string) => {
+    const data = await authClient.switchWorkspace(subTenantId);
+    const user = state.user ? { ...state.user, role: decodeTokenRole(data.token) } : null;
+    const tenant: AuthTenant | null = data.tenant
+      ? { id: data.tenant.id, name: data.tenant.name, slug: data.tenant.slug, plan: data.tenant.plan, subscriptionStatus: data.tenant.subscriptionStatus }
+      : null;
+    storage.setAuthSession(data.token, user, tenant);
+    setUser(user, tenant);
+    return tenant;
+  }, [state.user, setUser]);
+
   return (
-    <AuthContext.Provider value={{ ...state, login, signup, logout, refreshUser, updateProfile }}>
+    <AuthContext.Provider value={{ ...state, login, signup, logout, refreshUser, updateProfile, switchWorkspace }}>
       {children}
     </AuthContext.Provider>
   );

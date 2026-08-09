@@ -27,6 +27,7 @@ import {
   SessionHandoffService,
   WebsiteScanRepository, ScannedPageRepository, KbChunkRepository,
   WebsiteScannerService, BrandExtractor,
+  MailerService, Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth } from './middleware/auth';
@@ -65,6 +66,8 @@ import { createAnalyticsRoutes } from './routes/analytics';
 import { createHealthRoutes } from './routes/health';
 import { createAgentChatRoutes } from './routes/agent-chat';
 import { createWebsiteScannerRoutes } from './routes/website-scanner';
+import { createAgencyRoutes } from './routes/agency';
+import { dispatchLeadAlerts, LeadNotificationConfig } from './services/lead-notifier';
 
 const logger = createLogger('saas-api');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -360,7 +363,42 @@ const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, db);
 const leadService = new LeadService(leadRepo);
 // Live Human Agent Takeover / Session Handoff
 const sessionHandoff = new SessionHandoffService(conversationRepo);
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, { leadService, webhookRepo, webhookDeliveryRepo, getNotificationConfig: (tenantId) => widgetConfigRepo.get(tenantId), analyticsRepo, getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions }, sessionHandoff));
+
+// Transactional mailer (Nodemailer SMTP → Resend → console) + instant lead alerts
+const mailer = MailerService.fromEnv();
+const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
+  try {
+    const widgetConfig = widgetConfigRepo.get(lead.tenantId);
+    const config: LeadNotificationConfig = {
+      notificationEmail: widgetConfig?.notificationEmail,
+      slackWebhookUrl: widgetConfig?.slackWebhookUrl,
+      notifyThreshold: widgetConfig?.notifyThreshold,
+    };
+    const tenant = tenantRepo.findById(lead.tenantId);
+    dispatchLeadAlerts(mailer, {
+      config,
+      tenantNotificationEmail: tenant?.notificationEmail,
+      teamEmails: teamMemberRepo.findByTenant(lead.tenantId).map(m => m.email),
+      lead,
+      tenantName: tenant?.name,
+      conversationSummary: context.message.slice(0, 500),
+    });
+  } catch (err: any) {
+    createContextLogger(logger).error({ err }, 'Lead alert dispatch failed');
+  }
+};
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
+  leadService,
+  webhookRepo,
+  webhookDeliveryRepo,
+  notifyLeadCaptured,
+  getNotificationConfig: (tenantId) => {
+    const wc = widgetConfigRepo.get(tenantId);
+    return wc ? { notificationEmail: wc.notificationEmail, slackWebhookUrl: wc.slackWebhookUrl, notifyThreshold: wc.notifyThreshold } : null;
+  },
+  analyticsRepo,
+  getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
+}, sessionHandoff));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));
 app.use('/api/billing', createBillingWebhookRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
@@ -377,6 +415,12 @@ app.use('/api/knowledge', auth, tenantGuard, createWebsiteScannerRoutes({
   scanner: websiteScanner,
   scanRepo,
   pageRepo: scannedPageRepo,
+}));
+
+// Agency (sub-tenant) management routes
+app.use('/api/agency', auth, tenantGuard, createAgencyRoutes({
+  tenantRepo,
+  jwtSecret: JWT_SECRET,
 }));
 
 // Knowledge pipeline routes (protected)

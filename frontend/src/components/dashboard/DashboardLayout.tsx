@@ -2,6 +2,7 @@ import { type ReactNode, type HTMLAttributes, useMemo } from 'react';
 import { cn } from '../../utils/cn';
 import { DashboardSidebar, type NavItem } from './DashboardSidebar';
 import { DashboardTopbar } from './DashboardTopbar';
+import { WorkspaceSwitcher } from './WorkspaceSwitcher';
 import { useAuth } from '../../lib/auth-context';
 import { isAdmin, isAdminPath } from '../../lib/rbac';
 
@@ -60,6 +61,7 @@ export function DashboardLayout({
           breadcrumb={breadcrumb}
           notificationCount={notificationCount}
           onNotificationsClick={onNotificationsClick}
+          workspaceSwitcher={<WorkspaceSwitcher />}
         />
         <div className="flex flex-1 min-h-0">
           <div className={cn('flex flex-1 flex-col', className)}>

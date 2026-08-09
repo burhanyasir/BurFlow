@@ -55,6 +55,24 @@ export {
 } from './services/lead-extraction';
 export type { ContactDetails, BuildLeadDataInput, BuiltLeadData } from './services/lead-extraction';
 export type { JwtPayload } from './auth';
+export {
+  MailerService,
+  createNodemailerSmtpTransport,
+  createResendTransport,
+  createConsoleMailTransport,
+  renderLeadAlertEmail,
+  renderWelcomeEmail,
+  renderPasswordResetEmail,
+} from './services/mailer';
+export type {
+  MailMessage,
+  MailTransport,
+  SmtpConfig,
+  ResendConfig,
+  LeadAlertData,
+  MailerOptions,
+  NodemailerLike,
+} from './services/mailer';
 export type {
   User, Tenant, TenantApiKey, Conversation, Message,
   UsageRecord, TenantSettings, KnowledgeBase, KbDocument, KbChunk,
@@ -77,6 +95,7 @@ export type {
   SessionState, SessionNote,
   ScanStatus, ScanSchedule, ScanCrawlMode, ScannedPageStatus,
   WebsiteScan, ScannedPage,
+  WhiteLabelBranding,
 } from './types';
 export type { BrandIntelligence } from './types';
 export type { HandoffRequest } from './db/repositories';

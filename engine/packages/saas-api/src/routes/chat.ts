@@ -4,6 +4,7 @@ import {
   LeadService, LeadRepository, WebhookRepository, WebhookDeliveryRepository,
   AnalyticsRepository, SessionHandoffService, TAKEOVER_ACKNOWLEDGEMENT,
   extractContactDetails, mapScoreToBuyingIntent, hasContactInfo,
+  Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
 import { requireJsonObject, MESSAGE_MAX } from '../middleware/validate';
@@ -63,6 +64,8 @@ export interface LeadCaptureOptions {
   webhookRepo?: WebhookRepository;
   webhookDeliveryRepo?: WebhookDeliveryRepository;
   getNotificationConfig?: (tenantId: string) => LeadNotificationConfig | null | undefined;
+  /** Preferred lead-alert hook (Slack + MailerService email with recipient resolution). Falls back to getNotificationConfig + dispatchLeadNotifications when absent. */
+  notifyLeadCaptured?: (lead: Lead, context: { message: string }) => void;
   analyticsRepo?: AnalyticsRepository;
   getStarterOptions?: (tenantId: string) => string[] | undefined;
 }
@@ -137,7 +140,9 @@ export function createChatRoutes(
       }
 
       if (result.isNew || (result.qualificationChanged && result.lead.qualificationStatus === 'sales_qualified')) {
-        if (leadOptions.getNotificationConfig) {
+        if (leadOptions.notifyLeadCaptured) {
+          leadOptions.notifyLeadCaptured(result.lead, { message: input.message });
+        } else if (leadOptions.getNotificationConfig) {
           const notificationConfig = leadOptions.getNotificationConfig(input.tenantId);
           dispatchLeadNotifications(notificationConfig, result.lead);
         }

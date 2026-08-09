@@ -50,6 +50,17 @@ class AuthClient {
     return this.request<{ user: { id: string; email: string; name: string; avatarUrl?: string } }>('PUT', '/auth/me', { name, avatarUrl });
   }
 
+  switchWorkspace(subTenantId: string) {
+    return this.request<{ token: string; tenant: { id: string; name: string; slug: string; plan: string; subscriptionStatus?: string } }>('POST', '/agency/switch-workspace', { subTenantId });
+  }
+
+  listAgencyWorkspaces() {
+    return this.request<{
+      workspaces: Array<{ id: string; name: string; slug: string; plan: string; subscriptionStatus?: string; customDomain?: string | null }>;
+      parent: { id: string; name: string; slug: string; plan: string; subscriptionStatus?: string; customDomain?: string | null } | null;
+    }>('GET', '/agency/workspaces');
+  }
+
   changePassword(currentPassword: string, newPassword: string) {
     return this.request<{ message: string }>('PUT', '/auth/password', { currentPassword, newPassword });
   }

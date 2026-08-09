@@ -100,6 +100,10 @@ function migrate(db: Database.Database): void {
       stripe_subscription_id TEXT,
       trial_ends_at TEXT,
       settings TEXT DEFAULT '{}',
+      parent_tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
+      custom_domain TEXT,
+      white_label_branding TEXT DEFAULT '{}',
+      notification_email TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
@@ -806,4 +810,12 @@ function migrate(db: Database.Database): void {
   } catch (err: any) {
     console.warn(`[db] website scanner schema skipped: ${err?.message || err}`);
   }
+
+  // Agency workspace columns (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE tenants ADD COLUMN parent_tenant_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE tenants ADD COLUMN custom_domain TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE tenants ADD COLUMN white_label_branding TEXT DEFAULT '{}';`); } catch {}
+  try { db.exec(`ALTER TABLE tenants ADD COLUMN notification_email TEXT;`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_tenants_parent_tenant ON tenants(parent_tenant_id);`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain);`); } catch {}
 }

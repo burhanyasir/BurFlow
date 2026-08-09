@@ -23,6 +23,15 @@ export interface User {
   updatedAt: string;
 }
 
+export interface WhiteLabelBranding {
+  companyName?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  faviconUrl?: string;
+  hideBranding?: boolean;
+  customCss?: string;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -35,6 +44,10 @@ export interface Tenant {
   paddleCustomerId?: string;
   trialEndsAt?: string;
   settings: string;
+  parentTenantId?: string;
+  customDomain?: string;
+  whiteLabelBranding?: WhiteLabelBranding;
+  notificationEmail?: string;
   createdAt: string;
   updatedAt: string;
 }
