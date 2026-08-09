@@ -25,6 +25,8 @@ import {
   LeadService,
   AnalyticsService,
   SessionHandoffService,
+  WebsiteScanRepository, ScannedPageRepository, KbChunkRepository,
+  WebsiteScannerService, BrandExtractor,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth } from './middleware/auth';
@@ -62,6 +64,7 @@ import { setRawBodyBuffer } from './routes/billing-webhooks';
 import { createAnalyticsRoutes } from './routes/analytics';
 import { createHealthRoutes } from './routes/health';
 import { createAgentChatRoutes } from './routes/agent-chat';
+import { createWebsiteScannerRoutes } from './routes/website-scanner';
 
 const logger = createLogger('saas-api');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -186,6 +189,17 @@ const subprocessorRepo = new SubprocessorRepository(db);
 const topicResponseRepo = new TopicResponseTemplateRepository(db);
 const handoffRepo = new HandoffRequestRepository(db);
 const leadRepo = new LeadRepository(db);
+const scanRepo = new WebsiteScanRepository(db);
+const scannedPageRepo = new ScannedPageRepository(db);
+const kbChunkRepo = new KbChunkRepository(db);
+const websiteScanner = new WebsiteScannerService({
+  scanRepo,
+  pageRepo: scannedPageRepo,
+  kbRepo,
+  docRepo,
+  chunkRepo: kbChunkRepo,
+  brandExtractor: new BrandExtractor(),
+});
 
 const app = express();
 
@@ -357,6 +371,13 @@ app.use('/api/admin', auth, tenantGuard, createActivationRoutes(
   unansweredRepo, clusterRepo, suggestionRepo, citationRepo, insightsRepo,
   tenantRepo, usageRepo, subRepo, conversationRepo,
 ));
+
+// Website Scanner routes
+app.use('/api/knowledge', auth, tenantGuard, createWebsiteScannerRoutes({
+  scanner: websiteScanner,
+  scanRepo,
+  pageRepo: scannedPageRepo,
+}));
 
 // Knowledge pipeline routes (protected)
 const knowledgeDeps = {

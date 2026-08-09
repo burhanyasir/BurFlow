@@ -174,6 +174,58 @@ export interface KbChunk {
   createdAt: string;
 }
 
+export type ScanStatus = 'queued' | 'crawling' | 'completed' | 'failed' | 'cancelled';
+export type ScanSchedule = 'manual' | 'daily' | 'weekly';
+export type ScanCrawlMode = 'discover' | 'update';
+export type ScannedPageStatus = 'unchanged' | 'added' | 'updated' | 'deleted';
+
+export interface WebsiteScan {
+  id: string;
+  tenantId: string;
+  rootUrl: string;
+  status: ScanStatus;
+  crawlMode: ScanCrawlMode;
+  schedule: ScanSchedule;
+  maxDepth: number;
+  pageLimit: number;
+  pagesDiscovered: number;
+  pagesScanned: number;
+  pagesIndexed: number;
+  pagesUnchanged: number;
+  pagesAdded: number;
+  pagesUpdated: number;
+  pagesDeleted: number;
+  brandTone?: string;
+  primaryCtas: string[];
+  confidenceScore?: number;
+  nextScanAt?: string;
+  lastError?: string;
+  startedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ScannedPage {
+  id: string;
+  scanId: string;
+  tenantId: string;
+  url: string;
+  title?: string;
+  contentHash?: string;
+  content?: string;
+  status: ScannedPageStatus;
+  crawledAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BrandIntelligence {
+  brandTone: string;
+  primaryCtas: string[];
+  confidenceScore: number;
+}
+
 export interface WidgetConfig {
   id: string;
   tenantId: string;

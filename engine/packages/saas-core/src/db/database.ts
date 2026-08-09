@@ -752,4 +752,58 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE conversations ADD COLUMN assigned_agent_id TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE conversations ADD COLUMN takeover_at TEXT;`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_conversations_tenant_session_state ON conversations(tenant_id, session_state);`); } catch {}
+
+  // Website scanner tables (additive, safe to re-run)
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS website_scans (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        root_url TEXT NOT NULL,
+        status TEXT DEFAULT 'queued' CHECK (status IN ('queued','crawling','completed','failed','cancelled')),
+        crawl_mode TEXT DEFAULT 'discover' CHECK (crawl_mode IN ('discover','update')),
+        schedule TEXT DEFAULT 'manual' CHECK (schedule IN ('manual','daily','weekly')),
+        max_depth INTEGER DEFAULT 3,
+        page_limit INTEGER DEFAULT 50,
+        pages_discovered INTEGER DEFAULT 0,
+        pages_scanned INTEGER DEFAULT 0,
+        pages_indexed INTEGER DEFAULT 0,
+        pages_unchanged INTEGER DEFAULT 0,
+        pages_added INTEGER DEFAULT 0,
+        pages_updated INTEGER DEFAULT 0,
+        pages_deleted INTEGER DEFAULT 0,
+        brand_tone TEXT,
+        primary_ctas TEXT DEFAULT '[]',
+        confidence_score REAL,
+        next_scan_at TEXT,
+        last_error TEXT,
+        started_at TEXT,
+        completed_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS scanned_pages (
+        id TEXT PRIMARY KEY,
+        scan_id TEXT NOT NULL REFERENCES website_scans(id) ON DELETE CASCADE,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        url TEXT NOT NULL,
+        title TEXT,
+        content_hash TEXT,
+        content TEXT,
+        status TEXT DEFAULT 'unchanged' CHECK (status IN ('unchanged','added','updated','deleted')),
+        crawled_at TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_website_scans_tenant ON website_scans(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_website_scans_next_scan ON website_scans(next_scan_at);
+      CREATE INDEX IF NOT EXISTS idx_scanned_pages_scan ON scanned_pages(scan_id);
+      CREATE INDEX IF NOT EXISTS idx_scanned_pages_tenant ON scanned_pages(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_scanned_pages_url ON scanned_pages(tenant_id, url);
+    `);
+  } catch (err: any) {
+    console.warn(`[db] website scanner schema skipped: ${err?.message || err}`);
+  }
 }

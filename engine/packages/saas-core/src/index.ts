@@ -18,6 +18,7 @@ export {
   TopicResponseTemplateRepository,
   HandoffRequestRepository,
   LeadRepository,
+  WebsiteScanRepository, ScannedPageRepository, KbChunkRepository,
 } from './db/repositories';
 export {
   hashPassword, comparePassword, generateToken, verifyToken,
@@ -31,6 +32,15 @@ export { WhatsAppClient, WhatsAppNotConfiguredError } from './services/whatsapp-
 export type { WhatsAppClientConfig, WhatsAppSendResult } from './services/whatsapp-client';
 export { SessionHandoffService, TAKEOVER_ACKNOWLEDGEMENT } from './services/session-handoff';
 export { AnalyticsService } from './services/analytics';
+export {
+  WebsiteScannerService, computeNextScanAt, hashContent, cleanHtml,
+  chunkText, extractLinks, isSameOrigin, validateRootUrl, extractTitle,
+} from './services/website-scanner';
+export type {
+  CrawlPage, ScannerOptions, ScanStartOptions, ScannerDeps,
+} from './services/website-scanner';
+export { BrandExtractor } from './services/brand-extractor';
+export type { BrandExtractorOptions } from './services/brand-extractor';
 export type {
   AnalyticsTimeframe, SummaryMetrics, TopicBreakdown, TopicCount,
   StarterOptionStats, StarterOptionStat, VisitorIntentCategory,
@@ -65,7 +75,10 @@ export type {
   TopicResponseTemplate,
   Lead, LeadSource, QualificationStatus, BuyingIntentLevel,
   SessionState, SessionNote,
+  ScanStatus, ScanSchedule, ScanCrawlMode, ScannedPageStatus,
+  WebsiteScan, ScannedPage,
 } from './types';
+export type { BrandIntelligence } from './types';
 export type { HandoffRequest } from './db/repositories';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';
 export type { PaddlePlanConfig, PlanLimits } from './paddle';

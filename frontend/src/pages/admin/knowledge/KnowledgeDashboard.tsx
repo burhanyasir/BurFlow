@@ -6,7 +6,11 @@ import { useAuth } from '../../../lib/auth-context';
 import { fetchWithAuth } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Book, FileText, Globe, RefreshCw, Trash2, Upload, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Book, FileText, Globe, RefreshCw, Trash2, Upload, CheckCircle, XCircle, Clock, ScanSearch } from 'lucide-react';
+import { WebsiteScannerModal } from '../../../components/dashboard/knowledge/WebsiteScannerModal';
+import { ScanProgressCard } from '../../../components/dashboard/knowledge/ScanProgressCard';
+import { BrandIntelligenceCard } from '../../../components/dashboard/knowledge/BrandIntelligenceCard';
+import type { WebsiteScan } from '../../../components/dashboard/knowledge/types';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -51,6 +55,8 @@ export default function KnowledgeDashboard() {
   const [searchQuery, setSearchQuery] = useState(''); const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(new Set());
   const [processingExpanded, setProcessingExpanded] = useState(true);
+  const [scanModalOpen, setScanModalOpen] = useState(false);
+  const [latestScan, setLatestScan] = useState<WebsiteScan | null>(null);
   const pageSize = 20; const workspaceName = tenant?.name || 'Conversation Engine';
 
   const loadDocs = useCallback(async () => {
@@ -69,7 +75,57 @@ export default function KnowledgeDashboard() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadDocs(); }, [loadDocs]); useEffect(() => { loadMonitoring(); }, [loadMonitoring]);
+  const loadScanStatus = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth('/api/knowledge/scan/status');
+      if (!res.ok) return;
+      const data = await res.json();
+      setLatestScan(data.scan || null);
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]); useEffect(() => { loadMonitoring(); }, [loadMonitoring]); useEffect(() => { loadScanStatus(); }, [loadScanStatus]);
+
+  const scanActive = latestScan?.status === 'queued' || latestScan?.status === 'crawling';
+
+  useEffect(() => {
+    if (!scanActive) return;
+    const timer = setInterval(() => { loadScanStatus(); }, 5000);
+    return () => clearInterval(timer);
+  }, [scanActive, loadScanStatus]);
+
+  const handleScanStarted = (scan: WebsiteScan) => {
+    setLatestScan(scan);
+    loadDocs();
+    loadMonitoring();
+  };
+
+  const handleScheduleChange = async (schedule: WebsiteScan['schedule']) => {
+    if (!latestScan) return;
+    try {
+      const res = await fetchWithAuth('/api/knowledge/scan/schedule', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: latestScan.rootUrl, schedule }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        addToast(data.error || 'Failed to update schedule', 'error');
+        return;
+      }
+      setLatestScan(data.scan);
+      addToast(schedule === 'manual' ? 'Auto-scan disabled' : `Auto-scan set to ${schedule}`, 'success');
+    } catch {
+      addToast('Failed to update schedule', 'error');
+    }
+  };
+
+  useEffect(() => {
+    if (latestScan?.status === 'completed') {
+      loadDocs();
+      loadMonitoring();
+    }
+  }, [latestScan?.status, loadDocs, loadMonitoring]);
 
   const handleDelete = async (documentId: string) => {
     try { await fetchWithAuth(`/api/admin/knowledge/documents/${documentId}`, { method: 'DELETE' }); addToast('Document deleted', 'success'); loadDocs(); loadMonitoring(); }
@@ -152,9 +208,18 @@ export default function KnowledgeDashboard() {
               <p className="text-sm text-muted-foreground">Manage documents, sources, and processing</p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/dashboard/onboarding?tab=website')} className="rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04]">Crawl Website</button>
+              <button onClick={() => setScanModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04]">
+                <ScanSearch className="h-3.5 w-3.5" />
+                Scan Website
+              </button>
               <button onClick={() => navigate('/dashboard/onboarding')} className="btn-wine rounded-xl px-3 py-1.5 text-xs">Upload Document</button>
             </div>
+          </div>
+
+          {/* Website Scanner */}
+          <div className="grid gap-4 lg:grid-cols-3">
+            <ScanProgressCard scan={latestScan} onRefresh={loadScanStatus} onScheduleChange={handleScheduleChange} className="lg:col-span-2" />
+            <BrandIntelligenceCard scan={latestScan} />
           </div>
 
           {/* Metric Cards */}
@@ -241,6 +306,7 @@ export default function KnowledgeDashboard() {
           )}
         </div>
       </DashboardContent>
+      <WebsiteScannerModal open={scanModalOpen} onClose={() => setScanModalOpen(false)} onStarted={handleScanStarted} />
     </DashboardLayout>
   );
 }

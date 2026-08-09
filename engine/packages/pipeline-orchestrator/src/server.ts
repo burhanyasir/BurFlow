@@ -29,7 +29,8 @@ import { KnowledgeAdminStore } from './knowledge-admin-store';
 import { createKnowledgeAdminRouter } from './knowledge-admin-api';
 import { KnowledgeWorker } from './knowledge-worker';
 import { KnowledgeRetriever } from '@conversation-engine/knowledge-pipeline';
-import { createDatabase, UserRepository, TenantRepository, generateToken, generateVerificationToken, comparePassword } from '@conversation-engine/saas-core';
+import { createDatabase, UserRepository, TenantRepository, generateToken, generateVerificationToken, comparePassword, WebsiteScanRepository, ScannedPageRepository, KnowledgeBaseRepository, KbDocumentRepository, KbChunkRepository } from '@conversation-engine/saas-core';
+import { createWebsiteScanScheduler } from './scheduler';
 
 const logger = createLogger('pipeline-orchestrator');
 const PORT = parseInt(process.env.PORT || '3456', 10);
@@ -723,6 +724,16 @@ const authDbPath = join(DATA_DIR, 'saas.db');
 const authDb = createDatabase(authDbPath);
 const userRepo = new UserRepository(authDb);
 const tenantRepo = new TenantRepository(authDb);
+
+// ─── Website Scanner Scheduler (recurring daily/weekly scans) ────────
+const websiteScanScheduler = createWebsiteScanScheduler({
+  scanRepo: new WebsiteScanRepository(authDb),
+  pageRepo: new ScannedPageRepository(authDb),
+  kbRepo: new KnowledgeBaseRepository(authDb),
+  docRepo: new KbDocumentRepository(authDb),
+  chunkRepo: new KbChunkRepository(authDb),
+});
+websiteScanScheduler.start();
 
 app.post('/api/auth/signup', (req, res) => {
   try {

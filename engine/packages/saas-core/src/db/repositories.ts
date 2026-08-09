@@ -1,5 +1,5 @@
 import Database from 'better-sqlite3';
-import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState, SessionNote } from '../types';
+import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState, SessionNote, WebsiteScan, ScannedPage, ScanStatus, ScanCrawlMode, ScanSchedule, ScannedPageStatus } from '../types';
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
@@ -491,6 +491,19 @@ export class KnowledgeBaseRepository {
     return result.changes > 0;
   }
 
+  updateStatus(id: string, status: KnowledgeBase['status'], documentCount?: number): void {
+    const now = new Date().toISOString();
+    if (documentCount !== undefined) {
+      this.db.prepare(
+        'UPDATE knowledge_bases SET status = ?, document_count = ?, updated_at = ? WHERE id = ?'
+      ).run(status, documentCount, now, id);
+    } else {
+      this.db.prepare(
+        'UPDATE knowledge_bases SET status = ?, updated_at = ? WHERE id = ?'
+      ).run(status, now, id);
+    }
+  }
+
   private mapRow(row: any): KnowledgeBase {
     return {
       id: row.id, tenantId: row.tenant_id, name: row.name, description: row.description,
@@ -521,6 +534,18 @@ export class KbDocumentRepository {
     const rows = this.db.prepare('SELECT * FROM kb_documents WHERE knowledge_base_id = ? ORDER BY created_at DESC')
       .all(kbId) as any[];
     return rows.map(r => this.mapRow(r));
+  }
+
+  findBySourceUrl(tenantId: string, url: string): KbDocument | null {
+    const row = this.db.prepare(
+      'SELECT * FROM kb_documents WHERE tenant_id = ? AND source_url = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(tenantId, url) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  updateChunkCount(id: string, chunkCount: number): void {
+    this.db.prepare('UPDATE kb_documents SET chunk_count = ?, status = ?, error = NULL, updated_at = ? WHERE id = ?')
+      .run(chunkCount, 'completed', new Date().toISOString(), id);
   }
 
   updateStatus(id: string, status: KbDocument['status'], error?: string): void {
@@ -2284,5 +2309,241 @@ export class LeadRepository {
       notes: row.notes || undefined,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
+  }
+}
+
+export class WebsiteScanRepository {
+  constructor(private db: Database.Database) {}
+
+  create(data: {
+    tenantId: string; rootUrl: string; crawlMode: ScanCrawlMode; schedule: ScanSchedule;
+    maxDepth?: number; pageLimit?: number; nextScanAt?: string;
+  }): WebsiteScan {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(
+      `INSERT INTO website_scans
+        (id, tenant_id, root_url, crawl_mode, schedule, max_depth, page_limit, primary_ctas, next_scan_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, '[]', ?, ?, ?)`
+    ).run(id, data.tenantId, data.rootUrl, data.crawlMode, data.schedule,
+      data.maxDepth ?? 3, data.pageLimit ?? 50, data.nextScanAt || null, now, now);
+    return this.findById(id)!;
+  }
+
+  findById(id: string): WebsiteScan | null {
+    const row = this.db.prepare('SELECT * FROM website_scans WHERE id = ?').get(id) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  listByTenant(tenantId: string, limit = 50): WebsiteScan[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM website_scans WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?'
+    ).all(tenantId, limit) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  findLatestByTenant(tenantId: string): WebsiteScan | null {
+    const row = this.db.prepare(
+      'SELECT * FROM website_scans WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(tenantId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findLatestByTenantAndUrl(tenantId: string, rootUrl: string): WebsiteScan | null {
+    const row = this.db.prepare(
+      'SELECT * FROM website_scans WHERE tenant_id = ? AND root_url = ? ORDER BY created_at DESC LIMIT 1'
+    ).get(tenantId, rootUrl) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  listDueScans(nowIso: string): WebsiteScan[] {
+    const rows = this.db.prepare(
+      `SELECT * FROM website_scans
+       WHERE next_scan_at IS NOT NULL AND next_scan_at <= ? AND status IN ('queued','completed','failed')
+       ORDER BY next_scan_at ASC`
+    ).all(nowIso) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  listByStatus(statuses: ScanStatus[]): WebsiteScan[] {
+    const placeholders = statuses.map(() => '?').join(',');
+    const rows = this.db.prepare(
+      `SELECT * FROM website_scans WHERE status IN (${placeholders}) ORDER BY created_at DESC`
+    ).all(...statuses) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  cancelRunning(tenantId: string): number {
+    const now = new Date().toISOString();
+    const result = this.db.prepare(
+      `UPDATE website_scans SET status = 'cancelled', updated_at = ? WHERE tenant_id = ? AND status IN ('queued','crawling')`
+    ).run(now, tenantId);
+    return result.changes;
+  }
+
+  markRunning(id: string): void {
+    const now = new Date().toISOString();
+    this.db.prepare(
+      "UPDATE website_scans SET status = 'crawling', started_at = ?, last_error = NULL, updated_at = ? WHERE id = ?"
+    ).run(now, now, id);
+  }
+
+  setCounts(id: string, counts: Partial<{
+    pagesDiscovered: number; pagesScanned: number; pagesIndexed: number;
+    pagesUnchanged: number; pagesAdded: number; pagesUpdated: number; pagesDeleted: number;
+  }>): void {
+    const columns: string[] = [];
+    const values: (string | number)[] = [];
+    const colMap: Record<string, string> = {
+      pagesDiscovered: 'pages_discovered', pagesScanned: 'pages_scanned', pagesIndexed: 'pages_indexed',
+      pagesUnchanged: 'pages_unchanged', pagesAdded: 'pages_added',
+      pagesUpdated: 'pages_updated', pagesDeleted: 'pages_deleted',
+    };
+    for (const [key, value] of Object.entries(counts)) {
+      if (typeof value === 'number' && colMap[key]) {
+        columns.push(`${colMap[key]} = ?`);
+        values.push(value);
+      }
+    }
+    if (columns.length === 0) return;
+    values.push(new Date().toISOString(), id);
+    this.db.prepare(`UPDATE website_scans SET ${columns.join(', ')}, updated_at = ? WHERE id = ?`).run(...values);
+  }
+
+  markCompleted(id: string, data: {
+    counts: Partial<{
+      pagesDiscovered: number; pagesScanned: number; pagesIndexed: number;
+      pagesUnchanged: number; pagesAdded: number; pagesUpdated: number; pagesDeleted: number;
+    }>;
+    brandTone?: string; primaryCtas?: string[]; confidenceScore?: number; nextScanAt?: string;
+  }): void {
+    this.setCounts(id, data.counts);
+    const now = new Date().toISOString();
+    this.db.prepare(
+      `UPDATE website_scans SET status = 'completed', completed_at = ?, brand_tone = ?, primary_ctas = ?, confidence_score = ?, next_scan_at = ?, updated_at = ? WHERE id = ?`
+    ).run(now, data.brandTone || null,
+      data.primaryCtas ? JSON.stringify(data.primaryCtas) : '[]',
+      data.confidenceScore ?? null, data.nextScanAt || null, now, id);
+  }
+
+  markFailed(id: string, error: string): void {
+    const now = new Date().toISOString();
+    this.db.prepare(
+      `UPDATE website_scans SET status = 'failed', last_error = ?, completed_at = ?, updated_at = ? WHERE id = ?`
+    ).run(error, now, now, id);
+  }
+
+  updateSchedule(id: string, schedule: ScanSchedule, nextScanAt?: string): void {
+    const now = new Date().toISOString();
+    this.db.prepare(
+      'UPDATE website_scans SET schedule = ?, next_scan_at = ?, updated_at = ? WHERE id = ?'
+    ).run(schedule, nextScanAt || null, now, id);
+  }
+
+  private mapRow(row: any): WebsiteScan {
+    return {
+      id: row.id, tenantId: row.tenant_id, rootUrl: row.root_url,
+      status: row.status, crawlMode: row.crawl_mode, schedule: row.schedule,
+      maxDepth: row.max_depth, pageLimit: row.page_limit,
+      pagesDiscovered: row.pages_discovered, pagesScanned: row.pages_scanned,
+      pagesIndexed: row.pages_indexed, pagesUnchanged: row.pages_unchanged,
+      pagesAdded: row.pages_added, pagesUpdated: row.pages_updated,
+      pagesDeleted: row.pages_deleted,
+      brandTone: row.brand_tone || undefined,
+      primaryCtas: row.primary_ctas ? JSON.parse(row.primary_ctas) : [],
+      confidenceScore: row.confidence_score ?? undefined,
+      nextScanAt: row.next_scan_at || undefined,
+      lastError: row.last_error || undefined,
+      startedAt: row.started_at || undefined,
+      completedAt: row.completed_at || undefined,
+      createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+}
+
+export class ScannedPageRepository {
+  constructor(private db: Database.Database) {}
+
+  create(data: {
+    scanId: string; tenantId: string; url: string;
+    title?: string; content?: string; contentHash?: string; status: ScannedPageStatus;
+  }): ScannedPage {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(
+      `INSERT INTO scanned_pages (id, scan_id, tenant_id, url, title, content, content_hash, status, crawled_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, data.scanId, data.tenantId, data.url, data.title || null,
+      data.content || null, data.contentHash || null, data.status, now, now, now);
+    return this.findById(id)!;
+  }
+
+  findById(id: string): ScannedPage | null {
+    const row = this.db.prepare('SELECT * FROM scanned_pages WHERE id = ?').get(id) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  listByScan(scanId: string): ScannedPage[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM scanned_pages WHERE scan_id = ? ORDER BY crawled_at ASC'
+    ).all(scanId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  listLatestByTenant(tenantId: string): ScannedPage[] {
+    const rows = this.db.prepare(
+      `SELECT sp.* FROM scanned_pages sp
+       JOIN (
+         SELECT url, MAX(created_at) AS max_created FROM scanned_pages
+         WHERE tenant_id = ? GROUP BY url
+       ) m ON sp.url = m.url AND sp.created_at = m.max_created
+       WHERE sp.tenant_id = ?`
+    ).all(tenantId, tenantId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  updateStatus(id: string, status: ScannedPageStatus): void {
+    this.db.prepare(
+      'UPDATE scanned_pages SET status = ?, updated_at = ? WHERE id = ?'
+    ).run(status, new Date().toISOString(), id);
+  }
+
+  private mapRow(row: any): ScannedPage {
+    return {
+      id: row.id, scanId: row.scan_id, tenantId: row.tenant_id, url: row.url,
+      title: row.title || undefined, contentHash: row.content_hash || undefined,
+      content: row.content || undefined, status: row.status,
+      crawledAt: row.crawled_at, createdAt: row.created_at, updatedAt: row.updated_at,
+    };
+  }
+}
+
+export class KbChunkRepository {
+  constructor(private db: Database.Database) {}
+
+  insertMany(knowledgeBaseId: string, tenantId: string, documentId: string, chunks: { content: string; metadata?: Record<string, unknown> }[]): number {
+    const now = new Date().toISOString();
+    const insert = this.db.prepare(
+      `INSERT INTO kb_chunks (id, document_id, knowledge_base_id, tenant_id, content, metadata, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+    const insertMany = this.db.transaction((rows: { content: string; metadata?: Record<string, unknown> }[]) => {
+      for (const chunk of rows) {
+        insert.run(generateId(), documentId, knowledgeBaseId, tenantId, chunk.content,
+          JSON.stringify(chunk.metadata || {}), now);
+      }
+    });
+    insertMany(chunks);
+    return chunks.length;
+  }
+
+  deleteByDocument(documentId: string): number {
+    const result = this.db.prepare('DELETE FROM kb_chunks WHERE document_id = ?').run(documentId);
+    return result.changes;
+  }
+
+  countByDocument(documentId: string): number {
+    const row = this.db.prepare('SELECT COUNT(*) as c FROM kb_chunks WHERE document_id = ?').get(documentId) as any;
+    return row?.c || 0;
   }
 }
