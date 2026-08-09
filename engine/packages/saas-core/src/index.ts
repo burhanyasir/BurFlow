@@ -101,3 +101,5 @@ export type { BrandIntelligence } from './types';
 export type { HandoffRequest } from './db/repositories';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';
 export type { PaddlePlanConfig, PlanLimits } from './paddle';
+export { StripeClient, STRIPE_PLANS, getPlanConfig, isUnlimited, findPlanByPriceId, UNLIMITED_THRESHOLD } from './stripe';
+export type { StripePlanConfig, PlanConfig, StripeCheckoutSessionOptions, StripeCustomerData } from './stripe';

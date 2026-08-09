@@ -129,9 +129,10 @@ describe('Billing plans', () => {
     expect(ids).toContain('professional');
     expect(ids).toContain('enterprise');
     const free = res.body.plans.find((p: any) => p.id === 'free');
-    expect(free.limits.conversations).toBeGreaterThan(0);
+    expect(free.limits.conversationLimit).toBeGreaterThan(0);
     const starter = res.body.plans.find((p: any) => p.id === 'starter');
     expect(starter.price).toBeGreaterThan(0);
+    expect(starter.stripePriceId).toBeDefined();
   });
 });
 
@@ -277,7 +278,7 @@ describe('Billing lifecycle', () => {
     subRepo.init(fresh.tenantId, 'free');
     const res = await request('POST', '/api/billing/manage', {}, fresh.token);
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('No Paddle subscription');
+    expect(res.body.error).toContain('No Stripe subscription');
   });
 });
 

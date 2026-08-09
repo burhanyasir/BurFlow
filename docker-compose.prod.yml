@@ -1,0 +1,76 @@
+# ─── Production deployment ────────────────────────────────────────
+#   docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+#
+# Services:
+#   app   → saas-api server + background pipeline worker (multi-stage runner)
+#   nginx → SSL reverse proxy, rate limiting, static file server
+# Volume:
+#   sqlite_data → persistent SQLite storage at /app/data
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: burflow-app
+    restart: unless-stopped
+    expose:
+      - "3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_PATH=/app/data/saas.db
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required}
+      - WIDGET_SECRET=${WIDGET_SECRET:?WIDGET_SECRET is required}
+      - CORS_ORIGIN=${CORS_ORIGIN:-https://app.yourdomain.com}
+      - APP_URL=${APP_URL:-https://app.yourdomain.com}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      - STRIPE_PRICE_STARTER_MONTHLY=${STRIPE_PRICE_STARTER_MONTHLY:-}
+      - STRIPE_PRICE_PROFESSIONAL_MONTHLY=${STRIPE_PRICE_PROFESSIONAL_MONTHLY:-}
+      - STRIPE_PRICE_ENTERPRISE_MONTHLY=${STRIPE_PRICE_ENTERPRISE_MONTHLY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-1536}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - INTERNAL_SYNC_KEY=${INTERNAL_SYNC_KEY:-}
+      - MAILER_SMTP_HOST=${MAILER_SMTP_HOST:-}
+      - MAILER_SMTP_PORT=${MAILER_SMTP_PORT:-}
+      - MAILER_SMTP_USER=${MAILER_SMTP_USER:-}
+      - MAILER_SMTP_PASS=${MAILER_SMTP_PASS:-}
+      - MAILER_FROM_EMAIL=${MAILER_FROM_EMAIL:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - burflow-net
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: static
+    container_name: burflow-nginx
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/production.conf:/etc/nginx/conf.d/default.conf:ro
+      # Mount your TLS certificates here (fullchain.pem / privkey.pem):
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - burflow-net
+
+volumes:
+  sqlite_data:
+    name: burflow-sqlite-data

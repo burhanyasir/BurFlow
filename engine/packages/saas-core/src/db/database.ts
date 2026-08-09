@@ -98,6 +98,7 @@ function migrate(db: Database.Database): void {
       subscription_status TEXT DEFAULT 'trialing' CHECK (subscription_status IN ('active','trialing','past_due','cancelled','expired')),
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
+      subscription_period_end TEXT,
       trial_ends_at TEXT,
       settings TEXT DEFAULT '{}',
       parent_tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
@@ -286,6 +287,7 @@ function migrate(db: Database.Database): void {
       status TEXT NOT NULL DEFAULT 'trialing' CHECK (status IN ('active','trialing','past_due','cancelled','expired')),
       stripe_customer_id TEXT,
       stripe_subscription_id TEXT,
+      stripe_price_id TEXT,
       current_period_start TEXT NOT NULL,
       current_period_end TEXT NOT NULL,
       trial_start TEXT,
@@ -364,9 +366,11 @@ function migrate(db: Database.Database): void {
 
   // Paddle columns (additive, safe to re-run)
   try { db.exec(`ALTER TABLE tenants ADD COLUMN paddle_customer_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE tenants ADD COLUMN subscription_period_end TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_customer_id TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_subscription_id TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_price_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE subscriptions ADD COLUMN stripe_price_id TEXT;`); } catch {}
 
   // Auth feature columns (additive, safe to re-run with try-catch)
   try { db.exec(`ALTER TABLE users ADD COLUMN verification_token TEXT;`); } catch {}

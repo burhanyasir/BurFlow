@@ -1,0 +1,91 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Typecheck & Full Test Suite
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: engine/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck across monorepo
+        run: npm run typecheck
+
+      - name: Run full test suite
+        run: npm test
+
+  deploy:
+    name: Build & Deploy Healthcheck
+    if: github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build production image (runner target)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          target: runner
+          push: false
+          load: true
+          tags: burflow/app:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Start container
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WIDGET_SECRET: ${{ secrets.WIDGET_SECRET }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: |
+          docker run -d --name burflow-healthcheck \
+            -e NODE_ENV=production \
+            -e PORT=3000 \
+            -e DATABASE_PATH=/app/data/saas.db \
+            -e JWT_SECRET="$JWT_SECRET" \
+            -e WIDGET_SECRET="$WIDGET_SECRET" \
+            -e STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
+            -e STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+            burflow/app:${{ github.sha }}
+
+      - name: Deployment healthcheck (GET /api/health)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3000/api/health; then
+              echo "HEALTHCHECK_OK"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "HEALTHCHECK_FAILED: /api/health did not return 200 within 60s"
+          docker logs burflow-healthcheck
+          exit 1

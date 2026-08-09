@@ -18,8 +18,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Onboarding', href: '/dashboard/onboarding' },
 ];
 
-interface Plan { id: string; name: string; price: number; currency: string; interval: string; paddlePriceId: string; features: string[]; limits: { conversations: number; documents: number; knowledgeBases: number; teamMembers: number; apiCalls: number; storageMb: number; widgets: number; analytics: boolean; customBranding: boolean; prioritySupport: boolean }; }
-interface CurrentSubscription { planId: string; planName: string; status: string; paddleSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
+interface Plan { id: string; name: string; price: number; currency: string; interval: string; stripePriceId: string; features: string[]; limits: { conversations: number; documents: number; knowledgeBases: number; teamMembers: number; apiCalls: number; storageMb: number; widgets: number; analytics: boolean; customBranding: boolean; prioritySupport: boolean }; }
+interface CurrentSubscription { planId: string; planName: string; status: string; stripeSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
 interface UsageRecord { date: string; conversations: number; messages: number; documentsUploaded: number; }
 
 function UsageBar({ used, limit, label }: { used: number; limit: number; label: string }) {

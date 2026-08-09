@@ -145,7 +145,7 @@ export class TenantRepository {
     return { tenants: rows.map(r => this.mapRow(r)), total };
   }
 
-  update(id: string, data: Partial<Pick<Tenant, 'name' | 'plan' | 'subscriptionStatus' | 'settings' | 'notificationEmail'>> & { paddleCustomerId?: string | null }): Tenant | null {
+  update(id: string, data: Partial<Pick<Tenant, 'name' | 'plan' | 'subscriptionStatus' | 'settings' | 'notificationEmail'>> & { paddleCustomerId?: string | null; stripeCustomerId?: string | null; stripeSubscriptionId?: string | null; subscriptionPeriodEnd?: string | null }): Tenant | null {
     const sets: string[] = [];
     const vals: any[] = [];
     if (data.name !== undefined) { sets.push('name = ?'); vals.push(data.name); }
@@ -154,6 +154,9 @@ export class TenantRepository {
     if (data.settings !== undefined) { sets.push('settings = ?'); vals.push(JSON.stringify(data.settings)); }
     if (data.notificationEmail !== undefined) { sets.push('notification_email = ?'); vals.push(data.notificationEmail || null); }
     if (data.paddleCustomerId !== undefined) { sets.push('paddle_customer_id = ?'); vals.push(data.paddleCustomerId); }
+    if (data.stripeCustomerId !== undefined) { sets.push('stripe_customer_id = ?'); vals.push(data.stripeCustomerId); }
+    if (data.stripeSubscriptionId !== undefined) { sets.push('stripe_subscription_id = ?'); vals.push(data.stripeSubscriptionId); }
+    if (data.subscriptionPeriodEnd !== undefined) { sets.push('subscription_period_end = ?'); vals.push(data.subscriptionPeriodEnd); }
     if (sets.length === 0) return this.findById(id);
     sets.push('updated_at = ?');
     vals.push(new Date().toISOString());
@@ -172,6 +175,7 @@ export class TenantRepository {
       id: row.id, name: row.name, slug: row.slug, ownerId: row.owner_id,
       plan: row.plan, subscriptionStatus: row.subscription_status,
       stripeCustomerId: row.stripe_customer_id, stripeSubscriptionId: row.stripe_subscription_id,
+      subscriptionPeriodEnd: row.subscription_period_end || undefined,
       paddleCustomerId: row.paddle_customer_id,
       trialEndsAt: row.trial_ends_at, settings: JSON.parse(row.settings || '{}'),
       parentTenantId: row.parent_tenant_id || undefined,
@@ -473,6 +477,14 @@ export class UsageRepository {
     const usage = this.getOrCreate(tenantId, period);
     this.db.prepare('UPDATE usage_records SET api_calls_used = api_calls_used + ? WHERE id = ?')
       .run(count, usage.id);
+  }
+
+  getCurrentMonthConversations(tenantId: string): number {
+    const month = new Date().toISOString().slice(0, 7);
+    const row = this.db.prepare(
+      "SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND substr(started_at, 1, 7) = ?"
+    ).get(tenantId, month) as any;
+    return row?.c || 0;
   }
 
   listByTenant(tenantId: string, page = 1, limit = 12): { records: UsageRecord[]; total: number } {
@@ -930,6 +942,11 @@ export class SubscriptionRepository {
     return row ? this.mapRow(row) : null;
   }
 
+  findByStripeCustomerId(stripeCustomerId: string): Subscription | null {
+    const row = this.db.prepare('SELECT * FROM subscriptions WHERE stripe_customer_id = ?').get(stripeCustomerId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
   findByPaddleSubscriptionId(paddleSubscriptionId: string): Subscription | null {
     const row = this.db.prepare('SELECT * FROM subscriptions WHERE paddle_subscription_id = ?').get(paddleSubscriptionId) as any;
     return row ? this.mapRow(row) : null;
@@ -950,6 +967,7 @@ export class SubscriptionRepository {
     if (data.paddleCustomerId) { sets.push('paddle_customer_id = ?'); vals.push(data.paddleCustomerId); }
     if (data.paddleSubscriptionId) { sets.push('paddle_subscription_id = ?'); vals.push(data.paddleSubscriptionId); }
     if (data.paddlePriceId) { sets.push('paddle_price_id = ?'); vals.push(data.paddlePriceId); }
+    if (data.stripePriceId) { sets.push('stripe_price_id = ?'); vals.push(data.stripePriceId); }
     if (data.currentPeriodEnd) { sets.push('current_period_end = ?'); vals.push(data.currentPeriodEnd); }
     if (data.trialEnd) { sets.push('trial_end = ?'); vals.push(data.trialEnd); }
     if (data.cancelledAt !== undefined) { sets.push('cancelled_at = ?'); vals.push(data.cancelledAt); }
@@ -970,7 +988,7 @@ export class SubscriptionRepository {
       id: row.id, tenantId: row.tenant_id, plan: row.plan, status: row.status,
       stripeCustomerId: row.stripe_customer_id, stripeSubscriptionId: row.stripe_subscription_id,
       paddleCustomerId: row.paddle_customer_id, paddleSubscriptionId: row.paddle_subscription_id,
-      paddlePriceId: row.paddle_price_id,
+      paddlePriceId: row.paddle_price_id, stripePriceId: row.stripe_price_id,
       currentPeriodStart: row.current_period_start, currentPeriodEnd: row.current_period_end,
       trialStart: row.trial_start, trialEnd: row.trial_end, cancelledAt: row.cancelled_at,
       createdAt: row.created_at, updatedAt: row.updated_at,

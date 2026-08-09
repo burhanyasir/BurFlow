@@ -1,8 +1,29 @@
+# Dependencies & build artifacts
 node_modules
-fuzz-output*
-*.log
-qa_report_*.json
+**/node_modules
+dist
+**/dist
+*.tsbuildinfo
+
+# Local data & secrets
+.env
+.env.*
+!*.env.example
+engine/data
+data
+certs
+*.db
+*.db-*
+
+# Tooling noise
 .git
 .gitignore
+*.log
+fuzz-output*
+qa_report_*.json
 README.md
 start-demo.ps1
+.vite-server.log
+.DS_Store
+.idea/
+.vscode/

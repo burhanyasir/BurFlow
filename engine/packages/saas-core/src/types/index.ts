@@ -41,6 +41,7 @@ export interface Tenant {
   subscriptionStatus: SubscriptionStatus;
   stripeCustomerId?: string;
   stripeSubscriptionId?: string;
+  subscriptionPeriodEnd?: string;
   paddleCustomerId?: string;
   trialEndsAt?: string;
   settings: string;
@@ -290,6 +291,7 @@ export interface Subscription {
   paddleCustomerId?: string;
   paddleSubscriptionId?: string;
   paddlePriceId?: string;
+  stripePriceId?: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   trialStart?: string;

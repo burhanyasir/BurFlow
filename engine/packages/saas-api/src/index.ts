@@ -47,21 +47,20 @@ import { createChatRoutes } from './routes/chat';
 import { DbKnowledgeBaseProvider } from './orchestrator';
 import { createWidgetRoutes } from './routes/widget';
 import { createBillingRoutes } from './routes/billing';
-import { createBillingWebhookRoutes } from './routes/billing-webhooks';
 import { createAdminRoutes } from './routes/admin';
 import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
 import { createAuditRoutes } from './routes/audit';
-import { createWebhookRoutes } from './routes/webhooks';
+import { createWebhookRoutes, createStripeWebhookRoutes } from './routes/webhooks';
 import { createWhatsAppRoutes } from './routes/whatsapp';
 import { WhatsAppClient } from '@conversation-engine/saas-core';
 import { createTrustRoutes } from './routes/trust';
 import { createLeadRoutes } from './routes/leads';
 import { createHardeningRoutes } from './routes/hardening';
 import { errorHandler } from './middleware/structured-error';
+import { createQuotaGuard } from './middleware/quota-guard';
 import { setEmailProvider } from './services/email';
 import { SendGridEmailProvider } from './services/sendgrid-email';
-import { setRawBodyBuffer } from './routes/billing-webhooks';
 import { createAnalyticsRoutes } from './routes/analytics';
 import { createHealthRoutes } from './routes/health';
 import { createAgentChatRoutes } from './routes/agent-chat';
@@ -225,10 +224,7 @@ app.use(helmet({
 app.use(cors({ origin: CORS_ORIGIN === false ? false : (CORS_ORIGIN || false), credentials: true }));
 app.use(compression() as any);
 // Raw body parser for webhook signature verification (must come before json parser)
-app.use('/api/billing/webhook', express.raw({ type: 'application/json' }), (req: any, _res: any, next: any) => {
-  setRawBodyBuffer(req.body instanceof Buffer ? req.body : undefined);
-  next();
-});
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
 app.use(express.json({ limit: MAX_BODY_SIZE }));
 
 // ─── Global Rate Limiting ──────────────────────────────────────
@@ -291,6 +287,12 @@ app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET));
 // Protected routes
 const auth = authMiddleware(JWT_SECRET);
 const tenantGuard = requireTenant(tenantRepo);
+
+// Blocks chat traffic once the current-month conversation count hits the plan limit
+const chatQuotaGuard = createQuotaGuard({
+  getCurrentMonthConversations: (tenantId) => usageRepo.getCurrentMonthConversations(tenantId),
+  getPlan: (tenantId) => subRepo.findByTenant(tenantId)?.plan || null,
+});
 
 // Widget handoff route (uses widget token auth like /api/chat)
 const widgetHandoffAuth = publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo);
@@ -387,7 +389,7 @@ const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
     createContextLogger(logger).error({ err }, 'Lead alert dispatch failed');
   }
 };
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
   leadService,
   webhookRepo,
   webhookDeliveryRepo,
@@ -399,9 +401,9 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantG
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
 }, sessionHandoff));
+app.use('/api/webhooks/stripe', createStripeWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));
-app.use('/api/billing', createBillingWebhookRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo));
 app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo));
 
 // Customer Activation routes
