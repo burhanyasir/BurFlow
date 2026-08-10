@@ -437,6 +437,25 @@ function parseStructuredLeadFields(parsed: any): ExtractedLeadFields | null {
   return Object.keys(fields).length > 0 ? fields : null;
 }
 
+/**
+ * Parses the LLM's raw text output into a JSON object. Strips markdown code
+ * fences and returns null on any malformed output so callers can fall back to
+ * the heuristic engine instead of failing the turn.
+ */
+function parseLLMResponse(rawText: string): any | null {
+  if (!rawText || typeof rawText !== 'string') return null;
+  try {
+    const cleaned = rawText
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const parsed = JSON.parse(cleaned);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 const FOLLOW_UP_BY_GOAL: Record<ConversationGoal, string[]> = {
   build_trust: [
     "Would you like me to walk you through how it works?",
@@ -1691,9 +1710,12 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
 
 // ── BurFlow Brain: multi-provider LLM resolution ─────────────────────────
-// Preference order: Groq → xAI Grok → Anthropic → heuristic template fallback.
-// The active provider is determined once at module load (server boot) and
-// logged so operators can verify which provider serves conversations.
+// Preference order: Groq → xAI Grok → Anthropic → secondary accounts, then
+// heuristic template fallback. Only the first two CONFIGURED providers are
+// tried per turn, each bounded by an abortable timeout and a 7s global budget,
+// so a transient outage cannot stall a chat turn for tens of seconds. If every
+// provider fails or returns unparseable output, the brain degrades to the
+// heuristic template engine instead of erroring to the visitor.
 
 export type BrainProvider = 'GROQ' | 'GROK' | 'ANTHROPIC' | 'HEURISTIC_FALLBACK';
 
@@ -1710,8 +1732,8 @@ export function resolveBrainProvider(): BrainProvider {
   return 'HEURISTIC_FALLBACK';
 }
 
-// Logged at module load (server boot) and re-logged on the first brain call
-// so the active provider is visible in both cold-start and runtime logs.
+// Logged once at module load (server boot) so operators can verify which
+// provider serves conversations.
 function logActiveProvider(): void {
   // eslint-disable-next-line no-console
   console.log(`[BurFlow Brain] Active Provider: ${resolveBrainProvider()}`);
@@ -1760,20 +1782,20 @@ const groqClient5 = process.env.GROQ_API_KEY_5
   ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
-async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
   if (!anthropicClient) throw new Error('Anthropic not configured');
   const response = await anthropicClient.messages.create({
     model: ANTHROPIC_MODEL,
     max_tokens: 300,
     system: systemPrompt,
     messages,
-  });
+  }, { signal });
   return response.content
     .filter((c): c is Anthropic.TextBlock => c.type === 'text')
     .map(c => c.text).join('').trim();
 }
 
-async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
   const model = client.getGenerativeModel({ 
     model: 'gemini-1.5-flash',
     systemInstruction: systemPrompt,
@@ -1787,7 +1809,7 @@ async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, mess
   
   const chat = model.startChat({ history });
   const lastMessage = messages[messages.length - 1];
-  const result = await chat.sendMessage(lastMessage.content as string);
+  const result = await chat.sendMessage(lastMessage.content as string, { signal });
   return result.response.text().trim();
 }
 
@@ -1798,7 +1820,7 @@ function mapMessagesForOpenAI(messages: Anthropic.MessageParam[]): Array<{ role:
   }));
 }
 
-async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
   if (!client) throw new Error('Groq not configured');
   const response = await client.chat.completions.create({
     model: GROQ_MODEL,
@@ -1807,11 +1829,11 @@ async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.
       { role: 'system' as const, content: systemPrompt },
       ...mapMessagesForOpenAI(messages),
     ],
-  });
+  }, { signal });
   return response.choices[0]?.message?.content?.trim() || '';
 }
 
-async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
   if (!apiKey) throw new Error('xAI Grok not configured');
   const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
     method: 'POST',
@@ -1827,6 +1849,7 @@ async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropi
         ...mapMessagesForOpenAI(messages),
       ],
     }),
+    signal,
   });
   if (!response.ok) {
     const body = await response.text().catch(() => '');
@@ -1837,45 +1860,60 @@ async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropi
 }
 
 const LLM_PROVIDER_TIMEOUT_MS = 3500;
+const LLM_GLOBAL_BUDGET_MS = 7000;
 
-function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+/**
+ * Runs a provider call with an AbortSignal-backed timeout. Aborting the signal
+ * cancels the underlying HTTP request (SDK/fetch) so a timed-out call stops
+ * consuming connections and LLM tokens instead of lingering in the background.
+ */
+function withAbortTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: number, label: string): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${ms}ms`));
-    }, ms);
-    promise.then(
+    call(controller.signal).then(
       (val) => { clearTimeout(timer); resolve(val); },
-      (err) => { clearTimeout(timer); reject(err); },
+      (err) => {
+        clearTimeout(timer);
+        if (controller.signal.aborted) reject(new Error(`${label} timed out after ${ms}ms`));
+        else reject(err);
+      },
     );
   });
 }
 
 async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
-  // Preference order for BurFlow Brain: Groq → xAI Grok → Anthropic → secondary accounts.
+  // BurFlow Brain provider chain: configured providers are tried in preference
+  // order (Groq → xAI Grok → Anthropic → secondary accounts), capped at the
+  // first two CONFIGURED providers with a hard global budget so a single
+  // transient outage cannot stall a chat turn for tens of seconds.
   const providers = [
-    { name: 'Groq', call: () => groqClient ? withTimeout(callGroq(groqClient, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq') : Promise.reject(new Error('Groq not configured')) },
-    { name: 'Grok', call: () => grokApiKey ? withTimeout(callGrok(grokApiKey, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Grok') : Promise.reject(new Error('Grok not configured')) },
-    { name: 'Anthropic', call: () => anthropicClient ? withTimeout(callAnthropic(systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Anthropic') : Promise.reject(new Error('Anthropic not configured')) },
-    { name: 'Groq-2', call: () => groqClient2 ? withTimeout(callGroq(groqClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-2') : Promise.reject(new Error('Groq-2 not configured')) },
-    { name: 'Groq-3', call: () => groqClient3 ? withTimeout(callGroq(groqClient3, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-3') : Promise.reject(new Error('Groq-3 not configured')) },
-    { name: 'Groq-4', call: () => groqClient4 ? withTimeout(callGroq(groqClient4, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-4') : Promise.reject(new Error('Groq-4 not configured')) },
-    { name: 'Groq-5', call: () => groqClient5 ? withTimeout(callGroq(groqClient5, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-5') : Promise.reject(new Error('Groq-5 not configured')) },
-    { name: 'Gemini-1', call: () => geminiClient1 ? withTimeout(callGemini(geminiClient1, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-1') : Promise.reject(new Error('Gemini-1 not configured')) },
-    { name: 'Gemini-2', call: () => geminiClient2 ? withTimeout(callGemini(geminiClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-2') : Promise.reject(new Error('Gemini-2 not configured')) },
-  ];
+    { name: 'Groq', configured: !!groqClient, call: (signal: AbortSignal) => callGroq(groqClient!, systemPrompt, messages, signal) },
+    { name: 'Grok', configured: !!grokApiKey, call: (signal: AbortSignal) => callGrok(grokApiKey!, systemPrompt, messages, signal) },
+    { name: 'Anthropic', configured: !!anthropicClient, call: (signal: AbortSignal) => callAnthropic(systemPrompt, messages, signal) },
+    { name: 'Groq-2', configured: !!groqClient2, call: (signal: AbortSignal) => callGroq(groqClient2!, systemPrompt, messages, signal) },
+    { name: 'Groq-3', configured: !!groqClient3, call: (signal: AbortSignal) => callGroq(groqClient3!, systemPrompt, messages, signal) },
+    { name: 'Groq-4', configured: !!groqClient4, call: (signal: AbortSignal) => callGroq(groqClient4!, systemPrompt, messages, signal) },
+    { name: 'Groq-5', configured: !!groqClient5, call: (signal: AbortSignal) => callGroq(groqClient5!, systemPrompt, messages, signal) },
+    { name: 'Gemini-1', configured: !!geminiClient1, call: (signal: AbortSignal) => callGemini(geminiClient1!, systemPrompt, messages, signal) },
+    { name: 'Gemini-2', configured: !!geminiClient2, call: (signal: AbortSignal) => callGemini(geminiClient2!, systemPrompt, messages, signal) },
+  ].filter(p => p.configured).slice(0, 2);
 
+  const deadline = Date.now() + LLM_GLOBAL_BUDGET_MS;
   const failures: string[] = [];
   for (const provider of providers) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    const budget = Math.min(LLM_PROVIDER_TIMEOUT_MS, remaining);
     try {
-      const result = await provider.call();
+      const result = await withAbortTimeout(provider.call, budget, provider.name);
       console.log(`[brain] LLM response from ${provider.name}`);
       return result;
     } catch (error: unknown) {
       const status = (error as { status?: number })?.status;
       const message = error instanceof Error ? error.message : String(error);
-      const stack = error instanceof Error ? (error.stack || '') : '';
       failures.push(`${provider.name} (status=${status || 'no status'}): ${message}`);
-      console.error(`[brain] ${provider.name} FAILED (status=${status || 'no status'}) — trying next provider.\n  message: ${message}\n  stack: ${stack || '(no stack trace available)'}`);
+      console.error(`[brain] ${provider.name} FAILED (status=${status || 'no status'}): ${message}`);
     }
   }
   
@@ -2173,7 +2211,6 @@ buyingIntentDetected: memory.buyingIntentDetected,
   let llmFunnelHint: string | null = null;
   const llmSuggestedTopics: string[] = [];
   if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
-    logActiveProvider();
     try {
       const tenantIdForLLM = tenantId || 'default';
       const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
@@ -2239,38 +2276,43 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
 }`;
 
       const text = await callLLMWithFallback(systemPrompt, messages);
-      const cleaned = text.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
-      const parsed = JSON.parse(cleaned);
-      enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
-      structuredLeadFields = parseStructuredLeadFields(parsed);
+      const parsed = parseLLMResponse(text);
+      if (parsed) {
+        enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
+        structuredLeadFields = parseStructuredLeadFields(parsed);
 
-      // Apply structured hints from the LLM (validated against known enums)
-      if (typeof parsed.funnelStage === 'string') llmFunnelHint = parsed.funnelStage;
-      if (typeof parsed.ctaType === 'string') {
-        const ctaValue = parsed.ctaType as CTAType;
-        if (['start_free_trial', 'book_demo', 'contact_sales', 'developer_docs', 'pricing', 'upload_documentation', 'talk_enterprise_sales', 'partner_program', 'support', 'none'].includes(ctaValue)) {
-          llmCtaHint = ctaValue;
-        }
-      }
-      if (Array.isArray(parsed.suggestedTopics)) {
-        for (const topic of parsed.suggestedTopics.slice(0, 5)) {
-          if (typeof topic === 'string' && topic.trim() && !llmSuggestedTopics.includes(topic.trim())) {
-            llmSuggestedTopics.push(topic.trim());
+        // Apply structured hints from the LLM (validated against known enums)
+        if (typeof parsed.funnelStage === 'string') llmFunnelHint = parsed.funnelStage;
+        if (typeof parsed.ctaType === 'string') {
+          const ctaValue = parsed.ctaType as CTAType;
+          if (['start_free_trial', 'book_demo', 'contact_sales', 'developer_docs', 'pricing', 'upload_documentation', 'talk_enterprise_sales', 'partner_program', 'support', 'none'].includes(ctaValue)) {
+            llmCtaHint = ctaValue;
           }
         }
+        if (Array.isArray(parsed.suggestedTopics)) {
+          for (const topic of parsed.suggestedTopics.slice(0, 5)) {
+            if (typeof topic === 'string' && topic.trim() && !llmSuggestedTopics.includes(topic.trim())) {
+              llmSuggestedTopics.push(topic.trim());
+            }
+          }
+        }
+      } else {
+        // LLM responded with unparseable output — degrade gracefully to the
+        // heuristic template engine instead of failing the visitor's turn.
+        enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
       }
     } catch (error: unknown) {
       const err = error as { status?: number; message?: string; provider?: string };
       const status = err.status;
       const messageStr = error instanceof Error ? error.message : String(error);
-      console.error('[brain] LLM call failed:', { status, message: messageStr, tenantId: input.tenantId });
+      console.error(`[brain] LLM call failed (status=${status || 'no status'}): ${messageStr}`);
 
       // Invalid payload (bad message content) must surface as a 400 to the caller.
       if (error instanceof PayloadValidationError) throw error;
 
-      // Total upstream exhaustion (all providers rejected / failed / serialization):
-      // surface as 502 Bad Gateway so the route does not mask upstream failures.
-      throw new UpstreamLLMError(messageStr || 'Upstream LLM service unavailable', { status });
+      // Upstream exhaustion must not fail the visitor's turn — degrade
+      // gracefully to the heuristic template engine.
+      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
     }
   } else {
     enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);

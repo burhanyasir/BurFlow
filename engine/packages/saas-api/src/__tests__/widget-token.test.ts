@@ -22,16 +22,16 @@ function makeToken(tenantId: string, secret: string) {
 
 describe('widget token verification', () => {
   const servers: http.Server[] = [];
+  const REAL_WIDGET_SECRET = 'test-widget-secret-1234567890abcdef';
 
   afterEach(async () => {
     await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     })));
+    delete process.env.WIDGET_SECRET;
   });
 
-  it('accepts widget tokens signed with a legacy dev secret', async () => {
-    process.env.WIDGET_SECRET = 'dev-widget-secret';
-
+  async function requestWithToken(token: string): Promise<{ statusCode: number; body: string }> {
     const app = express();
     app.use(express.json());
     const widgetConfigRepo = {
@@ -41,12 +41,10 @@ describe('widget token verification', () => {
 
     const server = app.listen(0);
     servers.push(server);
-
     await new Promise<void>((resolve) => server.once('listening', resolve));
     const port = (server.address() as any).port;
 
-    const token = makeToken('demo-tenant', 'development-widget-secret-do-not-use-in-production');
-    const res = await new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
+    return new Promise<{ statusCode: number; body: string }>((resolve, reject) => {
       const req = http.request({ hostname: '127.0.0.1', port, path: `/api/widget/config?token=${encodeURIComponent(token)}`, method: 'GET' }, (response) => {
         let raw = '';
         response.setEncoding('utf8');
@@ -56,9 +54,36 @@ describe('widget token verification', () => {
       req.on('error', reject);
       req.end();
     });
+  }
+
+  it('rejects widget tokens signed with a legacy dev secret', async () => {
+    // Regression guard: tokens signed with published dev secrets must never be
+    // accepted once a real WIDGET_SECRET is configured.
+    process.env.WIDGET_SECRET = REAL_WIDGET_SECRET;
+
+    const token = makeToken('demo-tenant', 'development-widget-secret-do-not-use-in-production');
+    const res = await requestWithToken(token);
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('accepts widget tokens signed with the configured secret', async () => {
+    process.env.WIDGET_SECRET = REAL_WIDGET_SECRET;
+
+    const token = makeToken('demo-tenant', REAL_WIDGET_SECRET);
+    const res = await requestWithToken(token);
 
     expect(res.statusCode).toBe(200);
     const payload = JSON.parse(res.body);
     expect(payload.theme).toBe('light');
+  });
+
+  it('rejects all widget tokens when WIDGET_SECRET is not configured', async () => {
+    delete process.env.WIDGET_SECRET;
+
+    const token = makeToken('demo-tenant', REAL_WIDGET_SECRET);
+    const res = await requestWithToken(token);
+
+    expect(res.statusCode).toBe(401);
   });
 });

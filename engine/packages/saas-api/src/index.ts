@@ -106,6 +106,19 @@ for (const { key, purpose } of REQUIRED_ENV_VARS) {
   }
 }
 
+// Refuse to run production with a known development widget secret — widget tokens
+// signed with any published dev secret must never be accepted in production.
+if (NODE_ENV === 'production') {
+  const DEV_WIDGET_SECRETS = [
+    'development-widget-secret-do-not-use-in-production',
+    'dev-widget-secret',
+    'local-dev-widget-secret-1234567890123456789012345678901234567890',
+  ];
+  if (DEV_WIDGET_SECRETS.includes(process.env.WIDGET_SECRET || '')) {
+    throw new Error('WIDGET_SECRET is set to a known development value. Refusing to start in production — generate a new random secret.');
+  }
+}
+
 for (const { key, purpose } of OPTIONAL_WARN_ENV_VARS) {
   if (!process.env[key]) {
     logger.warn({ key, purpose }, `Missing optional environment variable ${key} — ${purpose}`);

@@ -12,6 +12,7 @@ import jwt from 'jsonwebtoken';
 describe('widget branding & customization API', () => {
   const TEST_DB = join(__dirname, '__test_widget_branding__.db');
   const JWT_SECRET = 'test-secret-key-for-widget-branding';
+  const WIDGET_SECRET = 'test-widget-secret-for-widget-branding';
 
   let db: Database.Database;
   let app: express.Express;
@@ -41,6 +42,7 @@ describe('widget branding & customization API', () => {
   }
 
   beforeAll(async () => {
+    process.env.WIDGET_SECRET = WIDGET_SECRET;
     if (existsSync(TEST_DB)) rmSync(TEST_DB);
     db = createDatabase(TEST_DB);
     const userRepo = new UserRepository(db);
@@ -68,6 +70,7 @@ describe('widget branding & customization API', () => {
   afterAll(() => {
     try { db.close(); } catch {}
     if (existsSync(TEST_DB)) rmSync(TEST_DB);
+    delete process.env.WIDGET_SECRET;
   });
 
   it('patches branding fields using spec field names and persists them canonically', async () => {

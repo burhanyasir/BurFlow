@@ -21,15 +21,27 @@ declare global {
   }
 }
 
-const WIDGET_SECRET: string = process.env.WIDGET_SECRET || 'development-widget-secret-do-not-use-in-production';
-
-const LEGACY_WIDGET_SECRETS = [
+const DEV_ONLY_WIDGET_SECRETS = new Set([
   'development-widget-secret-do-not-use-in-production',
   'dev-widget-secret',
   'local-dev-widget-secret-1234567890123456789012345678901234567890',
-];
+]);
 
-function signWidgetToken(encoded: string, secret: string = WIDGET_SECRET): string {
+/**
+ * Resolves the configured widget-token secret. Returns null when the secret is
+ * missing or (in production) set to a known development value, so verification
+ * always fails instead of falling back to a hardcoded secret.
+ */
+function getWidgetSecret(): string | null {
+  const secret = process.env.WIDGET_SECRET;
+  if (!secret) return null;
+  if (process.env.NODE_ENV === 'production' && DEV_ONLY_WIDGET_SECRETS.has(secret)) {
+    return null;
+  }
+  return secret;
+}
+
+function signWidgetToken(encoded: string, secret: string): string {
   return createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
@@ -41,19 +53,18 @@ interface WidgetTokenPayload {
 }
 
 function verifyWidgetToken(token: string): { tenantId: string } | null {
+  const secret = getWidgetSecret();
+  if (!secret) return null;
   try {
     const [encoded, sig] = token.split('.');
     if (!sig) return null;
-    const candidates = [WIDGET_SECRET, ...LEGACY_WIDGET_SECRETS.filter((secret) => secret !== WIDGET_SECRET)];
-    for (const secret of candidates) {
-      const expected = signWidgetToken(encoded, secret);
-      const sigBuf = Buffer.from(sig, 'hex');
-      const expectedBuf = Buffer.from(expected, 'hex');
-      if (sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf)) {
-        const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as WidgetTokenPayload;
-        if (payload.type !== 'widget' || payload.exp < Math.floor(Date.now() / 1000)) return null;
-        return { tenantId: payload.tenantId };
-      }
+    const expected = signWidgetToken(encoded, secret);
+    const sigBuf = Buffer.from(sig, 'hex');
+    const expectedBuf = Buffer.from(expected, 'hex');
+    if (sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf)) {
+      const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as WidgetTokenPayload;
+      if (payload.type !== 'widget' || payload.exp < Math.floor(Date.now() / 1000)) return null;
+      return { tenantId: payload.tenantId };
     }
     return null;
   } catch {
