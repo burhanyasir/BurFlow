@@ -19,9 +19,17 @@ const TABS = [
   { id: 'webflow', label: 'Webflow' },
 ] as const;
 
+// The widget bundle is served from the app's own origin (/widget/widget.js) in
+// both dev (Vite) and the Docker deployment (nginx). A dedicated CDN can
+// override it via VITE_WIDGET_CDN_URL. The loader reaches the API at the same
+// origin through the /api proxy, so no expiring JWT is embedded — the widget
+// exchanges the tenant id at runtime (tokenless bootstrap).
+const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || (typeof window !== 'undefined' ? `${window.location.origin}/widget/widget.js` : '/widget/widget.js');
+const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+
 function buildSnippet(tabId: string, agentId: string, token: string): string {
-  const base = import.meta.env.VITE_WIDGET_CDN_URL || `https://widget.conversationengine.ai/chatbot.js`;
-  const attr = `data-agent-id="${agentId}" data-token="${token}" data-primary-color="#A8244B" data-position="right"`;
+  const base = WIDGET_CDN;
+  const attr = `data-tenant-id="${agentId}" data-api-url="${WIDGET_API_URL}" data-primary-color="#A8244B" data-position="right"`;
   switch (tabId) {
     case 'vanilla':
       return `<!-- Conversation Engine Chatbot -->\n<script src="${base}" ${attr}></script>`;

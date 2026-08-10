@@ -21,7 +21,7 @@ const NAV_ITEMS: NavItem[] = [
 
 const COLOR_PRESETS = ['#0F6E56', '#12866A', '#5DCAA5', '#0B4F3F', '#1F7A8C', '#B4762C', '#8A3D62', '#2E3A46'];
 const TABS = [{ id: 'vanilla', label: 'HTML' }, { id: 'react', label: 'React' }, { id: 'wordpress', label: 'WordPress' }, { id: 'shopify', label: 'Shopify' }, { id: 'webflow', label: 'Webflow' }] as const;
-const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://widget.burflow.ai/chatbot.js';
+const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || (typeof window !== 'undefined' ? `${window.location.origin}/widget/widget.js` : '/widget/widget.js');
 // The widget loader reaches the API (config, chat, token bootstrap) at this
 // origin. The SPA is served from the same origin as the API, so fall back to it.
 const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
