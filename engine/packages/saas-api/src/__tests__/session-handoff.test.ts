@@ -226,6 +226,38 @@ describe('human takeover — chat guard & agent endpoints', () => {
     const last = messages[messages.length - 1];
     expect(last.content).toBe('Hi, this is Jane — I can help with that right now.');
     expect(last.role).toBe('assistant');
+    expect(last.sender).toBe('agent');
+  });
+
+  it('serves operator messages to the widget via GET /api/chat/history', async () => {
+    const convId = await conversationIdFor('ho-sess-1');
+    // Stored messages so far: visitor messages + AI replies (sender undefined) + the
+    // operator reply from the previous test (sender='agent').
+    const res = await request('GET', '/api/chat/history?sessionId=ho-sess-1&after=0', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    const all = res.body.messages as any[];
+    expect(all.length).toBeGreaterThan(0);
+    // Only agent-sent messages are delivered; user + AI messages are excluded
+    // (they are rendered locally / via SSE and must never duplicate).
+    expect(all.every(m => m.sender === 'agent')).toBe(true);
+    const lastSeq = Math.max(...all.map(m => m.sequenceNumber));
+
+    // A new operator reply is picked up by the next poll.
+    await request('POST', `/api/sessions/${convId}/message`, { content: 'Second message from the operator.' }, tenantAToken);
+    const poll = await request('GET', `/api/chat/history?sessionId=ho-sess-1&after=${lastSeq}`, undefined, tenantAToken);
+    expect(poll.status).toBe(200);
+    expect(poll.body.messages).toHaveLength(1);
+    expect(poll.body.messages[0].content).toBe('Second message from the operator.');
+    expect(poll.body.messages[0].sequenceNumber).toBeGreaterThan(lastSeq);
+
+    // No new messages → empty poll response (dedupe works).
+    const again = await request('GET', `/api/chat/history?sessionId=ho-sess-1&after=${poll.body.messages[0].sequenceNumber}`, undefined, tenantAToken);
+    expect(again.body.messages).toHaveLength(0);
+  });
+
+  it('validates the history endpoint sessionId param', async () => {
+    const res = await request('GET', '/api/chat/history', undefined, tenantAToken);
+    expect(res.status).toBe(400);
   });
 
   it('release endpoint hands control back to the AI', async () => {

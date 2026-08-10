@@ -31,6 +31,10 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   streaming?: boolean;
+  /** 'agent' marks a message sent by a human operator during takeover. */
+  sender?: 'agent';
+  /** Server-side sequence number used to dedupe polled operator messages. */
+  sequenceNumber?: number;
 }
 
 export interface SmartButton {

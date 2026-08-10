@@ -152,6 +152,7 @@ function migrate(db: Database.Database): void {
       token_count INTEGER,
       latency_ms INTEGER,
       safety_flags TEXT,
+      sender TEXT CHECK (sender IN ('agent','bot')),
       created_at TEXT NOT NULL
     );
 
@@ -309,6 +310,10 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN onboarding_status TEXT DEFAULT 'not_started' CHECK (onboarding_status IN ('not_started','in_progress','completed','skipped'));`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN business_profile TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE onboarding_progress ADD COLUMN first_successful_conversation TEXT;`); } catch {}
+
+  // Message sender column (additive, safe to re-run) — distinguishes operator
+  // replies (sender='agent') from AI-generated assistant messages.
+  try { db.exec(`ALTER TABLE messages ADD COLUMN sender TEXT CHECK (sender IN ('agent','bot'));`); } catch {}
 
   // Session management columns (additive, safe to re-run)
   try { db.exec(`ALTER TABLE conversations ADD COLUMN updated_at TEXT;`); } catch {}

@@ -133,6 +133,8 @@ export interface Message {
   tokenCount?: number;
   latencyMs?: number;
   safetyFlags?: string[];
+  /** 'agent' = sent by a human operator via the agent inbox; 'bot' = AI-generated. Undefined for user messages. */
+  sender?: 'agent' | 'bot';
   createdAt: string;
 }
 

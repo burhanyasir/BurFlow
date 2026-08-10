@@ -426,6 +426,37 @@ export function createChatRoutes(
     }
   };
 
+  // GET /history — poll for new operator-sent messages during a human takeover.
+  // Only agent-sent messages are returned; AI responses arrive synchronously
+  // through the POST /stream SSE channel, so nothing is duplicated client-side.
+  // `after` is the highest sequence number the client has already rendered.
+  router.get('/history', (req: Request, res: Response) => {
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId query parameter is required' });
+    }
+    const after = Math.max(parseInt(String(req.query.after || '0'), 10) || 0, 0);
+
+    const conversation = conversationRepo.findBySession(req.tenantId!, sessionId);
+    if (!conversation) {
+      return res.json({ messages: [], total: 0 });
+    }
+
+    const { messages } = messageRepo.listByConversation(conversation.id, 1, 500);
+    const operatorMessages = messages
+      .filter(m => m.sender === 'agent' && m.sequenceNumber > after)
+      .map(m => ({
+        id: m.id,
+        conversationId: m.conversationId,
+        role: m.role,
+        content: m.content,
+        sequenceNumber: m.sequenceNumber,
+        sender: m.sender,
+        createdAt: m.createdAt,
+      }));
+    return res.json({ messages: operatorMessages, total: operatorMessages.length });
+  });
+
   router.post('/', requireJsonObject, chatClientLimiter, chatTenantLimiter, (req: Request, res: Response) => handleChatRequest(req, res, false));
   router.post('/stream', requireJsonObject, chatClientLimiter, chatTenantLimiter, (req: Request, res: Response) => handleChatRequest(req, res, true));
 

@@ -171,6 +171,7 @@ export function createAgentChatRoutes(
       role: 'assistant',
       content: body.content as string,
       sequenceNumber: conversation.messageCount + 1,
+      sender: 'agent',
     });
     conversationRepo.incrementMessageCount(conversation.id);
 

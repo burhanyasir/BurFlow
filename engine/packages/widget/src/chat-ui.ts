@@ -372,6 +372,9 @@ export class ChatWidget {
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
   private autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
   private headerLogoEl: HTMLImageElement | null = null;
+  /** Polls GET /api/chat/history for operator messages during a human takeover. */
+  private agentPollTimer: ReturnType<typeof setInterval> | null = null;
+  private lastAgentSeq = 0;
   private readonly placeholders = ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
   private boundDismissPreOpen = (e: Event) => {
     if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
@@ -438,18 +441,63 @@ export class ChatWidget {
     if (this.config.widgetToken) {
       this.configLoadPromise = this.fetchRemoteConfig();
     }
+    this.startAgentPolling();
   }
 
   unmount(): void {
     this.abort();
     if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
+    if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
     this.container = null;
     this.bubbleEl = null;
     this.messagesEl = null;
     this.inputEl = null;
+  }
+
+  /**
+   * Poll the chat history every 4s while the widget is alive. Only agent-sent
+   * messages (sender='agent', sequence > lastAgentSeq) are appended, so AI
+   * responses — which arrive synchronously over SSE — are never duplicated and
+   * operator replies reach the visitor without them sending a new message.
+   */
+  private startAgentPolling(): void {
+    if (this.agentPollTimer) return;
+    const POLL_INTERVAL_MS = 4000;
+    this.agentPollTimer = setInterval(() => { this.pollForAgentMessages(); }, POLL_INTERVAL_MS);
+    this.pollForAgentMessages();
+  }
+
+  private async pollForAgentMessages(): Promise<void> {
+    const sessionId = this.config.sessionId;
+    const apiUrl = this.config.apiUrl;
+    if (!sessionId || !apiUrl) return;
+
+    try {
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (this.config.tenantId) headers['x-tenant-id'] = this.config.tenantId;
+      if (this.config.apiKey) headers['x-api-key'] = this.config.apiKey;
+      if (this.config.widgetToken) headers['x-widget-token'] = this.config.widgetToken;
+
+      const url = `${apiUrl}/api/chat/history?sessionId=${encodeURIComponent(sessionId)}&after=${this.lastAgentSeq}`;
+      const res = await fetch(url, { headers, signal: this.abortController?.signal });
+      if (!res.ok) return;
+      const data = await res.json();
+      const incoming: Array<{ id: string; content: string; sequenceNumber: number; createdAt: string }> = data?.messages || [];
+      for (const m of incoming) {
+        if (!m || typeof m.content !== 'string') continue;
+        this.lastAgentSeq = Math.max(this.lastAgentSeq, m.sequenceNumber || 0);
+        this.addMessage({ role: 'assistant', content: m.content, sender: 'agent', sequenceNumber: m.sequenceNumber });
+      }
+      if (incoming.length > 0) {
+        this.scrollToBottom();
+        this.hideTypingIndicator();
+      }
+    } catch {
+      // Silent — polling must never throw on the page.
+    }
   }
 
   private applyBrandingVars(): void {
@@ -936,16 +984,27 @@ export class ChatWidget {
     const bubble = document.createElement('div');
     bubble.className = 'cw-message-bubble';
     const isUser = msg.role === 'user';
-    bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;${isUser
-      ? `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;`
-      : 'background:#F3F4F6;color:#1F2937;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
-    }`;
+    const isAgent = msg.sender === 'agent';
+    const bubbleStyle = isUser
+      ? 'background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;'
+      : isAgent
+        ? 'background:#EEF2FF;color:#1F2937;border:1px solid #C7D2FE;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
+        : 'background:#F3F4F6;color:#1F2937;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);';
+    bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;${bubbleStyle}`;
 
     if (!isUser) {
       const icon = document.createElement('span');
       icon.style.cssText = 'margin-right:6px;opacity:0.6;font-size:12px;';
-      icon.textContent = '✨';
+      icon.textContent = isAgent ? '👤' : '✨';
       bubble.appendChild(icon);
+    }
+
+    if (isAgent) {
+      const label = document.createElement('div');
+      label.className = 'cw-agent-label';
+      label.textContent = 'Agent';
+      label.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6366f1;margin-bottom:4px;';
+      bubble.appendChild(label);
     }
 
     const content = document.createElement('div');
