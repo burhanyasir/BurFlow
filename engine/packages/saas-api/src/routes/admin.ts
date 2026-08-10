@@ -257,15 +257,68 @@ export function createAdminRoutes(
       if (!conversation || conversation.tenantId !== req.tenantId) {
         return res.status(404).json({ error: 'Session not found' });
       }
-      const messages = messageRepo.listByConversation(conversation.id, 1, 200);
+      const { messages } = messageRepo.listByConversation(conversation.id, 1, 500);
+
+      // Build the turn transcript from stored messages. Per-turn intelligence
+      // (polarity, strategy) is computed at runtime by the brain and not
+      // persisted, so those fields default to neutral/empty values.
+      const turns = (messages || []).map(m => ({
+        role: m.role,
+        content: m.content,
+        message: m.role === 'user' ? m.content : '',
+        response: m.role === 'assistant' ? m.content : '',
+        polarity: 0,
+        frustration: 0.1,
+        urgency: 0.1,
+        timestamp: new Date(m.createdAt).getTime(),
+        metadata: m.safetyFlags && m.safetyFlags.length > 0 ? { safetyFlags: m.safetyFlags } : undefined,
+      }));
+
+      const notes = (conversation.notes || []).map(n => ({
+        id: n.id,
+        tenantId: conversation.tenantId,
+        sessionId: conversation.id,
+        author: n.authorName || n.authorId,
+        message: n.content,
+        createdAt: n.createdAt,
+        updatedAt: n.createdAt,
+      }));
+
       res.json({
         sessionId: conversation.id,
         tenantId: conversation.tenantId,
         createdAt: conversation.startedAt,
         updatedAt: conversation.startedAt,
+        stateMachine: conversation.sessionState,
+        sequenceCounter: conversation.messageCount,
         turnCount: conversation.messageCount,
-        messages: messages.messages || [],
+        // Intelligence fields are not persisted per conversation — return safe
+        // defaults so the UI renders rather than throwing.
+        persona: '',
+        funnelStage: '',
+        buyingIntentDetected: false,
+        buyingIntentReason: null,
+        hasIntel: false,
+        status: conversation.status,
+        owner: conversation.assignedAgentId || null,
+        flagged: !!conversation.flagged,
+        archived: !!conversation.archived,
+        tags: conversation.tags || [],
+        turns,
+        objections: [],
+        qualificationState: {},
+        repeatedPhraseCount: 0,
+        topics: [],
         state: JSON.stringify(conversation),
+        conversationIntelligence: {
+          score: 0,
+          personaReason: '',
+          qualificationProgress: 'not_started',
+          topObjections: [],
+          sentiment: { polarity: 0, frustration: 0.1, urgency: 0.1 },
+        },
+        notes,
+        timeline: [],
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Failed to get session');

@@ -151,7 +151,8 @@ export default function ConversationDetailPage() {
   }
 
   const intel = data as any;
-  const tabs = data.turns.map((turn, i) => ({
+  const turns = Array.isArray(data?.turns) ? data.turns : [];
+  const tabs = turns.map((turn, i) => ({
     id: `turn-${i}`,
     label: `Turn ${i + 1}`,
     content: (
@@ -160,7 +161,7 @@ export default function ConversationDetailPage() {
           <Badge variant={turn.role === 'assistant' ? 'primary' : 'neutral'} size="sm" className="shrink-0 mt-0.5">{turn.role}</Badge>
           <p className="text-sm text-[var(--color-neutral-800)] whitespace-pre-wrap">{turn.content}</p>
         </div>
-        {turn.metadata && Object.keys(turn.metadata).length > 0 && (
+        {turn.metadata && typeof turn.metadata === 'object' && Object.keys(turn.metadata).length > 0 && (
           <details className="text-xs text-[var(--color-neutral-500)]">
             <summary className="cursor-pointer hover:text-[var(--color-neutral-700)]">Metadata</summary>
             <pre className="mt-1 p-2 bg-[var(--color-neutral-50)] rounded overflow-x-auto">{JSON.stringify(turn.metadata, null, 2)}</pre>
@@ -235,14 +236,14 @@ export default function ConversationDetailPage() {
           </SectionCard>
           <SectionCard title="Funnel Stage" className="lg:col-span-1">
             <div className="text-center py-4">
-              <p className="text-lg font-bold text-[var(--color-neutral-900)]">{funnelLabel(intel.funnelStage)}</p>
+              <p className="text-lg font-bold text-[var(--color-neutral-900)]">{funnelLabel(intel.funnelStage || 'unknown')}</p>
             </div>
           </SectionCard>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <SectionCard title="Persona">
-            <Badge variant="info" size="md">{personaLabel(intel.persona)}</Badge>
+            <Badge variant="info" size="md">{personaLabel(intel.persona || 'unknown')}</Badge>
             <p className="text-sm text-[var(--color-neutral-500)] mt-2">{intel.conversationIntelligence?.personaReason || ''}</p>
           </SectionCard>
           <SectionCard title="Qualification">

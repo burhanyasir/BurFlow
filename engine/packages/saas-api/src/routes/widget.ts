@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { WidgetConfigRepository } from '@conversation-engine/saas-core';
+import { WidgetConfigRepository, TenantRepository } from '@conversation-engine/saas-core';
 import jwt from 'jsonwebtoken';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validateRequiredString, validationError, LABEL_MAX } from '../middleware/validate';
@@ -215,7 +215,7 @@ function signWidgetToken(encoded: string, secret: string): string {
   return createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
-export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string): Router {
+export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string, tenantRepo?: TenantRepository): Router {
   const router = Router();
   const widgetAuth = jwtSecret ? authMiddleware(jwtSecret) : undefined;
   const LOCAL_DEMO_TENANT = 'demo-tenant';
@@ -298,6 +298,36 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Widget token generation failed');
+      res.status(500).json({ error: 'Failed to generate widget token' });
+    }
+  });
+
+  /**
+   * Public runtime bootstrap for embedded widgets. Site visitors receive the
+   * tenant identifier via the public embed snippet, and the widget exchanges it
+   * for a fresh, short-lived token at load time — so the pasted snippet never
+   * hardcodes an expiring JWT. Widget tokens only unlock the widget config and
+   * chat-as-tenant capabilities that are already public to site visitors, and
+   * the global rate limiter bounds minting per IP.
+   */
+  router.get('/public-token', (req: Request, res: Response) => {
+    try {
+      const tenantId = (req.query.tenantId as string) || '';
+      if (!tenantId) {
+        return res.status(400).json({ error: 'tenantId query parameter is required' });
+      }
+      let resolvedTenantId = tenantId;
+      if (tenantRepo) {
+        const tenant = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
+        if (!tenant) {
+          return res.status(404).json({ error: 'Tenant not found' });
+        }
+        resolvedTenantId = tenant.id;
+      }
+      const token = generateWidgetToken(resolvedTenantId);
+      res.json({ token, tenantId: resolvedTenantId, expiresIn: 86400 });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Public widget token generation failed');
       res.status(500).json({ error: 'Failed to generate widget token' });
     }
   });
@@ -424,11 +454,8 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
   router.get('/snippet', (req: Request, res: Response) => {
     try {
       let tenantId: string | null = tryJwtAuth(req);
-      let token: string;
-      if (tenantId) {
-        token = generateWidgetToken(tenantId);
-      } else {
-        token = req.query.token as string;
+      if (!tenantId) {
+        const token = req.query.token as string;
         if (!token) {
           return res.status(400).json({ error: 'Widget token required' });
         }
@@ -438,17 +465,22 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         }
         tenantId = payload.tenantId;
       }
+      // The snippet carries the public tenant identifier only; the widget
+      // exchanges it for a fresh token at runtime via /api/widget/public-token,
+      // so an expiring JWT is never hardcoded into the customer's site.
       const apiUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
-      const snippet = `<!-- Chat Widget -->
+      const snippet = `<!-- BurFlow Chatbot -->
 <script>
 (function() {
   var t=document.createElement('script');t.type='text/javascript';t.async=true;
-      t.src='${apiUrl}/widget/widget.js?token=${token}';
+  t.src='${apiUrl}/widget/widget.js';
+  t.setAttribute('data-tenant-id', '${tenantId}');
+  t.setAttribute('data-api-url', '${apiUrl}');
   var s=document.getElementsByTagName('script')[0];s.parentNode.insertBefore(t,s);
 })();
 </script>
 <link rel="stylesheet" href="${apiUrl}/widget/styles.css">
-<!-- End Chat Widget -->`;
+<!-- End BurFlow Chatbot -->`;
       res.setHeader('Content-Type', 'text/plain');
       res.send(snippet);
     } catch (err: any) {

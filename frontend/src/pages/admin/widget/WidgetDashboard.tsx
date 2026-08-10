@@ -22,13 +22,16 @@ const NAV_ITEMS: NavItem[] = [
 const COLOR_PRESETS = ['#0F6E56', '#12866A', '#5DCAA5', '#0B4F3F', '#1F7A8C', '#B4762C', '#8A3D62', '#2E3A46'];
 const TABS = [{ id: 'vanilla', label: 'HTML' }, { id: 'react', label: 'React' }, { id: 'wordpress', label: 'WordPress' }, { id: 'shopify', label: 'Shopify' }, { id: 'webflow', label: 'Webflow' }] as const;
 const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://widget.burflow.ai/chatbot.js';
-const DEFAULT_SNIPPET = '<script src="https://widget.burflow.ai/chatbot.js" data-agent-id="YOUR_AGENT_ID"></script>';
+// The widget loader reaches the API (config, chat, token bootstrap) at this
+// origin. The SPA is served from the same origin as the API, so fall back to it.
+const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
+const DEFAULT_SNIPPET = `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" data-tenant-id="YOUR_TENANT_ID" data-api-url="${WIDGET_API_URL}"></script>`;
 
-function buildSnippet(tabId: string, agentId: string, color: string, position: string, token: string): string {
-  const attrs = `data-agent-id="${agentId}" data-primary-color="${color}" data-position="${position}" data-token="${token}"`;
+function buildSnippet(tabId: string, tenantId: string, color: string, position: string): string {
+  const attrs = `data-tenant-id="${tenantId}" data-api-url="${WIDGET_API_URL}" data-primary-color="${color}" data-position="${position}"`;
   switch (tabId) {
     case 'vanilla': return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
-    case 'react': return `import { ChatWidget } from '@conversationengine/react';\n<ChatWidget agentId="${agentId}" primaryColor="${color}" position="${position}" token="${token}" />`;
+    case 'react': return `import { ChatWidget } from '@conversationengine/react';\n<ChatWidget tenantId="${tenantId}" apiUrl="${WIDGET_API_URL}" primaryColor="${color}" position="${position}" />`;
     default: return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
   }
 }
@@ -46,12 +49,11 @@ export default function WidgetDashboard() {
   const [autoOpenDelay, setAutoOpenDelay] = useState(3);
   const [activeTab, setActiveTab] = useState('vanilla');
   const [agentId, setAgentId] = useState<string | null>(null);
-  const [widgetToken, setWidgetToken] = useState<string | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<Record<string, unknown> | null>(null);
-  const snippet = agentId && widgetToken ? buildSnippet(activeTab, agentId, primaryColor, position, widgetToken) : DEFAULT_SNIPPET;
+  const snippet = agentId ? buildSnippet(activeTab, agentId, primaryColor, position) : DEFAULT_SNIPPET;
 
   const loadConfig = useCallback(async () => {
     try {
@@ -62,8 +64,7 @@ export default function WidgetDashboard() {
         setAgentId(slug);
         const tokenRes = await apiClient.post<{ token: string }>('/widget/token');
         if (tokenRes.token) {
-          setWidgetToken(tokenRes.token);
-          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; suggestedQuestions?: string[]; autoOpen?: boolean; autoOpenDelay?: number; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
+          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; starterOptions?: string[]; autoOpen?: boolean; autoOpenDelay?: number; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
           if (widgetRes.primaryColor) setPrimaryColor(widgetRes.primaryColor);
           if (widgetRes.position) {
             const normalized = widgetRes.position === 'bottom-right' ? 'right' : widgetRes.position === 'bottom-left' ? 'left' : widgetRes.position;
@@ -71,7 +72,7 @@ export default function WidgetDashboard() {
           }
           if (widgetRes.greeting) setWelcomeMessage(widgetRes.greeting);
           if (widgetRes.launcherText) setPlaceholder(widgetRes.launcherText);
-          if (widgetRes.suggestedQuestions) setSuggestedQuestions(widgetRes.suggestedQuestions);
+          if (Array.isArray(widgetRes.starterOptions)) setSuggestedQuestions(widgetRes.starterOptions);
           if (typeof widgetRes.autoOpen === 'boolean') setAutoOpen(widgetRes.autoOpen);
           if (typeof widgetRes.autoOpenDelay === 'number') setAutoOpenDelay(widgetRes.autoOpenDelay);
           if (widgetRes.businessProfile) setBusinessProfile(widgetRes.businessProfile);
@@ -89,7 +90,7 @@ export default function WidgetDashboard() {
         position,
         greeting: welcomeMessage,
         launcherText: placeholder,
-        suggestedQuestions,
+        starterOptions: suggestedQuestions,
         autoOpen,
         autoOpenDelay,
         companyName: workspaceName,

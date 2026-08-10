@@ -29,18 +29,42 @@ if (typeof window !== 'undefined') {
   window.ChatWidget = ChatWidget;
   window.initChatWidget = initChatWidget;
 
-  // Auto-initialize from script tag data attributes
+  // Auto-initialize from script tag data attributes. Two modes are supported:
+  //  - legacy `data-token="..."`: the token is embedded directly in the page
+  //  - `data-tenant-id="..."`: the widget exchanges the public tenant
+  //    identifier for a fresh token at runtime via /api/widget/public-token,
+  //    so the pasted snippet never hardcodes an expiring JWT
   function autoInit() {
     try {
       const script = _scriptEl;
       if (!script) return;
-      const token = script.getAttribute('data-token');
-      if (!token) return;
       const apiUrl = script.getAttribute('data-api-url') || '';
       const primaryColor = script.getAttribute('data-primary-color') || undefined;
       const position = script.getAttribute('data-position') as any || undefined;
       const title = script.getAttribute('data-title') || undefined;
-      initChatWidget({ widgetToken: token, apiUrl, primaryColor, position, title });
+
+      const token = script.getAttribute('data-token');
+      if (token) {
+        initChatWidget({ widgetToken: token, apiUrl, primaryColor, position, title });
+        return;
+      }
+
+      const tenantId = script.getAttribute('data-tenant-id');
+      if (tenantId && apiUrl) {
+        fetch(`${apiUrl}/api/widget/public-token?tenantId=${encodeURIComponent(tenantId)}`)
+          .then((res) => {
+            if (!res.ok) throw new Error(`public-token request failed (${res.status})`);
+            return res.json();
+          })
+          .then((data) => {
+            if (data && data.token) {
+              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title });
+            }
+          })
+          .catch(() => {
+            // Widget stays dormant if the bootstrap fails — never throw on page load.
+          });
+      }
     } catch {}
   }
   if (document.readyState === 'loading') {

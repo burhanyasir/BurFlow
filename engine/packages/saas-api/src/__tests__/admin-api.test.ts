@@ -218,6 +218,33 @@ describe('Admin session management', () => {
     expect(types).toContain('handoff');
   });
 
+  it('returns conversation detail with turns built from messages and safe intelligence defaults', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-detail-session');
+    messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'user', content: 'Do you support SSO?', sequenceNumber: 1 });
+    messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'assistant', content: 'Yes, SAML 2.0 and OIDC are supported.', sequenceNumber: 2 });
+    conversationRepo.incrementMessageCount(conv.id);
+    conversationRepo.incrementMessageCount(conv.id);
+    await request('PUT', `/api/admin/sessions/${conv.id}/tags`, { tags: ['pricing'] }, tenantAToken);
+
+    const res = await request('GET', `/api/admin/sessions/${conv.id}`, undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.sessionId).toBe(conv.id);
+    expect(res.body.turnCount).toBe(2);
+    expect(Array.isArray(res.body.turns)).toBe(true);
+    expect(res.body.turns).toHaveLength(2);
+    expect(res.body.turns[0]).toMatchObject({ role: 'user', content: 'Do you support SSO?', timestamp: expect.any(Number) });
+    expect(res.body.turns[1]).toMatchObject({ role: 'assistant', content: 'Yes, SAML 2.0 and OIDC are supported.' });
+    // Intelligence is not persisted per conversation — must default safely so the UI renders.
+    expect(res.body.persona).toBe('');
+    expect(res.body.funnelStage).toBe('');
+    expect(res.body.buyingIntentDetected).toBe(false);
+    expect(Array.isArray(res.body.tags)).toBe(true);
+    expect(res.body.tags).toContain('pricing');
+    expect(Array.isArray(res.body.timeline)).toBe(true);
+    expect(Array.isArray(res.body.notes)).toBe(true);
+    expect(res.body.conversationIntelligence).toMatchObject({ score: 0, qualificationProgress: 'not_started' });
+  });
+
   it('returns 404 for cross-tenant session access', async () => {
     const conv = conversationRepo.create(tenantAId, 'admin-cross-tenant');
     const res = await request('PUT', `/api/admin/sessions/${conv.id}/flag`, { flagged: true }, tenantBToken);

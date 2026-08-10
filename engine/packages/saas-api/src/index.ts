@@ -295,7 +295,7 @@ app.use('/api/auth', createPasswordResetRoutes(userRepo));
 app.use('/api/auth', createVerifyRoutes(userRepo, JWT_SECRET));
 
 // Widget public routes
-app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET));
+app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET, tenantRepo));
 
 // Protected routes
 const auth = authMiddleware(JWT_SECRET);
