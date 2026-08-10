@@ -12,7 +12,8 @@ export function generateConversationUI(
   stage: FunnelStage,
   buyingIntent: BuyingIntentResult,
   objection: ObjectionResult,
-  history: string[] = []
+  history: string[] = [],
+  currentMessage: string = ''
 ): ConversationUIState {
   const buttons: SmartButton[] = [];
   const suggestedActions: SmartButton[] = [];
@@ -41,19 +42,23 @@ export function generateConversationUI(
     }
   }
 
-  // 2. Evaluation / Pricing Stage
+  // 2. Evaluation / Pricing Stage — only show pricing card when the current message is about pricing
   else if (stage === 'evaluation' || buyingIntent.intentPhrase === 'pricing_inquiry') {
-    activeCard = {
-      type: 'pricing',
-      data: {
-        tiers: [
-          { name: 'Free', price: '$0/mo', msgs: '100 msgs' },
-          { name: 'Starter', price: '$29/mo', msgs: '1,000 msgs' },
-          { name: 'Professional', price: '$99/mo', msgs: '10,000 msgs', popular: true },
-          { name: 'Enterprise', price: 'Custom', msgs: 'Unlimited' }
-        ]
-      }
-    };
+    const msg = currentMessage.toLowerCase();
+    const isPricingTurn = /pric|plan|cost|tier|subscription|how much|fee|pay|billing|compare plan/i.test(msg);
+    if (isPricingTurn) {
+      activeCard = {
+        type: 'pricing',
+        data: {
+          tiers: [
+            { name: 'Free', price: '$0/mo', msgs: '100 msgs' },
+            { name: 'Starter', price: '$29/mo', msgs: '1,000 msgs' },
+            { name: 'Professional', price: '$99/mo', msgs: '10,000 msgs', popular: true },
+            { name: 'Enterprise', price: 'Custom', msgs: 'Unlimited' }
+          ]
+        }
+      };
+    }
 
     buttons.push(
       { id: 'btn_trial_starter', label: '🚀 Try Starter ($29)', action: 'navigate', payload: '/signup', variant: 'outline' },
@@ -62,12 +67,16 @@ export function generateConversationUI(
     );
   }
 
-  // 3. Purchase Intent Stage
+  // 3. Purchase Intent Stage — only show lead card when the current message signals buying intent
   else if (stage === 'purchase_intent' || buyingIntent.hasBuyingIntent) {
-    activeCard = {
-      type: 'lead_form',
-      data: { title: 'Launch Your 14-Day Free Trial', microcopy: 'No credit card required • 10-minute setup' }
-    };
+    const msg = currentMessage.toLowerCase();
+    const isBuyingTurn = /buy|purchase|sign up|start|trial|get started|demo|book|schedule|commit|ready/i.test(msg);
+    if (isBuyingTurn) {
+      activeCard = {
+        type: 'lead_form',
+        data: { title: 'Launch Your 14-Day Free Trial', microcopy: 'No credit card required • 10-minute setup' }
+      };
+    }
 
     buttons.push(
       { id: 'btn_confirm_trial', label: '✨ Launch 14-Day Free Trial', action: 'navigate', payload: '/signup', variant: 'primary' },

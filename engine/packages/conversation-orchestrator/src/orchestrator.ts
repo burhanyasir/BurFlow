@@ -75,7 +75,7 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
   const cta = selectCTA(persona.persona, funnelStage, buyingIntent);
 
   // 10. Conversation UI Engine (Buttons, Suggestions, Cards)
-  const uiState = generateConversationUI(persona.persona, funnelStage, buyingIntent, objection, history);
+  const uiState = generateConversationUI(persona.persona, funnelStage, buyingIntent, objection, history, message);
 
   // Append qualification options if present
   if (qualResult.options && qualResult.options.length > 0) {
