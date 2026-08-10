@@ -9,9 +9,9 @@ import { cn } from '../../utils/cn';
 
 // Tokenless bootstrap: the widget exchanges the public tenant id for a fresh
 // token at runtime (GET /api/widget/public-token). Override via
-// VITE_WIDGET_TENANT_ID in .env.development; `demo-tenant` mirrors the legacy
-// dev token's tenant for local demos.
-const DEV_WIDGET_TENANT_ID = import.meta.env.DEV ? 'demo-tenant' : undefined;
+// VITE_WIDGET_TENANT_ID in .env.development; `burflow-saas` is the seeded
+// SaaS demo tenant.
+const DEV_WIDGET_TENANT_ID = import.meta.env.DEV ? 'burflow-saas' : undefined;
 const WIDGET_TENANT_ID = (import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined) || DEV_WIDGET_TENANT_ID;
 const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || '/widget/widget.js';
 const WIDGET_API_URL = import.meta.env.VITE_API_URL || '';

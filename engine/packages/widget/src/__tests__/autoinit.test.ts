@@ -73,4 +73,32 @@ describe('widget autoInit (tokenless bootstrap)', () => {
 
     expect((window as any).__CURRENT_WIDGET).toBeUndefined();
   });
+
+  it('loads remote config same-origin (no data-api-url) after the token exchange', async () => {
+    // data-tenant-id only, no data-api-url → empty apiUrl means same-origin.
+    const fetchMock = (globalThis as any).fetch;
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'fresh-minted-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          companyName: 'BrandCo',
+          launcherText: 'Chat with BrandCo',
+          starterOptions: ['Option A', 'Option B'],
+          greeting: 'Hi from BrandCo',
+        }),
+      });
+
+    await import('../index');
+    await new Promise((r) => setTimeout(r, 50));
+
+    const calls = fetchMock.mock.calls.map((c: unknown[]) => String(c[0]));
+    expect(calls.some((u: string) => u.includes('/api/widget/public-token?tenantId=demo-tenant'))).toBe(true);
+    // Same-origin config fetch must use a relative URL (empty apiUrl base) and
+    // must actually run — the old guard skipped it when apiUrl was empty.
+    expect(calls.some((u: string) => u.startsWith('/api/widget/config?token='))).toBe(true);
+    const widget = (window as any).__CURRENT_WIDGET;
+    expect(widget.config.companyName).toBe('BrandCo');
+    expect(widget.config.launcherText).toBe('Chat with BrandCo');
+  });
 });

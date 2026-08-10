@@ -472,8 +472,10 @@ export class ChatWidget {
 
   private async pollForAgentMessages(): Promise<void> {
     const sessionId = this.config.sessionId;
+    // Empty apiUrl means same-origin — relative /api/... URLs resolve against
+    // the page origin (Vite proxy in dev, nginx in prod).
     const apiUrl = this.config.apiUrl;
-    if (!sessionId || !apiUrl) return;
+    if (!sessionId) return;
 
     try {
       const headers: Record<string, string> = { Accept: 'application/json' };
@@ -1442,12 +1444,13 @@ export class ChatWidget {
   }
 
   private async fetchRemoteConfig(): Promise<void> {
-    if (!this.config.widgetToken || !this.config.apiUrl) return;
+    if (!this.config.widgetToken) return;
 
     try {
-      const url = new URL('/api/widget/config', this.config.apiUrl);
-      url.searchParams.set('token', this.config.widgetToken);
-      const response = await fetch(url.toString(), {
+      // Empty apiUrl means same-origin — a relative /api/... URL resolves
+      // against the page origin (Vite proxy in dev, nginx in prod).
+      const url = `${this.config.apiUrl}/api/widget/config?token=${encodeURIComponent(this.config.widgetToken)}`;
+      const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json' },
       });
       if (!response.ok) return;
