@@ -1,19 +1,14 @@
-import { useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { CTA, Check, Eyebrow, Logo, Pill } from '../../components/landing/primitives';
-import { ScanCard } from '../../components/landing/scan-card';
+import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { CTA, Check, Eyebrow, Pill } from '../../components/landing/primitives';
+import { ScanCard, type ScanStatus } from '../../components/landing/scan-card';
 import { Reveal } from '../../components/landing/reveal';
+import { SiteHeader } from '../../components/landing/SiteHeader';
+import { SiteFooter } from '../../components/landing/SiteFooter';
+import { WidgetLauncher } from '../../components/landing/WidgetLauncher';
 import { LiveActivity, RatingProof, TrustMarquee } from '../../components/landing/social';
 import { StickyCta } from '../../components/landing/sticky-cta';
 import { initAnalytics, track, trackOnce } from '../../lib/analytics';
-
-const nav = [
-  { label: 'Product', to: '/features' },
-  { label: 'Pricing', to: '/pricing' },
-  { label: 'Docs', to: '/docs' },
-  { label: 'Blog', to: '/blog' },
-  { label: 'About', to: '/about' },
-];
 
 const outcomes = [
   {
@@ -109,15 +104,51 @@ const faqs = [
   },
 ];
 
-const footerColumns = [
-  { h: 'Product', l: [{ label: 'Features', to: '/features' }, { label: 'Pricing', to: '/pricing' }, { label: 'Changelog', to: '/changelog' }] },
-  { h: 'Platform', l: [{ label: 'API docs', to: '/docs/api' }, { label: 'Widget guide', to: '/docs/widget' }, { label: 'Status', to: '/status' }] },
-  { h: 'Company', l: [{ label: 'About', to: '/about' }, { label: 'Contact sales', to: '/contact' }, { label: 'Privacy', to: '/privacy' }] },
+const SCAN_STAGES: Array<[number, string]> = [
+  [10, 'Discovering pages…'],
+  [38, 'Reading pricing & services…'],
+  [66, 'Identifying products & buyer intents…'],
+  [88, 'Building your sales agent…'],
 ];
 
 export default function LandingPageV3() {
   const sectionsRef = useRef<HTMLElement | null>(null);
-  const navigate = useNavigate();
+  const [scan, setScan] = useState<{ status: ScanStatus; stage: string; progress: number; url: string }>({
+    status: 'idle',
+    stage: '',
+    progress: 0,
+    url: 'https://yourcompany.com/',
+  });
+  const scanTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (scanTimer.current) window.clearInterval(scanTimer.current);
+    };
+  }, []);
+
+  const startScan = (raw: string) => {
+    const url =
+      raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
+    setScan({ status: 'scanning', stage: SCAN_STAGES[0]![1], progress: 2, url });
+    track('scan_submit', { url });
+    document
+      .getElementById('scan-preview')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    let p = 2;
+    if (scanTimer.current) window.clearInterval(scanTimer.current);
+    scanTimer.current = window.setInterval(() => {
+      p = Math.min(p + 2 + Math.random() * 3, 100);
+      const stage = [...SCAN_STAGES].reverse().find(([at]) => p >= at)?.[1] ?? SCAN_STAGES[0]![1];
+      setScan((prev) => ({ ...prev, progress: p, stage }));
+      if (p >= 100) {
+        if (scanTimer.current) window.clearInterval(scanTimer.current);
+        scanTimer.current = null;
+        setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete' }));
+        trackOnce('scan_complete');
+      }
+    }, 110);
+  };
 
   useEffect(() => {
     initAnalytics();
@@ -152,38 +183,7 @@ export default function LandingPageV3() {
 
   return (
     <main ref={sectionsRef} className="landing min-h-screen bg-background">
-      {/* ─── Header ─────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-hairline bg-background/85 backdrop-blur-md">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-6">
-          <Link to="/" aria-label="BurFlow home">
-            <Logo />
-          </Link>
-          <nav className="hidden items-center gap-8 md:flex">
-            {nav.map((n) => (
-              <Link
-                key={n.label}
-                to={n.to}
-                onClick={() => track('nav_click', { item: n.label })}
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-4">
-            <Link to="/login" className="hidden text-sm text-muted-foreground hover:text-foreground sm:block">
-              Log in
-            </Link>
-            <Link
-              to="/signup"
-              onClick={() => track('cta_click', { label: 'Start free', location: 'header' })}
-              className="inline-flex h-9 items-center rounded-full bg-primary px-5 text-sm font-semibold text-primary-foreground transition-transform hover:-translate-y-0.5"
-            >
-              Start free
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* ─── Hero ───────────────────────────────────────────────── */}
       <div className="aurora relative overflow-hidden">
@@ -232,9 +232,8 @@ export default function LandingPageV3() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    const url = new FormData(e.currentTarget).get('website');
-                    track('scan_submit', { has_url: Boolean(url && url !== 'https://') });
-                    navigate('/signup');
+                    const input = new FormData(e.currentTarget).get('website');
+                    startScan(typeof input === 'string' ? input : '');
                   }}
                   className="flex flex-col gap-3 rounded-2xl border border-hairline bg-surface p-3 shadow-soft sm:flex-row sm:items-center"
                 >
@@ -243,15 +242,17 @@ export default function LandingPageV3() {
                     name="website"
                     onFocus={() => trackOnce('scan_input_focus')}
                     defaultValue="https://"
+                    disabled={scan.status === 'scanning'}
                     aria-label="Your website URL"
                     placeholder="https://yourcompany.com"
-                    className="h-12 w-full flex-1 rounded-xl bg-transparent px-4 text-base outline-none placeholder:text-muted-foreground/70"
+                    className="h-12 w-full flex-1 rounded-xl bg-transparent px-4 text-base outline-none placeholder:text-muted-foreground/70 disabled:opacity-60"
                   />
                   <button
                     type="submit"
-                    className="h-12 shrink-0 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-glow"
+                    disabled={scan.status === 'scanning'}
+                    className="h-12 shrink-0 rounded-xl bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-glow disabled:pointer-events-none disabled:opacity-60"
                   >
-                    Scan my website free
+                    {scan.status === 'scanning' ? 'Scanning…' : 'Scan my website free'}
                   </button>
                 </form>
                 <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
@@ -268,9 +269,19 @@ export default function LandingPageV3() {
               </div>
             </Reveal>
 
-            <Reveal delay={120}>
-              <ScanCard />
-            </Reveal>
+            <div id="scan-preview" className="scroll-mt-24">
+              <Reveal delay={120}>
+                <ScanCard
+                  status={scan.status}
+                  stage={scan.stage}
+                  progress={scan.progress}
+                  url={scan.url}
+                  onRestart={() =>
+                    setScan({ status: 'idle', stage: '', progress: 0, url: 'https://yourcompany.com/' })
+                  }
+                />
+              </Reveal>
+            </div>
           </div>
         </section>
 
@@ -557,47 +568,11 @@ export default function LandingPageV3() {
         </div>
       </section>
 
-      {/* ─── Footer ─────────────────────────────────────────────── */}
-      <footer className="border-t border-hairline px-6 py-14">
-        <div className="mx-auto grid w-full max-w-6xl gap-10 md:grid-cols-[1.4fr_repeat(3,1fr)]">
-          <div>
-            <Logo />
-            <p className="mt-4 max-w-xs text-sm text-muted-foreground">
-              AI website sales agents that turn traffic into qualified pipeline.
-            </p>
-            <div className="mt-5 flex gap-2">
-              {['SOC 2', 'GDPR', 'HIPAA'].map((b) => (
-                <span
-                  key={b}
-                  className="rounded-full border border-hairline px-3 py-1 text-xs text-muted-foreground"
-                >
-                  {b}
-                </span>
-              ))}
-            </div>
-          </div>
-          {footerColumns.map((c) => (
-            <div key={c.h}>
-              <p className="text-sm font-semibold">{c.h}</p>
-              <ul className="mt-3 space-y-2 text-sm text-muted-foreground">
-                {c.l.map((l) => (
-                  <li key={l.label}>
-                    <Link to={l.to} className="hover:text-foreground">
-                      {l.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <p className="mx-auto mt-12 w-full max-w-6xl text-sm text-muted-foreground">
-          © 2026 BurFlow. All rights reserved.
-        </p>
-      </footer>
+      <SiteFooter />
 
       <LiveActivity />
       <StickyCta />
+      <WidgetLauncher />
     </main>
   );
 }
