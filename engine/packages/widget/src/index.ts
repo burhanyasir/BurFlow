@@ -5,8 +5,25 @@ export { ChatWidget } from './chat-ui';
 export { streamChat } from './stream-client';
 export type { WidgetConfig, ChatMessage, StreamEvent, StreamClientOptions } from './types';
 
-// Capture the script element IMMEDIATELY during execution — currentScript is null after this
+// Capture the script element IMMEDIATELY during execution — currentScript is null after this.
+// Bundles loaded with async/defer or as modules report currentScript as null even during
+// execution, so autoInit falls back to scanning the DOM (resolveScriptEl).
 const _scriptEl = typeof document !== 'undefined' ? document.currentScript as HTMLScriptElement | null : null;
+
+/**
+ * Best-effort resolution of the widget's script element. Prefers the script
+ * that is currently executing (document.currentScript); when that is null
+ * (async/defer/module loading) finds the first script tagged with widget
+ * bootstrap attributes in the document.
+ */
+function resolveScriptEl(): HTMLScriptElement | null {
+  if (typeof document === 'undefined') return null;
+  const current = document.currentScript as HTMLScriptElement | null;
+  if (current) return current;
+  return document.querySelector<HTMLScriptElement>(
+    'script[data-tenant-id], script[data-token]',
+  );
+}
 
 export function initChatWidget(config: WidgetConfig): ChatWidget {
   const widget = new ChatWidget(config);
@@ -39,7 +56,7 @@ if (typeof window !== 'undefined') {
   //    proxy or an nginx /api reverse proxy need no extra configuration.
   function autoInit() {
     try {
-      const script = _scriptEl;
+      const script = _scriptEl || resolveScriptEl();
       if (!script) return;
       const apiUrl = script.getAttribute('data-api-url') || '';
       const primaryColor = script.getAttribute('data-primary-color') || undefined;
@@ -62,10 +79,18 @@ if (typeof window !== 'undefined') {
           .then((data) => {
             if (data && data.token) {
               initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title });
+            } else {
+              // Token exchange returned no token — render with local defaults
+              // so the bubble still appears (never fully dormant).
+              initChatWidget({ apiUrl, primaryColor, position, title });
             }
           })
           .catch(() => {
-            // Widget stays dormant if the bootstrap fails — never throw on page load.
+            // Backend unreachable or tenant unknown — render the bubble with
+            // local default config instead of staying dormant. This preserves
+            // the pre-tokenless behavior where a failed config fetch still
+            // showed the launcher with mock content.
+            initChatWidget({ apiUrl, primaryColor, position, title });
           });
       }
     } catch {}

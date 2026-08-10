@@ -1,0 +1,76 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// ─── Tokenless autoInit bootstrap ─────────────────────────
+// jsdom always reports document.currentScript === null, which reproduces the
+// async/defer/module loading condition where the widget previously stayed
+// dormant (missing launcher bubble).
+describe('widget autoInit (tokenless bootstrap)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+    // Simulate the embed snippet: a script tag carrying data-tenant-id.
+    const script = document.createElement('script');
+    script.src = '/widget/widget.js';
+    script.setAttribute('data-tenant-id', 'demo-tenant');
+    script.setAttribute('data-primary-color', '#123456');
+    document.body.appendChild(script);
+
+    // Page is fully loaded — autoInit should run immediately, not wait for
+    // DOMContentLoaded.
+    try {
+      Object.defineProperty(document, 'readyState', { value: 'complete', configurable: true });
+    } catch {
+      // Some jsdom versions expose readyState as a non-configurable getter.
+    }
+
+    const fetchMock = vi.fn();
+    (globalThis as any).fetch = fetchMock;
+    delete (window as any).__CURRENT_WIDGET;
+  });
+
+  afterEach(() => {
+    const widget = (window as any).__CURRENT_WIDGET;
+    if (widget && typeof widget.unmount === 'function') {
+      widget.unmount();
+    }
+    delete (window as any).__CURRENT_WIDGET;
+    vi.resetModules();
+  });
+
+  it('mounts the launcher via DOM fallback when the token exchange fails', async () => {
+    (globalThis as any).fetch.mockRejectedValue(new Error('network down'));
+
+    await import('../index');
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect((window as any).__CURRENT_WIDGET).toBeTruthy();
+    // The bubble must render even though the backend was unreachable.
+    expect(document.querySelector('.cw-bubble')).toBeTruthy();
+  });
+
+  it('exchanges the tenant id and initializes with the minted token on success', async () => {
+    (globalThis as any).fetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ token: 'fresh-minted-token' }),
+    });
+
+    await import('../index');
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/api/widget/public-token?tenantId=demo-tenant'),
+    );
+    const widget = (window as any).__CURRENT_WIDGET;
+    expect(widget).toBeTruthy();
+    expect(document.querySelector('.cw-bubble')).toBeTruthy();
+  });
+
+  it('does not initialize when no widget script attributes are present', async () => {
+    document.body.innerHTML = '';
+
+    await import('../index');
+    await new Promise((r) => setTimeout(r, 30));
+
+    expect((window as any).__CURRENT_WIDGET).toBeUndefined();
+  });
+});
