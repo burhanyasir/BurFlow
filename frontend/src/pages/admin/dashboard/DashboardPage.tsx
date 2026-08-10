@@ -1,35 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { PremiumCard, PremiumCardContent, PremiumCardHeader, PremiumCardTitle } from '../../../components/premium/PremiumCard';
-import { MetricCard } from '../../../components/premium/MetricCard';
-import { Badge } from '../../../components/premium/Badge';
-import { DashboardSkeleton } from '../../../components/premium/Skeleton';
-import { EmptyState } from '../../../components/premium/EmptyState';
-import { DashboardLayout, DashboardContent } from '../../../components/dashboard';
+import {
+  Activity,
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  Heart,
+  MessageSquare,
+  Rocket,
+  Star,
+  Target,
+  TrendingUp,
+  Upload,
+  Zap,
+} from 'lucide-react';
+import { DashboardLayout } from '../../../components/dashboard';
+import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
 import { useSessions, useAnalytics } from '../../../hooks/useConversationIntelligence';
 import { useOnboarding } from '../../../hooks/useOnboarding';
 import { fetchWithAuth } from '../../../lib/api-client';
 import { cn } from '../../../utils/cn';
-import type { SidebarItem } from '../../../layouts/Sidebar';
-
-const NAV_ITEMS: SidebarItem[] = [
-  { label: 'Dashboard', href: '/dashboard', active: true },
-  { label: 'Conversations', href: '/dashboard/conversations' },
-  { label: 'Analytics', href: '/dashboard/analytics' },
-  { label: 'Knowledge', href: '/dashboard/knowledge' },
-  { label: 'Unanswered', href: '/dashboard/unanswered' },
-  { label: 'Citations', href: '/dashboard/citations' },
-  { label: 'Insights', href: '/dashboard/insights' },
-  { label: 'Widget', href: '/dashboard/widget' },
-  { label: 'Billing', href: '/dashboard/billing' },
-  { label: 'Onboarding', href: '/dashboard/onboarding' },
-];
-
-const ONBOARDING_NAV_ITEMS: SidebarItem[] = [
-  { label: 'Dashboard', href: '/dashboard', active: true },
-  { label: 'Onboarding', href: '/dashboard/onboarding' },
-];
 
 function formatDate(value?: string) {
   if (!value) return 'Not set yet';
@@ -57,17 +48,6 @@ interface Recommendation {
   severity: 'info' | 'warning' | 'error';
 }
 
-interface BusinessIntelligenceReport {
-  productsAndServices: string[];
-  pricingPosition: string;
-  idealCustomer: string;
-  conversionIssues: string[];
-  trustIssues: string[];
-  missingContent: string[];
-  recommendedImprovements: string[];
-  salesOpportunity: string;
-}
-
 function getLast7Days(): string[] {
   const days: string[] = [];
   for (let i = 6; i >= 0; i--) {
@@ -93,11 +73,11 @@ function avgConfidenceByDay(sessions: any[], days: string[]): number[] {
 function BarChart({ data, label, max, height = 120 }: { data: number[]; label: string; max: number; height?: number }) {
   if (max === 0) max = 1;
   return (
-    <div className="flex items-end justify-between gap-1" style={{ height }} aria-label={label}>
+    <div className="flex items-end justify-between gap-1.5" style={{ height }} aria-label={label}>
       {data.map((val, i) => (
         <div
           key={i}
-          className="flex-1 rounded-t-[3px] bg-gradient-to-t from-[rgba(168,36,75,0.4)] to-[rgba(201,79,114,0.7)] transition-all duration-[var(--motion-functional)]"
+          className="flex-1 rounded-md bg-gradient-to-t from-primary/25 to-primary/60 transition-all duration-300"
           style={{ height: `${(val / max) * 100}%`, minHeight: val > 0 ? '4px' : '0' }}
           aria-label={`Day ${i + 1}: ${val}`}
         />
@@ -108,43 +88,37 @@ function BarChart({ data, label, max, height = 120 }: { data: number[]; label: s
 
 function ProgressIndicators({ data, days }: { data: number[]; days: string[] }) {
   return (
-    <div className="space-y-2" aria-label="Confidence trend per day">
+    <div className="space-y-2.5" aria-label="Confidence trend per day">
       {data.map((val, i) => (
-        <div key={i} className="flex items-center gap-2">
-          <span className="text-[11px] text-[rgba(255,255,255,0.4)] w-16 shrink-0">{days[i].slice(0, 3)}</span>
-          <div className="flex-1 h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+        <div key={i} className="flex items-center gap-2.5">
+          <span className="w-8 shrink-0 text-[11px] text-muted-foreground">{days[i].slice(0, 3)}</span>
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-surface-2">
             <div
               className={cn(
-                'h-full rounded-full transition-all duration-[var(--motion-functional)]',
-                val >= 70 ? 'bg-[#3DDC97]' : val >= 40 ? 'bg-[#F5B454]' : 'bg-[#F26D6D]',
+                'h-full rounded-full transition-all duration-300',
+                val >= 70 ? 'bg-success' : val >= 40 ? 'bg-warning-500' : 'bg-error-500',
               )}
               style={{ width: `${val}%` }}
               aria-label={`${days[i].slice(0, 3)}: ${val}% confidence`}
             />
           </div>
-          <span className="text-[11px] text-[rgba(255,255,255,0.6)] w-8 text-right tabular-nums">{val}%</span>
+          <span className="w-8 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">{val}%</span>
         </div>
       ))}
     </div>
   );
 }
 
-function RecommendationCard({ recommendation, onClick }: { recommendation: Recommendation; onClick: () => void }) {
+function RecommendationRow({ recommendation, onClick }: { recommendation: Recommendation; onClick: () => void }) {
   const colors = {
-    info: 'border-[rgba(58,111,240,0.2)] bg-[rgba(58,111,240,0.06)]',
-    warning: 'border-[rgba(199,126,31,0.2)] bg-[rgba(199,126,31,0.06)]',
-    error: 'border-[rgba(201,59,59,0.2)] bg-[rgba(201,59,59,0.06)]',
-  };
-  const dots = {
-    info: 'bg-[#6E96F5]',
-    warning: 'bg-[#F5B454]',
-    error: 'bg-[#F26D6D]',
+    info: 'bg-ember-soft text-foreground',
+    warning: 'bg-warning-300/25 text-foreground',
+    error: 'bg-error-300/25 text-foreground',
   };
   return (
     <div
       className={cn(
-        'flex items-center gap-3 p-3 rounded-[var(--radius-md)] border cursor-pointer transition-all duration-[var(--motion-functional)]',
-        'hover:bg-[rgba(255,255,255,0.04)] hover:-translate-y-[1px]',
+        'flex cursor-pointer items-center gap-3 rounded-xl border border-hairline p-3 transition-all duration-200 hover:-translate-y-px hover:shadow-soft',
         colors[recommendation.severity],
       )}
       onClick={onClick}
@@ -153,16 +127,36 @@ function RecommendationCard({ recommendation, onClick }: { recommendation: Recom
       aria-label={`Recommendation: ${recommendation.message}`}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick(); }}
     >
-      <span className={cn('w-2 h-2 rounded-full shrink-0', dots[recommendation.severity])} />
-      <p className="text-sm text-[rgba(255,255,255,0.8)]">{recommendation.message}</p>
-      <span className="text-xs text-[rgba(255,255,255,0.3)] ml-auto shrink-0">&rarr;</span>
+      <p className="text-sm">{recommendation.message}</p>
+      <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />
     </div>
+  );
+}
+
+function SetupStep({ done, label, to, onNavigate, index }: { done: boolean; label: string; to: string; onNavigate: (to: string) => void; index: number }) {
+  return (
+    <button
+      onClick={() => onNavigate(to)}
+      className="flex w-full items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 px-4 py-3 text-left transition hover:-translate-y-px hover:shadow-soft"
+    >
+      {done ? (
+        <CheckCircle2 className="size-5 shrink-0 text-success" />
+      ) : (
+        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-ember-soft text-[11px] font-bold text-foreground">
+          {index + 1}
+        </span>
+      )}
+      <span className={cn('text-sm font-medium', done ? 'text-muted-foreground line-through' : 'text-foreground')}>
+        {label}
+      </span>
+      {!done && <ArrowRight className="ml-auto size-4 shrink-0 text-muted-foreground" />}
+    </button>
   );
 }
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const { user, tenant, logout } = useAuth();
+  const { user, tenant } = useAuth();
   const { data: analyticsData, loading: analyticsLoading } = useAnalytics();
   const { data: sessionsData, loading: sessionsLoading } = useSessions(200, 0);
   const { progress, dashboard, loading: onboardingLoading } = useOnboarding();
@@ -228,7 +222,6 @@ export default function DashboardPage() {
   const planTrial = subscription?.onTrial || false;
   const usagePercent = usageLimit > 0 ? Math.round((usageThisMonth / usageLimit) * 100) : 0;
 
-
   const last7Days = useMemo(() => getLast7Days(), []);
   const dailyCounts = useMemo(() => countByDay(sessions, last7Days), [sessions, last7Days]);
   const dailyConfidence = useMemo(() => avgConfidenceByDay(sessions, last7Days), [sessions, last7Days]);
@@ -276,7 +269,7 @@ export default function DashboardPage() {
     if (totalDocs > 0 && knowledgeCoverage < 50) {
       items.push({
         id: 'coverage-drop',
-        message: 'Knowledge coverage dropped &mdash; review failed or missing documents',
+        message: 'Knowledge coverage dropped — review failed or missing documents',
         href: '/dashboard/knowledge',
         severity: 'warning',
       });
@@ -284,7 +277,7 @@ export default function DashboardPage() {
     if (avgConfidence > 0 && avgConfidence < 60) {
       items.push({
         id: 'low-confidence',
-        message: 'Low confidence detected &mdash; add more knowledge sources to improve answers',
+        message: 'Low confidence detected — add more knowledge sources to improve answers',
         href: '/dashboard/analytics',
         severity: 'warning',
       });
@@ -292,7 +285,7 @@ export default function DashboardPage() {
     if (dashboard?.firstUnansweredQuestion) {
       items.push({
         id: 'unanswered',
-        message: `Customers asking about &ldquo;${dashboard.firstUnansweredQuestion}&rdquo; &mdash; add a knowledge source`,
+        message: `Customers asking about "${dashboard.firstUnansweredQuestion}" — add a knowledge source`,
         href: '/dashboard/unanswered',
         severity: 'error',
       });
@@ -300,7 +293,7 @@ export default function DashboardPage() {
     if (items.length === 0 && totalSessions > 0) {
       items.push({
         id: 'all-clear',
-        message: 'Everything looks good &mdash; no recommendations at this time',
+        message: 'Everything looks good — no recommendations at this time',
         href: '/dashboard',
         severity: 'info',
       });
@@ -313,7 +306,6 @@ export default function DashboardPage() {
   const businessProfile = progress?.businessProfile as Record<string, any> | undefined;
   const businessProfileSummary = useMemo(() => {
     const industry = (businessProfile?.industry as string) || progress?.businessType || 'your market';
-    const website = progress?.primaryWebsite || 'your website';
     const companyName = (businessProfile?.businessName as string) || workspaceName;
     const knowledgeLabel = totalDocs > 0
       ? `${totalDocs} source${totalDocs === 1 ? '' : 's'} indexed`
@@ -323,41 +315,7 @@ export default function DashboardPage() {
       ? `${totalSessions} conversations captured`
       : 'waiting for the first visitor conversation';
     return `${companyName} has a working profile for ${industry}. ${knowledgeLabel}, the widget is ${widgetLabel}, and ${conversationLabel}.`;
-  }, [dashboard?.widgetInstalled, businessProfile?.businessName, businessProfile?.industry, progress?.businessType, progress?.primaryWebsite, totalDocs, totalSessions, workspaceName]);
-
-  const profileScores = useMemo(() => ({
-    intelligence: typeof businessProfile?.intelligenceScore === 'number' ? businessProfile.intelligenceScore : 0,
-    conversion: typeof businessProfile?.conversionScore === 'number' ? businessProfile.conversionScore : 0,
-    trust: typeof businessProfile?.trustScore === 'number' ? businessProfile.trustScore : 0,
-  }), [businessProfile]);
-
-  const intelligenceReport = useMemo<BusinessIntelligenceReport>(() => {
-    const productsAndServices = (businessProfile?.productsAndServices as string[] | undefined) || (totalDocs > 0 ? ['Core offering', 'Support and onboarding guidance'] : ['Core offering']);
-    const pricingPosition = (businessProfile?.pricingModel as string | undefined) || (totalSessions > 0 ? 'Positioned around guided next steps and demo conversion' : 'Needs clearer pricing or offer framing');
-    const idealCustomer = (businessProfile?.idealCustomer as string | undefined) || (progress?.businessType ? `Visitors evaluating ${progress.businessType} solutions` : 'Prospective buyers who need guidance');
-    const salesOpportunity = (businessProfile?.recommendedNextAction as string | undefined) || (totalSessions > 0 ? 'Turn the first conversations into booked demos by guiding each visitor to a concrete next step.' : 'A stronger first-contact path should increase demo conversion as soon as the widget engages visitors.');
-
-    return {
-      productsAndServices,
-      pricingPosition,
-      idealCustomer,
-      conversionIssues: totalSessions > 0 ? ['Some visitors still need stronger CTAs and clearer pricing cues'] : ['No visitor conversations yet; conversion path is still unproven'],
-      trustIssues: totalDocs > 0 ? ['Trust improves when the site clearly explains the offer and next steps'] : ['Knowledge coverage needs to be strengthened to inspire confidence'],
-      missingContent: businessProfile?.missingWebsiteContent as string[] | undefined || (totalDocs > 0 ? ['Pricing clarity', 'Product comparison guidance'] : ['Core offer summary', 'Pricing clarity']),
-      recommendedImprovements: [
-        'Add clear pricing and comparison cues to the widget prompts',
-        'Surface the best next step in the dashboard and widget',
-        'Strengthen the website scan inputs with higher-signal documents',
-      ],
-      salesOpportunity,
-    };
-  }, [businessProfile, progress?.businessType, totalDocs, totalSessions]);
-
-  const profileItems = useMemo(() => [
-    { label: 'Industry', value: (businessProfile?.industry as string) || progress?.businessType || 'Pending', accent: 'bg-[rgba(168,36,75,0.16)] text-white' },
-    { label: 'Knowledge', value: totalDocs > 0 ? `${totalDocs} sources` : 'Adding sources', accent: 'bg-[rgba(58,111,240,0.16)] text-white' },
-    { label: 'Widget', value: dashboard?.widgetInstalled ? 'Live' : 'Setup needed', accent: 'bg-[rgba(61,220,151,0.16)] text-white' },
-  ], [businessProfile?.industry, dashboard?.widgetInstalled, progress?.businessType, totalDocs]);
+  }, [dashboard?.widgetInstalled, businessProfile?.businessName, businessProfile?.industry, progress?.businessType, totalDocs, totalSessions, workspaceName]);
 
   const recommendedNextAction = useMemo(() => {
     if (!dashboard?.widgetInstalled) return 'Install the widget to start turning visitors into real conversations.';
@@ -365,339 +323,282 @@ export default function DashboardPage() {
     return 'Review the newest conversations and strengthen the knowledge base around the topics visitors ask about most.';
   }, [dashboard?.widgetInstalled, totalSessions]);
 
-  const handleNavigate = (item: SidebarItem) => {
-    if (item.href) navigate(item.href);
-  };
-
   const isOnboardingComplete = progress?.onboardingStatus === 'completed';
 
+  const welcomeName = subscription?.contactName || user?.name?.split(' ')[0];
+
   return (
-    <DashboardLayout
-      sidebarItems={isOnboardingComplete ? NAV_ITEMS : ONBOARDING_NAV_ITEMS}
-      onNavigate={handleNavigate}
-      workspaceName={workspaceName}
-      planName={planTrial ? 'Trial' : planName}
-      userName={user?.name}
-      userEmail={user?.email}
-      usagePercent={usagePercent}
-      onUpgrade={() => navigate('/dashboard/billing')}
-      onLogout={logout}
-      onSettings={() => navigate('/dashboard/settings')}
-    >
-      <div className="premium-layout min-h-full p-4 md:p-6 space-y-6" aria-label="Executive Dashboard">
-        {isBusy ? (
-          <DashboardSkeleton />
-        ) : !hasData ? (
-          <EmptyState
-            icon="📊"
-            title="Welcome to your Dashboard"
-            description="Start by uploading knowledge sources and installing the widget. Your analytics and metrics will appear here once you have conversations."
-            primaryAction={{ label: 'Upload Documents', onClick: () => navigate('/dashboard/knowledge') }}
-            secondaryAction={{ label: 'Install Widget', onClick: () => navigate('/dashboard/widget') }}
-          />
-        ) : (
+    <DashboardLayout>
+      <PageHead
+        title={welcomeName ? `Welcome back, ${welcomeName}` : 'Welcome back'}
+        sub={workspaceName}
+        actions={
           <>
-            <PremiumCard variant="glass" padding="lg">
-              <PremiumCardContent>
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-[rgba(168,36,75,0.15)] flex items-center justify-center text-xl" aria-hidden="true">
-                      &#x1F44B;
-                    </div>
-                    <div>
-                      <h1 className="text-lg font-bold text-white">Welcome back{subscription?.contactName ? `, ${subscription.contactName}` : ''}</h1>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-sm text-[rgba(255,255,255,0.5)]">{workspaceName}</span>
-                        <Badge variant={planTrial ? 'premium' : 'info'} size="sm">{planTrial ? 'Trial' : planName}</Badge>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-6">
-                    <div className="text-center" aria-label="AI Health Score">
-                      <p className="text-[11px] text-[rgba(255,255,255,0.4)] uppercase tracking-wider">AI Health</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="w-20 h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
-                          <div
-                            className={cn(
-                              'h-full rounded-full transition-all duration-500',
-                              healthScore >= 70 ? 'bg-[#3DDC97]' : healthScore >= 40 ? 'bg-[#F5B454]' : 'bg-[#F26D6D]',
-                            )}
-                            style={{ width: `${healthScore}%` }}
-                          />
-                        </div>
-                        <span className={cn(
-                          'text-sm font-bold tabular-nums',
-                          healthScore >= 70 ? 'text-[#3DDC97]' : healthScore >= 40 ? 'text-[#F5B454]' : 'text-[#F26D6D]',
-                        )}>
-                          {healthScore}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-center" aria-label="Usage this month">
-                      <p className="text-[11px] text-[rgba(255,255,255,0.4)] uppercase tracking-wider">Usage</p>
-                      <p className="text-sm font-bold text-white mt-1 tabular-nums">
-                        {usageThisMonth} <span className="text-[rgba(255,255,255,0.3)] font-normal">/ {usageLimit}</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </PremiumCardContent>
-            </PremiumCard>
-
-            <PremiumCard variant="glass" padding="lg">
-              <PremiumCardContent>
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-                  <div>
-                    <p className="text-[11px] uppercase tracking-[0.24em] text-[rgba(255,255,255,0.5)]">Business profile snapshot</p>
-                    <h2 className="mt-2 text-xl font-semibold text-white">Here is what BurFlow learned about {workspaceName}</h2>
-                    <p className="mt-3 max-w-2xl text-sm leading-7 text-[rgba(255,255,255,0.72)]">{businessProfileSummary}</p>
-                    {businessProfile && (
-                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                        {[
-                          { label: 'AI readiness', value: `${profileScores.intelligence}%`, accent: 'bg-[rgba(61,220,151,0.16)] text-white' },
-                          { label: 'Conversion confidence', value: `${profileScores.conversion}%`, accent: 'bg-[rgba(58,111,240,0.16)] text-white' },
-                          { label: 'Trust strength', value: `${profileScores.trust}%`, accent: 'bg-[rgba(168,36,75,0.16)] text-white' },
-                        ].map((item) => (
-                          <div key={item.label} className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3">
-                            <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">{item.label}</p>
-                            <div className={cn('mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', item.accent)}>
-                              {item.value}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      {profileItems.map((item) => (
-                        <div key={item.label} className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.04)] p-3">
-                          <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">{item.label}</p>
-                          <div className={cn('mt-2 inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium', item.accent)}>
-                            {item.value}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl border border-[rgba(255,255,255,0.08)] bg-[rgba(0,0,0,0.16)] p-4">
-                    <p className="text-[11px] uppercase tracking-[0.24em] text-[rgba(255,255,255,0.5)]">Recommended next move</p>
-                    <p className="mt-3 text-sm leading-7 text-[rgba(255,255,255,0.82)]">{recommendedNextAction}</p>
-                    <div className="mt-4 space-y-2 text-sm text-[rgba(255,255,255,0.7)]">
-                      <div className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.04)] px-3 py-2">
-                        <span>Last update</span>
-                        <span className="font-medium text-white">{formatDate(progress?.updatedAt)}</span>
-                      </div>
-                      <div className="flex items-center justify-between rounded-xl bg-[rgba(255,255,255,0.04)] px-3 py-2">
-                        <span>Grounded answers</span>
-                        <span className="font-medium text-white">{dashboard?.groundedAnswerRate ? `${Math.round(dashboard.groundedAnswerRate * 100)}%` : 'Pending'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </PremiumCardContent>
-            </PremiumCard>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3" aria-label="Key metrics">
-              <MetricCard icon="&#x1F4AC;" label="Conversations" value={totalSessions.toLocaleString()} onClick={() => navigate('/dashboard/conversations')} />
-              <MetricCard
-                icon="&#x2705;"
-                label="Resolution Rate"
-                value={`${resolutionRate}%`}
-                variant={resolutionRate >= 70 ? 'success' : resolutionRate >= 40 ? 'warning' : 'error'}
-                onClick={() => navigate('/dashboard/analytics')}
-              />
-              <MetricCard
-                icon="&#x1F3AF;"
-                label="Avg Confidence"
-                value={`${avgConfidence}%`}
-                variant={avgConfidence >= 70 ? 'success' : avgConfidence >= 40 ? 'warning' : 'error'}
-                onClick={() => navigate('/dashboard/analytics')}
-              />
-              <MetricCard
-                icon="&#x1F4DA;"
-                label="Knowledge Coverage"
-                value={totalDocs > 0 ? `${knowledgeCoverage}%` : '\u2014'}
-                variant={knowledgeCoverage >= 80 ? 'success' : knowledgeCoverage >= 50 ? 'warning' : knowledgeCoverage > 0 ? 'error' : 'default'}
-                onClick={() => navigate('/dashboard/knowledge')}
-              />
-              <MetricCard
-                icon="&#x1F504;"
-                label="Human Handoff"
-                value={`${handoffRate}%`}
-                variant={handoffRate <= 20 ? 'success' : handoffRate <= 50 ? 'warning' : 'error'}
-                onClick={() => navigate('/dashboard/analytics')}
-              />
-              <MetricCard
-                icon="&#x2B50;"
-                label="Satisfaction"
-                value={csat !== null ? `${csat}%` : '\u2014'}
-                variant={csat !== null ? (csat >= 70 ? 'success' : csat >= 40 ? 'warning' : 'error') : 'default'}
-                onClick={() => navigate('/dashboard/analytics')}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-4" aria-label="Charts and recommendations">
-              <PremiumCard variant="elevated" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Business Intelligence Report</PremiumCardTitle>
-                  <Badge variant="premium" size="sm">Beta</Badge>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  <div className="space-y-3 text-sm text-[rgba(255,255,255,0.78)]">
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Products & services</p>
-                      <p className="mt-1">{intelligenceReport.productsAndServices.join(', ')}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Pricing position</p>
-                      <p className="mt-1">{intelligenceReport.pricingPosition}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Ideal customer</p>
-                      <p className="mt-1">{intelligenceReport.idealCustomer}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] uppercase tracking-[0.2em] text-[rgba(255,255,255,0.4)]">Sales opportunity</p>
-                      <p className="mt-1">{intelligenceReport.salesOpportunity}</p>
-                    </div>
-                  </div>
-                </PremiumCardContent>
-              </PremiumCard>
-
-              <PremiumCard variant="elevated" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Conversations &mdash; Last 7 Days</PremiumCardTitle>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  <BarChart data={dailyCounts} label="Conversations per day" max={maxDailyCount} height={160} />
-                  <div className="flex justify-between mt-2">
-                    {last7Days.map((day, i) => (
-                      <span key={i} className="text-[10px] text-[rgba(255,255,255,0.3)]">{day.slice(0, 3)}</span>
-                    ))}
-                  </div>
-                </PremiumCardContent>
-              </PremiumCard>
-
-              <PremiumCard variant="elevated" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Confidence Trend &mdash; Last 7 Days</PremiumCardTitle>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  <ProgressIndicators data={dailyConfidence} days={last7Days} />
-                </PremiumCardContent>
-              </PremiumCard>
-
-              <PremiumCard variant="glass" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Today&rsquo;s Recommendations</PremiumCardTitle>
-                  <Badge variant="premium" size="sm">{recommendations.length}</Badge>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  <div className="space-y-2">
-                    {recommendations.map(r => (
-                      <RecommendationCard key={r.id} recommendation={r} onClick={() => navigate(r.href)} />
-                    ))}
-                  </div>
-                </PremiumCardContent>
-              </PremiumCard>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4" aria-label="Knowledge sources and topics">
-              <PremiumCard variant="elevated" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Top Knowledge Sources</PremiumCardTitle>
-                  <Badge variant="neutral" size="sm">{knowledgeSources.length} sources</Badge>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  {knowledgeSources.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <span className="text-2xl mb-2 block" aria-hidden="true">&#x1F4C4;</span>
-                      <p className="text-sm text-[rgba(255,255,255,0.5)]">No knowledge sources indexed yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {knowledgeSources.map((source, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between p-2.5 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)] transition-colors cursor-pointer"
-                          onClick={() => navigate('/dashboard/knowledge')}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Knowledge source: ${source.name}`}
-                          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/knowledge'); }}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <span className={cn(
-                              'w-2 h-2 rounded-full shrink-0',
-                              source.status === 'indexed' ? 'bg-[#3DDC97]' : source.status === 'failed' ? 'bg-[#F26D6D]' : 'bg-[#F5B454]',
-                            )} />
-                            <span className="text-sm text-[rgba(255,255,255,0.8)] truncate">{source.name}</span>
-                          </div>
-                          <span className="text-xs text-[rgba(255,255,255,0.4)] tabular-nums shrink-0 ml-3">
-                            {source.citationCount} citation{source.citationCount !== 1 ? 's' : ''}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {totalDocs > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[rgba(255,255,255,0.06)]">
-                      <div className="flex items-center justify-between text-xs text-[rgba(255,255,255,0.4)]">
-                        <span>{indexedDocs} of {totalDocs} documents indexed</span>
-                        <span>{knowledgeCoverage}% coverage</span>
-                      </div>
-                    </div>
-                  )}
-                </PremiumCardContent>
-              </PremiumCard>
-
-              <PremiumCard variant="elevated" padding="md">
-                <PremiumCardHeader>
-                  <PremiumCardTitle>Most Asked Topics</PremiumCardTitle>
-                  <Badge variant="neutral" size="sm">{topTopics.length} topics</Badge>
-                </PremiumCardHeader>
-                <PremiumCardContent>
-                  {topTopics.length === 0 ? (
-                    <div className="py-6 text-center">
-                      <span className="text-2xl mb-2 block" aria-hidden="true">&#x1F4AC;</span>
-                      <p className="text-sm text-[rgba(255,255,255,0.5)]">No conversation data yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {topTopics.map((topic, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between p-2.5 rounded-[var(--radius-md)] bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.06)] transition-colors cursor-pointer"
-                          onClick={() => navigate('/dashboard/conversations')}
-                          role="button"
-                          tabIndex={0}
-                          aria-label={`Topic: ${topic.topic}`}
-                          onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/conversations'); }}
-                        >
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="w-6 h-6 rounded-full bg-[rgba(168,36,75,0.12)] flex items-center justify-center text-xs text-[rgba(255,255,255,0.6)] shrink-0">
-                              {i + 1}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-sm text-[rgba(255,255,255,0.8)] truncate">{topic.topic}</p>
-                              <p className="text-[11px] text-[rgba(255,255,255,0.35)]">{topic.count} conversation{topic.count !== 1 ? 's' : ''}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 shrink-0 ml-3">
-                            <div className="w-16 h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
-                              <div className="h-full rounded-full bg-[rgba(168,36,75,0.6)]" style={{ width: `${topic.percentage}%` }} />
-                            </div>
-                            <span className="text-xs text-[rgba(255,255,255,0.4)] tabular-nums w-8 text-right">{topic.percentage}%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </PremiumCardContent>
-              </PremiumCard>
-            </div>
+            <span className="inline-flex items-center rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold text-foreground">
+              {planTrial ? 'Trial' : planName} plan
+            </span>
+            <DashButton onClick={() => navigate('/dashboard/widget')}>
+              <Zap className="size-4" /> Open widget
+            </DashButton>
           </>
-        )}
-      </div>
+        }
+      />
+
+      {isBusy ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="h-36 animate-pulse rounded-2xl border border-hairline bg-surface" />
+          ))}
+        </div>
+      ) : !hasData ? (
+        <EmptyState
+          icon={<MessageSquare className="size-6" />}
+          title="Welcome to your Dashboard"
+          body="Start by uploading knowledge sources and installing the widget. Your analytics and metrics will appear here once you have conversations."
+          actions={
+            <>
+              <DashButton onClick={() => navigate('/dashboard/knowledge')}>
+                <Upload className="size-4" /> Upload documents
+              </DashButton>
+              <DashButton variant="ghost" onClick={() => navigate('/dashboard/widget')}>
+                Install widget
+              </DashButton>
+            </>
+          }
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* ── AI Health + usage strip ── */}
+          <Panel className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <span className="grid size-12 place-items-center rounded-2xl bg-ember-soft text-primary">
+                <Activity className="size-6" />
+              </span>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">AI Health score</p>
+                <div className="mt-1.5 flex items-center gap-3">
+                  <div className="h-2 w-40 overflow-hidden rounded-full bg-surface-2">
+                    <div
+                      className={cn(
+                        'h-full rounded-full transition-all duration-500',
+                        healthScore >= 70 ? 'bg-success' : healthScore >= 40 ? 'bg-warning-500' : 'bg-error-500',
+                      )}
+                      style={{ width: `${healthScore}%` }}
+                    />
+                  </div>
+                  <span className="font-display text-2xl font-bold tabular-nums">{healthScore}</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Usage this month</p>
+                <p className="mt-1 font-display text-lg font-bold tabular-nums">
+                  {usageThisMonth} <span className="font-normal text-muted-foreground">/ {usageLimit}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Grounded answers</p>
+                <p className="mt-1 font-display text-lg font-bold tabular-nums">
+                  {dashboard?.groundedAnswerRate ? `${Math.round(dashboard.groundedAnswerRate * 100)}%` : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Last update</p>
+                <p className="mt-1 font-display text-lg font-bold">{formatDate(progress?.updatedAt)}</p>
+              </div>
+            </div>
+          </Panel>
+
+          {/* ── Key metrics ── */}
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              icon={<MessageSquare className="size-4" />}
+              label="Conversations"
+              value={totalSessions.toLocaleString()}
+              hint="Total captured this period"
+            />
+            <StatCard
+              icon={<Target className="size-4" />}
+              label="Resolution rate"
+              value={`${resolutionRate}%`}
+              hint={resolutionRate >= 70 ? 'Strong performance' : 'Room to improve'}
+            />
+            <StatCard
+              icon={<TrendingUp className="size-4" />}
+              label="Avg confidence"
+              value={`${avgConfidence}%`}
+              hint="Across all grounded answers"
+            />
+            <StatCard
+              icon={<BookOpen className="size-4" />}
+              label="Knowledge coverage"
+              value={totalDocs > 0 ? `${knowledgeCoverage}%` : '—'}
+              hint={`${indexedDocs} of ${totalDocs} documents indexed`}
+            />
+          </div>
+
+          {/* ── Recommended next move ── */}
+          <Panel>
+            <p className="text-xs uppercase tracking-wider text-muted-foreground">Recommended next move</p>
+            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl text-sm leading-7 text-foreground/85">{recommendedNextAction}</p>
+              <DashButton onClick={() => navigate('/dashboard/knowledge')}>
+                {recommendedNextAction.startsWith('Install') ? 'Install widget' : 'Go to knowledge'}
+                <ArrowRight className="size-4" />
+              </DashButton>
+            </div>
+          </Panel>
+
+          {/* ── Finish setup ── */}
+          <Panel>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight">Finish setup</h2>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold text-foreground">
+                <Rocket className="size-3.5" /> {isOnboardingComplete ? 'On track' : `${Math.min(3, (totalDocs > 0 ? 1 : 0) + (dashboard?.widgetInstalled ? 1 : 0) + (totalSessions > 0 ? 1 : 0))} of 3 done`}
+              </span>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <SetupStep done={totalDocs > 0} label="Upload knowledge sources" to="/dashboard/knowledge" onNavigate={navigate} index={0} />
+              <SetupStep done={!!dashboard?.widgetInstalled} label="Install the widget" to="/dashboard/widget" onNavigate={navigate} index={1} />
+              <SetupStep done={totalSessions > 0} label="First visitor conversation" to="/dashboard/conversations" onNavigate={navigate} index={2} />
+            </div>
+            <p className="mt-4 text-sm leading-6 text-muted-foreground">{businessProfileSummary}</p>
+          </Panel>
+
+          {/* ── Recommendations ── */}
+          <Panel>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight">Today's recommendations</h2>
+              <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{recommendations.length}</span>
+            </div>
+            <div className="mt-4 grid gap-2.5">
+              {recommendations.map(r => (
+                <RecommendationRow key={r.id} recommendation={r} onClick={() => navigate(r.href)} />
+              ))}
+            </div>
+          </Panel>
+
+          {/* ── Charts ── */}
+          <div className="grid gap-4 xl:grid-cols-3">
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Conversations — last 7 days</h2>
+              <div className="mt-6">
+                <BarChart data={dailyCounts} label="Conversations per day" max={maxDailyCount} height={160} />
+                <div className="mt-2 flex justify-between">
+                  {last7Days.map((day, i) => (
+                    <span key={i} className="text-[10px] text-muted-foreground">{day.slice(0, 3)}</span>
+                  ))}
+                </div>
+              </div>
+            </Panel>
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Confidence trend — last 7 days</h2>
+              <div className="mt-6">
+                <ProgressIndicators data={dailyConfidence} days={last7Days} />
+              </div>
+            </Panel>
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Business intelligence</h2>
+              <div className="mt-4 space-y-3 text-sm">
+                <div>
+                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Sales opportunity</p>
+                  <p className="mt-1 leading-6 text-foreground/85">{businessProfile?.recommendedNextAction || 'A stronger first-contact path should increase demo conversion as soon as the widget engages visitors.'}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-2.5 py-1 text-xs font-medium">
+                    <Heart className="size-3 text-primary" /> Trust building
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-2.5 py-1 text-xs font-medium">
+                    <Star className="size-3 text-primary" /> Conversion focus
+                  </span>
+                </div>
+              </div>
+            </Panel>
+          </div>
+
+          {/* ── Knowledge sources + topics ── */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Panel>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold tracking-tight">Top knowledge sources</h2>
+                <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{knowledgeSources.length} sources</span>
+              </div>
+              {knowledgeSources.length === 0 ? (
+                <p className="mt-6 text-sm text-muted-foreground">No knowledge sources indexed yet</p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {knowledgeSources.map((source, i) => (
+                    <div
+                      key={i}
+                      className="flex cursor-pointer items-center justify-between rounded-xl bg-surface-2/60 p-3 transition hover:-translate-y-px hover:shadow-soft"
+                      onClick={() => navigate('/dashboard/knowledge')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/knowledge'); }}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className={cn(
+                          'size-2 shrink-0 rounded-full',
+                          source.status === 'indexed' ? 'bg-success' : source.status === 'failed' ? 'bg-error-500' : 'bg-warning-500',
+                        )} />
+                        <span className="truncate text-sm">{source.name}</span>
+                      </div>
+                      <span className="ml-3 shrink-0 text-xs tabular-nums text-muted-foreground">
+                        {source.citationCount} citation{source.citationCount !== 1 ? 's' : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {totalDocs > 0 && (
+                <div className="mt-4 flex items-center justify-between border-t border-hairline pt-4 text-xs text-muted-foreground">
+                  <span>{indexedDocs} of {totalDocs} documents indexed</span>
+                  <span>{knowledgeCoverage}% coverage</span>
+                </div>
+              )}
+            </Panel>
+            <Panel>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold tracking-tight">Most asked topics</h2>
+                <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{topTopics.length} topics</span>
+              </div>
+              {topTopics.length === 0 ? (
+                <p className="mt-6 text-sm text-muted-foreground">No conversation data yet</p>
+              ) : (
+                <div className="mt-4 space-y-2">
+                  {topTopics.map((topic, i) => (
+                    <div
+                      key={i}
+                      className="flex cursor-pointer items-center justify-between rounded-xl bg-surface-2/60 p-3 transition hover:-translate-y-px hover:shadow-soft"
+                      onClick={() => navigate('/dashboard/conversations')}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate('/dashboard/conversations'); }}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="grid size-6 shrink-0 place-items-center rounded-full bg-ember-soft text-xs font-semibold text-foreground">
+                          {i + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm">{topic.topic}</p>
+                          <p className="text-[11px] text-muted-foreground">{topic.count} conversation{topic.count !== 1 ? 's' : ''}</p>
+                        </div>
+                      </div>
+                      <div className="ml-3 flex shrink-0 items-center gap-2">
+                        <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${topic.percentage}%` }} />
+                        </div>
+                        <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{topic.percentage}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Panel>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

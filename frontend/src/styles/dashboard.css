@@ -1,0 +1,193 @@
+/* ─── BurFlow Dashboard theme ────────────────────────────────────
+   Global semantic token system (port of the dashboard reference).
+   Tailwind v3 emits utilities that reference these CSS variables;
+   the `.dark` class (toggled by ThemeProvider) swaps the palette. */
+
+:root {
+  --radius: 0.5rem;
+
+  --background: oklch(0.988 0.006 165);
+  --foreground: oklch(0.24 0.045 168);
+  --ink: oklch(0.24 0.05 168);
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.965 0.014 168);
+  --hairline: oklch(0.9 0.018 168);
+  --ember: oklch(0.44 0.09 167);
+  --ember-soft: oklch(0.955 0.03 167);
+  --success: oklch(0.72 0.11 165);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.24 0.045 168);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.24 0.045 168);
+  --primary: oklch(0.44 0.09 167);
+  --primary-foreground: oklch(0.99 0.006 165);
+  --secondary: oklch(0.965 0.014 168);
+  --secondary-foreground: oklch(0.24 0.045 168);
+  --muted: oklch(0.965 0.014 168);
+  --muted-foreground: oklch(0.52 0.02 168);
+  --accent: oklch(0.955 0.03 167);
+  --accent-foreground: oklch(0.36 0.08 167);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(0.9 0.018 168);
+  --input: oklch(0.9 0.018 168);
+  --ring: oklch(0.44 0.09 167);
+
+  --shadow-soft:
+    0 1px 2px oklch(0.24 0.05 168 / 0.05),
+    0 12px 32px -16px oklch(0.24 0.05 168 / 0.2);
+  --shadow-lift:
+    0 2px 4px oklch(0.24 0.05 168 / 0.07),
+    0 28px 60px -24px oklch(0.24 0.05 168 / 0.3);
+  --shadow-glow:
+    0 0 0 1px color-mix(in oklab, var(--primary) 14%, transparent),
+    0 24px 70px -30px color-mix(in oklab, var(--primary) 60%, transparent);
+
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
+  --sidebar: oklch(0.984 0.003 247.858);
+  --sidebar-foreground: oklch(0.129 0.042 264.695);
+  --sidebar-primary: oklch(0.208 0.042 265.755);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.968 0.007 247.896);
+  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
+  --sidebar-border: oklch(0.929 0.013 255.508);
+  --sidebar-ring: oklch(0.704 0.04 256.788);
+}
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --ink: oklch(0.984 0.003 247.858);
+  --surface: oklch(0.208 0.042 265.755);
+  --surface-2: oklch(0.279 0.041 260.031);
+  --hairline: oklch(1 0 0 / 10%);
+  --ember: oklch(0.929 0.013 255.508);
+  --ember-soft: oklch(0.279 0.041 260.031);
+  --success: oklch(0.696 0.17 162.48);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'DM Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4 {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  letter-spacing: -0.03em;
+}
+
+/* ── Utilities (Tailwind v3 stand-ins for the reference @utility blocks) ── */
+
+.eyebrow {
+  font-family: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ember);
+}
+
+.shadow-soft { box-shadow: var(--shadow-soft); }
+.shadow-lift { box-shadow: var(--shadow-lift); }
+.shadow-glow { box-shadow: var(--shadow-glow); }
+
+.aurora {
+  position: relative;
+  isolation: isolate;
+}
+
+.aurora-layer {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 12% 0%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 70%),
+    radial-gradient(50% 45% at 88% 8%, color-mix(in oklab, var(--success) 22%, transparent), transparent 70%),
+    radial-gradient(70% 60% at 50% 100%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 75%);
+}
+
+.grid-fade {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--ink) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--ink) 6%, transparent) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(72% 60% at 50% 30%, black, transparent 80%);
+  -webkit-mask-image: radial-gradient(72% 60% at 50% 30%, black, transparent 80%);
+}
+
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+
+[data-reveal='in'] {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 55%, transparent); }
+  70% { box-shadow: 0 0 0 8px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+.live-dot { animation: pulse-ring 2.4s ease-out infinite; }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.marquee-track { animation: marquee 32s linear infinite; }

@@ -5,48 +5,94 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['IBM Plex Sans', 'system-ui', '-apple-system', 'sans-serif'],
+        sans: ['DM Sans', 'system-ui', '-apple-system', 'sans-serif'],
         display: ['Space Grotesk', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['IBM Plex Mono', 'Fira Code', 'monospace'],
         // Landing page body font (BurFlow marketing site)
         body: ['DM Sans', 'system-ui', '-apple-system', 'sans-serif']
       },
+      borderRadius: {
+        sm: 'calc(var(--radius) - 4px)',
+        md: 'calc(var(--radius) - 2px)',
+        lg: 'var(--radius)',
+        xl: 'calc(var(--radius) + 4px)',
+        '2xl': 'calc(var(--radius) + 8px)',
+        '3xl': 'calc(var(--radius) + 12px)',
+        '4xl': 'calc(var(--radius) + 16px)'
+      },
       colors: {
-        // ── Landing page palette (tokens scoped under `.landing`) ──
-        background: 'var(--lp-background)',
-        foreground: 'var(--lp-foreground)',
-        ink: 'var(--lp-ink)',
-        surface: 'var(--lp-surface)',
-        'surface-2': 'var(--lp-surface-2)',
-        hairline: 'var(--lp-hairline)',
-        ember: 'var(--lp-ember)',
-        'ember-soft': 'var(--lp-ember-soft)',
-        primary: {
-          DEFAULT: 'var(--lp-primary)',
-          foreground: 'var(--lp-primary-foreground)'
-        },
+        // ── Global semantic palette (dashboard + landing) ──
+        background: 'var(--background)',
+        foreground: 'var(--foreground)',
+        ink: 'var(--ink)',
+        surface: 'var(--surface)',
+        'surface-2': 'var(--surface-2)',
+        hairline: 'var(--hairline)',
+        ember: 'var(--ember)',
+        'ember-soft': 'var(--ember-soft)',
         success: {
-          DEFAULT: 'var(--lp-success)',
+          DEFAULT: 'var(--success)',
           '300': '#7FB08F',
           '500': '#3F7855'
         },
+        primary: {
+          DEFAULT: 'var(--primary)',
+          foreground: 'var(--primary-foreground)'
+        },
+        secondary: {
+          DEFAULT: 'var(--secondary)',
+          foreground: 'var(--secondary-foreground)'
+        },
+        muted: {
+          DEFAULT: 'var(--muted)',
+          foreground: 'var(--muted-foreground)'
+        },
         accent: {
-          DEFAULT: 'var(--lp-accent)',
-          foreground: 'var(--lp-accent-foreground)',
+          DEFAULT: 'var(--accent)',
+          foreground: 'var(--accent-foreground)',
           '200': '#E8C7CE',
           '400': '#B96478',
           '500': '#93304A',
           '600': '#7A2038',
           '700': '#5C1729'
         },
-        muted: {
-          DEFAULT: 'var(--lp-muted)',
-          foreground: 'var(--lp-muted-foreground)'
+        card: {
+          DEFAULT: 'var(--card)',
+          foreground: 'var(--card-foreground)'
         },
-        card: 'var(--lp-surface)',
-        'card-foreground': 'var(--lp-foreground)',
-        popover: 'var(--lp-surface)',
-        'popover-foreground': 'var(--lp-foreground)',
+        popover: {
+          DEFAULT: 'var(--popover)',
+          foreground: 'var(--popover-foreground)'
+        },
+        destructive: {
+          DEFAULT: 'var(--destructive)',
+          foreground: 'var(--destructive-foreground)'
+        },
+        border: 'var(--border)',
+        input: 'var(--input)',
+        ring: 'var(--ring)',
+        'ring-offset-background': 'var(--background)',
+        chart: {
+          '1': 'var(--chart-1)',
+          '2': 'var(--chart-2)',
+          '3': 'var(--chart-3)',
+          '4': 'var(--chart-4)',
+          '5': 'var(--chart-5)'
+        },
+        sidebar: {
+          DEFAULT: 'var(--sidebar)',
+          foreground: 'var(--sidebar-foreground)',
+          primary: {
+            DEFAULT: 'var(--sidebar-primary)',
+            foreground: 'var(--sidebar-primary-foreground)'
+          },
+          accent: {
+            DEFAULT: 'var(--sidebar-accent)',
+            foreground: 'var(--sidebar-accent-foreground)'
+          },
+          border: 'var(--sidebar-border)',
+          ring: 'var(--sidebar-ring)'
+        },
         warning: {
           '300': '#D9AE5C',
           '500': '#A87A1E',
@@ -62,9 +108,9 @@ module.exports = {
         }
       },
       boxShadow: {
-        soft: 'var(--lp-shadow-soft)',
-        lift: 'var(--lp-shadow-lift)',
-        glow: 'var(--lp-shadow-glow)'
+        soft: 'var(--shadow-soft)',
+        lift: 'var(--shadow-lift)',
+        glow: 'var(--shadow-glow)'
       }
     }
   }

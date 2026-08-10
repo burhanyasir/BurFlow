@@ -24,6 +24,7 @@ export function ThemeProvider({
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
     localStorage.setItem('ce-theme', theme);
   }, [theme]);
 

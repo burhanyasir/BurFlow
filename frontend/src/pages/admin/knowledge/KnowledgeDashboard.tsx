@@ -1,22 +1,20 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout, DashboardContent, DashboardSection, DashboardTable, DashboardSearch, DashboardPagination, DashboardMetricGrid, DashboardEmptyState, DashboardLoadingState, DashboardErrorState, Badge } from '../../../components/dashboard';
-import type { NavItem, Column } from '../../../components/dashboard';
+import { DashboardLayout } from '../../../components/dashboard';
+import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
 import { fetchWithAuth } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Book, FileText, Globe, RefreshCw, Trash2, Upload, CheckCircle, XCircle, Clock, ScanSearch } from 'lucide-react';
+import { AlertTriangle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Globe, RefreshCw, Search, Sparkles, Trash2, Upload } from 'lucide-react';
 import { WebsiteScannerModal } from '../../../components/dashboard/knowledge/WebsiteScannerModal';
-import { ScanProgressCard } from '../../../components/dashboard/knowledge/ScanProgressCard';
-import { BrandIntelligenceCard } from '../../../components/dashboard/knowledge/BrandIntelligenceCard';
 import type { WebsiteScan } from '../../../components/dashboard/knowledge/types';
 
-const NAV_ITEMS: NavItem[] = [
+const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Conversations', href: '/dashboard/conversations' },
   { label: 'Analytics', href: '/dashboard/analytics' },
-  { label: 'Knowledge', href: '/dashboard/knowledge', active: true },
+  { label: 'Knowledge', href: '/dashboard/knowledge' },
   { label: 'Widget', href: '/dashboard/widget' },
   { label: 'Billing', href: '/dashboard/billing' },
   { label: 'Onboarding', href: '/dashboard/onboarding' },
@@ -35,9 +33,15 @@ interface MonitoringStats {
 
 type FilterTab = 'all' | 'published' | 'processing' | 'failed';
 
-const STATUS_BADGE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
-  published: 'success', queued: 'warning', processing: 'info', failed: 'error', parsing: 'info', embedding: 'info',
-};
+const SCAN_COUNTS: { key: keyof Pick<WebsiteScan, 'pagesDiscovered' | 'pagesScanned' | 'pagesIndexed' | 'pagesAdded' | 'pagesUpdated' | 'pagesUnchanged' | 'pagesDeleted'>; label: string; accent?: boolean }[] = [
+  { key: 'pagesDiscovered', label: 'Discovered' },
+  { key: 'pagesScanned', label: 'Scanned' },
+  { key: 'pagesIndexed', label: 'Indexed', accent: true },
+  { key: 'pagesAdded', label: 'Added', accent: true },
+  { key: 'pagesUpdated', label: 'Updated' },
+  { key: 'pagesUnchanged', label: 'Unchanged' },
+  { key: 'pagesDeleted', label: 'Deleted' },
+];
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return '—';
@@ -45,6 +49,38 @@ function formatDate(dateStr: string): string {
   const days = Math.floor(diff / 86400000);
   if (days === 0) return 'Today'; if (days === 1) return 'Yesterday'; if (days < 7) return `${days}d ago`;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatWhen(dateStr?: string): string {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  const diff = Date.now() - d.getTime();
+  if (diff < 60_000) return 'just now';
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function StatusChip({ label, chipClass, dotClass }: { label: string; chipClass: string; dotClass: string }) {
+  return (
+    <span className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold', chipClass)}>
+      <span className={cn('size-2 rounded-full', dotClass)} />
+      {label}
+    </span>
+  );
+}
+
+function docStatusStyle(status: string): { chipClass: string; dotClass: string } {
+  if (status === 'failed') return { chipClass: 'bg-error-300/25 text-foreground', dotClass: 'bg-error-500' };
+  if (status === 'published') return { chipClass: 'bg-ember-soft text-foreground', dotClass: 'bg-success' };
+  return { chipClass: 'bg-warning-300/25 text-foreground', dotClass: 'bg-warning-500' };
+}
+
+function scanStatusStyle(status: WebsiteScan['status']) {
+  switch (status) {
+    case 'failed': return { chipClass: 'bg-error-300/25 text-foreground', dotClass: 'bg-error-500' };
+    case 'completed': return { chipClass: 'bg-ember-soft text-foreground', dotClass: 'bg-success' };
+    default: return { chipClass: 'bg-warning-300/25 text-foreground', dotClass: 'bg-warning-500' };
+  }
 }
 
 export default function KnowledgeDashboard() {
@@ -127,6 +163,8 @@ export default function KnowledgeDashboard() {
     }
   }, [latestScan?.status, loadDocs, loadMonitoring]);
 
+  const handleRefresh = useCallback(() => { loadDocs(); loadMonitoring(); loadScanStatus(); }, [loadDocs, loadMonitoring, loadScanStatus]);
+
   const handleDelete = async (documentId: string) => {
     try { await fetchWithAuth(`/api/admin/knowledge/documents/${documentId}`, { method: 'DELETE' }); addToast('Document deleted', 'success'); loadDocs(); loadMonitoring(); }
     catch { addToast('Failed to delete document', 'error'); }
@@ -159,34 +197,9 @@ export default function KnowledgeDashboard() {
   const processingCount = (monitoring?.processingDocuments || 0) + (monitoring?.queuedDocuments || 0);
   const totalPages = Math.ceil(total / pageSize);
 
-  const columns: Column<KnowledgeDoc>[] = useMemo(() => [
-    { key: 'select', header: <input type="checkbox" checked={selectedDocs.size === docs.length && docs.length > 0} onChange={toggleSelectAll} className="w-4 h-4 rounded border-hairline bg-transparent text-wine focus:ring-wine/30 cursor-pointer" aria-label="Select all" />, cell: (doc) => (
-      <input type="checkbox" checked={selectedDocs.has(doc.documentId)} onChange={() => toggleSelectDoc(doc.documentId)} className="w-4 h-4 rounded border-hairline bg-transparent text-wine focus:ring-wine/30 cursor-pointer" aria-label={`Select ${doc.title || doc.originalName}`} onClick={(e) => e.stopPropagation()} />
-    ), className: 'w-10' },
-    { key: 'name', header: 'Name', sortable: true, cell: (doc) => (
-      <div className="flex items-center gap-2.5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wine/[0.12] shrink-0"><FileText className="h-4 w-4 text-wine" /></div>
-        <div className="min-w-0">
-          <div className="truncate text-sm font-medium text-foreground">{doc.title || doc.originalName}</div>
-          <div className="text-xs text-muted-foreground">{doc.sourceType} · {doc.chunkCount} chunks</div>
-        </div>
-      </div>
-    )},
-    { key: 'status', header: 'Status', cell: (doc) => <Badge variant={STATUS_BADGE[doc.status] || 'neutral'} size="sm" dot>{doc.status}</Badge>, className: 'hidden sm:table-cell' },
-    { key: 'updated', header: 'Updated', cell: (doc) => <span className="text-xs text-muted-foreground">{formatDate(doc.updatedAt)}</span>, className: 'hidden md:table-cell' },
-    { key: 'actions', header: '', cell: (doc) => (
-      <div className="flex items-center gap-1 justify-end">
-        {doc.status === 'failed' && (
-          <button onClick={(e) => { e.stopPropagation(); handleRetry(doc.documentId); }} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition" aria-label="Retry">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </button>
-        )}
-        <button onClick={(e) => { e.stopPropagation(); handleDelete(doc.documentId); }} className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/[0.06] transition" aria-label="Delete">
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    ), className: 'w-20' },
-  ], [selectedDocs, docs]);
+  const scanProgress = latestScan && latestScan.pagesDiscovered > 0
+    ? Math.round((latestScan.pagesScanned / latestScan.pagesDiscovered) * 100)
+    : 0;
 
   const FILTER_TABS: { key: FilterTab; label: string }[] = [
     { key: 'all', label: 'All' }, { key: 'published', label: 'Published' },
@@ -194,118 +207,378 @@ export default function KnowledgeDashboard() {
   ];
 
   if (loading && !monitoring) {
-    return <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}><DashboardContent loading /></DashboardLayout>;
+    return (
+      <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
+        <div className="space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map(i => (
+              <div key={i} className="h-36 animate-pulse rounded-2xl border border-hairline bg-surface" />
+            ))}
+          </div>
+          <div className="h-72 animate-pulse rounded-3xl border border-hairline bg-surface" />
+        </div>
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
-      <DashboardContent>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-[15px] font-medium text-foreground">Knowledge Center</h1>
-              <p className="text-sm text-muted-foreground">Manage documents, sources, and processing</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setScanModalOpen(true)} className="inline-flex items-center gap-1.5 rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04]">
-                <ScanSearch className="h-3.5 w-3.5" />
-                Scan Website
-              </button>
-              <button onClick={() => navigate('/dashboard/onboarding')} className="btn-wine rounded-xl px-3 py-1.5 text-xs">Upload Document</button>
-            </div>
-          </div>
+      <div className="space-y-6">
+        <PageHead
+          title="Knowledge base"
+          sub="Manage the documents and sources your chatbot learns from to answer customer questions."
+          actions={
+            <>
+              <DashButton variant="ghost" onClick={handleRefresh}>
+                <RefreshCw className="size-4" /> Refresh
+              </DashButton>
+              <DashButton variant="ghost" onClick={() => setScanModalOpen(true)}>
+                <Globe className="size-4" /> Scan website
+              </DashButton>
+              <DashButton onClick={() => navigate('/dashboard/onboarding')}>
+                <Upload className="size-4" /> Add documents
+              </DashButton>
+            </>
+          }
+        />
 
-          {/* Website Scanner */}
+        {/* Website scan status */}
+        {latestScan && (
           <div className="grid gap-4 lg:grid-cols-3">
-            <ScanProgressCard scan={latestScan} onRefresh={loadScanStatus} onScheduleChange={handleScheduleChange} className="lg:col-span-2" />
-            <BrandIntelligenceCard scan={latestScan} />
-          </div>
-
-          {/* Metric Cards */}
-          {monitoring && (
-            <DashboardMetricGrid columns={4}>
-              {[
-                { icon: <Book className="h-4 w-4" />, label: 'Knowledge Sources', value: monitoring.indexedDocuments, onClick: () => navigate('/dashboard/onboarding') },
-                { icon: <FileText className="h-4 w-4" />, label: 'Documents', value: monitoring.totalDocuments, variant: 'success' as const, onClick: () => navigate('/dashboard/onboarding') },
-                { icon: <Globe className="h-4 w-4" />, label: 'Website Crawls', value: websiteCount, onClick: () => navigate('/dashboard/onboarding?tab=website') },
-                { icon: <RefreshCw className="h-4 w-4" />, label: 'Processing Queue', value: processingCount, variant: processingCount > 0 ? ('warning' as const) : ('default' as const), onClick: () => setProcessingExpanded((p: boolean) => !p) },
-              ].map(m => (
-                <div key={m.label} onClick={m.onClick} className={cn('glass rounded-2xl p-5 transition duration-300 cursor-pointer hover:-translate-y-0.5 hover:border-border-strong')}>
-                  <div className={cn('flex h-9 w-9 items-center justify-center rounded-xl', m.variant === 'success' ? 'bg-success/[0.1] text-success' : m.variant === 'warning' ? 'bg-warning/[0.1] text-warning' : 'bg-wine/[0.1] text-wine')}>{m.icon}</div>
-                  <p className="mt-3 text-2xl font-bold text-foreground tabular-nums">{m.value}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{m.label}</p>
+            <Panel className="lg:col-span-2">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ember-soft text-primary">
+                    <Globe className={cn('size-4', scanActive && 'animate-pulse')} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{latestScan.rootUrl}</p>
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                      <Clock className="size-3" />
+                      {scanActive ? `Started ${formatWhen(latestScan.startedAt)}` : `Finished ${formatWhen(latestScan.completedAt)}`}
+                      {latestScan.schedule !== 'manual' && <span>· Auto {latestScan.schedule}</span>}
+                    </p>
+                  </div>
                 </div>
-              ))}
-            </DashboardMetricGrid>
-          )}
+                <div className="flex items-center gap-2">
+                  <StatusChip label={latestScan.status} {...scanStatusStyle(latestScan.status)} />
+                  <select
+                    value={latestScan.schedule}
+                    onChange={(e) => handleScheduleChange(e.target.value as WebsiteScan['schedule'])}
+                    className="rounded-full border border-hairline bg-surface px-3 py-1.5 text-xs text-foreground outline-none transition focus:border-primary/40"
+                    aria-label="Scan schedule"
+                  >
+                    <option value="manual">Manual</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                  </select>
+                  <button
+                    onClick={loadScanStatus}
+                    className="grid size-8 place-items-center rounded-full border border-hairline bg-surface text-muted-foreground transition hover:text-foreground"
+                    aria-label="Refresh scan status"
+                  >
+                    <RefreshCw className={cn('size-3.5', scanActive && 'animate-spin')} />
+                  </button>
+                </div>
+              </div>
 
-          {/* Empty state */}
-          {!loading && monitoring && monitoring.totalDocuments === 0 && (
-            <DashboardEmptyState icon={<FileText className="h-6 w-6" />} title="Upload your first document" description="Add PDFs, text files, or connect a website. Your chatbot learns from these to answer customer questions accurately." primaryAction={{ label: 'Upload Document', onClick: () => navigate('/dashboard/onboarding') }} secondaryAction={{ label: 'Crawl a website', onClick: () => navigate('/dashboard/onboarding?tab=website') }} />
-          )}
+              <div className="mt-5">
+                <div className="mb-1.5 flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Crawl progress</span>
+                  <span className="text-xs font-semibold tabular-nums">{scanProgress}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-surface-2" role="progressbar" aria-valuenow={scanProgress} aria-valuemin={0} aria-valuemax={100}>
+                  <div className={cn('h-full rounded-full transition-all duration-500', scanActive ? 'bg-primary animate-pulse' : 'bg-success')} style={{ width: `${Math.min(scanProgress, 100)}%` }} />
+                </div>
+              </div>
 
-          {/* Processing Queue */}
-          {monitoring && processingDocs.length > 0 && (
-            <DashboardSection title="Processing Queue" actions={<Badge variant="info" size="sm">{processingDocs.length}</Badge>} variant="card">
-              <button onClick={() => setProcessingExpanded(p => !p)} className="flex items-center gap-2 text-sm font-medium text-foreground mb-3" aria-expanded={processingExpanded}>
-                <svg className={cn('h-4 w-4 transition', processingExpanded && 'rotate-90')} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
-                Show queue
-              </button>
-              {processingExpanded && (
-                <div className="space-y-2">
-                  {processingDocs.map(doc => (
-                    <div key={doc.documentId} className="flex items-center gap-3 rounded-xl border border-hairline bg-white/[0.02] p-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-wine/[0.1] shrink-0"><RefreshCw className="h-4 w-4 animate-spin text-wine" /></div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-foreground truncate">{doc.title || doc.originalName}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <Badge variant={STATUS_BADGE[doc.status] || 'neutral'} size="sm">{doc.status}</Badge>
-                          {doc.chunkCount > 0 && <span className="text-xs text-muted-foreground">{doc.chunkCount} chunks</span>}
-                        </div>
+              <div className="mt-5 grid grid-cols-4 gap-2 sm:grid-cols-7">
+                {SCAN_COUNTS.map(item => (
+                  <div key={item.key} className="rounded-xl border border-hairline bg-surface-2/60 px-2 py-2 text-center">
+                    <p className={cn('text-sm font-bold tabular-nums', item.accent ? 'text-primary' : 'text-foreground')}>{latestScan[item.key]}</p>
+                    <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+
+              {latestScan.lastError && (
+                <p className="mt-4 rounded-xl border border-error-300/25 bg-error-300/25 px-3 py-2 text-xs text-foreground">
+                  {latestScan.lastError}
+                </p>
+              )}
+            </Panel>
+
+            {latestScan.brandTone && (
+              <Panel>
+                <div className="flex items-center gap-3">
+                  <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-ember-soft text-primary">
+                    <Sparkles className="size-4" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-semibold">Brand Intelligence</p>
+                    <p className="text-xs text-muted-foreground">Detected from the latest website scan</p>
+                  </div>
+                </div>
+                <div className="mt-5 space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-xs uppercase tracking-wider text-muted-foreground">Brand tone</span>
+                    <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold text-foreground">{latestScan.brandTone}</span>
+                  </div>
+                  {latestScan.primaryCtas.length > 0 && (
+                    <div className="flex items-start justify-between gap-4">
+                      <span className="pt-1 text-xs uppercase tracking-wider text-muted-foreground">Primary CTAs</span>
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {latestScan.primaryCtas.map(cta => (
+                          <span key={cta} className="rounded-full border border-hairline bg-surface-2/60 px-2.5 py-1 text-xs">{cta}</span>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+                  {typeof latestScan.confidenceScore === 'number' && (
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-xs uppercase tracking-wider text-muted-foreground">Confidence</span>
+                        <span className="text-xs font-semibold tabular-nums">{Math.round(latestScan.confidenceScore * 100)}%</span>
+                      </div>
+                      <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
+                        <div className="h-full rounded-full bg-success" style={{ width: `${Math.min(Math.round(latestScan.confidenceScore * 100), 100)}%` }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </DashboardSection>
-          )}
+              </Panel>
+            )}
+          </div>
+        )}
 
-          {/* Document Table */}
-          {monitoring && monitoring.totalDocuments > 0 && (
-            <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <DashboardSearch value={searchQuery} onChange={(v) => { setSearchQuery(v); setPage(0); }} placeholder="Search documents..." className="max-w-sm" />
+        {/* Key metrics */}
+        {monitoring && (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              icon={<CheckCircle2 className="size-4" />}
+              label="Indexed documents"
+              value={String(monitoring.indexedDocuments)}
+              hint={`${Math.round((monitoring.indexedDocuments / Math.max(monitoring.totalDocuments, 1)) * 100)}% of all documents`}
+            />
+            <StatCard
+              icon={<FileText className="size-4" />}
+              label="Total documents"
+              value={String(monitoring.totalDocuments)}
+              hint={`${websiteCount} from website crawls`}
+            />
+            <StatCard
+              icon={<AlertTriangle className="size-4" />}
+              label="Failed documents"
+              value={String(monitoring.failedDocuments)}
+              hint={`${processingCount} still in queue`}
+            />
+            <StatCard
+              icon={<BookOpen className="size-4" />}
+              label="Knowledge chunks"
+              value={String(monitoring.totalChunks)}
+              hint="Chunks indexed for retrieval"
+            />
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!loading && monitoring && monitoring.totalDocuments === 0 && (
+          <EmptyState
+            icon={<FileText className="size-6" />}
+            title="Upload your first document"
+            body="Add PDFs, text files, or connect a website. Your chatbot learns from these to answer customer questions accurately."
+            actions={
+              <>
+                <DashButton onClick={() => navigate('/dashboard/onboarding')}>
+                  <Upload className="size-4" /> Add documents
+                </DashButton>
+                <DashButton variant="ghost" onClick={() => setScanModalOpen(true)}>
+                  <Globe className="size-4" /> Crawl a website
+                </DashButton>
+              </>
+            }
+          />
+        )}
+
+        {/* Processing queue */}
+        {monitoring && processingDocs.length > 0 && (
+          <Panel>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight">Processing queue</h2>
+              <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{processingDocs.length}</span>
+            </div>
+            <button
+              onClick={() => setProcessingExpanded(p => !p)}
+              className="mt-2 flex items-center gap-1.5 text-sm font-medium text-foreground"
+              aria-expanded={processingExpanded}
+            >
+              <ChevronRight className={cn('size-4 text-muted-foreground transition-transform', processingExpanded && 'rotate-90')} />
+              Show queue
+            </button>
+            {processingExpanded && (
+              <div className="mt-4 space-y-2">
+                {processingDocs.map(doc => {
+                  const s = docStatusStyle(doc.status);
+                  return (
+                    <div key={doc.documentId} className="flex items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 p-3">
+                      <RefreshCw className="size-4 shrink-0 animate-spin text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm">{doc.title || doc.originalName}</p>
+                        {doc.chunkCount > 0 && <p className="mt-0.5 text-xs text-muted-foreground">{doc.chunkCount} chunks</p>}
+                      </div>
+                      <StatusChip label={doc.status} chipClass={s.chipClass} dotClass={s.dotClass} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </Panel>
+        )}
+
+        {/* Documents list */}
+        {monitoring && monitoring.totalDocuments > 0 && (
+          <Panel>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-bold tracking-tight">Documents</h2>
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={selectedDocs.size === docs.length && docs.length > 0}
+                    onChange={toggleSelectAll}
+                    className="size-4 rounded border-hairline bg-transparent text-primary focus:ring-primary/30"
+                    aria-label="Select all"
+                  />
+                  Select all
+                </label>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+                    placeholder="Search documents…"
+                    className="h-9 w-full rounded-full border border-hairline bg-surface pl-9 pr-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40 focus:shadow-glow sm:w-56"
+                  />
+                </div>
                 <div className="flex items-center gap-1" role="tablist">
                   {FILTER_TABS.map(tab => (
-                    <button key={tab.key} role="tab" aria-selected={activeFilter === tab.key} onClick={() => { setActiveFilter(tab.key); setPage(0); }}
-                      className={cn('px-3 py-1.5 text-xs font-medium rounded-lg transition', activeFilter === tab.key ? 'wine-gradient text-white' : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04] border border-transparent')}>
+                    <button
+                      key={tab.key}
+                      role="tab"
+                      aria-selected={activeFilter === tab.key}
+                      onClick={() => { setActiveFilter(tab.key); setPage(0); }}
+                      className={cn(
+                        'rounded-full px-3 py-1.5 text-xs font-semibold transition',
+                        activeFilter === tab.key ? 'bg-ember-soft text-foreground' : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
+                      )}
+                    >
                       {tab.label}
                     </button>
                   ))}
                 </div>
               </div>
+            </div>
 
-              <DashboardTable columns={columns} data={filteredDocs} loading={loading} empty={filteredDocs.length === 0 && !loading} onRowClick={(doc) => {/* could open detail */}} rowKey={(d) => d.documentId} />
-
-              {totalPages > 1 && (
-                <DashboardPagination total={total} page={page + 1} pageSize={pageSize} onPageChange={(p) => setPage(p - 1)} />
+            <div className="mt-5 space-y-2">
+              {loading ? (
+                [0, 1, 2].map(i => (
+                  <div key={i} className="h-16 animate-pulse rounded-xl border border-hairline bg-surface-2/60" />
+                ))
+              ) : filteredDocs.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">No documents match your search.</p>
+              ) : (
+                filteredDocs.map(doc => {
+                  const s = docStatusStyle(doc.status);
+                  return (
+                    <div key={doc.documentId} className="flex items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 p-3">
+                      <input
+                        type="checkbox"
+                        checked={selectedDocs.has(doc.documentId)}
+                        onChange={() => toggleSelectDoc(doc.documentId)}
+                        className="size-4 shrink-0 rounded border-hairline bg-transparent text-primary focus:ring-primary/30"
+                        aria-label={`Select ${doc.title || doc.originalName}`}
+                      />
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-ember-soft text-primary">
+                        <FileText className="size-4" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{doc.title || doc.originalName}</p>
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {doc.sourceType} · {doc.chunkCount} chunks · {formatDate(doc.updatedAt)}
+                        </p>
+                      </div>
+                      <StatusChip label={doc.status} chipClass={s.chipClass} dotClass={s.dotClass} />
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        {doc.status === 'failed' && (
+                          <button
+                            onClick={() => handleRetry(doc.documentId)}
+                            className="grid size-8 place-items-center rounded-full border border-hairline bg-surface text-muted-foreground transition hover:text-foreground"
+                            aria-label="Retry"
+                          >
+                            <RefreshCw className="size-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDelete(doc.documentId)}
+                          className="grid size-8 place-items-center rounded-full border border-hairline bg-surface text-muted-foreground transition hover:border-error-300/40 hover:text-error-500"
+                          aria-label="Delete"
+                        >
+                          <Trash2 className="size-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-          )}
 
-          {/* Bulk action bar */}
-          {selectedDocs.size > 0 && (
-            <div className="sticky bottom-4 z-20 flex items-center justify-between rounded-2xl border border-wine/20 bg-wine/[0.12] px-5 py-3 backdrop-blur-2xl shadow-lg">
-              <span className="text-sm font-medium text-foreground">{selectedDocs.size} document(s) selected</span>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setSelectedDocs(new Set())} className="rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04]">Cancel</button>
-                <button onClick={handleBulkDelete} className="btn-wine rounded-xl px-3 py-1.5 text-xs">Delete Selected</button>
+            {totalPages > 1 && (
+              <div className="mt-5 flex items-center justify-between border-t border-hairline pt-4">
+                <p className="text-xs text-muted-foreground">
+                  {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="grid size-8 place-items-center rounded-full border border-hairline bg-surface text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="grid size-8 place-items-center rounded-full border border-hairline bg-surface text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+                    aria-label="Next page"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
               </div>
+            )}
+          </Panel>
+        )}
+
+        {/* Bulk action bar */}
+        {selectedDocs.size > 0 && (
+          <div className="sticky bottom-4 z-20 flex items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface/95 px-5 py-3 shadow-lift backdrop-blur">
+            <span className="text-sm font-medium">
+              {selectedDocs.size} document{selectedDocs.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <DashButton variant="ghost" onClick={() => setSelectedDocs(new Set())}>
+                Cancel
+              </DashButton>
+              <DashButton onClick={handleBulkDelete}>
+                <Trash2 className="size-4" /> Delete selected
+              </DashButton>
             </div>
-          )}
-        </div>
-      </DashboardContent>
+          </div>
+        )}
+      </div>
       <WebsiteScannerModal open={scanModalOpen} onClose={() => setScanModalOpen(false)} onStarted={handleScanStarted} />
     </DashboardLayout>
   );

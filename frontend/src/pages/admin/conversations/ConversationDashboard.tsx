@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout, DashboardContent, Badge } from '../../../components/dashboard';
+import { DashboardLayout } from '../../../components/dashboard';
 import type { NavItem } from '../../../components/dashboard';
+import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
-import { ArrowLeft, MessageSquare, Clock, Users } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, Clock, MessageSquare, Users } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -28,33 +29,8 @@ interface Conversation {
   lastMessage?: string;
 }
 
-interface Message {
-  id: string;
-  conversationId: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  sequenceNumber: number;
-  createdAt: string;
-}
-
-interface HandoffRequest {
-  id: string;
-  sessionId: string;
-  visitorEmail?: string;
-  conversationSummary?: string;
-  status: 'pending' | 'resolved';
-  createdAt: string;
-  resolvedAt?: string;
-  resolvedBy?: string;
-}
-
 interface ConversationsResponse {
   conversations: Conversation[];
-  total: number;
-}
-
-interface MessagesResponse {
-  messages: Message[];
   total: number;
 }
 
@@ -77,6 +53,15 @@ function statusVariant(status: string): 'success' | 'warning' | 'error' | 'neutr
     case 'ended': case 'completed': return 'neutral';
     case 'escalated': return 'error';
     default: return 'info';
+  }
+}
+
+function statusDotClass(status: string): string {
+  switch (statusVariant(status)) {
+    case 'success': return 'bg-success';
+    case 'warning': return 'bg-warning-500';
+    case 'error': return 'bg-error-500';
+    default: return 'bg-surface-2';
   }
 }
 
@@ -116,11 +101,6 @@ export default function ConversationDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
-  const [selectedConv, setSelectedConv] = useState<Conversation | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
-  const [handoff, setHandoff] = useState<HandoffRequest | null>(null);
-  const [resolving, setResolving] = useState(false);
   const pageSize = 20;
 
   const workspaceName = tenant?.name || 'Conversation Engine';
@@ -142,41 +122,6 @@ export default function ConversationDashboard() {
   }, [page, activeFilter]);
 
   useEffect(() => { fetchConversations(); }, [fetchConversations]);
-
-  const fetchMessages = useCallback(async (convId: string) => {
-    setMessagesLoading(true);
-    try {
-      const data = await apiClient.get<MessagesResponse>(`/conversations/${convId}/messages?limit=200`);
-      setMessages(data.messages || []);
-    } catch {
-      setMessages([]);
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, []);
-
-  const handleRowClick = useCallback(async (conv: Conversation) => {
-    setSelectedConv(conv);
-    setHandoff(null);
-    fetchMessages(conv.id);
-    try {
-      const data = await apiClient.get<{ handoff: HandoffRequest | null }>(`/conversations/${conv.id}/handoff`);
-      setHandoff(data.handoff);
-    } catch { /* no handoff */ }
-  }, [fetchMessages]);
-
-  const handleResolve = useCallback(async () => {
-    if (!selectedConv || resolving) return;
-    setResolving(true);
-    try {
-      await apiClient.patch(`/conversations/${selectedConv.id}/resolve`, {});
-      setSelectedConv({ ...selectedConv, status: 'ended' });
-      setHandoff(null);
-      fetchConversations();
-    } catch { /* ignore */ } finally {
-      setResolving(false);
-    }
-  }, [selectedConv, resolving, fetchConversations]);
 
   const handleFilterChange = useCallback((filter: FilterStatus) => {
     setActiveFilter(filter);
@@ -204,184 +149,138 @@ export default function ConversationDashboard() {
       userEmail={user?.email}
       onLogout={logout}
       onSettings={() => navigate('/dashboard/settings')}
-      rightRail={
-        selectedConv ? (
-          <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
-              <h3 className="text-sm font-medium text-foreground">Conversation</h3>
-              <button onClick={() => { setSelectedConv(null); setMessages([]); }} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.04] transition" aria-label="Close">
-                <ArrowLeft className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              <div className="glass rounded-xl p-3 space-y-2 text-xs">
-                <div className="flex justify-between"><span className="text-muted-foreground">Session</span><span className="font-mono text-foreground">{selectedConv.sessionId.slice(0, 12)}...</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge variant={statusVariant(selectedConv.status)} size="sm">{statusLabel(selectedConv.status)}</Badge></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Messages</span><span className="text-foreground">{selectedConv.messageCount}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Started</span><span className="text-foreground">{formatRelativeTime(selectedConv.startedAt)}</span></div>
-              </div>
+    >
+      <div className="space-y-6">
+        <PageHead
+          title="Conversations"
+          sub="Every visitor conversation captured by your widget — with status, escalation, and handoff state."
+        />
 
-              {selectedConv.status === 'escalated' && (
-                <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 space-y-2">
-                  <p className="text-xs font-semibold text-orange-400">Needs Human</p>
-                  {handoff?.visitorEmail && (
-                    <div className="flex items-center gap-2 text-xs">
-                      <span className="text-orange-300/70">Email:</span>
-                      <span className="text-orange-200 font-medium">{handoff.visitorEmail}</span>
-                    </div>
-                  )}
-                  {handoff?.conversationSummary && (
-                    <p className="text-xs text-orange-300/70">{handoff.conversationSummary}</p>
-                  )}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            icon={<MessageSquare className="size-4" />}
+            label="Conversations today"
+            value={String(todayCount)}
+            hint="Started in the last 24 hours"
+          />
+          <StatCard
+            icon={<Users className="size-4" />}
+            label="Handoff requests pending"
+            value={String(handoffCount)}
+            hint="Escalated and awaiting a human"
+          />
+          <StatCard
+            icon={<Clock className="size-4" />}
+            label="Avg messages / conversation"
+            value={String(avgMessages)}
+            hint="Across the current page"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {FILTER_BUTTONS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => handleFilterChange(f.key)}
+              className={`inline-flex h-10 items-center rounded-full px-4 text-sm font-semibold transition ${
+                activeFilter === f.key
+                  ? 'bg-primary text-primary-foreground shadow-soft'
+                  : 'border border-hairline bg-surface text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <Panel>
+            <h2 className="text-lg font-bold tracking-tight">Conversations</h2>
+            <div className="mt-4 space-y-3">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-16 animate-pulse rounded-xl border border-hairline bg-surface-2/60" />
+              ))}
+            </div>
+          </Panel>
+        ) : error ? (
+          <Panel>
+            <div className="flex flex-col items-center gap-3 py-10 text-center">
+              <AlertTriangle className="size-8 text-error-500" />
+              <p className="text-sm text-muted-foreground">{error}</p>
+              <DashButton variant="ghost" onClick={fetchConversations}>Retry</DashButton>
+            </div>
+          </Panel>
+        ) : conversations.length === 0 ? (
+          <EmptyState
+            icon={<MessageSquare className="size-6" />}
+            title="No conversations found"
+            body="Visitor conversations will appear here as soon as the widget engages someone. Try a different filter if you expect to see results."
+            actions={
+              activeFilter !== 'all' ? (
+                <DashButton variant="ghost" onClick={() => handleFilterChange('all')}>
+                  Clear filters
+                </DashButton>
+              ) : undefined
+            }
+          />
+        ) : (
+          <Panel>
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold tracking-tight">Conversations</h2>
+              <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{total}</span>
+            </div>
+            <div className="mt-4 space-y-3">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate(`/dashboard/conversations/${conv.id}`)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') navigate(`/dashboard/conversations/${conv.id}`); }}
+                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 p-4 transition hover:-translate-y-px hover:shadow-soft"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-foreground">{conv.lastMessage || '—'}</p>
+                    <p className="mt-0.5 truncate font-mono text-xs text-muted-foreground">{conv.sessionId.slice(0, 12)}…</p>
+                  </div>
+                  <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">
+                    <span className={`size-1.5 shrink-0 rounded-full ${statusDotClass(conv.status)}`} />
+                    {statusLabel(conv.status)}
+                  </span>
+                  <span className="hidden shrink-0 text-xs text-muted-foreground sm:inline">{formatRelativeTime(conv.startedAt)}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{conv.messageCount} msgs</span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </div>
+              ))}
+            </div>
+            {total > pageSize && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-4">
+                <p className="text-xs text-muted-foreground">
+                  Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total} · Page {page} of {Math.max(1, Math.ceil(total / pageSize))}
+                </p>
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={handleResolve}
-                    disabled={resolving}
-                    className="mt-2 w-full px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 transition disabled:opacity-50"
+                    onClick={() => setPage((p) => p - 1)}
+                    disabled={page <= 1}
+                    aria-label="Previous page"
+                    className="grid size-9 place-items-center rounded-full border border-hairline bg-surface text-sm transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
                   >
-                    {resolving ? 'Resolving...' : 'Mark Resolved'}
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    onClick={() => setPage((p) => p + 1)}
+                    disabled={page * pageSize >= total}
+                    aria-label="Next page"
+                    className="grid size-9 place-items-center rounded-full border border-hairline bg-surface text-sm transition hover:bg-surface-2 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <ChevronRight className="size-4" />
                   </button>
                 </div>
-              )}
-
-              <div className="space-y-1">
-                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Chat Transcript</p>
-                {messagesLoading ? (
-                  <div className="text-xs text-muted-foreground py-4 text-center">Loading messages...</div>
-                ) : messages.length === 0 ? (
-                  <div className="text-xs text-muted-foreground py-4 text-center">No messages found</div>
-                ) : (
-                  <div className="space-y-2">
-                    {messages.map((msg) => (
-                      <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed ${
-                          msg.role === 'user'
-                            ? 'bg-[var(--color-accent-600)] text-white'
-                            : 'bg-white/[0.06] text-foreground'
-                        }`}>
-                          {msg.role === 'assistant' && <span className="mr-1 opacity-60">✨</span>}
-                          {msg.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
-            </div>
-          </div>
-        ) : undefined
-      }
-    >
-      <DashboardContent>
-        <div className="space-y-5">
-          <h1 className="text-[15px] font-medium text-foreground">Conversations</h1>
-
-          {/* Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="glass rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[var(--color-accent-600)]/10">
-                  <MessageSquare className="h-4 w-4 text-[var(--color-accent-600)]" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{todayCount}</p>
-                  <p className="text-xs text-muted-foreground">Conversations Today</p>
-                </div>
-              </div>
-            </div>
-            <div className="glass rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10">
-                  <Users className="h-4 w-4 text-orange-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{handoffCount}</p>
-                  <p className="text-xs text-muted-foreground">Handoff Requests Pending</p>
-                </div>
-              </div>
-            </div>
-            <div className="glass rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
-                  <Clock className="h-4 w-4 text-emerald-400" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{avgMessages}</p>
-                  <p className="text-xs text-muted-foreground">Avg Messages / Conversation</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Filter Buttons */}
-          <div className="flex flex-wrap gap-2">
-            {FILTER_BUTTONS.map((f) => (
-              <button
-                key={f.key}
-                onClick={() => handleFilterChange(f.key)}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg transition ${
-                  activeFilter === f.key
-                    ? 'bg-[var(--color-accent-600)] text-white shadow-sm'
-                    : 'bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.08]'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Table */}
-          {loading ? (
-            <div className="glass rounded-xl p-8 text-center text-sm text-muted-foreground">Loading conversations...</div>
-          ) : error ? (
-            <div className="glass rounded-xl p-8 text-center">
-              <p className="text-sm text-red-400">{error}</p>
-              <button onClick={fetchConversations} className="mt-3 text-xs text-[var(--color-accent-600)] hover:underline">Retry</button>
-            </div>
-          ) : conversations.length === 0 ? (
-            <div className="glass rounded-xl p-8 text-center text-sm text-muted-foreground">No conversations found</div>
-          ) : (
-            <div className="glass rounded-xl overflow-hidden">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="border-b border-white/[0.06]">
-                    <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Session</th>
-                    <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Started</th>
-                    <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold hidden sm:table-cell">Turns</th>
-                    <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold hidden md:table-cell">Last Message</th>
-                    <th className="px-4 py-3 text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {conversations.map((conv) => (
-                    <tr
-                      key={conv.id}
-                      onClick={() => handleRowClick(conv)}
-                      className="border-b border-white/[0.04] hover:bg-white/[0.02] cursor-pointer transition"
-                    >
-                      <td className="px-4 py-3 font-mono text-xs text-foreground">{conv.sessionId.slice(0, 10)}...</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatRelativeTime(conv.startedAt)}</td>
-                      <td className="px-4 py-3 text-xs text-foreground tabular-nums hidden sm:table-cell">{conv.messageCount}</td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground truncate max-w-[200px] hidden md:table-cell">{(conv.lastMessage || '—').slice(0, 60)}</td>
-                      <td className="px-4 py-3"><Badge variant={statusVariant(conv.status)} size="sm">{statusLabel(conv.status)}</Badge></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* Pagination */}
-          {total > pageSize && (
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Showing {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, total)} of {total}</span>
-              <div className="flex gap-2">
-                <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-not-allowed transition">Prev</button>
-                <button disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] disabled:opacity-40 disabled:cursor-not-allowed transition">Next</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </DashboardContent>
+            )}
+          </Panel>
+        )}
+      </div>
     </DashboardLayout>
   );
 }

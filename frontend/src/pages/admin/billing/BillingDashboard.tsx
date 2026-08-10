@@ -1,12 +1,13 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout, DashboardContent, DashboardSection, DashboardMetricGrid, DashboardChartCard, DashboardTable, DashboardLoadingState, DashboardErrorState, Badge } from '../../../components/dashboard';
-import type { NavItem, Column } from '../../../components/dashboard';
+import { DashboardLayout } from '../../../components/dashboard';
+import type { NavItem } from '../../../components/dashboard';
+import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { CreditCard, Zap, FileText, Check, RefreshCw, AlertCircle, ExternalLink, CalendarDays } from 'lucide-react';
+import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, ExternalLink } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -22,14 +23,15 @@ interface Plan { id: string; name: string; price: number; currency: string; inte
 interface CurrentSubscription { planId: string; planName: string; status: string; stripeSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
 interface UsageRecord { date: string; conversations: number; messages: number; documentsUploaded: number; }
 
-function UsageBar({ used, limit, label }: { used: number; limit: number; label: string }) {
-  const pct = Math.round((used / Math.max(limit, 1)) * 100);
-  return (
-    <div>
-      <div className="mb-1.5 flex items-center justify-between text-xs"><span className="text-muted-foreground">{label}</span><span className={cn('font-medium tabular-nums', pct > 80 ? 'text-destructive' : pct > 50 ? 'text-warning' : 'text-foreground/80')}>{used.toLocaleString()} / {limit.toLocaleString()}</span></div>
-      <div className="h-2 overflow-hidden rounded-full bg-white/[0.06]"><div className={cn('h-full rounded-full transition-all duration-500', pct > 80 ? 'bg-destructive' : pct > 50 ? 'bg-warning' : 'bg-wine')} style={{ width: `${Math.min(pct, 100)}%` }} /></div>
-    </div>
-  );
+const DEFAULT_PLANS: Plan[] = [
+  { id: 'free', name: 'Free', price: 0, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['100 conversations per month'], limits: { conversations: 100, documents: 3, knowledgeBases: 1, teamMembers: 1, apiCalls: 0, storageMb: 100, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'starter', name: 'Starter', price: 29, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['1,000 conversations per month'], limits: { conversations: 1000, documents: 20, knowledgeBases: 3, teamMembers: 3, apiCalls: 5000, storageMb: 1024, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'professional', name: 'Professional', price: 99, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['5,000 conversations per month', 'Custom branding'], limits: { conversations: 5000, documents: 100, knowledgeBases: 10, teamMembers: 10, apiCalls: 50000, storageMb: 10240, widgets: 3, analytics: true, customBranding: true, prioritySupport: true } },
+  { id: 'enterprise', name: 'Enterprise', price: 299, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['White-label', 'SSO', 'Dedicated support'], limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 500000, storageMb: 102400, widgets: 10, analytics: true, customBranding: true, prioritySupport: true } },
+];
+
+function usagePercent(used: number, limit: number) {
+  return Math.round((used / Math.max(limit, 1)) * 100);
 }
 
 export default function BillingDashboard() {
@@ -62,141 +64,180 @@ export default function BillingDashboard() {
     catch (err: any) { setError(err.message || 'Failed to change plan'); } finally { setChangePlanLoading(false); }
   };
 
+  const handleSelectPlan = async (plan: Plan) => {
+    if (plan.price === 0) { await handleChangePlan(plan.id); return; }
+    try { const res = await apiClient.post<{ url: string }>('/billing/checkout', { plan: plan.id }); if (res.url) window.open(res.url, '_blank'); else await handleChangePlan(plan.id); }
+    catch { await handleChangePlan(plan.id); }
+  };
+
   const handleManageBilling = async () => {
     try { const res = await apiClient.post<{ url: string }>('/billing/manage'); if (res.url) window.open(res.url, '_blank'); else addToast('No billing portal URL returned', 'warning'); }
     catch { addToast('Failed to open billing portal', 'error'); }
   };
 
-  const statusBadge = (sub: CurrentSubscription): { variant: 'success' | 'warning' | 'error' | 'info'; label: string } => {
-    if (sub.onTrial) return { variant: 'warning', label: `${sub.daysLeftInTrial ?? 0} days left in trial` };
-    if (sub.status === 'cancelled') return { variant: 'warning', label: 'Cancelled' };
-    if (sub.status === 'past_due') return { variant: 'error', label: 'Past Due' };
-    return { variant: 'success', label: 'Active' };
+  const statusLabel = (sub: CurrentSubscription): string => {
+    if (sub.onTrial) return `${sub.daysLeftInTrial ?? 0} days left in trial`;
+    if (sub.status === 'cancelled') return 'Cancelled';
+    if (sub.status === 'past_due') return 'Past due';
+    return 'Active';
   };
 
-  const usageColumns: Column<UsageRecord>[] = useMemo(() => [
-    { key: 'date', header: 'Date', cell: (r) => <span className="text-sm">{new Date(r.date).toLocaleDateString()}</span> },
-    { key: 'conversations', header: 'Conversations', cell: (r) => <span className="text-sm tabular-nums">{r.conversations}</span>, className: 'text-right' },
-    { key: 'messages', header: 'Messages', cell: (r) => <span className="text-sm tabular-nums">{r.messages}</span>, className: 'hidden sm:table-cell text-right' },
-    { key: 'uploads', header: 'Uploads', cell: (r) => <span className="text-sm tabular-nums">{r.documentsUploaded}</span>, className: 'hidden md:table-cell text-right' },
-  ], []);
-
-  const planBadge = (currentPlanId: string, id: string) => currentPlanId === id ? { variant: 'success' as const, label: 'Current' as const } : null;
+  const displayPlans = plans.length > 0 ? plans : DEFAULT_PLANS;
 
   if (loading) {
-    return <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}><DashboardContent loading /></DashboardLayout>;
+    return (
+      <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
+        <div className="animate-pulse space-y-6">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[0, 1, 2].map(i => <div key={i} className="h-36 rounded-2xl border border-hairline bg-surface" />)}
+          </div>
+          <div className="h-48 rounded-3xl border border-hairline bg-surface" />
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {[0, 1, 2, 3].map(i => <div key={i} className="h-64 rounded-3xl border border-hairline bg-surface" />)}
+          </div>
+        </div>
+      </DashboardLayout>
+    );
   }
 
   if (error && !currentSub) {
-    return <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}><DashboardContent><DashboardErrorState message={error} onRetry={loadData} /></DashboardContent></DashboardLayout>;
+    return (
+      <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
+        <EmptyState
+          icon={<AlertTriangle className="size-6" />}
+          title="Couldn't load billing"
+          body={error}
+          actions={<DashButton onClick={loadData}><RefreshCw className="size-4" /> Retry</DashButton>}
+        />
+      </DashboardLayout>
+    );
   }
 
   return (
     <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
-      <DashboardContent>
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <h1 className="text-[15px] font-medium text-foreground">Billing</h1>
-              <p className="text-sm text-muted-foreground">Manage your subscription and billing details</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={loadData} className="rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04] inline-flex items-center gap-1.5"><RefreshCw className="h-3 w-3" /> Refresh</button>
-              {currentSub && <button onClick={handleManageBilling} className="btn-wine rounded-xl px-3 py-1.5 text-xs inline-flex items-center gap-1.5"><ExternalLink className="h-3 w-3" /> Manage Billing</button>}
-            </div>
-          </div>
-
-          {/* Error banner */}
-          {error && (
-            <div className="flex items-center gap-3 rounded-xl border border-destructive/20 bg-destructive/[0.04] px-4 py-3">
-              <AlertCircle className="h-5 w-5 shrink-0 text-destructive" />
-              <p className="flex-1 text-sm text-foreground/80">{error}</p>
-              <button onClick={() => setError(null)} className="text-xs text-muted-foreground hover:text-foreground">Dismiss</button>
-            </div>
-          )}
-
-          {/* No subscription */}
-          {!currentSub ? (
-            <DashboardSection>
-              <div className="glass rounded-2xl p-6 text-center py-16">
-                <CreditCard className="mx-auto mb-4 h-12 w-12 text-wine" />
-                <h2 className="mb-1 text-base font-medium text-foreground">No active subscription</h2>
-                <p className="mb-6 max-w-sm mx-auto text-sm text-muted-foreground">Subscribe to a plan to continue using the service.</p>
-                <button onClick={() => navigate('/dashboard/onboarding')} className="btn-wine rounded-xl px-4 py-2 text-sm">View Plans</button>
-              </div>
-            </DashboardSection>
-          ) : (
+      <div className="space-y-6">
+        <PageHead
+          title="Billing"
+          sub={`Manage your subscription and billing for ${workspaceName}`}
+          actions={
             <>
-              {/* Current plan + usage cards */}
-              <DashboardMetricGrid columns={3}>
-                <div className="glass rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <CreditCard className="h-4 w-4 text-wine" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Current Plan</span>
-                  </div>
-                  <p className="text-lg font-bold text-foreground">{currentSub.planName}</p>
-                  <div className="mt-2">
-                    {(() => { const sb = statusBadge(currentSub); return <Badge variant={sb.variant} size="sm">{sb.label}</Badge>; })()}
-                  </div>
-                </div>
-                <div className="glass rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap className="h-4 w-4 text-wine" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Conversation Usage</span>
-                  </div>
-                  <UsageBar used={currentSub.conversationsUsed} limit={currentSub.conversationsLimit} label="Conversations" />
-                </div>
-                <div className="glass rounded-2xl p-5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <FileText className="h-4 w-4 text-wine" />
-                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Documents Used</span>
-                  </div>
-                  <UsageBar used={currentSub.documentsUsed} limit={currentSub.documentsLimit} label="Documents" />
-                </div>
-              </DashboardMetricGrid>
-
-              {/* Plans grid */}
-              <DashboardChartCard title="Available Plans">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {plans.map(plan => {
-                    const isCurrent = plan.id === currentSub.planId;
-                    return (
-                      <div key={plan.id} className={cn('relative rounded-2xl border p-5 transition', isCurrent ? 'border-wine/40 bg-wine/[0.04] ring-1 ring-wine/20' : 'border-hairline bg-white/[0.02]')}>
-                        {isCurrent && <Badge variant="success" size="sm" className="absolute top-3 right-3">Current</Badge>}
-                        <h3 className="text-base font-bold text-foreground">{plan.name}</h3>
-                        <p className="text-2xl font-bold text-wine mt-2">${plan.price}<span className="text-sm font-normal text-muted-foreground">/{plan.interval}</span></p>
-                        <ul className="mt-4 space-y-2 text-sm">
-                          {plan.features.map((f, i) => (
-                            <li key={i} className="flex items-center gap-2 text-foreground/80">
-                              <Check className="h-4 w-4 text-success shrink-0" /> {f}
-                            </li>
-                          ))}
-                        </ul>
-                        {!isCurrent && currentSub.status !== 'cancelled' && currentSub.status !== 'expired' && (
-                          <button onClick={async () => {
-                            if (plan.price === 0) await handleChangePlan(plan.id);
-                            else { try { const res = await apiClient.post<{ url: string }>('/billing/checkout', { plan: plan.id }); if (res.url) window.open(res.url, '_blank'); else await handleChangePlan(plan.id); } catch { await handleChangePlan(plan.id); } }
-                          }} disabled={changePlanLoading} className="mt-4 w-full rounded-xl border border-hairline px-3 py-2 text-xs text-foreground transition hover:bg-white/[0.04]">
-                            {changePlanLoading ? 'Loading\u2026' : plan.price > 0 && currentSub.planId === 'free' ? 'Upgrade' : `Switch to ${plan.name}`}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </DashboardChartCard>
-
-              {/* Usage History */}
-              {usage.length > 0 && (
-                <DashboardChartCard title="Usage History">
-                  <DashboardTable columns={usageColumns} data={usage.slice(0, 12)} rowKey={(r, i) => `${r.date}-${i}`} />
-                </DashboardChartCard>
-              )}
+              <DashButton variant="ghost" onClick={loadData}><RefreshCw className="size-4" /> Refresh</DashButton>
+              {currentSub && <DashButton onClick={handleManageBilling}><ExternalLink className="size-4" /> Manage subscription</DashButton>}
             </>
-          )}
-        </div>
-      </DashboardContent>
+          }
+        />
+
+        {/* Error banner */}
+        {error && (
+          <div className="flex items-center gap-3 rounded-2xl border border-error-500/20 bg-error-300/25 px-4 py-3">
+            <AlertTriangle className="size-5 shrink-0 text-error-500" />
+            <p className="flex-1 text-sm">{error}</p>
+            <button onClick={() => setError(null)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
+          </div>
+        )}
+
+        {/* No subscription */}
+        {!currentSub ? (
+          <EmptyState
+            icon={<CreditCard className="size-6" />}
+            title="No active subscription"
+            body="Subscribe to a plan to continue using the service."
+            actions={<DashButton onClick={() => navigate('/dashboard/onboarding')}>View plans</DashButton>}
+          />
+        ) : (
+          <>
+            {/* Key stats */}
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              <StatCard icon={<CreditCard className="size-4" />} label="Current plan" value={currentSub.planName} hint={statusLabel(currentSub)} />
+              <StatCard icon={<MessageSquare className="size-4" />} label="Conversations this month" value={currentSub.conversationsUsed.toLocaleString()} hint={`${currentSub.conversationsLimit.toLocaleString()} included in your plan`} />
+              <StatCard icon={<FileText className="size-4" />} label="Documents used" value={`${currentSub.documentsUsed.toLocaleString()} / ${currentSub.documentsLimit.toLocaleString()}`} hint="Across all knowledge bases" />
+            </div>
+
+            {/* Usage this month */}
+            <Panel>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-bold tracking-tight">Usage this month</h2>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold"><Zap className="size-3.5 text-primary" /> {currentSub.planName} plan</span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{statusLabel(currentSub)}</span>
+                </div>
+              </div>
+              <p className="mt-6 text-xs uppercase tracking-wider text-muted-foreground">Conversations</p>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(usagePercent(currentSub.conversationsUsed, currentSub.conversationsLimit), 100)}%` }} />
+              </div>
+              <p className="mt-3 text-sm text-muted-foreground">{currentSub.conversationsUsed.toLocaleString()} / {currentSub.conversationsLimit.toLocaleString()} conversations this month</p>
+            </Panel>
+
+            {/* Plans */}
+            <Panel>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold tracking-tight">Plans</h2>
+                <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{displayPlans.length} plans</span>
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                {displayPlans.map(plan => {
+                  const isCurrent = plan.id === currentSub.planId;
+                  const canChange = !isCurrent && currentSub.status !== 'cancelled' && currentSub.status !== 'expired';
+                  const isUpgrade = plan.price > 0 && currentSub.planId === 'free';
+                  return (
+                    <div key={plan.id} className={cn('flex flex-col rounded-3xl border p-6 transition', isCurrent ? 'border-primary shadow-glow' : 'border-hairline')}>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-display text-base font-bold">{plan.name}</h3>
+                        {isCurrent && <span className="inline-flex items-center rounded-full bg-ember-soft px-2.5 py-0.5 text-[11px] font-semibold">Current</span>}
+                      </div>
+                      <p className="mt-4 font-display text-3xl font-bold tracking-tight">${plan.price}<span className="text-sm font-normal text-muted-foreground">/{plan.interval || 'mo'}</span></p>
+                      <ul className="mt-5 flex-1 space-y-2.5 text-sm text-muted-foreground">
+                        {plan.features.map((f, i) => (
+                          <li key={i} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" /> {f}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-6">
+                        {isCurrent ? (
+                          <DashButton variant="primary" className="pointer-events-none w-full opacity-60">Current plan</DashButton>
+                        ) : canChange ? (
+                          <DashButton variant={isUpgrade ? 'primary' : 'ghost'} className="w-full" onClick={() => handleSelectPlan(plan)}>
+                            {changePlanLoading ? 'Loading…' : isUpgrade ? 'Upgrade' : `Switch to ${plan.name}`}
+                          </DashButton>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Panel>
+
+            {/* Usage history */}
+            {usage.length > 0 && (
+              <Panel>
+                <h2 className="text-lg font-bold tracking-tight">Usage history</h2>
+                <div className="mt-4 overflow-x-auto rounded-2xl border border-hairline">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-hairline">
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Date</th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversations</th>
+                        <th className="hidden px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Messages</th>
+                        <th className="hidden px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Uploads</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {usage.slice(0, 12).map((r, i) => (
+                        <tr key={`${r.date}-${i}`} className="border-b border-hairline last:border-0">
+                          <td className="px-4 py-3">{new Date(r.date).toLocaleDateString()}</td>
+                          <td className="px-4 py-3 text-right tabular-nums">{r.conversations}</td>
+                          <td className="hidden px-4 py-3 text-right tabular-nums sm:table-cell">{r.messages}</td>
+                          <td className="hidden px-4 py-3 text-right tabular-nums md:table-cell">{r.documentsUploaded}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Panel>
+            )}
+          </>
+        )}
+      </div>
     </DashboardLayout>
   );
 }

@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DashboardLayout, DashboardContent, DashboardSection, DashboardChartCard, DashboardEmptyState, DashboardLoadingState, Badge } from '../../../components/dashboard';
+import { DashboardLayout } from '../../../components/dashboard';
 import type { NavItem } from '../../../components/dashboard';
 import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Palette, Monitor, Code, Copy, Check, Send } from 'lucide-react';
+import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
+import { Palette, Code, Copy, Check, Send, Trash2 } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -18,16 +19,17 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Onboarding', href: '/dashboard/onboarding' },
 ];
 
-const COLOR_PRESETS = ['#6366f1', '#3b82f6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#C94F72'];
-const TABS = [{ id: 'vanilla', label: 'HTML' }, { id: 'react', label: 'React/Next.js' }, { id: 'wordpress', label: 'WordPress' }, { id: 'shopify', label: 'Shopify' }, { id: 'webflow', label: 'Webflow' }] as const;
-const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://widget.conversationengine.ai/chatbot.js';
+const COLOR_PRESETS = ['#0F6E56', '#12866A', '#5DCAA5', '#0B4F3F', '#1F7A8C', '#B4762C', '#8A3D62', '#2E3A46'];
+const TABS = [{ id: 'vanilla', label: 'HTML' }, { id: 'react', label: 'React' }, { id: 'wordpress', label: 'WordPress' }, { id: 'shopify', label: 'Shopify' }, { id: 'webflow', label: 'Webflow' }] as const;
+const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://widget.burflow.ai/chatbot.js';
+const DEFAULT_SNIPPET = '<script src="https://widget.burflow.ai/chatbot.js" data-agent-id="YOUR_AGENT_ID"></script>';
 
 function buildSnippet(tabId: string, agentId: string, color: string, position: string, token: string): string {
   const attrs = `data-agent-id="${agentId}" data-primary-color="${color}" data-position="${position}" data-token="${token}"`;
   switch (tabId) {
-    case 'vanilla': return `<!-- Conversation Engine Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
+    case 'vanilla': return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
     case 'react': return `import { ChatWidget } from '@conversationengine/react';\n<ChatWidget agentId="${agentId}" primaryColor="${color}" position="${position}" token="${token}" />`;
-    default: return `<!-- Conversation Engine Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
+    default: return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
   }
 }
 
@@ -47,7 +49,7 @@ export default function WidgetDashboard() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<Record<string, unknown> | null>(null);
-  const snippet = agentId && widgetToken ? buildSnippet(activeTab, agentId, primaryColor, position, widgetToken) : '';
+  const snippet = agentId && widgetToken ? buildSnippet(activeTab, agentId, primaryColor, position, widgetToken) : DEFAULT_SNIPPET;
 
   const loadConfig = useCallback(async () => {
     try {
@@ -95,127 +97,169 @@ export default function WidgetDashboard() {
 
   return (
     <DashboardLayout sidebarItems={NAV_ITEMS} onNavigate={(item) => item.href && navigate(item.href)} workspaceName={workspaceName} userName={user?.name} userEmail={user?.email} onLogout={logout} onSettings={() => navigate('/dashboard/settings')}>
-      <DashboardContent>
-        {!agentId && configLoaded ? (
-          <DashboardEmptyState icon={<Palette className="h-6 w-6" />} title="No workspace configured" description="Create a workspace first to set up your chatbot widget." primaryAction={{ label: 'Go to Onboarding', onClick: () => navigate('/dashboard/onboarding') }} />
-        ) : !configLoaded ? (
-          <DashboardLoadingState variant="skeleton" />
-        ) : (
-          <div className="space-y-6">
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h1 className="text-[15px] font-medium text-foreground">Widget Manager</h1>
-                <p className="text-sm text-muted-foreground">Customize, preview, and manage your chatbot widget</p>
-              </div>
-              <button onClick={handleSave} disabled={saving} className="btn-wine rounded-xl px-4 py-2 text-sm">{saving ? 'Saving\u2026' : 'Save Changes'}</button>
-            </div>
+      {!agentId && configLoaded ? (
+        <EmptyState
+          icon={<Palette className="size-6" />}
+          title="No workspace configured"
+          body="Create a workspace first to set up your chatbot widget."
+          actions={<DashButton onClick={() => navigate('/dashboard/onboarding')}>Go to Onboarding</DashButton>}
+        />
+      ) : !configLoaded ? (
+        <div className="space-y-6">
+          <div className="h-28 animate-pulse rounded-3xl border border-hairline bg-surface" />
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <div className="h-[420px] animate-pulse rounded-3xl border border-hairline bg-surface" />
+            <div className="h-[420px] animate-pulse rounded-3xl border border-hairline bg-surface" />
+          </div>
+          <div className="h-64 animate-pulse rounded-3xl border border-hairline bg-surface" />
+          <div className="h-80 animate-pulse rounded-3xl border border-hairline bg-surface" />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          <PageHead
+            title="Widget settings"
+            sub="Customize the look and behavior of your chat widget, then embed it on your site."
+            actions={<DashButton onClick={handleSave}>{saving ? 'Saving\u2026' : 'Save changes'}</DashButton>}
+          />
 
-            {/* Status bar */}
-            <div className="glass rounded-2xl px-4 py-3">
-              <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><Badge variant="success" size="sm" dot>Active</Badge> Widget Status</span>
-                <span className="text-hairline">|</span>
-                <span>Agent: <span className="font-medium text-foreground">{agentId}</span></span>
-                <span className="text-hairline">|</span>
-                <span>Theme: <span className="font-medium" style={{ color: primaryColor }}>{primaryColor}</span></span>
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">
+              <span className="size-2 rounded-full bg-success" /> Widget active
+            </span>
+            <span className="text-sm text-muted-foreground">Agent: <span className="font-medium text-foreground">{agentId}</span></span>
+            <span className="text-sm text-muted-foreground">Theme: <span className="font-medium" style={{ color: primaryColor }}>{primaryColor}</span></span>
+          </div>
 
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              {/* Customize */}
-              <DashboardChartCard title="Customize Widget" variant="glass-strong">
-                <div className="space-y-5">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground/70 mb-2">Primary Color</label>
-                    <div className="flex gap-2 flex-wrap mb-2">
-                      {COLOR_PRESETS.map(c => (
-                        <button key={c} onClick={() => setPrimaryColor(c)} className={cn('h-7 w-7 rounded-full border-2 transition-all', primaryColor === c ? 'border-foreground scale-110 shadow-[0_0_12px_rgba(201,79,114,0.3)]' : 'border-transparent')} style={{ backgroundColor: c }} aria-label={`Set color ${c}`} />
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Widget appearance</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Pick a brand color and position for the launcher.</p>
+              <div className="mt-6 space-y-5">
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Primary color</label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {COLOR_PRESETS.map(c => (
+                      <button
+                        key={c}
+                        onClick={() => setPrimaryColor(c)}
+                        className={cn('size-9 rounded-full transition-all', primaryColor.toLowerCase() === c.toLowerCase() ? 'scale-110 ring-2 ring-foreground ring-offset-2 ring-offset-surface' : 'ring-1 ring-hairline')}
+                        style={{ backgroundColor: c }}
+                        aria-label={`Set color ${c}`}
+                      />
+                    ))}
+                  </div>
+                  <input
+                    value={primaryColor}
+                    onChange={e => setPrimaryColor(e.target.value)}
+                    className="mt-4 h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
+                    aria-label="Hex color"
+                  />
+                </div>
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Launcher position</label>
+                  <select value={position} onChange={e => setPosition(e.target.value as 'right' | 'left')} className="h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40" aria-label="Widget position">
+                    <option value="right">Right</option><option value="left">Left</option>
+                  </select>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Widget preview</h2>
+              <p className="mt-1 text-sm text-muted-foreground">A live preview of how the widget will look on your site.</p>
+              <div className="relative mt-6 h-[380px] overflow-hidden rounded-2xl border border-hairline bg-surface-2/60">
+                <div className={cn('absolute bottom-4 transition-all z-10', position === 'right' ? 'right-4' : 'left-4')}>
+                  <div className="w-[260px] overflow-hidden rounded-2xl border border-hairline bg-surface shadow-soft">
+                    <div className="flex items-center gap-3 p-3" style={{ backgroundColor: primaryColor }}>
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold text-white">A</div>
+                      <div>
+                        <p className="text-sm font-semibold text-white">Chatbot</p>
+                        <p className="text-xs text-white/70">Online</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3 p-3">
+                      <div className="max-w-[85%] rounded-xl rounded-tl-none p-2.5 text-xs text-white" style={{ backgroundColor: primaryColor }}>
+                        {welcomeMessage}
+                      </div>
+                      {suggestedQuestions.slice(0, 2).map((q, i) => (
+                        <div key={i} className="cursor-pointer rounded-lg border border-hairline bg-surface-2/60 px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-surface-2">{q}</div>
                       ))}
                     </div>
-                    <input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-9 w-full rounded-xl border border-hairline bg-white/[0.03] px-3 text-sm text-foreground focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Hex color" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground/70 mb-2">Position</label>
-                    <select value={position} onChange={e => setPosition(e.target.value as 'right' | 'left')} className="h-9 w-full rounded-xl border border-hairline bg-white/[0.03] px-3 text-sm text-foreground focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring" aria-label="Widget position">
-                      <option value="right">Right</option><option value="left">Left</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground/70 mb-2">Welcome Message</label>
-                    <textarea rows={2} value={welcomeMessage} onChange={e => setWelcomeMessage(e.target.value)} className="w-full rounded-xl border border-hairline bg-white/[0.03] px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground/70 mb-2">Input Placeholder</label>
-                    <input value={placeholder} onChange={e => setPlaceholder(e.target.value)} className="h-9 w-full rounded-xl border border-hairline bg-white/[0.03] px-3 text-sm text-foreground focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground/70 mb-2">Suggested Questions</label>
-                    <div className="flex gap-2 mb-2">
-                      <input placeholder="Type a question" value={questionInput} onChange={e => setQuestionInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addQuestion(); }} className="h-9 flex-1 rounded-xl border border-hairline bg-white/[0.03] px-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-border-strong focus:outline-none focus:ring-1 focus:ring-ring" aria-label="New question" />
-                      <button onClick={addQuestion} disabled={!questionInput.trim()} className="rounded-xl border border-hairline px-3 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04] disabled:opacity-40">Add</button>
-                    </div>
-                    {suggestedQuestions.length > 0 && (
-                      <div className="space-y-1 mt-2">
-                        {suggestedQuestions.map((q, i) => (
-                          <div key={i} className="flex items-center justify-between rounded-lg border border-hairline bg-white/[0.02] px-3 py-1.5 text-sm">
-                            <span className="text-foreground/70 truncate">{q}</span>
-                            <button onClick={() => setSuggestedQuestions(suggestedQuestions.filter((_, idx) => idx !== i))} className="text-xs text-muted-foreground hover:text-destructive transition ml-2 shrink-0">Remove</button>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </DashboardChartCard>
-
-              {/* Live Preview */}
-              <DashboardChartCard title="Live Preview" variant="glass-strong">
-                <div className="relative rounded-xl border border-hairline bg-black/40 h-[420px] overflow-hidden">
-                  <div className={cn('absolute bottom-4 transition-all z-10', position === 'right' ? 'right-4' : 'left-4')}>
-                    <div className="w-[260px] overflow-hidden rounded-2xl border border-hairline bg-background shadow-2xl">
-                      <div className="flex items-center gap-3 p-3" style={{ backgroundColor: primaryColor }}>
-                        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-sm font-bold text-white">A</div>
-                        <div><p className="text-sm font-semibold text-white">Chatbot</p><p className="text-xs text-white/70">Online</p></div>
-                      </div>
-                      <div className="space-y-3 p-3 min-h-[140px]">
-                        <div className="max-w-[85%] rounded-lg rounded-tl-none bg-white/[0.06] p-2.5"><p className="text-xs text-foreground/80">{welcomeMessage}</p></div>
-                        {suggestedQuestions.slice(0, 2).map((q, i) => (
-                          <div key={i} className="cursor-pointer rounded-lg border border-hairline px-2.5 py-1.5 text-xs text-muted-foreground transition hover:bg-white/[0.04]">{q}</div>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-2 border-t border-hairline p-3">
-                        <div className="flex-1 h-8 rounded-lg border border-hairline bg-white/[0.03]" />
-                        <button className="flex h-8 w-8 items-center justify-center rounded-lg text-white transition-opacity hover:opacity-90" style={{ backgroundColor: primaryColor }} aria-label="Send"><Send className="h-3.5 w-3.5" /></button>
-                      </div>
+                    <div className="flex items-center gap-2 border-t border-hairline p-3">
+                      <div className="h-8 flex-1 rounded-lg border border-hairline bg-surface-2/60" />
+                      <button className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-opacity hover:opacity-90" style={{ backgroundColor: primaryColor }} aria-label="Send"><Send className="h-3.5 w-3.5" /></button>
                     </div>
                   </div>
                 </div>
-              </DashboardChartCard>
-            </div>
-
-            {/* Embed Code */}
-            <DashboardChartCard title="Embed Code" variant="glass-strong">
-              <div className="flex gap-1 mb-4 overflow-x-auto pb-1">
-                {TABS.map(tab => (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn('px-4 py-2 text-sm font-medium rounded-lg whitespace-nowrap transition', activeTab === tab.id ? 'wine-gradient text-white' : 'text-muted-foreground hover:text-foreground hover:bg-white/[0.04]')}>
-                    {tab.label}
-                  </button>
-                ))}
               </div>
-              <div className="overflow-hidden rounded-xl border border-hairline">
-                <div className="flex items-center justify-between border-b border-hairline bg-white/[0.02] px-4 py-2.5">
-                  <span className="text-xs text-muted-foreground font-mono">{TABS.find(t => t.id === activeTab)?.label || 'HTML'}</span>
-                  <button onClick={async () => { if (snippet) { await navigator.clipboard.writeText(snippet); setCopied(true); setTimeout(() => setCopied(false), 2000); } }} disabled={!snippet} className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs text-foreground transition hover:bg-white/[0.04]">
-                    {copied ? <><Check className="h-3 w-3" /> Copied!</> : <><Copy className="h-3 w-3" /> Copy</>}
-                  </button>
-                </div>
-                <pre className="overflow-x-auto bg-[#0A0A0F] p-4 text-sm text-[#e4e4f0]"><code>{snippet || 'Generate widget token first'}</code></pre>
-              </div>
-            </DashboardChartCard>
+            </Panel>
           </div>
-        )}
-      </DashboardContent>
+
+          <Panel>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">Embed</h2>
+                <p className="mt-1 text-sm text-muted-foreground">Copy the snippet for your platform to add the widget to your site.</p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold"><Code className="size-3" /> {TABS.find(t => t.id === activeTab)?.label || 'HTML'}</span>
+            </div>
+            <div className="mt-6 flex gap-1 overflow-x-auto pb-1">
+              {TABS.map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={cn('inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold transition', activeTab === tab.id ? 'bg-ember-soft text-foreground' : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground')}>
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 rounded-xl bg-surface-2 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="truncate font-mono text-xs text-muted-foreground">{TABS.find(t => t.id === activeTab)?.label || 'HTML'}</span>
+                <DashButton
+                  variant="ghost"
+                  onClick={async () => { if (snippet) { await navigator.clipboard.writeText(snippet); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
+                  className="h-9 shrink-0 px-4 text-xs"
+                >
+                  {copied ? <><Check className="size-3.5" /> Copied!</> : <><Copy className="size-3.5" /> Copy</>}
+                </DashButton>
+              </div>
+              <pre className="mt-3 overflow-x-auto font-mono text-xs leading-relaxed text-foreground/80"><code>{snippet || 'Generate widget token first'}</code></pre>
+            </div>
+          </Panel>
+
+          <Panel>
+            <h2 className="text-lg font-bold tracking-tight">Configuration</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Tune the greeting, launcher text, and starter questions shown to visitors.</p>
+            <div className="mt-6 space-y-5">
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Greeting message</label>
+                <textarea rows={2} value={welcomeMessage} onChange={e => setWelcomeMessage(e.target.value)} className="w-full rounded-2xl border border-hairline bg-surface px-4 py-3 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40" />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Launcher text</label>
+                <input value={placeholder} onChange={e => setPlaceholder(e.target.value)} className="h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40" />
+              </div>
+              <div>
+                <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Starter questions</label>
+                <div className="flex gap-2">
+                  <input placeholder="Type a question" value={questionInput} onChange={e => setQuestionInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addQuestion(); }} className="h-10 flex-1 rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40" aria-label="New question" />
+                  <DashButton variant="ghost" onClick={addQuestion} className="h-10 shrink-0 px-4 text-xs">Add</DashButton>
+                </div>
+                {suggestedQuestions.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {suggestedQuestions.map((q, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 p-3">
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground/80">{q}</span>
+                        <button onClick={() => setSuggestedQuestions(suggestedQuestions.filter((_, idx) => idx !== i))} className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-surface hover:text-error-500" aria-label={`Remove ${q}`}>
+                          <Trash2 className="size-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </Panel>
+        </div>
+      )}
     </DashboardLayout>
   );
 }
