@@ -42,6 +42,8 @@ export default function WidgetDashboard() {
   const [placeholder, setPlaceholder] = useState('Type your message here\u2026');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [questionInput, setQuestionInput] = useState('');
+  const [autoOpen, setAutoOpen] = useState(false);
+  const [autoOpenDelay, setAutoOpenDelay] = useState(3);
   const [activeTab, setActiveTab] = useState('vanilla');
   const [agentId, setAgentId] = useState<string | null>(null);
   const [widgetToken, setWidgetToken] = useState<string | null>(null);
@@ -61,7 +63,7 @@ export default function WidgetDashboard() {
         const tokenRes = await apiClient.post<{ token: string }>('/widget/token');
         if (tokenRes.token) {
           setWidgetToken(tokenRes.token);
-          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; suggestedQuestions?: string[]; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
+          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; suggestedQuestions?: string[]; autoOpen?: boolean; autoOpenDelay?: number; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
           if (widgetRes.primaryColor) setPrimaryColor(widgetRes.primaryColor);
           if (widgetRes.position) {
             const normalized = widgetRes.position === 'bottom-right' ? 'right' : widgetRes.position === 'bottom-left' ? 'left' : widgetRes.position;
@@ -70,6 +72,8 @@ export default function WidgetDashboard() {
           if (widgetRes.greeting) setWelcomeMessage(widgetRes.greeting);
           if (widgetRes.launcherText) setPlaceholder(widgetRes.launcherText);
           if (widgetRes.suggestedQuestions) setSuggestedQuestions(widgetRes.suggestedQuestions);
+          if (typeof widgetRes.autoOpen === 'boolean') setAutoOpen(widgetRes.autoOpen);
+          if (typeof widgetRes.autoOpenDelay === 'number') setAutoOpenDelay(widgetRes.autoOpenDelay);
           if (widgetRes.businessProfile) setBusinessProfile(widgetRes.businessProfile);
         }
       }
@@ -86,6 +90,8 @@ export default function WidgetDashboard() {
         greeting: welcomeMessage,
         launcherText: placeholder,
         suggestedQuestions,
+        autoOpen,
+        autoOpenDelay,
         companyName: workspaceName,
         businessProfile: businessProfile || undefined,
       });
@@ -237,6 +243,36 @@ export default function WidgetDashboard() {
                 <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Launcher text</label>
                 <input value={placeholder} onChange={e => setPlaceholder(e.target.value)} className="h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40" />
               </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface-2/60 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Auto-open chat</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Open the chat window automatically after visitors land on your site.</p>
+                </div>
+                <button
+                  role="switch"
+                  aria-checked={autoOpen}
+                  aria-label="Auto-open chat"
+                  onClick={() => setAutoOpen(v => !v)}
+                  className={cn('relative h-7 w-12 shrink-0 rounded-full transition-colors', autoOpen ? 'bg-primary' : 'bg-surface-2 border border-hairline')}
+                >
+                  <span className={cn('absolute top-1/2 size-5 -translate-y-1/2 rounded-full bg-white shadow-soft transition-all', autoOpen ? 'left-[calc(100%-1.375rem)]' : 'left-0.5')} />
+                </button>
+              </div>
+              {autoOpen && (
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Auto-open delay (seconds)</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={60}
+                    value={autoOpenDelay}
+                    onChange={e => setAutoOpenDelay(Math.max(0, Math.min(60, Number(e.target.value) || 0)))}
+                    className="h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
+                    aria-label="Auto-open delay seconds"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Between 0 and 60 seconds after page load.</p>
+                </div>
+              )}
               <div>
                 <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Starter questions</label>
                 <div className="flex gap-2">
