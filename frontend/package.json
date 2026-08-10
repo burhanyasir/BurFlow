@@ -4,9 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "node scripts/sync-widget.js",
     "dev": "vite",
+    "prebuild": "node scripts/sync-widget.js",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "prepreview": "node scripts/sync-widget.js",
     "preview": "vite preview"
   },
   "dependencies": {
