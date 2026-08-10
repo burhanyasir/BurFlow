@@ -413,7 +413,7 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantG
   },
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
-}, sessionHandoff, unansweredRepo));
+}, sessionHandoff, unansweredRepo, widgetConfigRepo));
 app.use('/api/webhooks/stripe', createStripeWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));

@@ -102,54 +102,68 @@ const DEMOS = [
   {
     slug: 'demo-ecommerce',
     id: 'tenant-demo-ecommerce',
-    name: 'Tech & Apparel Store',
+    name: 'MTH Medical Store',
     widget: {
       theme: 'light',
       position: 'right',
       primary_color: '#A8244B',
-      company_name: 'Tech & Apparel Store',
-      greeting: "Hi there! I'm your shopping assistant at Tech & Apparel. Ask me about our products, shipping, or returns — or start shopping right away.",
+      company_name: 'MTH Medical Store',
+      greeting: "Welcome to MTH Medical Store! I'm your assistant for medical supplies, lab tests, and doctor consultations. Ask me about products, delivery, returns, or booking.",
       launcher_text: 'Chat with us',
-      starter_options: ['What products do you have?', 'Shipping & returns', 'Start shopping'],
+      starter_options: ['🛒 Show top selling health products', '🚚 How does same-day delivery work?', '🔄 What is your return policy?'],
+      business_profile: {
+        primary_goal: 'direct_checkout',
+        business_type: 'ecommerce',
+        cta: { type: 'product_recommendation', label: 'Shop the catalog', link: '#products' },
+        button_catalog: [
+          { id: 'btn_top_sellers', label: 'Show top selling health products', payload: 'Show top selling health products', action: 'send_text', variant: 'primary', category: 'products', defaultScore: 60, icon: 'shopping-cart', tags: ['products', 'best sellers'] },
+          { id: 'btn_delivery', label: 'How does same-day delivery work?', payload: 'How does same-day delivery work?', action: 'send_text', variant: 'secondary', category: 'delivery', defaultScore: 55, icon: 'truck', tags: ['delivery', 'shipping'] },
+          { id: 'btn_returns', label: 'What is your return policy?', payload: 'What is your return policy?', action: 'send_text', variant: 'secondary', category: 'returns', defaultScore: 52, icon: 'refresh', tags: ['returns', 'refund'] },
+          { id: 'btn_view_catalog', label: 'View all products', payload: '#products', action: 'navigate', variant: 'primary', category: 'products', defaultScore: 50, icon: 'shopping-bag', tags: ['catalog', 'products'] },
+          { id: 'btn_consult', label: 'Book a consultation', payload: 'Book a doctor consultation', action: 'send_text', variant: 'secondary', category: 'appointment', defaultScore: 45, icon: 'calendar', tags: ['consultation', 'appointment'] },
+        ],
+      },
     },
     topics: [
       {
         section: 'Overview',
         content: [
-          'Tech & Apparel Store is an online shop for tech accessories and everyday apparel. Browse our catalog, add items to your cart, and check out securely — we ship across the country with fast, tracked delivery.',
-          'We carry wireless headphones and earbuds, running and lifestyle sneakers, denim and bomber jackets, smartwatches, phone accessories, and seasonal apparel. New arrivals drop every week.',
+          'MTH Medical Store is Madinah Teaching Hospital\'s online healthcare marketplace — trusted medical supplies, wellness products, and health consultations, all in one place. Every product is vetted by MTH\'s team of specialist doctors and pharmacists.',
+          'We are located in Madina Town, Faisalabad, Pakistan. Contact us at +92 41 123 4567 or info@mthstore.pk. Your health data is encrypted and never shared with third parties.',
         ],
       },
       {
         section: 'Products',
         content: [
-          'Wireless Noise-Cancelling Headphones — $89.99: over-ear, 30-hour battery life, Bluetooth 5.3, built-in mic for calls. Our best seller.',
-          'Running Sneakers — $119.99: lightweight breathable mesh, cushioned sole, available in men\'s and women\'s sizes 6–13.',
-          'Classic Denim Jacket — $79.99: medium-wash, unisex fit S–XXL, machine washable.',
-          'Bomber Jacket — $94.99: quilted lining, zip front, navy and black.',
-          'Wireless Earbuds — $49.99: compact case, 24-hour total battery, touch controls.',
-          'Smartwatch — $129.99: fitness tracking, heart-rate monitor, 7-day battery, iOS and Android compatible.',
+          'Digital Blood Pressure Monitor — Rs 4,500 (was Rs 6,200). Our best seller: clinically validated automatic blood pressure monitor with irregular heartbeat detection.',
+          'Daily Multivitamin Pack — Rs 1,200: a 30-day supply of essential vitamins and minerals for overall health and immunity.',
+          'Pulse Oximeter — Rs 2,800 (was Rs 3,500): fingertip SpO2 and pulse rate monitor with OLED display. FDA approved.',
+          'Complete First Aid Kit — Rs 3,200: 120-piece emergency kit with bandages, antiseptics, scissors, and more.',
+          'Complete Blood Count (CBC) — Rs 800: comprehensive blood screening with same-day results from our certified lab.',
+          'Online Doctor Consultation — Rs 1,500: a 30-minute video consultation with a specialist doctor, available 24/7.',
+          'Infrared Thermometer — Rs 1,800 (was Rs 2,400): non-contact forehead thermometer with fever alarm, reads in 1 second.',
+          'Hand Sanitizer Bundle (6-pack) — Rs 950: 70% alcohol-based, hospital grade, dermatologically tested.',
         ],
       },
       {
-        section: 'Shipping',
+        section: 'Delivery',
         content: [
-          'Standard shipping takes 3–5 business days on all orders. Shipping is free on orders over $50; otherwise a flat $4.99 applies.',
-          'Express shipping (1–2 business days) is available at checkout for $12.99. All orders ship with tracking, and you will receive an email the moment your order leaves the warehouse.',
+          'We deliver across Faisalabad city same-day — order before 2 PM and receive your products the same day within Faisalabad.',
+          'Across Pakistan, delivery takes 3–5 business days via TCS/Leopard courier. Delivery is available citywide with fast, tracked shipping.',
         ],
       },
       {
-        section: 'Returns',
+        section: 'Returns & insurance',
         content: [
-          'We offer a 30-day return policy. Items must be unused, in their original packaging, and returned within 30 days of delivery for a full refund to your original payment method.',
-          'To start a return, go to your order confirmation email and use the return link, or contact support with your order number. Refunds are processed within 3–5 business days after the item reaches our warehouse.',
+          'Return policy: unopened products can be returned within 7 days of delivery. Lab tests and consultations are non-refundable.',
+          'We accept all major insurance providers for lab tests and consultations. Contact our support for details on coverage.',
         ],
       },
       {
-        section: 'Checkout & support',
+        section: 'Consultations & support',
         content: [
-          'Checkout is quick and secure: add items to your cart, enter your shipping details, and pay by card or PayPal. You can track your order from your account page at any time.',
-          'Need help? Our support team answers within a few hours at support@techapparel.example. If you cannot find what you are looking for, we will help you place the order over chat.',
+          'Booking a doctor consultation is easy: book directly from the website or ask the AI assistant. We have specialists available 24/7 via video call.',
+          'Our AI health assistant gives product recommendations and health advice instantly. For help with an order, contact support at info@mthstore.pk or call +92 41 123 4567.',
         ],
       },
     ],
@@ -166,6 +180,18 @@ const DEMOS = [
       greeting: 'Welcome to Maple Grove Dental! Ask me about our services, pricing, office hours, or how to book an appointment.',
       launcher_text: 'Chat with us',
       starter_options: ['Book an appointment', 'What services do you offer?', 'Office hours & insurance'],
+      business_profile: {
+        primary_goal: 'appointment_booking',
+        business_type: 'clinic',
+        cta: { type: 'appointment_booking', label: 'Book an appointment', link: '#book' },
+        button_catalog: [
+          { id: 'btn_book_appt', label: 'Book an appointment', payload: 'Book an appointment', action: 'send_text', variant: 'primary', category: 'appointment', defaultScore: 60, icon: 'calendar', tags: ['appointment', 'book'] },
+          { id: 'btn_services', label: 'What services do you offer?', payload: 'What services do you offer?', action: 'send_text', variant: 'secondary', category: 'services', defaultScore: 55, icon: 'tooth', tags: ['services', 'treatment'] },
+          { id: 'btn_hours', label: 'Office hours', payload: 'What are your office hours?', action: 'send_text', variant: 'secondary', category: 'hours', defaultScore: 50, icon: 'clock', tags: ['hours', 'open'] },
+          { id: 'btn_insurance', label: 'Insurance & payment', payload: 'Do you accept my insurance?', action: 'send_text', variant: 'secondary', category: 'insurance', defaultScore: 48, icon: 'shield', tags: ['insurance', 'payment'] },
+          { id: 'btn_emergency', label: 'Emergency care', payload: 'Do you handle dental emergencies?', action: 'send_text', variant: 'secondary', category: 'emergency', defaultScore: 45, icon: 'alert', tags: ['emergency'] },
+        ],
+      },
     },
     topics: [
       {
@@ -303,12 +329,13 @@ function main() {
         greeting: demo.widget.greeting,
         launcher_text: demo.widget.launcher_text,
         starter_options: JSON.stringify(demo.widget.starter_options),
+        business_profile: demo.widget.business_profile ? JSON.stringify(demo.widget.business_profile) : undefined,
         notify_threshold: 'all',
         auto_open: 0,
         created_at: now(),
         updated_at: now(),
       };
-      const cols = wcCols.filter(c => c !== 'id' && c in row);
+      const cols = wcCols.filter(c => c !== 'id' && c in row && row[c] !== undefined);
       db.prepare('DELETE FROM widget_configs WHERE tenant_id = ?').run(demo.id);
       db.prepare(
         `INSERT INTO widget_configs (${cols.join(', ')})

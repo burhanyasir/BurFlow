@@ -101,4 +101,31 @@ describe('widget autoInit (tokenless bootstrap)', () => {
     expect(widget.config.companyName).toBe('BrandCo');
     expect(widget.config.launcherText).toBe('Chat with BrandCo');
   });
+
+  it('renders business-appropriate pre-open suggestions and placeholder (no SaaS leaks) after remote config loads', async () => {
+    const fetchMock = (globalThis as any).fetch;
+    fetchMock
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'fresh-minted-token' }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          companyName: 'MTH Medical Store',
+          starterOptions: ['🛒 Show top selling health products', '🚚 How does same-day delivery work?', '🔄 What is your return policy?'],
+          businessProfile: { business_type: 'ecommerce', company_name: 'MTH Medical Store' },
+        }),
+      });
+
+    await import('../index');
+    await new Promise((r) => setTimeout(r, 50));
+
+    const widget = (window as any).__CURRENT_WIDGET;
+    // Pre-open panel must show the tenant's store chips, not the SaaS fallback.
+    const pills = Array.from(document.querySelectorAll('.cw-preopen-panel .cw-preopen-options span')).map(
+      (el: Element) => el.textContent,
+    );
+    expect(pills).toContain('🛒 Show top selling health products');
+    expect(pills.some((t: string | null) => (t || '').includes('Book a demo'))).toBe(false);
+    // Input placeholder must be store-oriented after the config applies.
+    expect(widget.inputEl.placeholder).toContain('What products');
+  });
 });

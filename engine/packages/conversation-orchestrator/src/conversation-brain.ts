@@ -300,6 +300,37 @@ export interface BrainInput {
   ignoredButtonIds?: string[];
   tenantId?: string;
   knowledgeBaseProvider?: KnowledgeBaseProvider;
+  /**
+   * Tenant-level CTA/business profile (derived from the widget config's
+   * business_profile JSON). Lets a tenant swap the SaaS "Book a demo / Free
+   * trial" CTAs and button catalog for store- or clinic-appropriate ones.
+   */
+  businessProfile?: TenantCtaProfile;
+}
+
+/**
+ * Optional per-tenant CTA configuration carried inside the widget config's
+ * `business_profile` JSON. When present, the brain prefers these over the
+ * built-in SaaS CTAs; when absent, the default SaaS behavior is unchanged.
+ */
+export interface TenantCtaProfile {
+  /** Primary business goal, e.g. 'book_demo' | 'direct_checkout' | 'product_recommendation' | 'appointment_booking'. */
+  primary_goal?: string;
+  /** Funnel CTA override (label + link) used for buying-oriented turns. */
+  cta?: { type?: string; label: string; link: string };
+  /** Replacement button catalog for dynamic quick replies (store/clinic chips). */
+  button_catalog?: Array<{
+    id: string;
+    label: string;
+    payload: string;
+    action?: 'send_text' | 'navigate' | 'open_modal';
+    variant?: 'primary' | 'secondary' | 'outline';
+    category?: string;
+    defaultScore?: number;
+    icon?: string;
+    locale?: string;
+    tags?: string[];
+  }>;
 }
 
 export interface DecisionTrace {
@@ -606,7 +637,20 @@ function inferPersonaFromMessage(message: string, memory: ConversationMemoryData
   return 'unknown';
 }
 
-function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent }, memory: ConversationMemoryData): CTASelectionResult {
+function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent }, memory: ConversationMemoryData, profile?: TenantCtaProfile): CTASelectionResult {
+  // Tenant CTA override: e-commerce / clinic tenants replace the SaaS
+  // "Start Free Trial" / "Book a Demo" funnel CTAs with their own conversion
+  // action (e.g. shop the catalog, book an appointment).
+  const profileCta = profile?.cta;
+  const profileCtaResult = (): CTASelectionResult => ({
+    primaryCTA: (profileCta!.type as CTAType) || 'contact_sales',
+    label: profileCta!.label,
+    link: profileCta!.link,
+    secondaryCTA: undefined,
+    secondaryLabel: undefined,
+    secondaryLink: undefined,
+  });
+
   if (memory.isLeaving || plan.goal === 'finish_conversation') {
     return {
       primaryCTA: 'contact_sales',
@@ -619,6 +663,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
   }
 
   if (plan.goal === 'close_trial' || plan.goal === 'recommend_plan' || plan.customerIntent === 'buying') {
+    if (profileCta) return profileCtaResult();
     if (persona === 'enterprise' && !isCTARejected(memory, 'book_demo')) {
       return {
         primaryCTA: 'book_demo',
@@ -643,6 +688,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
     const hasProofGap = memory.trustLevel === 'low' || memory.salesSignals.trustIssues.length > 0 || memory.salesSignals.objections.length > 0;
     const hasBuyingSignal = memory.buyingIntentDetected || memory.qualificationCollected.completed || memory.salesSignals.timelineSignals.length > 0;
     const hasPriceObjection = memory.objectionsHandled.includes('price') || memory.salesSignals.objections.includes('price') || memory.salesSignals.budget === 'budget-sensitive';
+    if (hasBuyingSignal && profileCta) return profileCtaResult();
     if (hasPriceObjection && !hasProofGap) {
       return {
         primaryCTA: 'start_free_trial',
@@ -684,6 +730,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
   }
 
   if (plan.goal === 'recover_abandonment') {
+    if (profileCta) return profileCtaResult();
     return {
       primaryCTA: 'book_demo',
       label: 'Book a Quick Demo',
@@ -695,6 +742,10 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
   }
 
   const ctaOptions: Array<{ primary: CTAType; label: string; link: string }> = [];
+
+  if (profileCta) {
+    return profileCtaResult();
+  }
 
   const personaCta = PERSONA_SPECIFIC_CTA[persona];
   if (personaCta) ctaOptions.push(personaCta);
@@ -741,6 +792,7 @@ function buildStrategyResponse(
   relevantFacts: RelevantKnownFacts,
   tenantId?: string,
   kbProvider?: KnowledgeBaseProvider,
+  profile?: TenantCtaProfile,
 ): string {
   const parts: string[] = [];
 
@@ -840,7 +892,7 @@ function buildStrategyResponse(
   }
 
   // 6. CTA per strategy
-  const ctaText = buildCTAText(strategy, plan, memory, ciResult);
+  const ctaText = buildCTAText(strategy, plan, memory, ciResult, profile);
   if (ctaText) parts.push(ctaText);
 
   // 6b. Plan recommendation (for recommend_plan goal) — avoid repeating previous recommendations
@@ -1218,10 +1270,11 @@ function buildCTAText(
   plan: { customerIntent: CustomerIntent; goal: ConversationGoal; funnelStage: FunnelStageExtended },
   memory: ConversationMemoryData,
   ci: ConversationIntelligenceResult,
+  profile?: TenantCtaProfile,
 ): string | null {
   if (strategy.cta === 'none') return null;
 
-  const cta = selectCTAByPlan(ci.persona.persona, plan, memory);
+  const cta = selectCTAByPlan(ci.persona.persona, plan, memory, profile);
   if (cta.primaryCTA === 'none') return null;
 
   const ctaTexts: Record<string, string> = {
@@ -1236,6 +1289,9 @@ function buildCTAText(
 
   // Personalize CTA based on memory
   let text = ctaTexts[cta.primaryCTA] || '';
+  if (!text && profile?.cta) {
+    text = `Would you like to ${profile.cta.label.toLowerCase()}?`;
+  }
   if (cta.primaryCTA === 'start_free_trial' && memory.companySize) {
     text = `Your ${memory.companySize}-person team can start a free trial today.`;
   }
@@ -1466,14 +1522,22 @@ function buildDynamicQuickReplies(
   plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
   memory: ConversationMemoryData,
   ciResult: ConversationIntelligenceResult,
+  profile?: TenantCtaProfile,
 ): SmartButton[] {
   if (plan.goal === 'finish_conversation') return [];
+
+  // Tenant button catalog override: when the tenant configures its own
+  // business_profile.button_catalog (e.g. store delivery/returns chips), use
+  // it instead of the SaaS button catalog.
+  const catalog: ButtonCandidate[] = profile?.button_catalog?.length
+    ? (profile.button_catalog as ButtonCandidate[])
+    : BUTTON_CATALOG;
 
   const historical = buttonTelemetry.snapshot().byButton;
   const recentLabels = new Set(memory.buttonsShown.filter(b => b.turnNumber >= memory.turnCount - 2).map(b => b.label.toLowerCase()));
   const messageTags = extractMessageTags(message);
 
-  const candidates: Array<SmartButton> = BUTTON_CATALOG
+  const candidates: Array<SmartButton> = catalog
     .filter(button => isButtonRelevant(button, plan, memory, ciResult, messageTags))
     .map(button => ({
       ...button,
@@ -1509,7 +1573,7 @@ function buildDynamicQuickReplies(
   const replies = [...topButtons];
 
   if (replies.length < MIN_QUICK_REPLIES) {
-    const fallback = BUTTON_CATALOG.filter(button => !recentLabels.has(button.label.toLowerCase()) && button.category !== 'qualification').slice(0, MIN_QUICK_REPLIES - replies.length);
+    const fallback = catalog.filter(button => !recentLabels.has(button.label.toLowerCase()) && button.category !== 'qualification').slice(0, MIN_QUICK_REPLIES - replies.length);
     for (const fallbackButton of fallback) {
       replies.push({
         id: fallbackButton.id,
@@ -1921,7 +1985,7 @@ async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.Mes
 }
 
 async function processConversationBrainInner(input: BrainInput): Promise<BrainOutput> {
-  const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider } = input;
+  const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider, businessProfile } = input;
 
   const memory = fromLegacyMemory(legacyMemory);
 
@@ -2304,7 +2368,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
         // LLM responded with unparseable output — degrade gracefully to the
         // heuristic template engine instead of failing the visitor's turn.
         usedFallback = true;
-        enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+        enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
       }
     } catch (error: unknown) {
       const err = error as { status?: number; message?: string; provider?: string };
@@ -2318,12 +2382,12 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       // Upstream exhaustion must not fail the visitor's turn — degrade
       // gracefully to the heuristic template engine.
       usedFallback = true;
-      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
     }
   } else {
     // No LLM provider configured — the heuristic engine answers this turn.
     usedFallback = true;
-    enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
+    enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
   }
 
   // Surface the degradation signal to the CI result so callers can detect
@@ -2356,7 +2420,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
   if (strategy.cta === 'none') {
     cta = { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
   } else {
-    cta = selectCTAByPlan(ciResult.persona?.persona ?? 'unknown', plan, memory);
+    cta = selectCTAByPlan(ciResult.persona?.persona ?? 'unknown', plan, memory, businessProfile);
     if (strategy.cta === 'soft' && cta.primaryCTA !== 'none') {
       cta = { ...cta, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
     }
@@ -2364,7 +2428,18 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
 
   // LLM-structured CTA hint overrides the deterministic pick when valid
   if (llmCtaHint && llmCtaHint !== 'none' && strategy.cta !== 'none') {
-    const llmCtaLabels: Record<CTAType, { label: string; link: string }> = {
+    // Tenant CTA profile wins over the SaaS label/link map.
+    if (businessProfile?.cta) {
+      cta = {
+        primaryCTA: (businessProfile.cta.type as CTAType) || llmCtaHint,
+        label: businessProfile.cta.label,
+        link: businessProfile.cta.link,
+        secondaryCTA: undefined,
+        secondaryLabel: undefined,
+        secondaryLink: undefined,
+      };
+    } else {
+      const llmCtaLabels: Record<CTAType, { label: string; link: string }> = {
       start_free_trial: { label: 'Start Free Trial', link: '/signup' },
       book_demo: { label: 'Book a Demo', link: '/demo' },
       contact_sales: { label: 'Talk to Sales', link: '/contact' },
@@ -2376,14 +2451,15 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       partner_program: { label: 'Join Partner Program', link: '/contact' },
       none: { label: '', link: '' },
     };
-    const chosen = llmCtaLabels[llmCtaHint];
-    if (chosen) {
-      cta = { primaryCTA: llmCtaHint, label: chosen.label, link: chosen.link, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+      const chosen = llmCtaLabels[llmCtaHint];
+      if (chosen) {
+        cta = { primaryCTA: llmCtaHint, label: chosen.label, link: chosen.link, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+      }
     }
   }
 
   const nextBestAction = determineNextBestAction(plan, memory, ciResult);
-  const quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult);
+  const quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult, businessProfile);
 
   // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
   const recommended = recommendPlan(memory);
@@ -2406,7 +2482,9 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       payload: qr.payload,
       variant: qr.variant,
     })),
-    activeCard: ciResult.uiState?.activeCard,
+    // Tenant CTA profiles replace the SaaS conversion UI (free-trial lead
+    // forms, SaaS pricing cards) with the tenant's own quick replies + CTA.
+    activeCard: businessProfile ? undefined : ciResult.uiState?.activeCard,
   };
 
   if (strategy.topicToAnswer) {

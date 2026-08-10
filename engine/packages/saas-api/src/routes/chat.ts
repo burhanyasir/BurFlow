@@ -5,6 +5,7 @@ import {
   AnalyticsRepository, SessionHandoffService, TAKEOVER_ACKNOWLEDGEMENT,
   extractContactDetails, mapScoreToBuyingIntent, hasContactInfo,
   UnansweredQuestionRepository,
+  WidgetConfigRepository,
   Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
@@ -79,6 +80,7 @@ export function createChatRoutes(
   leadOptions?: LeadCaptureOptions,
   handoff?: SessionHandoffService,
   unansweredRepo?: UnansweredQuestionRepository,
+  widgetConfigRepo?: WidgetConfigRepository,
 ): Router {
   const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
@@ -286,12 +288,26 @@ export function createChatRoutes(
       }
 
       const brainFn = async (input: any) => processConversationBrain(input);
+
+      // Tenant CTA/business profile (widget config business_profile JSON): lets
+      // e-commerce / clinic tenants replace SaaS "Book a demo / Free trial"
+      // CTAs and quick replies with store-appropriate ones. Never fails the turn.
+      let businessProfile: Record<string, unknown> | undefined;
+      if (widgetConfigRepo) {
+        try {
+          businessProfile = widgetConfigRepo.get(tenantId!)?.businessProfile;
+        } catch {
+          businessProfile = undefined;
+        }
+      }
+
       const pipelineResult = await executePipeline({
         message: normalizedText,
         sessionId: convSessionId,
         tenantId: tenantId!,
         brainFunction: brainFn,
         knowledgeBaseProvider: kb,
+        businessProfile,
         policy: {
           qualification: DEFAULT_TENANT_POLICY.qualification,
           cta: DEFAULT_TENANT_POLICY.cta,

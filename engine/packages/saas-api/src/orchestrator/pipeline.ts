@@ -13,6 +13,8 @@ export interface PipelineInput {
   brainFunction: (input: any) => any;
   policy?: Partial<TenantPolicy>;
   knowledgeBaseProvider?: KnowledgeBaseProvider;
+  /** Tenant CTA/business profile from the widget config (business_profile JSON). */
+  businessProfile?: Record<string, unknown>;
 }
 
 export interface PipelineResult {
@@ -40,7 +42,7 @@ const TRACE_LOG = true;
 
 export async function executePipeline(input: PipelineInput): Promise<PipelineResult> {
   const startTime = Date.now();
-  const { message, sessionId, tenantId, brainFunction, policy, knowledgeBaseProvider: kbProvider } = input;
+  const { message, sessionId, tenantId, brainFunction, policy, knowledgeBaseProvider: kbProvider, businessProfile } = input;
   const traceId = `${sessionId.slice(-8)}-${Date.now() % 10000}`;
 
   // Step 1: Load conversation state
@@ -89,6 +91,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       },
       tenantId,
       knowledgeBaseProvider: kbProvider,
+      businessProfile,
     };
     let rapportQuickReplies: any[] = [];
     let rapportUiState: any = { buttons: [], suggestedActions: [] };
@@ -154,7 +157,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
   }
 
   // Step 5: Build brain input with full conversation context
-  const brainInput = buildBrainInput(message, state, policyDecision, tenantId, kbProvider);
+  const brainInput = buildBrainInput(message, state, policyDecision, tenantId, kbProvider, businessProfile);
 
   // Step 6: Call frozen Conversation Engine
   let brainOutput: any;
@@ -258,7 +261,7 @@ function mapStrategyToStage(strategy: Strategy): ConversationStage {
   return map[strategy] || 'discovery';
 }
 
-function buildBrainInput(message: string, state: OrchestratorState, policy: PolicyDecision, tenantId?: string, kbProvider?: KnowledgeBaseProvider): any {
+function buildBrainInput(message: string, state: OrchestratorState, policy: PolicyDecision, tenantId?: string, kbProvider?: KnowledgeBaseProvider, businessProfile?: Record<string, unknown>): any {
   const turns = state.turnCount > 0
     ? [{ message: state.lastUserMessage || '', response: state.lastBotMessage || '', polarity: 0, frustration: 0, urgency: 0, timestamp: Date.now() }]
     : [];
@@ -268,6 +271,7 @@ function buildBrainInput(message: string, state: OrchestratorState, policy: Poli
     responseText: '',
     tenantId,
     knowledgeBaseProvider: kbProvider,
+    businessProfile,
     legacyMemory: {
       turns,
       turnCount: state.turnCount,

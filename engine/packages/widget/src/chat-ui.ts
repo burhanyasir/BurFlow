@@ -32,7 +32,10 @@ interface BusinessContextLike {
 }
 
 export function buildBusinessProfileFromWidgetConfig(config: Partial<WidgetConfig> = {}): BusinessContextLike {
+  // The stored business_profile JSON uses snake_case keys (e.g. business_type),
+  // while the widget's internal profile uses camelCase — accept both.
   const persisted = (config.businessProfile || {}) as Record<string, unknown>;
+  const pick = (camel: string, snake: string): unknown => persisted[camel] ?? persisted[snake];
   const titleText = (config.title || '').toLowerCase();
   const greetingText = (config.greeting || '').toLowerCase();
   const hasSalesLanguage = titleText.includes('sales') || greetingText.includes('demo') || greetingText.includes('plan') || greetingText.includes('pricing');
@@ -41,19 +44,19 @@ export function buildBusinessProfileFromWidgetConfig(config: Partial<WidgetConfi
   const hasPricingAction = suggestedActions.some((label) => label.includes('plan') || label.includes('pricing'));
 
   const base: BusinessContextLike = {
-    companyName: (persisted.companyName as string | undefined) || config.companyName || 'this business',
-    industry: (persisted.industry as string | undefined) || (hasSalesLanguage ? 'SaaS' : undefined),
-    businessType: (persisted.businessType as string | undefined) || (hasSalesLanguage ? 'saas' : undefined),
-    products: ((persisted.products as string[] | undefined) || ['product guidance', hasDemoAction ? 'demo qualification' : 'core offering'].filter(Boolean)) as string[],
-    services: ((persisted.services as string[] | undefined) || ['guided recommendations', hasDemoAction ? 'demo booking support' : 'support'].filter(Boolean)) as string[],
-    pricingModel: (persisted.pricingModel as string | undefined) || (hasPricingAction ? 'guided plans' : 'flexible options'),
-    valuePropositions: ((persisted.valuePropositions as string[] | undefined) || [hasDemoAction ? 'clear next steps' : 'clear guidance', 'fast, trustworthy responses']) as string[],
-    targetAudience: ((persisted.targetAudience as string[] | undefined) || ['prospective buyers', 'website visitors']) as string[],
-    faqs: ((persisted.faqs as string[] | undefined) || ['How does this work?', 'What should I do next?']) as string[],
-    contactDetails: ((persisted.contactDetails as string[] | undefined) || ['sales contact']) as string[],
-    trustSignals: ((persisted.trustSignals as string[] | undefined) || ['website-guided guidance', 'transparent next steps']) as string[],
-    brandTone: (persisted.brandTone as string | undefined) || 'confident and helpful',
-    sourceUrls: (persisted.sourceUrls as Record<string, string> | undefined) || (config.companyName ? { pricing: '#', services: '#', faq: '#', about: '#' } : undefined),
+    companyName: (pick('companyName', 'company_name') as string | undefined) || config.companyName || 'this business',
+    industry: (pick('industry', 'industry') as string | undefined) || (hasSalesLanguage ? 'SaaS' : undefined),
+    businessType: (pick('businessType', 'business_type') as string | undefined) || (hasSalesLanguage ? 'saas' : undefined),
+    products: ((pick('products', 'products') as string[] | undefined) || ['product guidance', hasDemoAction ? 'demo qualification' : 'core offering'].filter(Boolean)) as string[],
+    services: ((pick('services', 'services') as string[] | undefined) || ['guided recommendations', hasDemoAction ? 'demo booking support' : 'support'].filter(Boolean)) as string[],
+    pricingModel: (pick('pricingModel', 'pricing_model') as string | undefined) || (hasPricingAction ? 'guided plans' : 'flexible options'),
+    valuePropositions: ((pick('valuePropositions', 'value_propositions') as string[] | undefined) || [hasDemoAction ? 'clear next steps' : 'clear guidance', 'fast, trustworthy responses']) as string[],
+    targetAudience: ((pick('targetAudience', 'target_audience') as string[] | undefined) || ['prospective buyers', 'website visitors']) as string[],
+    faqs: ((pick('faqs', 'faqs') as string[] | undefined) || ['How does this work?', 'What should I do next?']) as string[],
+    contactDetails: ((pick('contactDetails', 'contact_details') as string[] | undefined) || ['sales contact']) as string[],
+    trustSignals: ((pick('trustSignals', 'trust_signals') as string[] | undefined) || ['website-guided guidance', 'transparent next steps']) as string[],
+    brandTone: (pick('brandTone', 'brand_tone') as string | undefined) || 'confident and helpful',
+    sourceUrls: (pick('sourceUrls', 'source_urls') as Record<string, string> | undefined) || (config.companyName ? { pricing: '#', services: '#', faq: '#', about: '#' } : undefined),
   };
 
   return base;
@@ -375,7 +378,16 @@ export class ChatWidget {
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
   private agentPollTimer: ReturnType<typeof setInterval> | null = null;
   private lastAgentSeq = 0;
-  private readonly placeholders = ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
+  private get placeholders(): string[] {
+    const type = (this.businessProfile.businessType || '').toLowerCase();
+    if (/ecommerce|retail|store|shop|medical|pharma/.test(type)) {
+      return ['What products do you offer?', 'How fast is delivery?', 'What is your return policy?', 'Do you have this in stock?'];
+    }
+    if (/clinic|dental|healthcare|hospital/.test(type)) {
+      return ['What services do you offer?', 'How do I book an appointment?', 'What are your hours?', 'Do you accept insurance?'];
+    }
+    return ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
+  }
   private boundDismissPreOpen = (e: Event) => {
     if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
       this.dismissPreOpenPanel();
@@ -575,9 +587,33 @@ export class ChatWidget {
     header.textContent = 'Suggested questions';
     panel.appendChild(header);
 
+    const optionsWrap = document.createElement('div');
+    optionsWrap.className = 'cw-preopen-options';
+    panel.appendChild(optionsWrap);
+
+    document.body.appendChild(panel);
+    this.preOpenPanelEl = panel;
+    this.renderPreOpenOptions();
+
+    setTimeout(() => {
+      if (!this.preOpenDismissed && !this.isOpen) {
+        panel.style.display = 'block';
+      }
+    }, 2000);
+    setTimeout(() => this.dismissPreOpenPanel(), 12000);
+    document.addEventListener('click', this.boundDismissPreOpen);
+  }
+
+  /** Rebuilds the pre-open "Suggested questions" rows from the current config (called at mount and again when remote config arrives). */
+  private renderPreOpenOptions(): void {
+    if (!this.preOpenPanelEl) return;
+    const wrap = this.preOpenPanelEl.querySelector('.cw-preopen-options');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+
     const options = this.config.starterOptions?.length
       ? this.config.starterOptions
-      : ['Show me pricing', 'How does it work?', 'Book a demo'];
+      : this.defaultStarterOptions();
     options.forEach((text, i) => {
       const row = document.createElement('div');
       row.style.cssText = `padding:8px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;${i < options.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}transition:background 0.15s ease;`;
@@ -595,19 +631,19 @@ export class ChatWidget {
           if (this.inputEl) { this.inputEl.value = text; this.send(); }
         }, 150);
       });
-      panel.appendChild(row);
+      wrap.appendChild(row);
     });
+  }
 
-    document.body.appendChild(panel);
-    this.preOpenPanelEl = panel;
-
-    setTimeout(() => {
-      if (!this.preOpenDismissed && !this.isOpen) {
-        panel.style.display = 'block';
-      }
-    }, 2000);
-    setTimeout(() => this.dismissPreOpenPanel(), 12000);
-    document.addEventListener('click', this.boundDismissPreOpen);
+  private defaultStarterOptions(): string[] {
+    const type = (this.businessProfile.businessType || '').toLowerCase();
+    if (/ecommerce|retail|store|shop|medical|pharma/.test(type)) {
+      return ['What products do you offer?', 'How fast is delivery?', 'What is your return policy?'];
+    }
+    if (/clinic|dental|healthcare|hospital/.test(type)) {
+      return ['Book an appointment', 'What services do you offer?', 'What are your hours?'];
+    }
+    return ['Show me pricing', 'How does it work?', 'Book a demo'];
   }
 
   private showPreOpenPanel(): void {
@@ -1105,7 +1141,7 @@ export class ChatWidget {
 
     const starters = this.config.starterOptions?.length
       ? this.config.starterOptions
-      : ['Show me pricing', 'How does it work?', 'Book a demo'];
+      : this.defaultStarterOptions();
 
     const chipWrap = document.createElement('div');
     chipWrap.className = 'cw-starter-chips';
@@ -1465,6 +1501,10 @@ export class ChatWidget {
     const merged = this.normalizeAliases(remote);
     this.config = { ...this.config, ...merged };
     this.businessProfile = this.deriveBusinessProfileFromConfig();
+    if (this.inputEl && this.placeholders.length) {
+      this.inputEl.placeholder = this.placeholders[0];
+    }
+    this.renderPreOpenOptions();
     this.applyBrandingVars();
     this.updateBubbleAndContainerStyles();
     this.updateHeaderText();

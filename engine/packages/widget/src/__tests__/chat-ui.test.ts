@@ -37,6 +37,22 @@ describe('deriveSuggestedActions', () => {
     expect(greeting.toLowerCase()).toContain('pricing');
   });
 
+  it('maps snake_case business_profile keys (as stored in the DB) to camelCase', () => {
+    const profile = buildBusinessProfileFromWidgetConfig({
+      companyName: 'MTH Medical Store',
+      businessProfile: {
+        business_type: 'ecommerce',
+        company_name: 'MTH Medical Store',
+        pricing_model: 'per-order',
+        target_audience: ['shoppers'],
+      } as unknown as Record<string, unknown>,
+    });
+    expect(profile.businessType).toBe('ecommerce');
+    expect(profile.companyName).toBe('MTH Medical Store');
+    expect(profile.pricingModel).toBe('per-order');
+    expect(profile.targetAudience).toEqual(['shoppers']);
+  });
+
   it('derives a sales-oriented profile from widget config and suggested actions', () => {
     const profile = buildBusinessProfileFromWidgetConfig({
       companyName: 'Northstar Labs',
