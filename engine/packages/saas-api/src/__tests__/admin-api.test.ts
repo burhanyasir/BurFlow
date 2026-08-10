@@ -40,6 +40,7 @@ let analyticsRepo: AnalyticsRepository;
 let subRepo: SubscriptionRepository;
 let leadRepo: LeadRepository;
 let handoffReqRepo: HandoffRequestRepository;
+let unansweredRepo: UnansweredQuestionRepository;
 let app: express.Express;
 
 function makeApp() {
@@ -50,7 +51,7 @@ function makeApp() {
   const tenantGuard = requireTenant(tenantRepo);
   a.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffReqRepo));
   a.use('/api/admin', auth, tenantGuard, createActivationRoutes(
-    new UnansweredQuestionRepository(db),
+    unansweredRepo,
     new UnansweredQuestionClusterRepository(db),
     new KnowledgeSuggestionRepository(db),
     new CitationAnalyticsRepository(db),
@@ -58,7 +59,7 @@ function makeApp() {
     tenantRepo, usageRepo, subRepo, conversationRepo,
   ));
   const leadService = new LeadService(leadRepo);
-  a.use('/api/chat', auth, tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, undefined, { leadService }));
+  a.use('/api/chat', auth, tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, undefined, { leadService }, undefined, unansweredRepo));
   return a;
 }
 
@@ -104,6 +105,7 @@ beforeAll(async () => {
   subRepo = new SubscriptionRepository(db);
   leadRepo = new LeadRepository(db);
   handoffReqRepo = new HandoffRequestRepository(db);
+  unansweredRepo = new UnansweredQuestionRepository(db);
   app = makeApp();
 
   const signupA = await request('POST', '/api/auth/signup', { email: 'admin-a@test.com', password: 'password123', name: 'Admin A', companyName: 'Admin Corp A' });
@@ -327,5 +329,35 @@ describe('Admin activation route authorization', () => {
   it('allows owners and admins through the guard', async () => {
     const res = await request('GET', '/api/admin/usage/current', undefined, tenantAToken);
     expect(res.status).toBe(200);
+  });
+});
+
+// ─── Knowledge Gap Recording ──────────────────────────────
+
+describe('Knowledge gap recording', () => {
+  it('records an unanswered question when the brain falls back to heuristics', async () => {
+    const question = `What is the return window for gap-test-${Date.now()}?`;
+    const chat = await request('POST', '/api/chat', { message: question, sessionId: `gap-session-${Date.now()}` }, tenantAToken);
+    expect(chat.status).toBe(200);
+
+    // In the test environment no LLM keys are configured, so the brain degrades
+    // to heuristic templates and the turn is flagged as a fallback → gap recorded.
+    const res = await request('GET', '/api/admin/unanswered?resolved=false', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    const gaps = res.body as any[];
+    expect(gaps.length).toBeGreaterThan(0);
+    const match = gaps.find((g: any) => g.question === question);
+    expect(match).toBeDefined();
+    expect(match.resolvedAt).toBeFalsy();
+    expect(match.retrievalStatus).toBe('unanswered');
+  });
+
+  it('does not record gaps for other tenants', async () => {
+    const resA = await request('GET', '/api/admin/unanswered?resolved=false', undefined, tenantAToken);
+    const resB = await request('GET', '/api/admin/unanswered?resolved=false', undefined, tenantBToken);
+    const questionsA = (resA.body as any[]).map((g: any) => g.question);
+    for (const g of (resB.body as any[])) {
+      expect(questionsA).not.toContain(g.question);
+    }
   });
 });

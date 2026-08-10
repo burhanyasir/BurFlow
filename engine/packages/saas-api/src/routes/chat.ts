@@ -4,6 +4,7 @@ import {
   LeadService, LeadRepository, WebhookRepository, WebhookDeliveryRepository,
   AnalyticsRepository, SessionHandoffService, TAKEOVER_ACKNOWLEDGEMENT,
   extractContactDetails, mapScoreToBuyingIntent, hasContactInfo,
+  UnansweredQuestionRepository,
   Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
@@ -77,6 +78,7 @@ export function createChatRoutes(
   kbProvider?: KnowledgeBaseProvider,
   leadOptions?: LeadCaptureOptions,
   handoff?: SessionHandoffService,
+  unansweredRepo?: UnansweredQuestionRepository,
 ): Router {
   const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
@@ -322,6 +324,25 @@ export function createChatRoutes(
         leadCapture,
         buyingIntentScore,
       });
+
+      // ─── Knowledge Gap Recording ────────────────────────────────
+      // When the brain degraded to heuristic templates (LLM unavailable,
+      // failed, or returned unparseable output), the visitor's question is a
+      // candidate knowledge-base gap. Persist it so tenants can review and
+      // add answers from the dashboard. Never fails the chat turn.
+      if (pipelineResult.isFallback && unansweredRepo) {
+        try {
+          unansweredRepo.create({
+            tenantId: tenantId!,
+            conversationId: conversation.id,
+            question: normalizedText.slice(0, 500),
+            confidence: 0.15,
+            retrievalStatus: 'unanswered',
+          });
+        } catch (err: any) {
+          createContextLogger(logger).error({ err }, 'Failed to record unanswered question');
+        }
+      }
 
       messageRepo.create({
         conversationId: conversation.id,

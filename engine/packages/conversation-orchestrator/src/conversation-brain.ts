@@ -2210,6 +2210,10 @@ buyingIntentDetected: memory.buyingIntentDetected,
   let llmCtaHint: CTAType | null = null;
   let llmFunnelHint: string | null = null;
   const llmSuggestedTopics: string[] = [];
+  // True when this turn's reply came from the heuristic template engine instead of
+  // the LLM (upstream failure, unparseable output, or no LLM key configured). This
+  // is the signal downstream consumers use to record knowledge-base gaps.
+  let usedFallback = false;
   if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
     try {
       const tenantIdForLLM = tenantId || 'default';
@@ -2299,6 +2303,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       } else {
         // LLM responded with unparseable output — degrade gracefully to the
         // heuristic template engine instead of failing the visitor's turn.
+        usedFallback = true;
         enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
       }
     } catch (error: unknown) {
@@ -2312,11 +2317,18 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
 
       // Upstream exhaustion must not fail the visitor's turn — degrade
       // gracefully to the heuristic template engine.
+      usedFallback = true;
       enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
     }
   } else {
+    // No LLM provider configured — the heuristic engine answers this turn.
+    usedFallback = true;
     enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider);
   }
+
+  // Surface the degradation signal to the CI result so callers can detect
+  // knowledge gaps at chat time.
+  if (usedFallback) ciResult.isFallback = true;
 
   enrichedResponse = enforceContinuity(enrichedResponse, memory, newTopics);
 
@@ -2541,6 +2553,7 @@ const BRAIN_HARD_CEILING_MS = 5000;
 function buildTimeoutFallback(input: BrainInput): BrainOutput {
   const memory = fromLegacyMemory(input.legacyMemory);
   const ciResult = buildMinimalCIResult(memory, input.message);
+  ciResult.isFallback = true;
   memory.turnCount++;
   const updatedLegacy: ConversationIntelligenceMemory = {
     ...input.legacyMemory,

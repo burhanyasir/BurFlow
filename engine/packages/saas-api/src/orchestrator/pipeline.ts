@@ -26,6 +26,8 @@ export interface PipelineResult {
   composition: CompositionResult;
   policy: PolicyDecision;
   isRapportHandled: boolean;
+  /** True when the brain degraded to heuristic responses (LLM failure/unconfigured) for this turn. */
+  isFallback: boolean;
   traceId: string;
   latencyMs: number;
   quickReplies: any[];
@@ -119,6 +121,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
         detectedIndustry: null,
       },
       isRapportHandled: true,
+      isFallback: false,
       traceId,
       latencyMs,
       quickReplies: rapportQuickReplies,
@@ -173,6 +176,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       composition: { text: '', leakageDetected: false, duplicatesRemoved: 0 },
       policy: policyDecision,
       isRapportHandled: false,
+      isFallback: true,
       traceId,
       latencyMs: Date.now() - startTime,
       quickReplies: [],
@@ -225,6 +229,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     composition,
     policy: policyDecision,
     isRapportHandled: false,
+    isFallback: !!(brainOutput?.ciResult?.isFallback || brainOutput?.orchestratorResult?.isFallback),
     traceId,
     latencyMs,
     quickReplies: brainOutput?.quickReplies || [],

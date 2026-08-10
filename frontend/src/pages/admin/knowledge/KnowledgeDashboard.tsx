@@ -6,9 +6,10 @@ import { useAuth } from '../../../lib/auth-context';
 import { fetchWithAuth } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { AlertTriangle, BookOpen, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Globe, RefreshCw, Search, Sparkles, Trash2, Upload } from 'lucide-react';
+import { AlertTriangle, BookOpen, BookPlus, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileText, Globe, HelpCircle, RefreshCw, Search, Sparkles, Trash2, Upload } from 'lucide-react';
 import { WebsiteScannerModal } from '../../../components/dashboard/knowledge/WebsiteScannerModal';
-import type { WebsiteScan } from '../../../components/dashboard/knowledge/types';
+import { KbGapConvertModal } from '../../../components/dashboard/knowledge/KbGapConvertModal';
+import type { WebsiteScan, UnansweredGap } from '../../../components/dashboard/knowledge/types';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -93,6 +94,9 @@ export default function KnowledgeDashboard() {
   const [processingExpanded, setProcessingExpanded] = useState(true);
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [latestScan, setLatestScan] = useState<WebsiteScan | null>(null);
+  const [gaps, setGaps] = useState<UnansweredGap[]>([]);
+  const [gapsLoading, setGapsLoading] = useState(false);
+  const [convertGap, setConvertGap] = useState<UnansweredGap | null>(null);
   const pageSize = 20; const workspaceName = tenant?.name || 'Conversation Engine';
 
   const loadDocs = useCallback(async () => {
@@ -120,7 +124,15 @@ export default function KnowledgeDashboard() {
     } catch { /* silent */ }
   }, []);
 
-  useEffect(() => { loadDocs(); }, [loadDocs]); useEffect(() => { loadMonitoring(); }, [loadMonitoring]); useEffect(() => { loadScanStatus(); }, [loadScanStatus]);
+  const loadGaps = useCallback(async () => {
+    setGapsLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/unanswered?resolved=false');
+      if (res.ok) setGaps(await res.json());
+    } catch { /* silent */ } finally { setGapsLoading(false); }
+  }, []);
+
+  useEffect(() => { loadDocs(); }, [loadDocs]); useEffect(() => { loadMonitoring(); }, [loadMonitoring]); useEffect(() => { loadScanStatus(); }, [loadScanStatus]); useEffect(() => { loadGaps(); }, [loadGaps]);
 
   const scanActive = latestScan?.status === 'queued' || latestScan?.status === 'crawling';
 
@@ -163,7 +175,7 @@ export default function KnowledgeDashboard() {
     }
   }, [latestScan?.status, loadDocs, loadMonitoring]);
 
-  const handleRefresh = useCallback(() => { loadDocs(); loadMonitoring(); loadScanStatus(); }, [loadDocs, loadMonitoring, loadScanStatus]);
+  const handleRefresh = useCallback(() => { loadDocs(); loadMonitoring(); loadScanStatus(); loadGaps(); }, [loadDocs, loadMonitoring, loadScanStatus, loadGaps]);
 
   const handleDelete = async (documentId: string) => {
     try { await fetchWithAuth(`/api/admin/knowledge/documents/${documentId}`, { method: 'DELETE' }); addToast('Document deleted', 'success'); loadDocs(); loadMonitoring(); }
@@ -193,6 +205,29 @@ export default function KnowledgeDashboard() {
   }), [docs, activeFilter]);
 
   const processingDocs = useMemo(() => docs.filter(d => ['queued', 'processing', 'parsing', 'embedding'].includes(d.status)), [docs]);
+
+  // Group unresolved gaps by normalized question text so repeated queries show
+  // a frequency count instead of one row per conversation.
+  const gapGroups = useMemo(() => {
+    const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+    const groups = new Map<string, UnansweredGap[]>();
+    for (const g of gaps) {
+      const key = norm(g.question) || g.id;
+      const arr = groups.get(key) || [];
+      arr.push(g);
+      groups.set(key, arr);
+    }
+    return Array.from(groups.values())
+      .map(items => ({
+        key: items[0].id,
+        question: items[0].question,
+        count: items.length,
+        lastAsked: items.reduce((max, g) => (g.createdAt > max ? g.createdAt : max), items[0].createdAt),
+        id: items[0].id,
+      }))
+      .sort((a, b) => (a.lastAsked < b.lastAsked ? 1 : -1));
+  }, [gaps]);
+
   const websiteCount = docs.filter(d => d.sourceType === 'website').length;
   const processingCount = (monitoring?.processingDocuments || 0) + (monitoring?.queuedDocuments || 0);
   const totalPages = Math.ceil(total / pageSize);
@@ -380,6 +415,61 @@ export default function KnowledgeDashboard() {
             />
           </div>
         )}
+
+        {/* Unanswered questions / KB gaps */}
+        <Panel>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-warning-300/25 text-warning-500">
+                <HelpCircle className="size-4" />
+              </span>
+              <div>
+                <h2 className="text-lg font-bold tracking-tight">Unanswered questions</h2>
+                <p className="text-xs text-muted-foreground">
+                  Visitor queries your chatbot couldn't answer from the knowledge base
+                </p>
+              </div>
+            </div>
+            {gapGroups.length > 0 && (
+              <span className="rounded-full bg-warning-300/25 px-3 py-1 text-xs font-semibold text-foreground">
+                {gapGroups.length} gap{gapGroups.length !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-5 space-y-2">
+            {gapsLoading ? (
+              [0, 1, 2].map(i => (
+                <div key={i} className="h-16 animate-pulse rounded-xl border border-hairline bg-surface-2/60" />
+              ))
+            ) : gapGroups.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-hairline px-4 py-8 text-center">
+                <HelpCircle className="mx-auto size-5 text-muted-foreground" />
+                <p className="mt-2 text-sm font-medium">No unanswered questions</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Gaps appear here when the chatbot can't answer a visitor's question from your knowledge base.
+                </p>
+              </div>
+            ) : (
+              gapGroups.map(group => (
+                <div key={group.key} className="flex items-center gap-3 rounded-xl border border-hairline bg-surface-2/60 p-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-warning-300/25 text-warning-500">
+                    <HelpCircle className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium">{group.question}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      asked {group.count} {group.count === 1 ? 'time' : 'times'} · last {formatWhen(group.lastAsked)}
+                    </p>
+                  </div>
+                  <DashButton onClick={() => setConvertGap(gaps.find(g => g.id === group.id) || null)}>
+                    <BookPlus className="size-4" /> Add to KB
+                  </DashButton>
+                </div>
+              ))
+            )}
+          </div>
+        </Panel>
 
         {/* Empty state */}
         {!loading && monitoring && monitoring.totalDocuments === 0 && (
@@ -580,6 +670,11 @@ export default function KnowledgeDashboard() {
         )}
       </div>
       <WebsiteScannerModal open={scanModalOpen} onClose={() => setScanModalOpen(false)} onStarted={handleScanStarted} />
+      <KbGapConvertModal
+        gap={convertGap}
+        onClose={() => setConvertGap(null)}
+        onConverted={() => { loadGaps(); loadDocs(); loadMonitoring(); }}
+      />
     </DashboardLayout>
   );
 }

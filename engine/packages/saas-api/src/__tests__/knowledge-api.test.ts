@@ -6,7 +6,7 @@ import { existsSync, rmSync } from 'fs';
 import {
   createDatabase, UserRepository, TenantRepository, ApiKeyRepository, RefreshTokenRepository,
   ConversationRepository, MessageRepository, UsageRepository,
-  KnowledgeBaseRepository, KbDocumentRepository,
+  KnowledgeBaseRepository, KbDocumentRepository, UnansweredQuestionRepository,
   generateToken,
 } from '@conversation-engine/saas-core';
 import { authMiddleware } from '../middleware/auth';
@@ -31,6 +31,7 @@ let messageRepo: MessageRepository;
 let usageRepo: UsageRepository;
 let kbRepo: KnowledgeBaseRepository;
 let docRepo: KbDocumentRepository;
+let unansweredRepo: UnansweredQuestionRepository;
 let app: express.Express;
 
 function makeApp() {
@@ -43,7 +44,7 @@ function makeApp() {
   a.use('/api/conversations', auth, createConversationRoutes(conversationRepo, messageRepo));
   a.use('/api/usage', auth, createUsageRoutes(usageRepo));
   a.use('/api/knowledge-bases', auth, createKnowledgeBaseRoutes(kbRepo, docRepo));
-  a.use('/api/knowledge', auth, createKnowledgeRoutes({ db, embeddingDimension: 64 }));
+  a.use('/api/knowledge', auth, createKnowledgeRoutes({ db, embeddingDimension: 64, unansweredRepo }));
   return a;
 }
 
@@ -92,6 +93,7 @@ beforeAll(async () => {
   usageRepo = new UsageRepository(db);
   kbRepo = new KnowledgeBaseRepository(db);
   docRepo = new KbDocumentRepository(db);
+  unansweredRepo = new UnansweredQuestionRepository(db);
   app = makeApp();
 
   // Create user 1
@@ -119,6 +121,72 @@ beforeAll(async () => {
     role: 'member',
   }, JWT_SECRET);
   memberTenantId = memberTenant.id;
+});
+
+// ─────────────────────────────────────────
+// KNOWLEDGE GAPS: CONVERT TO FAQ
+// ─────────────────────────────────────────
+describe('Knowledge gaps: convert to FAQ', () => {
+  it('converts an unanswered question into an FAQ and resolves the gap', async () => {
+    const conv = conversationRepo.create(tenantId, `gap-convert-${Date.now()}`);
+    const gap = unansweredRepo.create({
+      tenantId,
+      conversationId: conv.id,
+      question: 'How do I cancel my subscription?',
+      confidence: 0.2,
+    });
+    // Duplicate of the same question to verify all matching gaps resolve together.
+    const dup = unansweredRepo.create({
+      tenantId,
+      conversationId: conv.id,
+      question: 'how do i cancel my subscription?',
+      confidence: 0.2,
+    });
+
+    const res = await request('POST', `/api/knowledge/unanswered/${gap.id}/convert`, {
+      answer: 'Go to Settings → Billing → Cancel subscription. Your plan stays active until the end of the period.',
+    }, userToken);
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.documentId).toBeTruthy();
+    expect(res.body.resolvedCount).toBe(2);
+
+    expect(unansweredRepo.findById(gap.id)!.resolvedAt).toBeTruthy();
+    expect(unansweredRepo.findById(dup.id)!.resolvedAt).toBeTruthy();
+  });
+
+  it('requires an answer', async () => {
+    const conv = conversationRepo.create(tenantId, `gap-convert-bad-${Date.now()}`);
+    const gap = unansweredRepo.create({
+      tenantId,
+      conversationId: conv.id,
+      question: 'What is your uptime SLA?',
+      confidence: 0.2,
+    });
+    const res = await request('POST', `/api/knowledge/unanswered/${gap.id}/convert`, { answer: '  ' }, userToken);
+    expect(res.status).toBe(400);
+  });
+
+  it('returns 404 for gaps owned by another tenant', async () => {
+    const conv = conversationRepo.create(tenant2Id, `gap-cross-${Date.now()}`);
+    const gap = unansweredRepo.create({
+      tenantId: tenant2Id,
+      conversationId: conv.id,
+      question: 'Private question',
+      confidence: 0.2,
+    });
+    const res = await request('POST', `/api/knowledge/unanswered/${gap.id}/convert`, {
+      answer: 'Should not work',
+    }, userToken);
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 404 for unknown gap ids', async () => {
+    const res = await request('POST', '/api/knowledge/unanswered/does-not-exist/convert', {
+      answer: 'Whatever',
+    }, userToken);
+    expect(res.status).toBe(404);
+  });
 });
 
 afterAll(() => {

@@ -1,3 +1,16 @@
+export interface UnansweredGap {
+  id: string;
+  tenantId: string;
+  conversationId: string;
+  question: string;
+  confidence: number;
+  retrievalStatus: 'unanswered' | 'partial' | 'retrieved';
+  escalationStatus: 'none' | 'pending' | 'escalated' | 'resolved';
+  resolvedAt?: string;
+  clusterId?: string;
+  createdAt: string;
+}
+
 export interface WebsiteScan {
   id: string;
   tenantId: string;

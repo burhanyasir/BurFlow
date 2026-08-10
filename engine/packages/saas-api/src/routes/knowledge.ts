@@ -11,6 +11,7 @@ import {
 import { SourceType, ParsedDocument } from '@conversation-engine/knowledge-pipeline';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { validateId, validationError, validateRequiredString, LABEL_MAX } from '../middleware/validate';
+import { UnansweredQuestionRepository } from '@conversation-engine/saas-core';
 import Groq from 'groq-sdk';
 
 const logger = createLogger('saas-api:knowledge');
@@ -19,6 +20,8 @@ export interface KnowledgeRouteDeps {
   db: Database.Database;
   embeddingApiKey?: string;
   embeddingDimension?: number;
+  /** Optional repo for the unanswered-questions gap detector. When present, enables POST /unanswered/:id/convert. */
+  unansweredRepo?: UnansweredQuestionRepository;
 }
 
 const VALID_SOURCE_TYPES = new Set<string>(['pdf', 'docx', 'text', 'markdown', 'html', 'faq', 'url']);
@@ -267,6 +270,64 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         return res.status(413).json({ error: err.message });
       }
       res.status(500).json({ error: 'Failed to enqueue document' });
+    }
+  });
+
+  // POST /unanswered/:id/convert — Turn a logged knowledge gap into an FAQ entry
+  router.post('/unanswered/:id/convert', async (req: Request, res: Response) => {
+    if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+    if (!deps.unansweredRepo) return res.status(404).json({ error: 'Unanswered question tracking is not enabled' });
+
+    const { answer, question: questionOverride } = req.body;
+    if (typeof answer !== 'string' || !answer.trim()) {
+      return res.status(400).json({ error: 'answer is required and must be a non-empty string' });
+    }
+    const answerBytes = Buffer.byteLength(answer, 'utf-8');
+    if (answerBytes > MAX_INLINE_CONTENT_BYTES) {
+      return res.status(413).json({ error: `Answer size ${answerBytes} bytes exceeds maximum ${MAX_INLINE_CONTENT_BYTES} bytes` });
+    }
+
+    const tenantId = req.user.tenantId;
+    const gap = deps.unansweredRepo.findById(req.params.id);
+    if (!gap || gap.tenantId !== tenantId) {
+      return res.status(404).json({ error: 'Unanswered question not found' });
+    }
+
+    const question =
+      typeof questionOverride === 'string' && questionOverride.trim()
+        ? questionOverride.trim().slice(0, 500)
+        : gap.question;
+    const safeFilename = sanitizeFilename(`unanswered-${gap.id}.txt`);
+    const content = `Q: ${question}\nA: ${answer.trim()}`;
+
+    try {
+      const docId = await pipeline.enqueue(tenantId, 'faq', safeFilename, content);
+
+      // Resolve this gap plus any unresolved duplicates of the same question
+      // so the gap list stays clean after the FAQ lands in the knowledge base.
+      const unresolved = deps.unansweredRepo.listByTenant(tenantId, { resolved: false });
+      const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+      let resolvedCount = 0;
+      for (const u of unresolved) {
+        if (u.id === gap.id || normalize(u.question) === normalize(question)) {
+          deps.unansweredRepo.resolve(u.id);
+          resolvedCount++;
+        }
+      }
+
+      const status = pipeline.getQueueStatus(docId);
+      res.json({
+        success: true,
+        documentId: docId,
+        status: status?.status || 'queued',
+        resolvedCount,
+      });
+    } catch (err: any) {
+      if (err.message?.includes('exceeds maximum')) {
+        return res.status(413).json({ error: err.message });
+      }
+      createContextLogger(logger).error({ err }, 'Failed to convert unanswered question');
+      res.status(500).json({ error: 'Failed to convert question to FAQ' });
     }
   });
 

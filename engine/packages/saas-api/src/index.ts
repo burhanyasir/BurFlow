@@ -413,7 +413,7 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantG
   },
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
-}, sessionHandoff));
+}, sessionHandoff, unansweredRepo));
 app.use('/api/webhooks/stripe', createStripeWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));
@@ -443,6 +443,7 @@ const knowledgeDeps = {
   db,
   embeddingApiKey: process.env.OPENAI_API_KEY,
   embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '128', 10),
+  unansweredRepo,
 };
 app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps));
 
