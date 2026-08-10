@@ -412,6 +412,7 @@ export class ChatWidget {
       .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#6366f1) 0%,var(--cw-primary-color,#8b5cf6) 100%) !important; }
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
+      .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
       .cw-input:focus { border-color:var(--cw-primary-color,#818CF8) !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
       html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
       html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
@@ -1098,7 +1099,7 @@ export class ChatWidget {
   private createActiveCard(card: NonNullable<ConversationUIState['activeCard']>): HTMLDivElement {
     const el = document.createElement('div');
     el.className = 'cw-active-card';
-    el.style.cssText = 'background:linear-gradient(135deg,#fff 0%,#f8fafc 100%);border:1px solid #E5E7EB;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 40px rgba(15, 23, 42, 0.08);';
+    el.style.cssText = 'background:linear-gradient(135deg,#fff 0%,#f8fafc 100%);border:1px solid #E5E7EB;border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:10px;box-shadow:0 16px 40px rgba(15, 23, 42, 0.08);max-height:320px;overflow-y:auto;';
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:13px;font-weight:700;color:#111827;display:flex;justify-content:space-between;align-items:center;';
@@ -1119,62 +1120,6 @@ export class ChatWidget {
     summary.style.cssText = 'font-size:12px;color:#374151;line-height:1.5;';
     summary.textContent = this.getCardSummary(data);
     body.appendChild(summary);
-
-    const recommendation = buildRecommendationCardFromMessage(this.messages.map((msg) => msg.content).join(' ') || this.config.greeting || '', this.businessProfile);
-    if (recommendation) {
-      const cardBody = document.createElement('div');
-      cardBody.style.cssText = 'display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;background:#fff;border:1px solid #E5E7EB;';
-      const cardHeadline = document.createElement('div');
-      cardHeadline.style.cssText = 'font-size:13px;font-weight:700;color:#111827;';
-      cardHeadline.textContent = `${recommendation.icon || '✨'} ${recommendation.title}`;
-      cardBody.appendChild(cardHeadline);
-      const desc = document.createElement('div');
-      desc.style.cssText = 'font-size:12px;color:#4B5563;line-height:1.5;';
-      desc.textContent = recommendation.description;
-      cardBody.appendChild(desc);
-
-      if (recommendation.trustNote) {
-        const trustNote = document.createElement('div');
-        trustNote.style.cssText = 'font-size:11px;color:#7C3AED;line-height:1.4;';
-        trustNote.textContent = recommendation.trustNote;
-        cardBody.appendChild(trustNote);
-      }
-
-      if (recommendation.source) {
-        const sourceLink = document.createElement('a');
-        sourceLink.href = recommendation.source.url || '#';
-        sourceLink.target = '_blank';
-        sourceLink.rel = 'noreferrer';
-        sourceLink.textContent = recommendation.source.label;
-        sourceLink.style.cssText = 'font-size:11px;color:#2563EB;text-decoration:none;display:inline-flex;align-items:center;gap:4px;';
-        sourceLink.title = recommendation.source.url ? `View source: ${recommendation.source.url}` : 'Source attribution';
-        cardBody.appendChild(sourceLink);
-      }
-
-      const benefits = document.createElement('div');
-      benefits.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;';
-      recommendation.benefits.forEach((benefit) => {
-        const pill = document.createElement('span');
-        pill.textContent = benefit;
-        pill.style.cssText = 'font-size:11px;padding:4px 7px;border-radius:999px;background:#F3F4F6;color:#374151;';
-        benefits.appendChild(pill);
-      });
-      cardBody.appendChild(benefits);
-      const ctaRow = document.createElement('div');
-      ctaRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
-      const primary = this.createActionButton(recommendation.primaryCta);
-      ctaRow.appendChild(primary);
-      if (recommendation.secondaryCta) {
-        ctaRow.appendChild(this.createActionButton(recommendation.secondaryCta));
-      }
-      cardBody.appendChild(ctaRow);
-      body.appendChild(cardBody);
-    } else {
-      const fallbackCard = this.createUnknownGuidanceCard(this.messages.map((msg) => msg.content).join(' ') || this.config.greeting || '');
-      if (fallbackCard) {
-        body.appendChild(fallbackCard);
-      }
-    }
 
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
