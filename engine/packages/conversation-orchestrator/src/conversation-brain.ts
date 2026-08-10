@@ -1690,6 +1690,34 @@ import Anthropic from '@anthropic-ai/sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Groq from 'groq-sdk';
 
+// ── BurFlow Brain: multi-provider LLM resolution ─────────────────────────
+// Preference order: Groq → xAI Grok → Anthropic → heuristic template fallback.
+// The active provider is determined once at module load (server boot) and
+// logged so operators can verify which provider serves conversations.
+
+export type BrainProvider = 'GROQ' | 'GROK' | 'ANTHROPIC' | 'HEURISTIC_FALLBACK';
+
+const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROK_BASE_URL = 'https://api.x.ai/v1';
+const GROK_MODEL = 'grok-2-latest';
+const ANTHROPIC_MODEL = 'claude-3-haiku-20240307';
+
+export function resolveBrainProvider(): BrainProvider {
+  if (process.env.GROQ_API_KEY) return 'GROQ';
+  if (process.env.XAI_API_KEY || process.env.GROK_API_KEY) return 'GROK';
+  if (process.env.ANTHROPIC_API_KEY) return 'ANTHROPIC';
+  return 'HEURISTIC_FALLBACK';
+}
+
+// Logged at module load (server boot) and re-logged on the first brain call
+// so the active provider is visible in both cold-start and runtime logs.
+function logActiveProvider(): void {
+  // eslint-disable-next-line no-console
+  console.log(`[BurFlow Brain] Active Provider: ${resolveBrainProvider()}`);
+}
+logActiveProvider();
+
 const anthropicClient = process.env.ANTHROPIC_API_KEY
   ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 3500 })
   : null;
@@ -1704,35 +1732,38 @@ const geminiClient2 = process.env.GEMINI_API_KEY_2
   ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY_2)
   : null;
 
-// Provider 4: Groq (Llama)
+// Provider 4: Groq (Llama) — OpenAI-compatible
 const groqClient = process.env.GROQ_API_KEY
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 3500 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
-// Provider 5: Groq Account 2
+// Provider 5: xAI Grok — OpenAI-compatible (fetch, no SDK dependency)
+const grokApiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY || null;
+
+// Provider 6: Groq Account 2
 const groqClient2 = process.env.GROQ_API_KEY_2
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 3500 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
-// Provider 6: Groq Account 3
+// Provider 7: Groq Account 3
 const groqClient3 = process.env.GROQ_API_KEY_3
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 3500 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
-// Provider 7: Groq Account 4
+// Provider 8: Groq Account 4
 const groqClient4 = process.env.GROQ_API_KEY_4
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 3500 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
-// Provider 8: Groq Account 5
+// Provider 9: Groq Account 5
 const groqClient5 = process.env.GROQ_API_KEY_5
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 3500 })
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
   if (!anthropicClient) throw new Error('Anthropic not configured');
   const response = await anthropicClient.messages.create({
-    model: 'claude-haiku-4-5',
+    model: ANTHROPIC_MODEL,
     max_tokens: 300,
     system: systemPrompt,
     messages,
@@ -1760,21 +1791,49 @@ async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, mess
   return result.response.text().trim();
 }
 
-async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
-  if (!groqClient) throw new Error('Groq not configured');
-  const groqMessages = messages.map(m => ({
-    role: m.role as 'user' | 'assistant',
+function mapMessagesForOpenAI(messages: Anthropic.MessageParam[]): Array<{ role: 'user' | 'assistant'; content: string }> {
+  return messages.map(m => ({
+    role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
     content: typeof m.content === 'string' ? m.content : m.content.map(b => 'text' in b ? b.text : '').join(''),
   }));
-  const response = await groqClient.chat.completions.create({
-    model: 'llama-3.1-8b-instant',
+}
+
+async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  if (!client) throw new Error('Groq not configured');
+  const response = await client.chat.completions.create({
+    model: GROQ_MODEL,
     max_tokens: 300,
     messages: [
       { role: 'system' as const, content: systemPrompt },
-      ...groqMessages,
+      ...mapMessagesForOpenAI(messages),
     ],
   });
   return response.choices[0]?.message?.content?.trim() || '';
+}
+
+async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  if (!apiKey) throw new Error('xAI Grok not configured');
+  const response = await fetch(`${GROK_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GROK_MODEL,
+      max_tokens: 300,
+      messages: [
+        { role: 'system' as const, content: systemPrompt },
+        ...mapMessagesForOpenAI(messages),
+      ],
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`xAI Grok request failed (status=${response.status}): ${body.slice(0, 300)}`);
+  }
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
 const LLM_PROVIDER_TIMEOUT_MS = 3500;
@@ -1792,15 +1851,17 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 }
 
 async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
+  // Preference order for BurFlow Brain: Groq → xAI Grok → Anthropic → secondary accounts.
   const providers = [
+    { name: 'Groq', call: () => groqClient ? withTimeout(callGroq(groqClient, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq') : Promise.reject(new Error('Groq not configured')) },
+    { name: 'Grok', call: () => grokApiKey ? withTimeout(callGrok(grokApiKey, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Grok') : Promise.reject(new Error('Grok not configured')) },
     { name: 'Anthropic', call: () => anthropicClient ? withTimeout(callAnthropic(systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Anthropic') : Promise.reject(new Error('Anthropic not configured')) },
-    { name: 'Gemini-1', call: () => geminiClient1 ? withTimeout(callGemini(geminiClient1, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-1') : Promise.reject(new Error('Gemini-1 not configured')) },
-    { name: 'Gemini-2', call: () => geminiClient2 ? withTimeout(callGemini(geminiClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-2') : Promise.reject(new Error('Gemini-2 not configured')) },
-    { name: 'Groq-1', call: () => groqClient ? withTimeout(callGroq(groqClient, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-1') : Promise.reject(new Error('Groq-1 not configured')) },
     { name: 'Groq-2', call: () => groqClient2 ? withTimeout(callGroq(groqClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-2') : Promise.reject(new Error('Groq-2 not configured')) },
     { name: 'Groq-3', call: () => groqClient3 ? withTimeout(callGroq(groqClient3, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-3') : Promise.reject(new Error('Groq-3 not configured')) },
     { name: 'Groq-4', call: () => groqClient4 ? withTimeout(callGroq(groqClient4, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-4') : Promise.reject(new Error('Groq-4 not configured')) },
     { name: 'Groq-5', call: () => groqClient5 ? withTimeout(callGroq(groqClient5, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Groq-5') : Promise.reject(new Error('Groq-5 not configured')) },
+    { name: 'Gemini-1', call: () => geminiClient1 ? withTimeout(callGemini(geminiClient1, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-1') : Promise.reject(new Error('Gemini-1 not configured')) },
+    { name: 'Gemini-2', call: () => geminiClient2 ? withTimeout(callGemini(geminiClient2, systemPrompt, messages), LLM_PROVIDER_TIMEOUT_MS, 'Gemini-2') : Promise.reject(new Error('Gemini-2 not configured')) },
   ];
 
   const failures: string[] = [];
@@ -2108,7 +2169,11 @@ buyingIntentDetected: memory.buyingIntentDetected,
   // Strategy-first response building — LLM-powered
   let enrichedResponse: string;
   let structuredLeadFields: ExtractedLeadFields | null = null;
-  if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5) {
+  let llmCtaHint: CTAType | null = null;
+  let llmFunnelHint: string | null = null;
+  const llmSuggestedTopics: string[] = [];
+  if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
+    logActiveProvider();
     try {
       const tenantIdForLLM = tenantId || 'default';
       const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
@@ -2152,26 +2217,25 @@ If you don't know something, say so honestly and offer to connect them with some
 
 CRITICAL RULES:
 1. Answer the question directly first. No filler openers like "For teams, this is especially relevant."
-2. Use the specific business information below — don't give generic answers.
-3. If the visitor asks about pricing, services, or products, reference the actual business details provided.
-4. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
-5. Be warm and helpful, not pushy.
+2. Do not repeat filler phrases like "For small business teams..." and do not repeat questions that were already asked in previous turns of this conversation — vary your wording and only ask something new.
+3. Use the specific business information below — don't give generic answers.
+4. If the visitor asks about pricing, services, or products, reference the actual business details provided.
+5. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
+6. Be warm and helpful, not pushy.
 
 LEAD CAPTURE:
-If the visitor shares contact details or company info in this message (email, phone, their name, or company), extract them into the "extractedLead" object. Leave fields null when not provided. Never invent contact details.
+If the visitor shares contact details or company info in this message (email, phone, their name, or company), also include an "extractedLead" object with the fields email, phone, name, company (leave null when not provided). Never invent contact details.
 
 BUSINESS KNOWLEDGE:
 ${businessContext}
 
-Respond with ONLY a JSON object — no markdown, no explanation:
+Respond with ONLY a JSON object — no markdown, no explanation, using exactly this shape:
 {
   "responseText": "your response to the visitor",
-  "extractedLead": {
-    "email": "visitor email or null",
-    "phone": "visitor phone or null",
-    "name": "visitor name or null",
-    "company": "visitor company or null"
-  }
+  "strategy": "one or two words describing your conversational strategy, e.g. educate, qualify, handle_objection, advance_funnel, recommend_plan, close_trial, schedule_demo, build_trust",
+  "suggestedTopics": ["1-3 follow-up topics the visitor might care about next"],
+  "ctaType": "one of: none, book_demo, start_free_trial, contact_sales, pricing, support",
+  "funnelStage": "one of: greeting, awareness, interest, consideration, evaluation, purchase_intent, decision, customer, support"
 }`;
 
       const text = await callLLMWithFallback(systemPrompt, messages);
@@ -2179,6 +2243,22 @@ Respond with ONLY a JSON object — no markdown, no explanation:
       const parsed = JSON.parse(cleaned);
       enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
       structuredLeadFields = parseStructuredLeadFields(parsed);
+
+      // Apply structured hints from the LLM (validated against known enums)
+      if (typeof parsed.funnelStage === 'string') llmFunnelHint = parsed.funnelStage;
+      if (typeof parsed.ctaType === 'string') {
+        const ctaValue = parsed.ctaType as CTAType;
+        if (['start_free_trial', 'book_demo', 'contact_sales', 'developer_docs', 'pricing', 'upload_documentation', 'talk_enterprise_sales', 'partner_program', 'support', 'none'].includes(ctaValue)) {
+          llmCtaHint = ctaValue;
+        }
+      }
+      if (Array.isArray(parsed.suggestedTopics)) {
+        for (const topic of parsed.suggestedTopics.slice(0, 5)) {
+          if (typeof topic === 'string' && topic.trim() && !llmSuggestedTopics.includes(topic.trim())) {
+            llmSuggestedTopics.push(topic.trim());
+          }
+        }
+      }
     } catch (error: unknown) {
       const err = error as { status?: number; message?: string; provider?: string };
       const status = err.status;
@@ -2228,6 +2308,26 @@ Respond with ONLY a JSON object — no markdown, no explanation:
     }
   }
 
+  // LLM-structured CTA hint overrides the deterministic pick when valid
+  if (llmCtaHint && llmCtaHint !== 'none' && strategy.cta !== 'none') {
+    const llmCtaLabels: Record<CTAType, { label: string; link: string }> = {
+      start_free_trial: { label: 'Start Free Trial', link: '/signup' },
+      book_demo: { label: 'Book a Demo', link: '/demo' },
+      contact_sales: { label: 'Talk to Sales', link: '/contact' },
+      pricing: { label: 'See Pricing', link: '/pricing' },
+      support: { label: 'Contact Support', link: '/support' },
+      developer_docs: { label: 'View Developer Docs', link: '/docs' },
+      upload_documentation: { label: 'Upload Documentation', link: '/docs' },
+      talk_enterprise_sales: { label: 'Talk to Enterprise Sales', link: '/contact' },
+      partner_program: { label: 'Join Partner Program', link: '/contact' },
+      none: { label: '', link: '' },
+    };
+    const chosen = llmCtaLabels[llmCtaHint];
+    if (chosen) {
+      cta = { primaryCTA: llmCtaHint, label: chosen.label, link: chosen.link, secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
+    }
+  }
+
   const nextBestAction = determineNextBestAction(plan, memory, ciResult);
   const quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult);
 
@@ -2259,6 +2359,40 @@ Respond with ONLY a JSON object — no markdown, no explanation:
     memory.currentTopic = strategy.topicToAnswer;
   } else if (newTopics.length > 0) {
     memory.currentTopic = newTopics[newTopics.length - 1];
+  }
+
+  // LLM-structured funnel-stage hint (validated) — keeps memory + output plan in sync
+  const VALID_FUNNEL_STAGES: FunnelStageExtended[] = [
+    'greeting', 'awareness', 'interest', 'consideration', 'evaluation',
+    'purchase_intent', 'decision', 'customer', 'support',
+  ];
+  if (llmFunnelHint && (VALID_FUNNEL_STAGES as string[]).includes(llmFunnelHint)) {
+    memory.funnelStage = llmFunnelHint as FunnelStageExtended;
+    plan.funnelStage = llmFunnelHint as FunnelStageExtended;
+  }
+
+  // LLM-suggested follow-up topics (mapped onto known topics, deduped, capped)
+  if (llmSuggestedTopics.length > 0) {
+    const topicKeywordMap: Array<[RegExp, DiscernedTopic]> = [
+      [/pricing|price|cost|plan/i, 'pricing'],
+      [/secur|soc|compliance/i, 'security'],
+      [/feature|capabilit/i, 'features'],
+      [/trial/i, 'trial'],
+      [/demo/i, 'demo'],
+      [/integrat/i, 'integrations'],
+      [/api|sdk|develop/i, 'api'],
+      [/onboard/i, 'onboarding'],
+      [/compar|alternativ/i, 'comparison'],
+      [/roi|return on/i, 'roi'],
+      [/sso|single sign/i, 'sso'],
+      [/walkthrough|how it works/i, 'walkthrough'],
+    ];
+    for (const topic of llmSuggestedTopics) {
+      const matched = topicKeywordMap.find(([re]) => re.test(topic))?.[1];
+      if (matched && !plan.topicsToDiscuss.some(t => t === matched) && plan.topicsToDiscuss.length < 5) {
+        plan.topicsToDiscuss.push(matched);
+      }
+    }
   }
 
   updateMemoryFromBrain(memory, message, enrichedResponse, ciResult, plan, { plannerActionScores: (plan as any).actionScores || [], directorChosenAction: strategy.chosenAction?.action, brainExecutedAction: strategy.chosenAction?.action, ctaDecision: { ctaId: cta.primaryCTA, timing: strategy.cta } });
@@ -2317,7 +2451,8 @@ funnelStage: ciResult.funnelStage,
   Strategy: ${strategy.primaryGoal} | ${strategy.cta}
   LeadScore: ${memory.leadScore} | ConvScore: ${memory.conversationScore}
   NextAction: ${plan.goal} ${strategy.cta === 'none' ? '(no CTA)' : `(${strategy.cta} CTA)`}
-  Reason: intent=${plan.customerIntent} stage=${memory.funnelStage} qual=${memory.qualificationCollected.completed}`);
+  Reason: intent=${plan.customerIntent} stage=${memory.funnelStage} qual=${memory.qualificationCollected.completed}
+  LLMHints: funnel=${llmFunnelHint || '—'} cta=${llmCtaHint || '—'} topics=${llmSuggestedTopics.join(', ') || '—'}`);
   }
 
   const telemetrySnapshot = buttonTelemetry.snapshot();
