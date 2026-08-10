@@ -485,6 +485,9 @@ app.use('/api/leads', auth, tenantGuard, createLeadRoutes(leadRepo, webhookRepo,
 
 // Analytics
 const analyticsService = new AnalyticsService(db);
+// Dashboard polling can hit analytics endpoints every 15s per tenant — allow
+// 300 req/min (5/s) so a busy dashboard never trips the 429 path.
+app.use('/api/analytics', createRateLimit({ windowMs: 60_000, max: 300, keyFn: (req) => `analytics:${req.ip || 'unknown'}` }));
 app.use('/api/analytics', auth, tenantGuard, createAnalyticsRoutes(analyticsService));
 
 // Trust Center

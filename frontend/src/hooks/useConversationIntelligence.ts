@@ -20,7 +20,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 // ─── Session List ────────────────────────────────────────
-export function useSessions(limit = 50, offset = 0) {
+export function useSessions(limit = 50, offset = 0, pollMs?: number) {
   const [data, setData] = useState<(SessionsResponse & { sessions: SessionSummary[] }) | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +39,13 @@ export function useSessions(limit = 50, offset = 0) {
   }, [limit, offset]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Optional background polling (e.g. the Analytics dashboard refreshes every 15s).
+  useEffect(() => {
+    if (!pollMs || pollMs <= 0) return;
+    const interval = setInterval(() => { load(); }, pollMs);
+    return () => clearInterval(interval);
+  }, [load, pollMs]);
 
   return { data, loading, error, reload: load };
 }
@@ -69,7 +76,7 @@ export function useSessionDetail(sessionId: string | null) {
 }
 
 // ─── Analytics ───────────────────────────────────────────
-export function useAnalytics() {
+export function useAnalytics(pollMs?: number) {
   const [data, setData] = useState<AnalyticsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,6 +95,13 @@ export function useAnalytics() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // Optional background polling (e.g. the Analytics dashboard refreshes every 15s).
+  useEffect(() => {
+    if (!pollMs || pollMs <= 0) return;
+    const interval = setInterval(() => { load(); }, pollMs);
+    return () => clearInterval(interval);
+  }, [load, pollMs]);
 
   return { data, loading, error, reload: load };
 }

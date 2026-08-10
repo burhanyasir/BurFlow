@@ -11,6 +11,7 @@ import {
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
 import { requireJsonObject, MESSAGE_MAX } from '../middleware/validate';
 import { createRateLimit } from '../middleware/rate-limit';
+import { openSessionEventStream } from '../services/takeover-events';
 import {
   processConversationBrain,
   DefaultKnowledgeBaseProvider,
@@ -308,6 +309,9 @@ export function createChatRoutes(
         brainFunction: brainFn,
         knowledgeBaseProvider: kb,
         businessProfile,
+        // Defense-in-depth: if an agent took over between the route-level
+        // guard above and pipeline execution, the pipeline skips the LLM.
+        isHumanTookOver: handoff ? !handoff.isAiManaged(tenantId!, convSessionId) : false,
         policy: {
           qualification: DEFAULT_TENANT_POLICY.qualification,
           cta: DEFAULT_TENANT_POLICY.cta,
@@ -471,6 +475,38 @@ export function createChatRoutes(
         createdAt: m.createdAt,
       }));
     return res.json({ messages: operatorMessages, total: operatorMessages.length });
+  });
+
+  // GET /events — live SSE feed of takeover events (TAKEOVER_STARTED,
+  // OPERATOR_MESSAGE, TAKEOVER_ENDED) for this visitor session. The widget
+  // subscribes once and renders operator messages / banners instantly instead
+  // of waiting for the next poll tick.
+  router.get('/events', (req: Request, res: Response) => {
+    const sessionId = typeof req.query.sessionId === 'string' ? req.query.sessionId : '';
+    if (!sessionId) {
+      return res.status(400).json({ error: 'sessionId query parameter is required' });
+    }
+    const tenantId = req.tenantId!;
+
+    const close = openSessionEventStream(res, tenantId, sessionId);
+
+    // If the session is already under human control when the visitor
+    // subscribes, push the current state immediately.
+    const state = handoff ? handoff.getSessionState(tenantId, sessionId) : 'ai_managed';
+    if (state === 'human_takeover') {
+      const conversation = conversationRepo.findBySession(tenantId, sessionId);
+      if (conversation) {
+        writeSseEvent(res, {
+          type: 'TAKEOVER_STARTED',
+          sessionId,
+          conversationId: conversation.id,
+          payload: { agentId: conversation.assignedAgentId },
+        });
+      }
+    }
+
+    req.on('close', close);
+    res.on('close', close);
   });
 
   router.post('/', requireJsonObject, chatClientLimiter, chatTenantLimiter, (req: Request, res: Response) => handleChatRequest(req, res, false));

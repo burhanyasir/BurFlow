@@ -1,6 +1,6 @@
 import { storage } from './storage';
 
-const API_BASE = import.meta.env.VITE_API_URL || '/api';
+export const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 export interface ApiResponse<T = unknown> {
   data?: T;

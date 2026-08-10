@@ -5,6 +5,7 @@ import {
 } from '@conversation-engine/saas-core';
 import { createLogger } from '@conversation-engine/logger';
 import { MESSAGE_MAX } from '../middleware/validate';
+import { takeoverEvents, writeSseEvent, openSessionEventStream } from '../services/takeover-events';
 
 const logger = createLogger('saas-api:agent-chat');
 
@@ -73,6 +74,65 @@ export function createAgentChatRoutes(
     return res.json({ sessions, total: sessions.length });
   });
 
+  // GET /api/sessions/events — agent presence stream. While the agent inbox
+  // holds this connection open, the session stays in human_takeover. When the
+  // agent closes the tab / navigates away, the connection drops and every
+  // session that agent was holding is handed back to the AI automatically.
+  router.get('/events', (req: Request, res: Response) => {
+    const tenantId = req.tenantId!;
+    const agentId = req.user?.sub || 'agent';
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+    writeSseEvent(res, { type: 'AGENT_CONNECTED', agentId });
+
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(`: ping\n\n`);
+      } catch {
+        /* stream closed */
+      }
+    }, 15000);
+    if (heartbeat.unref) heartbeat.unref();
+
+    const onClose = () => {
+      clearInterval(heartbeat);
+      // Handback: release every session this agent still holds, so the AI
+      // resumes driving the conversation the moment the agent leaves.
+      const heldIds = new Set<string>([
+        ...takeoverEvents.getAgentSessions(agentId),
+        ...conversationRepo.listTakeoversByAgent(tenantId, agentId).map((c) => c.id),
+      ]);
+      for (const conversationId of heldIds) {
+        const conversation = conversationRepo.findById(conversationId);
+        if (!conversation || conversation.tenantId !== tenantId) continue;
+        const released = handoff.releaseTakeover(tenantId, conversation.sessionId);
+        if (!released) continue;
+        takeoverEvents.untrackAgentSession(agentId, conversationId);
+        takeoverEvents.emit({
+          type: 'TAKEOVER_ENDED',
+          tenantId,
+          sessionId: conversation.sessionId,
+          conversationId: conversation.id,
+          payload: { reason: 'agent_disconnected' },
+        });
+        logger.info({ tenantId, sessionId: conversation.sessionId, agentId }, 'Agent disconnected — takeover released, AI resumed');
+      }
+      takeoverEvents.clearAgent(agentId);
+      try {
+        res.end();
+      } catch {
+        /* already closed */
+      }
+    };
+
+    req.on('close', onClose);
+    res.on('close', onClose);
+  });
+
   // GET /api/sessions/:id/messages — full thread history for a session
   router.get('/:id/messages', (req: Request, res: Response) => {
     const { id } = req.params;
@@ -113,6 +173,15 @@ export function createAgentChatRoutes(
       return res.status(409).json({ error: 'Session is not open for takeover' });
     }
 
+    takeoverEvents.trackAgentSession(agentId, updated.id);
+    takeoverEvents.emit({
+      type: 'TAKEOVER_STARTED',
+      tenantId: req.tenantId!,
+      sessionId: conversation.sessionId,
+      conversationId: updated.id,
+      payload: { agentId },
+    });
+
     logger.info({ tenantId: req.tenantId, sessionId: conversation.sessionId, agentId }, 'Human takeover initiated');
     return res.status(200).json({
       sessionId: conversation.sessionId,
@@ -132,10 +201,19 @@ export function createAgentChatRoutes(
       return res.status(404).json({ error: 'Session not found' });
     }
 
+    const priorAgent = conversation.assignedAgentId;
     const updated = handoff.releaseTakeover(req.tenantId!, conversation.sessionId);
     if (!updated) {
       return res.status(409).json({ error: 'Session is not open for release' });
     }
+
+    if (priorAgent) takeoverEvents.untrackAgentSession(priorAgent, conversation.id);
+    takeoverEvents.emit({
+      type: 'TAKEOVER_ENDED',
+      tenantId: req.tenantId!,
+      sessionId: conversation.sessionId,
+      conversationId: conversation.id,
+    });
 
     logger.info({ tenantId: req.tenantId, sessionId: conversation.sessionId }, 'Takeover released — AI resumed');
     return res.status(200).json({
@@ -174,6 +252,20 @@ export function createAgentChatRoutes(
       sender: 'agent',
     });
     conversationRepo.incrementMessageCount(conversation.id);
+
+    takeoverEvents.emit({
+      type: 'OPERATOR_MESSAGE',
+      tenantId: req.tenantId!,
+      sessionId: conversation.sessionId,
+      conversationId: conversation.id,
+      payload: {
+        id: message.id,
+        content: message.content,
+        sequenceNumber: message.sequenceNumber,
+        sender: 'agent',
+        createdAt: message.createdAt,
+      },
+    });
 
     logger.info({ tenantId: req.tenantId, conversationId: conversation.id, agentId: req.user?.sub }, 'Agent message sent');
     return res.status(201).json({

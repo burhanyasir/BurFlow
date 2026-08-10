@@ -375,6 +375,8 @@ export class ChatWidget {
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
   private autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
   private headerLogoEl: HTMLImageElement | null = null;
+  /** Long-lived SSE stream of takeover events (TAKEOVER_STARTED / OPERATOR_MESSAGE / TAKEOVER_ENDED). */
+  private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
   private agentPollTimer: ReturnType<typeof setInterval> | null = null;
   private lastAgentSeq = 0;
@@ -454,10 +456,13 @@ export class ChatWidget {
       this.configLoadPromise = this.fetchRemoteConfig();
     }
     this.startAgentPolling();
+    this.subscribeTakeoverEvents();
   }
 
   unmount(): void {
     this.abort();
+    this.takeoverEventsController?.abort();
+    this.takeoverEventsController = null;
     if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
@@ -480,6 +485,90 @@ export class ChatWidget {
     const POLL_INTERVAL_MS = 4000;
     this.agentPollTimer = setInterval(() => { this.pollForAgentMessages(); }, POLL_INTERVAL_MS);
     this.pollForAgentMessages();
+  }
+
+  /**
+   * Subscribes to the session takeover event stream (SSE). This is the
+   * real-time channel for TAKEOVER_STARTED / OPERATOR_MESSAGE / TAKEOVER_ENDED
+   * — the 4s history poll remains as a fallback for browsers/connections that
+   * cannot hold an SSE stream open.
+   */
+  private subscribeTakeoverEvents(): void {
+    const sessionId = this.config.sessionId;
+    const apiUrl = this.config.apiUrl;
+    if (!sessionId) return;
+
+    // Defensive: if fetch is unavailable or fails to return a promise, never
+    // let subscription break widget mounting (a synchronous throw here would
+    // propagate through mount() and could trigger the autoInit fallback path).
+    try {
+      this.takeoverEventsController?.abort();
+    } catch {
+      /* ignore */
+    }
+    this.takeoverEventsController = new AbortController();
+
+    const headers: Record<string, string> = { Accept: 'text/event-stream' };
+    if (this.config.tenantId) headers['x-tenant-id'] = this.config.tenantId;
+    if (this.config.apiKey) headers['x-api-key'] = this.config.apiKey;
+    if (this.config.widgetToken) headers['x-widget-token'] = this.config.widgetToken;
+
+    const url = `${apiUrl}/api/chat/events?sessionId=${encodeURIComponent(sessionId)}`;
+    Promise.resolve(fetch(url, { headers, signal: this.takeoverEventsController.signal }))
+      .then(async (res) => {
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const frames = buffer.split('\n\n');
+          buffer = frames.pop() || '';
+          for (const frame of frames) {
+            const dataLine = frame.split('\n').find((l) => l.startsWith('data:'));
+            if (!dataLine) continue;
+            const raw = dataLine.slice(5).trim();
+            if (!raw) continue;
+            try {
+              this.handleTakeoverEvent(JSON.parse(raw));
+            } catch {
+              /* malformed frame — ignore */
+            }
+          }
+        }
+      })
+      .catch(() => {
+        // SSE is best-effort; the 4s poll covers failures.
+      });
+  }
+
+  private handleTakeoverEvent(event: { type?: string; payload?: Record<string, unknown> }): void {
+    switch (event.type) {
+      case 'TAKEOVER_STARTED':
+        this.showTakeoverBanner();
+        this.hideStarterChips();
+        break;
+      case 'OPERATOR_MESSAGE': {
+        const payload = event.payload || {};
+        const content = typeof payload.content === 'string' ? payload.content : '';
+        const seq = typeof payload.sequenceNumber === 'number' ? payload.sequenceNumber : 0;
+        if (!content) break;
+        if (seq > this.lastAgentSeq) {
+          this.lastAgentSeq = seq;
+          this.addMessage({ role: 'assistant', content, sender: 'agent', sequenceNumber: seq });
+          this.scrollToBottom();
+          this.hideTypingIndicator();
+        }
+        break;
+      }
+      case 'TAKEOVER_ENDED':
+        this.hideTakeoverBanner();
+        // AI is back in control — restore the starter chips.
+        this.renderInitialActions();
+        break;
+    }
   }
 
   private async pollForAgentMessages(): Promise<void> {
@@ -815,10 +904,23 @@ export class ChatWidget {
       <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
         <span style="font-size:14px;flex-shrink:0;">👤</span>
         <div>
-          <p style="margin:0;font-size:12px;font-weight:600;color:#312E81;">A human agent is now assisting</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">Your conversation has been handed to our team. Replies will come from a real person shortly.</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:#312E81;">Human agent joined</p>
+          <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">A real person is now assisting this conversation. Replies will come from them shortly.</p>
         </div>
       </div>`;
+  }
+
+  /** Hides the takeover banner when the agent releases control or disconnects. */
+  private hideTakeoverBanner(): void {
+    this.takeoverShown = false;
+    if (this.takeoverEl) this.takeoverEl.style.display = 'none';
+  }
+
+  /** Removes the starter chips while a human agent is driving the session. */
+  private hideStarterChips(): void {
+    if (!this.messagesEl) return;
+    const chips = this.messagesEl.querySelector('.cw-starter-chips');
+    if (chips) chips.remove();
   }
 
   private createHandoffArea(): HTMLDivElement {
@@ -965,6 +1067,7 @@ export class ChatWidget {
       },
       onHumanTakeover: () => {
         this.showTakeoverBanner();
+        this.hideStarterChips();
       },
       onComplete: (fullContent) => {
         if (fullContent) assistantMsg.content = fullContent;

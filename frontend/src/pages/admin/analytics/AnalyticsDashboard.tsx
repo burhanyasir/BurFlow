@@ -21,8 +21,8 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function AnalyticsDashboard() {
   const navigate = useNavigate(); const { user, tenant, logout } = useAuth();
-  const { data, loading, error, reload } = useAnalytics();
-  const { data: sessionsData } = useSessions(200, 0);
+  const { data, loading, error, reload } = useAnalytics(15000);
+  const { data: sessionsData } = useSessions(200, 0, 15000);
   const workspaceName = tenant?.name || 'Conversation Engine';
   const DATE_RANGES = ['Last 7 days', 'Last 30 days', 'Last 90 days', 'All time'];
   const [dateRange, setDateRange] = useState('Last 7 days');

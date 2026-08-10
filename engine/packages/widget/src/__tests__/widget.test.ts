@@ -686,7 +686,7 @@ describe('ChatWidget', () => {
     const banner = document.querySelector('.cw-takeover');
     expect(banner).toBeTruthy();
     expect(banner!.style.display).toBe('block');
-    expect(banner!.textContent).toContain('A human agent is now assisting');
+    expect(banner!.textContent).toContain('Human agent joined');
   });
 
   it('does not show takeover banner without the flag', async () => {
@@ -710,5 +710,33 @@ describe('ChatWidget', () => {
     await new Promise(r => setTimeout(r, 50));
 
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
+  });
+
+  it('hides starter chips on TAKEOVER_STARTED and restores them on TAKEOVER_ENDED via the event stream', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } })}\n\n`));
+        setTimeout(() => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'TAKEOVER_ENDED', sessionId: 's1', conversationId: 'c1', payload: {} })}\n\n`));
+          controller.close();
+        }, 150);
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '', sessionId: 's1', starterOptions: ['Option A', 'Option B'] });
+    widget.mount();
+    widget.toggle();
+
+    // TAKEOVER_STARTED: banner visible, starter chips removed.
+    await new Promise(r => setTimeout(r, 60));
+    expect(document.querySelector('.cw-takeover')!.style.display).toBe('block');
+    expect(document.querySelector('.cw-starter-chips')).toBeFalsy();
+
+    // TAKEOVER_ENDED: banner hidden, starter chips restored.
+    await new Promise(r => setTimeout(r, 200));
+    expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
+    expect(document.querySelector('.cw-starter-chips')).toBeTruthy();
   });
 });

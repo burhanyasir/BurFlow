@@ -1,8 +1,13 @@
 import { Router, Request, Response } from 'express';
 import { AnalyticsService } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
+import { createTtlCache } from '../utils/ttl-cache';
 
 const logger = createLogger('saas-api:analytics');
+
+/** 15s TTL cache — the dashboard polls at 15s, so reads are served from memory. */
+const ANALYTICS_CACHE_TTL_MS = 15_000;
+const summaryCache = createTtlCache<unknown>(ANALYTICS_CACHE_TTL_MS);
 
 function timeframeFromQuery(req: Request): { startDate?: string; endDate?: string } {
   const startDate = (req.query.startDate as string) || (req.query.from as string);
@@ -13,13 +18,24 @@ function timeframeFromQuery(req: Request): { startDate?: string; endDate?: strin
   return timeframe;
 }
 
+function cacheKeyFor(tenantId: string, timeframe: { startDate?: string; endDate?: string }): string {
+  return `${tenantId}|${timeframe.startDate || ''}|${timeframe.endDate || ''}`;
+}
+
 export function createAnalyticsRoutes(analyticsService: AnalyticsService): Router {
   const router = Router();
 
   router.get('/summary', (req: Request, res: Response) => {
     try {
       const tenantId = req.tenantId!;
-      const metrics = analyticsService.getSummaryMetrics(tenantId, timeframeFromQuery(req));
+      const timeframe = timeframeFromQuery(req);
+      const cacheKey = cacheKeyFor(tenantId, timeframe);
+      const cached = summaryCache.get(cacheKey);
+      if (cached !== undefined) {
+        return res.json(cached);
+      }
+      const metrics = analyticsService.getSummaryMetrics(tenantId, timeframe);
+      summaryCache.set(cacheKey, metrics);
       res.json(metrics);
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Analytics summary failed');

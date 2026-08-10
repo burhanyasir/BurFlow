@@ -4,6 +4,7 @@ import { processRapportRepair } from './rapport-repair';
 import { processPolicyEngine, PolicyDecision } from './policy-engine';
 import { composeResponse, CompositionResult } from './response-composer';
 import { TenantPolicy } from './types';
+import { TAKEOVER_ACKNOWLEDGEMENT } from '@conversation-engine/saas-core';
 import { KnowledgeBaseProvider, PayloadValidationError, UpstreamLLMError } from '@conversation-engine/conversation-orchestrator';
 
 export interface PipelineInput {
@@ -15,6 +16,13 @@ export interface PipelineInput {
   knowledgeBaseProvider?: KnowledgeBaseProvider;
   /** Tenant CTA/business profile from the widget config (business_profile JSON). */
   businessProfile?: Record<string, unknown>;
+  /**
+   * When a human agent has taken over this session, the pipeline skips the
+   * LLM brain entirely and returns the takeover acknowledgement instead.
+   * Defense-in-depth: the chat route also short-circuits, but this guard
+   * protects any direct pipeline caller from burning LLM budget mid-handoff.
+   */
+  isHumanTookOver?: boolean;
 }
 
 export interface PipelineResult {
@@ -47,6 +55,47 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
 
   // Step 1: Load conversation state
   const state = stateManager.getOrCreate(sessionId, tenantId, policy);
+
+  // ─── Human Takeover Guard ────────────────────────────────────
+  // Skip ALL LLM execution while a human agent is driving the session.
+  if (input.isHumanTookOver) {
+    state.strategy = 'human_handoff';
+    state.stage = 'human_handoff';
+    state.lastStrategy = 'human_handoff';
+    state.lastUserMessage = message;
+    stateManager.recordTurn(state, message, TAKEOVER_ACKNOWLEDGEMENT, state.ledger.questionsAnswered);
+    if (TRACE_LOG) {
+      console.log(`[ORCH:${traceId}] Human takeover active — LLM skipped, acknowledgement returned`);
+    }
+    return {
+      response: TAKEOVER_ACKNOWLEDGEMENT,
+      strategy: 'human_handoff' as Strategy,
+      mood: state.mood,
+      trustScore: state.trustScore,
+      buyingIntentScore: state.buyingIntentScore,
+      stage: 'human_handoff',
+      state,
+      composition: { text: TAKEOVER_ACKNOWLEDGEMENT, leakageDetected: false, duplicatesRemoved: 0 },
+      policy: {
+        strategy: 'human_handoff' as Strategy,
+        priority: 1,
+        buyingSignalDetected: false,
+        canQualify: false,
+        canShowCTA: false,
+        detectedTopics: [],
+        detectedUseCase: null,
+        detectedIndustry: null,
+      },
+      isRapportHandled: false,
+      isFallback: false,
+      traceId,
+      latencyMs: Date.now() - startTime,
+      quickReplies: [],
+      uiState: { state: 'handoff', buttons: [], suggestedActions: [] },
+      cta: null,
+      leadCapture: null,
+    };
+  }
 
   if (TRACE_LOG) {
     console.log(`[ORCH:${traceId}] Stage=${state.stage} Mood=${state.mood} Turn=${state.turnCount} Trust=${state.trustScore} Buying=${state.buyingIntentScore}`);

@@ -8,8 +8,13 @@ import {
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { parsePagination, requireJsonObject, validationError, validateRequiredString, validateRequiredEnum } from '../middleware/validate';
+import { createTtlCache } from '../utils/ttl-cache';
 
 const logger = createLogger('saas-api:admin');
+
+/** 15s TTL cache for the session list — the dashboard polls at 15s. */
+const SESSIONS_CACHE_TTL_MS = 15_000;
+const sessionsCache = createTtlCache<unknown>(SESSIONS_CACHE_TTL_MS);
 
 const VALID_SESSION_STATUSES = ['active', 'ended', 'escalated'] as const;
 
@@ -243,8 +248,16 @@ export function createAdminRoutes(
       const { page = '1', limit = '50' } = req.query as Record<string, string>;
       const pageNum = Math.max(1, parseInt(page, 10) || 1);
       const limitNum = Math.min(200, Math.max(1, parseInt(limit, 10) || 50));
+      // Cache key is tenant-scoped so reads never leak across tenants.
+      const cacheKey = `${req.tenantId}|${pageNum}|${limitNum}`;
+      const cached = sessionsCache.get(cacheKey);
+      if (cached !== undefined) {
+        return res.json(cached);
+      }
       const result = conversationRepo.listByTenant(req.tenantId!, pageNum, limitNum);
-      res.json({ sessions: result.conversations || [], total: result.total || 0, limit: limitNum, offset: (pageNum - 1) * limitNum });
+      const payload = { sessions: result.conversations || [], total: result.total || 0, limit: limitNum, offset: (pageNum - 1) * limitNum };
+      sessionsCache.set(cacheKey, payload);
+      res.json(payload);
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Failed to list sessions');
       res.status(500).json({ error: 'Failed to list sessions' });

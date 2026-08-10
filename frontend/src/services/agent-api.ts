@@ -1,4 +1,5 @@
-import { apiClient } from '../lib/api-client';
+import { apiClient, API_BASE } from '../lib/api-client';
+import { storage } from '../lib/storage';
 
 export type SessionState = 'ai_managed' | 'human_takeover' | 'closed';
 
@@ -81,4 +82,22 @@ export async function releaseTakeover(sessionConversationId: string): Promise<Ag
 /** Send a manual reply from the agent to the visitor. */
 export async function sendAgentMessage(sessionConversationId: string, content: string): Promise<AgentMessageResponse> {
   return apiClient.post<AgentMessageResponse>(`/sessions/${sessionConversationId}/message`, { content });
+}
+
+/**
+ * Opens the agent presence stream (SSE). While this connection is open the
+ * agent's takeovers stay active; when it drops (tab closed / navigation) the
+ * server automatically releases every session this agent holds and the AI
+ * resumes. Returns an AbortController to close the stream.
+ */
+export function openAgentEventStream(): AbortController {
+  const controller = new AbortController();
+  const token = storage.getToken();
+  const headers: Record<string, string> = { Accept: 'text/event-stream' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  fetch(`${API_BASE}/sessions/events`, { headers, signal: controller.signal }).catch(() => {
+    // Presence stream is best-effort — the 3s session poll covers updates.
+  });
+  return controller;
 }

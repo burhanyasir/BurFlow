@@ -298,6 +298,24 @@ describe('Edge cases',()=>{
   it('empty msg no crash',async()=>{const s=sid();const r=await pip(s,'',okBrain);expect(r.state.turnCount).toBe(1);});
   it('whitespace no crash',async()=>{const s=sid();const r=await pip(s,'   ',okBrain);expect(r.state.turnCount).toBe(1);});
   it('null brain returns policy-strategy response',async()=>{const s=sid();const r=await executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>null,policy});expect(r.strategy).toBe('answer');});
+
+  it('skips the LLM brain entirely when a human agent has taken over', async () => {
+    const s = sid();
+    let brainCalled = false;
+    const r = await executePipeline({
+      message: 'I need a human now',
+      sessionId: s,
+      tenantId: tenant,
+      brainFunction: () => { brainCalled = true; return okBrain(); },
+      policy,
+      isHumanTookOver: true,
+    });
+    expect(brainCalled).toBe(false);
+    expect(r.strategy).toBe('human_handoff');
+    expect(r.stage).toBe('human_handoff');
+    expect(r.response).toContain('human team member');
+    expect(r.uiState).toMatchObject({ state: 'handoff' });
+  });
   it('brain error returns fallback',async()=>{const s=sid();const r=await executePipeline({message:'How does it work?',sessionId:s,tenantId:tenant,brainFunction:()=>{throw Error('crash');},policy});expect(r.response).toContain('rephrase');expect(r.strategy).toBe('repair_confusion');});
   it('repeated same message',async()=>{const s=sid();await pip(s,'How does it work?',okBrain);const r2=await pip(s,'How does it work?',okBrain);expect(r2.response).toBeTruthy();});
   it('unicode handled',async()=>{expect((await pip(sid(),'Cómo funciona?',okBrain)).response).toBeTruthy();});

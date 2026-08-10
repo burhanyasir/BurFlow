@@ -9,7 +9,7 @@ import { Skeleton } from '../../../components/ui/Skeleton';
 import { useToast } from '../../../components/ui/Toast';
 import type { SidebarItem } from '../../../layouts/Sidebar';
 import {
-  fetchSessions, fetchMessages, initiateTakeover, releaseTakeover, sendAgentMessage,
+  fetchSessions, fetchMessages, initiateTakeover, releaseTakeover, sendAgentMessage, openAgentEventStream,
   type AgentSession, type SessionMessage,
 } from '../../../services/agent-api';
 
@@ -98,6 +98,14 @@ export default function AgentInboxPage() {
     }, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
   }, [refreshSessions, refreshThread, selectedId]);
+
+  // Presence stream: while this page is open the agent's takeovers stay
+  // active. When the tab closes or the user navigates away, the connection
+  // drops and the server hands every held session back to the AI.
+  useEffect(() => {
+    const controller = openAgentEventStream();
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     threadEndRef.current?.scrollIntoView({ behavior: 'smooth' });

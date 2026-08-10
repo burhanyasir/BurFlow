@@ -365,6 +365,17 @@ export class ConversationRepository {
     ).get(tenantId) as any)?.c || 0;
   }
 
+  /**
+   * Conversations currently held by a specific agent (session_state =
+   * 'human_takeover'). Used for seamless handback when the agent disconnects.
+   */
+  listTakeoversByAgent(tenantId: string, agentId: string): Conversation[] {
+    const rows = this.db.prepare(
+      "SELECT * FROM conversations WHERE tenant_id = ? AND assigned_agent_id = ? AND session_state = 'human_takeover'"
+    ).all(tenantId, agentId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
   countActiveUsers(tenantId: string): number {
     return (this.db.prepare(
       'SELECT COUNT(DISTINCT user_id) as c FROM conversations WHERE tenant_id = ? AND user_id IS NOT NULL'
