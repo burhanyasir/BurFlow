@@ -7,11 +7,12 @@ import { TrustSection } from './TrustSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
 
-const DEV_WIDGET_TOKEN = import.meta.env.DEV
-  ? 'eyJ0ZW5hbnRJZCI6ImRlbW8tdGVuYW50IiwidHlwZSI6IndpZGdldCIsImlhdCI6MTc4NTY2MDk3NiwiZXhwIjoyMTAxMDIwOTc2fQ.de33b8c3083e6a1f52663eb05fdb5555f8c59bbd5a43fe75f386ccde712f35bc'
-  : undefined;
-// Keep the dev fallback aligned with the SaaS API's default widget signing secret.
-const WIDGET_TOKEN = (import.meta.env.VITE_WIDGET_TOKEN as string | undefined) || DEV_WIDGET_TOKEN;
+// Tokenless bootstrap: the widget exchanges the public tenant id for a fresh
+// token at runtime (GET /api/widget/public-token). Override via
+// VITE_WIDGET_TENANT_ID in .env.development; `demo-tenant` mirrors the legacy
+// dev token's tenant for local demos.
+const DEV_WIDGET_TENANT_ID = import.meta.env.DEV ? 'demo-tenant' : undefined;
+const WIDGET_TENANT_ID = (import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined) || DEV_WIDGET_TENANT_ID;
 const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || '/widget/widget.js';
 const WIDGET_API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -103,7 +104,7 @@ function WidgetHealthIndicator() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!import.meta.env.DEV || !WIDGET_TOKEN || typeof document === 'undefined') return;
+    if (!import.meta.env.DEV || !WIDGET_TENANT_ID || typeof document === 'undefined') return;
     const checkScript = () => setScriptLoaded(!!document.querySelector(`script[src^="${WIDGET_CDN}"]`));
     checkScript();
     const observer = new MutationObserver(checkScript);
@@ -113,7 +114,12 @@ function WidgetHealthIndicator() {
     const loadConfig = async () => {
       setStatus('loading');
       try {
-        const response = await fetch(`/api/widget/config?token=${encodeURIComponent(WIDGET_TOKEN)}`);
+        // Tokenless: exchange the public tenant id for a short-lived token first.
+        const tokenRes = await fetch(`/api/widget/public-token?tenantId=${encodeURIComponent(WIDGET_TENANT_ID)}`);
+        if (!tokenRes.ok) throw new Error(`${tokenRes.status} ${tokenRes.statusText}`);
+        const { token } = await tokenRes.json();
+        if (!token) throw new Error('No token returned');
+        const response = await fetch('/api/widget/config', { headers: { 'x-widget-token': token } });
         if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
         const payload = await response.json();
         setConfig(payload);
@@ -163,41 +169,22 @@ function WidgetHealthIndicator() {
 
 function WidgetEmbedLoader() {
   useEffect(() => {
-    if (!WIDGET_TOKEN || typeof document === 'undefined') return;
+    if (!WIDGET_TENANT_ID || typeof document === 'undefined') return;
     if (document.querySelector(`script[src^="${WIDGET_CDN}"]`)) return;
 
-    const apiUrl = WIDGET_API_URL || window.location.origin;
     const script = document.createElement('script');
-    script.src = `${WIDGET_CDN}?token=${encodeURIComponent(WIDGET_TOKEN)}`;
+    script.src = WIDGET_CDN;
     script.async = true;
     script.defer = true;
-    script.setAttribute('data-api-url', apiUrl);
+    // The widget's autoInit reads these attributes and bootstraps a fresh
+    // token from /api/widget/public-token (same-origin when VITE_API_URL is
+    // unset — the Vite dev proxy forwards /api to the SaaS API).
+    script.setAttribute('data-tenant-id', WIDGET_TENANT_ID);
+    if (WIDGET_API_URL) script.setAttribute('data-api-url', WIDGET_API_URL);
     script.setAttribute('data-position', 'bottom-right');
     script.setAttribute('data-primary-color', '#6366f1');
     script.setAttribute('data-greeting', '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!');
     script.setAttribute('data-launcher-text', 'Try for free');
-
-    script.onload = () => {
-      const w = window as any;
-      if (!document.querySelector('.cw-bubble') && typeof w.initChatWidget === 'function') {
-        w.initChatWidget({
-          apiUrl,
-          widgetToken: WIDGET_TOKEN,
-          position: 'bottom-right',
-          primaryColor: '#6366f1',
-          greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
-          launcherText: 'Chat with us',
-          title: 'BurFlow AI Assistant',
-          subtitle: 'Your smart buying assistant',
-          suggestedActions: [
-            { id: 'best-fit', label: 'Best fit', action: 'send_text', payload: 'Which option fits our needs best?', variant: 'primary' },
-            { id: 'pricing', label: 'Pricing', action: 'send_text', payload: 'Show me pricing', variant: 'secondary' },
-            { id: 'products', label: 'Products', action: 'send_text', payload: 'What products do you offer?', variant: 'secondary' },
-            { id: 'demo', label: 'Book demo', action: 'send_text', payload: 'I want to book a demo', variant: 'secondary' },
-          ],
-        });
-      }
-    };
 
     document.body.appendChild(script);
     return () => script.remove();
@@ -452,7 +439,7 @@ export default function LandingPage() {
             <p className="mt-4 text-lg text-[var(--color-neutral-600)]">The widget greets visitors confidently, offers smart suggestions, and guides them toward the next best action.</p>
           </motion.div>
           <motion.div {...fadeUp} transition={{ duration: 0.5, delay: 0.06 }} className="mt-10">
-            {WIDGET_TOKEN ? <WidgetEmbedLoader /> : <div className="rounded-2xl border border-[var(--color-neutral-200)] bg-white p-10 text-center text-sm text-[var(--color-neutral-500)]">Widget token missing. Set <code>VITE_WIDGET_TOKEN</code> in local dev to preview the live widget.</div>}
+            {WIDGET_TENANT_ID ? <WidgetEmbedLoader /> : <div className="rounded-2xl border border-[var(--color-neutral-200)] bg-white p-10 text-center text-sm text-[var(--color-neutral-500)]">Widget tenant missing. Set <code>VITE_WIDGET_TENANT_ID</code> in local dev to preview the live widget.</div>}
           </motion.div>
         </Container>
       </section>

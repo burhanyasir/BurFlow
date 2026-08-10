@@ -11,9 +11,12 @@ const STYLE_ID = 'burflow-widget-styles';
 
 export function WidgetLauncher() {
   useEffect(() => {
-    const token = import.meta.env.VITE_WIDGET_TOKEN as string | undefined;
+    // Tokenless bootstrap: the widget exchanges the public tenant id for a
+    // fresh widget token at runtime. Configure via .env.development:
+    //   VITE_WIDGET_TENANT_ID=<tenant id or slug>
+    const tenantId = import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined;
     const apiUrl = (import.meta.env.VITE_WIDGET_API_URL as string | undefined) || '';
-    if (!token || document.getElementById(SCRIPT_ID)) return;
+    if (!tenantId || document.getElementById(SCRIPT_ID)) return;
 
     if (!document.getElementById(STYLE_ID)) {
       const style = document.createElement('link');
@@ -27,17 +30,12 @@ export function WidgetLauncher() {
     script.id = SCRIPT_ID;
     script.src = '/widget/widget.js';
     script.async = true;
-    script.onload = () => {
-      if (window.initChatWidget) {
-        window.initChatWidget({
-          apiUrl,
-          widgetToken: token,
-          primaryColor: '#016248',
-          title: 'BurFlow',
-          position: 'bottom-right',
-        });
-      }
-    };
+    // The widget's autoInit reads these attributes and bootstraps itself.
+    script.setAttribute('data-tenant-id', tenantId);
+    if (apiUrl) script.setAttribute('data-api-url', apiUrl);
+    script.setAttribute('data-primary-color', '#016248');
+    script.setAttribute('data-position', 'bottom-right');
+    script.setAttribute('data-title', 'BurFlow');
     document.body.appendChild(script);
   }, []);
 

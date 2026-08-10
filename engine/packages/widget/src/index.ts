@@ -33,7 +33,10 @@ if (typeof window !== 'undefined') {
   //  - legacy `data-token="..."`: the token is embedded directly in the page
   //  - `data-tenant-id="..."`: the widget exchanges the public tenant
   //    identifier for a fresh token at runtime via /api/widget/public-token,
-  //    so the pasted snippet never hardcodes an expiring JWT
+  //    so the pasted snippet never hardcodes an expiring JWT. When
+  //    `data-api-url` is omitted the exchange (and all API traffic) resolves
+  //    against the page's own origin — same-origin setups such as the Vite dev
+  //    proxy or an nginx /api reverse proxy need no extra configuration.
   function autoInit() {
     try {
       const script = _scriptEl;
@@ -50,7 +53,7 @@ if (typeof window !== 'undefined') {
       }
 
       const tenantId = script.getAttribute('data-tenant-id');
-      if (tenantId && apiUrl) {
+      if (tenantId) {
         fetch(`${apiUrl}/api/widget/public-token?tenantId=${encodeURIComponent(tenantId)}`)
           .then((res) => {
             if (!res.ok) throw new Error(`public-token request failed (${res.status})`);

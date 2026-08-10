@@ -308,20 +308,8 @@
     </div>
   </footer>
 
-  <!-- BurFlow Chatbot Widget -->
-  <script>
-    var WIDGET_TOKEN = "eyJ0ZW5hbnRJZCI6InRlbmFudC0xNzg2MDA2NDkzMTYyIiwidHlwZSI6IndpZGdldCIsImlhdCI6MTc4NjAxNzMyMCwiZXhwIjoxNzg2MTAzNzIwfQ.08a7a41d03aa3ec036a363e682af521f472924ea9b6cf5e169ec69dc91d48239";
-  </script>
-  <script src="/widget/widget.js"></script>
-  <script>
-    if (window.initChatWidget) {
-      initChatWidget({ widgetToken: WIDGET_TOKEN, apiUrl: '', primaryColor: '#2563eb', position: 'right' });
-    } else {
-      document.addEventListener('DOMContentLoaded', function() {
-        if (window.initChatWidget) initChatWidget({ widgetToken: WIDGET_TOKEN, apiUrl: '', primaryColor: '#2563eb', position: 'right' });
-      });
-    }
-  </script>
+  <!-- BurFlow Chatbot Widget (tokenless bootstrap: the widget exchanges the public tenant id for a fresh token) -->
+  <script src="/widget/widget.js" data-tenant-id="tenant-1786006493162" data-primary-color="#2563eb" data-position="right"></script>
 
 </body>
 </html>
