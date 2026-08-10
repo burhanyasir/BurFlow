@@ -16,15 +16,14 @@ The **single canonical dashboard UI is `frontend/`** at the repository root
 (a Vite + React 19 SPA). It is served by the `saas-api` Express server and is
 what tenants actually use.
 
-## Deployment caveat (before deleting)
+## Deployment caveat (resolved)
 
 `engine/Dockerfile.frontend` (used by the `frontend` service in
-`engine/docker-compose.yml`) still builds this package and serves its `dist/`
-via nginx. Before removing this folder:
+`engine/docker-compose.yml`) previously built this package. It now builds the
+canonical `frontend/` dashboard instead (build context is the repository root;
+see the header comment in that Dockerfile). The `frontend` nginx service serves
+only the canonical dashboard and proxies `/api` to `saas-api:3000`.
 
-1. Point `Dockerfile.frontend` at the canonical `frontend/` build, or
-2. Remove the `frontend` service from `engine/docker-compose.yml` (the dashboard
-   is already served by `saas-api`), then
-3. Delete this directory and its workspace entry.
-
-Once the Docker wiring is updated, this package can be deleted.
+This package can now be deleted outright — nothing in the repository depends on
+it (not referenced by `tsc -b`, `build:all`, vitest, or any package import).
+Delete this directory and, if present, any workspace/tsconfig entry referencing it.

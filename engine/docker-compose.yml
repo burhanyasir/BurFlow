@@ -99,18 +99,24 @@ services:
     networks:
       - app-network
 
-  # ─── Admin Portal Frontend ────────────────────────────────────
+  # ─── Canonical Dashboard Frontend (frontend/) ──────────────────
   frontend:
     build:
-      context: .
-      dockerfile: Dockerfile.frontend
+      # The canonical frontend/ lives at the repository root, outside engine/,
+      # so the build context is the repo root and the Dockerfile is referenced
+      # by its engine/ path.
+      context: ..
+      dockerfile: engine/Dockerfile.frontend
+      args:
+        # Build-time variable inlined by Vite. Leave unset for same-origin
+        # /api (nginx proxies to saas-api); set to an absolute URL only when
+        # the dashboard must call the API on a different origin.
+        VITE_API_URL: ${VITE_API_URL:-}
     container_name: ce-frontend
     expose:
       - "80"
     ports:
       - "${FRONTEND_PORT:-8080}:80"
-    environment:
-      - VITE_API_URL=${APP_URL:-https://app.yourdomain.com}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost/"]
