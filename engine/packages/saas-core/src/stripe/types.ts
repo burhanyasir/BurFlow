@@ -59,6 +59,19 @@ export const STRIPE_PLANS: Record<string, StripePlanConfig> = {
     features: ['Unlimited conversations', 'Unlimited documents', 'Unlimited knowledge bases', 'Unlimited team members', 'Enterprise analytics', 'White-label branding', 'Dedicated support', 'SSO', 'SLA'],
     limits: { conversations: UNLIMITED_THRESHOLD, documents: UNLIMITED_THRESHOLD, knowledgeBases: 999, teamMembers: 999, apiCalls: UNLIMITED_THRESHOLD, storageMb: 50000, widgets: 999 },
   },
+  // Modern Paddle catalog tiers (legacy 'professional'/'enterprise' kept above)
+  pro: {
+    id: 'pro', name: 'Pro', price: 40, currency: 'USD', interval: 'month',
+    stripePriceId: '',
+    features: ['5,000 conversations/month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'],
+    limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10 },
+  },
+  advanced: {
+    id: 'advanced', name: 'Advanced', price: 120, currency: 'USD', interval: 'month',
+    stripePriceId: '',
+    features: ['50,000 conversations/month', '1,000 documents', '50 knowledge bases', '50 team members', 'Enterprise analytics', 'White-label branding', 'Dedicated support', 'SSO', 'SLA'],
+    limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50 },
+  },
 };
 
 export function getPlanConfig(plan: string): PlanConfig {
@@ -75,8 +88,8 @@ export function getPlanConfig(plan: string): PlanConfig {
     storageMbLimit: p.limits.storageMb,
     widgetsLimit: p.limits.widgets,
     analytics: plan !== 'free',
-    customBranding: plan === 'professional' || plan === 'enterprise',
-    prioritySupport: plan === 'professional' || plan === 'enterprise',
+    customBranding: ['professional', 'enterprise', 'pro', 'advanced'].includes(plan),
+    prioritySupport: ['professional', 'enterprise', 'pro', 'advanced'].includes(plan),
   };
 }
 

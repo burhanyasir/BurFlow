@@ -1,11 +1,22 @@
 export { createDatabase } from './db/database';
+export { SqliteDatabase } from './db/sqlite';
+export type { SqlDatabase, SqlStatement, SqlRunResult, DatabaseDialect } from './db/types';
+export { isPostgresDatabase } from './db/types';
+export { rewritePlaceholders } from './db/pg/placeholder';
+export type { RewrittenSql } from './db/pg/placeholder';
+export { PgDatabase } from './db/pg/pg-database';
+export type { PgDatabaseOptions } from './db/pg/pg-database';
+export { createPrimaryDatabase, assertSaaSMigrationsApplied } from './db/select';
+export type { CreatePrimaryDatabaseOptions } from './db/select';
+export { serializeError, deserializeError, coerceRows } from './db/pg/protocol';
+export type { WorkerOp, WorkerReply, QueryReply } from './db/pg/protocol';
 export {
   UserRepository, TenantRepository, ApiKeyRepository,
   ConversationRepository, MessageRepository, UsageRepository,
   KnowledgeBaseRepository, KbDocumentRepository, OnboardingProgressRepository,
   WidgetConfigRepository, RefreshTokenRepository, AnalyticsRepository,
   SubscriptionRepository, InvoiceRepository, PaymentRepository,
-  BillingEventRepository,
+  BillingEventRepository, PaddleCustomerRepository,
   UnansweredQuestionRepository, UnansweredQuestionClusterRepository,
   KnowledgeSuggestionRepository, CitationAnalyticsRepository,
   ConversationInsightsRepository,
@@ -94,12 +105,22 @@ export type {
   Lead, LeadSource, QualificationStatus, BuyingIntentLevel,
   SessionState, SessionNote,
   ScanStatus, ScanSchedule, ScanCrawlMode, ScannedPageStatus,
-  WebsiteScan, ScannedPage,
+  WebsiteScan, ScannedPage, PaddleCustomer,
   WhiteLabelBranding,
 } from './types';
 export type { BrandIntelligence } from './types';
 export type { HandoffRequest } from './db/repositories';
 export { PaddleClient, PADDLE_PLANS, getPlanLimits } from './paddle';
 export type { PaddlePlanConfig, PlanLimits } from './paddle';
-export { StripeClient, STRIPE_PLANS, getPlanConfig, isUnlimited, findPlanByPriceId, UNLIMITED_THRESHOLD } from './stripe';
-export type { StripePlanConfig, PlanConfig, StripeCheckoutSessionOptions, StripeCustomerData } from './stripe';
+export {
+  PADDLE_TIERS, PADDLE_TIERS_BY_ID, PADDLE_TRIAL_DAYS,
+  getTierById, getTierPriceId, findPlanByPaddlePriceId,
+} from './config/paddle-plans';
+export type {
+  PaddleTierConfig, PaddlePriceConfig, PaddleCountryPriceOverride,
+} from './config/paddle-plans';
+// Plan/quota catalog only. StripeClient and the Stripe checkout types are
+// quarantined — Paddle is the sole billing provider and no production code
+// may reach Stripe anymore.
+export { getPlanConfig, isUnlimited, UNLIMITED_THRESHOLD } from './stripe';
+export type { PlanConfig, StripePlanConfig } from './stripe';

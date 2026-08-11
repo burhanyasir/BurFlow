@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import {
-  UserRepository, TenantRepository, ConversationRepository,
+  UserRepository, TenantRepository, ConversationRepository, Conversation,
   UsageRepository, KnowledgeBaseRepository, KbDocumentRepository,
   ApiKeyRepository, AnalyticsRepository, SubscriptionRepository,
   MessageRepository, LeadRepository, HandoffRequestRepository,
@@ -9,14 +9,32 @@ import {
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { parsePagination, requireJsonObject, validationError, validateRequiredString, validateRequiredEnum } from '../middleware/validate';
 import { createTtlCache } from '../utils/ttl-cache';
+import { buildSessionSummary, aggregateAnalytics, computeConversationIntel, buildLeadSummary } from '../services/conversation-intel';
 
 const logger = createLogger('saas-api:admin');
 
-/** 15s TTL cache for the session list — the dashboard polls at 15s. */
+/** 15s TTL cache for the session list + analytics — the dashboard polls at 15s. */
 const SESSIONS_CACHE_TTL_MS = 15_000;
 const sessionsCache = createTtlCache<unknown>(SESSIONS_CACHE_TTL_MS);
+const analyticsCache = createTtlCache<unknown>(SESSIONS_CACHE_TTL_MS);
 
-const VALID_SESSION_STATUSES = ['active', 'ended', 'escalated'] as const;
+/** Pages through every conversation for a tenant (listByTenant is page-based). */
+function listAllTenantConversations(repo: ConversationRepository, tenantId: string): Conversation[] {
+  const all: Conversation[] = [];
+  const PAGE_SIZE = 200;
+  for (let page = 1; ; page++) {
+    const { conversations } = repo.listByTenant(tenantId, page, PAGE_SIZE);
+    all.push(...conversations);
+    if (conversations.length < PAGE_SIZE) break;
+  }
+  return all;
+}
+
+// Conversation status mixes the engine lifecycle (active/ended/escalated) with
+// the CRM pipeline statuses the detail page lets agents set (new/working/
+// qualified/won/lost). Accept both so the status PUT never 400s on a valid
+// agent action.
+const VALID_SESSION_STATUSES = ['active', 'ended', 'escalated', 'new', 'working', 'qualified', 'won', 'lost'] as const;
 
 function sessionTimeline(conversation: any, messages: any[], notes: SessionNote[], handoff: any) {
   const events: any[] = messages.map((m: any) => ({
@@ -98,12 +116,25 @@ export function createAdminRoutes(
 
   router.get('/analytics', adminOnly, (req: Request, res: Response) => {
     try {
-      const { page, limit } = parsePagination(req.query as any, { limit: 20, maxLimit: 100 });
-      const event = req.query.event as string | undefined;
-      const from = req.query.from as string | undefined;
-      const to = req.query.to as string | undefined;
-      const result = analyticsRepo.query(req.tenantId!, event, from, to, page, limit);
-      res.json(result);
+      // Tenant-scoped 15s cache — the dashboard polls this endpoint every 15s.
+      const cacheKey = `analytics:${req.tenantId}`;
+      const cached = analyticsCache.get(cacheKey);
+      if (cached !== undefined) {
+        return res.json(cached);
+      }
+
+      const conversations = listAllTenantConversations(conversationRepo, req.tenantId!);
+      const entries = conversations.map(conv => {
+        const { messages } = messageRepo.listByConversation(conv.id, 1, 500);
+        return {
+          conversation: conv,
+          messages,
+          lead: leadRepo.findBySession(req.tenantId!, conv.sessionId),
+        };
+      });
+      const payload = aggregateAnalytics(entries);
+      analyticsCache.set(cacheKey, payload);
+      res.json(payload);
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Analytics query failed');
       res.status(500).json({ error: 'Failed to query analytics' });
@@ -255,7 +286,15 @@ export function createAdminRoutes(
         return res.json(cached);
       }
       const result = conversationRepo.listByTenant(req.tenantId!, pageNum, limitNum);
-      const payload = { sessions: result.conversations || [], total: result.total || 0, limit: limitNum, offset: (pageNum - 1) * limitNum };
+      // Enrich each conversation with intelligence derived from its stored
+      // transcript + captured lead so the dashboard's hasIntel gate passes and
+      // persona/funnel/buying-intent fields render real values.
+      const sessions = result.conversations.map(conv => {
+        const { messages } = messageRepo.listByConversation(conv.id, 1, 500);
+        const lead = leadRepo.findBySession(req.tenantId!, conv.sessionId);
+        return buildSessionSummary(conv, messages, lead);
+      });
+      const payload = { sessions, total: result.total || 0, limit: limitNum, offset: (pageNum - 1) * limitNum };
       sessionsCache.set(cacheKey, payload);
       res.json(payload);
     } catch (err: any) {
@@ -297,6 +336,20 @@ export function createAdminRoutes(
         updatedAt: n.createdAt,
       }));
 
+      // Derive intelligence from the stored transcript + captured lead so the
+      // detail page shows real funnel stage, buying intent, objections, and score.
+      const lead = leadRepo.findBySession(req.tenantId!, conversation.sessionId);
+      const intel = computeConversationIntel(conversation, messages, lead);
+      // Score on a 0-10 scale: prefer the captured lead score when present,
+      // otherwise a composite of buying intent + conversation depth.
+      const score = lead
+        ? Math.round(lead.leadScore / 10)
+        : Math.min(10, (intel.buyingIntentDetected ? 3 : 0) + Math.min(intel.turnCount * 2, 7));
+      const qualificationProgress = lead ? 'completed' : intel.turnCount >= 3 ? 'in_progress' : 'not_started';
+      const personaReason = lead
+        ? `Captured lead (score ${lead.leadScore}, ${lead.buyingIntent} buying intent)`
+        : intel.buyingIntentReason || (intel.turnCount > 0 ? 'Multi-turn conversation with stored transcript' : 'No substantive conversation yet');
+
       res.json({
         sessionId: conversation.id,
         tenantId: conversation.tenantId,
@@ -304,30 +357,28 @@ export function createAdminRoutes(
         updatedAt: conversation.startedAt,
         stateMachine: conversation.sessionState,
         sequenceCounter: conversation.messageCount,
-        turnCount: conversation.messageCount,
-        // Intelligence fields are not persisted per conversation — return safe
-        // defaults so the UI renders rather than throwing.
-        persona: '',
-        funnelStage: '',
-        buyingIntentDetected: false,
-        buyingIntentReason: null,
-        hasIntel: false,
+        turnCount: intel.turnCount,
+        persona: intel.persona,
+        funnelStage: intel.funnelStage,
+        buyingIntentDetected: intel.buyingIntentDetected,
+        buyingIntentReason: intel.buyingIntentReason,
+        hasIntel: intel.hasIntel,
         status: conversation.status,
         owner: conversation.assignedAgentId || null,
         flagged: !!conversation.flagged,
         archived: !!conversation.archived,
         tags: conversation.tags || [],
         turns,
-        objections: [],
+        objections: intel.objections,
         qualificationState: {},
         repeatedPhraseCount: 0,
         topics: [],
         state: JSON.stringify(conversation),
         conversationIntelligence: {
-          score: 0,
-          personaReason: '',
-          qualificationProgress: 'not_started',
-          topObjections: [],
+          score,
+          personaReason,
+          qualificationProgress,
+          topObjections: intel.objections,
           sentiment: { polarity: 0, frustration: 0.1, urgency: 0.1 },
         },
         notes,
@@ -479,11 +530,24 @@ export function createAdminRoutes(
     }
   });
 
+  // Enrich each lead with intelligence derived from its conversation transcript
+  // so the Lead Inbox renders persona/funnel/intent/turns instead of blanks, and
+  // sessionId points at the conversation id (the detail page + status/owner
+  // actions resolve by conversation id).
+  const enrichLead = (tenantId: string) => (lead: import('@conversation-engine/saas-core').Lead) => {
+    const conversation = lead.conversationId
+      ? conversationRepo.findById(lead.conversationId)
+      : null;
+    const conv = conversation || conversationRepo.findBySession(tenantId, lead.sessionId);
+    const messages = conv ? (messageRepo.listByConversation(conv.id, 1, 500).messages || []) : [];
+    return buildLeadSummary(conv, messages, lead);
+  };
+
   router.get('/leads', adminOnly, (req: Request, res: Response) => {
     try {
       const { page, limit } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
       const result = leadRepo.findByTenant(req.tenantId!, page, limit);
-      res.json({ leads: result.leads, total: result.total, limit, offset: (page - 1) * limit });
+      res.json({ leads: result.leads.map(enrichLead(req.tenantId!)), total: result.total, limit, offset: (page - 1) * limit });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Admin leads fetch failed');
       res.status(500).json({ error: 'Failed to fetch leads' });
@@ -495,7 +559,7 @@ export function createAdminRoutes(
       const { page, limit } = parsePagination(req.query as any, { limit: 50, maxLimit: 200 });
       const result = leadRepo.findByTenant(req.tenantId!, page, limit);
       const followups = result.leads.filter(l => l.qualificationStatus !== 'disqualified');
-      res.json({ followups, total: result.total, limit, offset: (page - 1) * limit });
+      res.json({ followups: followups.map(enrichLead(req.tenantId!)), total: result.total, limit, offset: (page - 1) * limit });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Followups fetch failed');
       res.status(500).json({ error: 'Failed to fetch followups' });

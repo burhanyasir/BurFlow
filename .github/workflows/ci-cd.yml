@@ -36,11 +36,64 @@ jobs:
       - name: Run full test suite
         run: npm test
 
-  deploy:
-    name: Build & Deploy Healthcheck
-    if: github.ref == 'refs/heads/main'
-    needs: test
+  frontend-build:
+    name: Frontend Production Build
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Production build (vite + tsc)
+        run: npm run build
+
+  # Production Image Validation — NOT a deployment. Builds the production
+  # image and boots it against a real PostgreSQL service with the CURRENT
+  # production architecture (Neon-compatible DATABASE_URL via a local
+  # postgres, Paddle, SendGrid, OpenAI/LLM, APP_URL, PIPELINE_URL,
+  # INTERNAL_SYNC_KEY, CORS_ORIGIN) and an EXPLICIT db:migrate step.
+  #
+  # Required repository secrets (the boot fails clearly without them, which
+  # is correct — production-like validation needs production-like inputs):
+  #   JWT_SECRET, WIDGET_SECRET, INTERNAL_SYNC_KEY, CORS_ORIGIN, APP_URL,
+  #   OPENAI_API_KEY, LLM_API_KEY, SENDGRID_API_KEY, PADDLE_API_KEY,
+  #   PADDLE_WEBHOOK_SECRET, PADDLE_PRICE_STARTER_MONTHLY,
+  #   PADDLE_PRICE_STARTER_YEARLY, PADDLE_PRICE_PRO_MONTHLY,
+  #   PADDLE_PRICE_PRO_YEARLY, PADDLE_PRICE_ADVANCED_MONTHLY,
+  #   PADDLE_PRICE_ADVANCED_YEARLY
+  deploy:
+    name: Production Image Validation (Postgres + migrate + healthcheck)
+    if: github.ref == 'refs/heads/main'
+    needs: [test, frontend-build]
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: burflow
+          POSTGRES_USER: burflow
+          POSTGRES_PASSWORD: burflow-ci-validation
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U burflow"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI_DATABASE_URL: postgresql://burflow:burflow-ci-validation@127.0.0.1:5432/burflow
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -60,32 +113,106 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Start container
+      - name: Verify required secrets are configured
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           WIDGET_SECRET: ${{ secrets.WIDGET_SECRET }}
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+          INTERNAL_SYNC_KEY: ${{ secrets.INTERNAL_SYNC_KEY }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          APP_URL: ${{ secrets.APP_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          PADDLE_API_KEY: ${{ secrets.PADDLE_API_KEY }}
+          PADDLE_WEBHOOK_SECRET: ${{ secrets.PADDLE_WEBHOOK_SECRET }}
+          PADDLE_PRICE_STARTER_MONTHLY: ${{ secrets.PADDLE_PRICE_STARTER_MONTHLY }}
+          PADDLE_PRICE_STARTER_YEARLY: ${{ secrets.PADDLE_PRICE_STARTER_YEARLY }}
+          PADDLE_PRICE_PRO_MONTHLY: ${{ secrets.PADDLE_PRICE_PRO_MONTHLY }}
+          PADDLE_PRICE_PRO_YEARLY: ${{ secrets.PADDLE_PRICE_PRO_YEARLY }}
+          PADDLE_PRICE_ADVANCED_MONTHLY: ${{ secrets.PADDLE_PRICE_ADVANCED_MONTHLY }}
+          PADDLE_PRICE_ADVANCED_YEARLY: ${{ secrets.PADDLE_PRICE_ADVANCED_YEARLY }}
         run: |
-          docker run -d --name burflow-healthcheck \
+          MISSING=""
+          for var in JWT_SECRET WIDGET_SECRET INTERNAL_SYNC_KEY CORS_ORIGIN APP_URL \
+                     OPENAI_API_KEY LLM_API_KEY SENDGRID_API_KEY PADDLE_API_KEY \
+                     PADDLE_WEBHOOK_SECRET PADDLE_PRICE_STARTER_MONTHLY \
+                     PADDLE_PRICE_STARTER_YEARLY PADDLE_PRICE_PRO_MONTHLY \
+                     PADDLE_PRICE_PRO_YEARLY PADDLE_PRICE_ADVANCED_MONTHLY \
+                     PADDLE_PRICE_ADVANCED_YEARLY; do
+            if [ -z "${!var}" ]; then MISSING="$MISSING $var"; fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Missing required secrets for production validation:$MISSING"
+            echo "Configure them in the repository settings before this job can pass."
+            exit 1
+          fi
+
+      - name: Start container against PostgreSQL (production env)
+        env:
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          WIDGET_SECRET: ${{ secrets.WIDGET_SECRET }}
+          INTERNAL_SYNC_KEY: ${{ secrets.INTERNAL_SYNC_KEY }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          APP_URL: ${{ secrets.APP_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          PADDLE_API_KEY: ${{ secrets.PADDLE_API_KEY }}
+          PADDLE_WEBHOOK_SECRET: ${{ secrets.PADDLE_WEBHOOK_SECRET }}
+          PADDLE_PRICE_STARTER_MONTHLY: ${{ secrets.PADDLE_PRICE_STARTER_MONTHLY }}
+          PADDLE_PRICE_STARTER_YEARLY: ${{ secrets.PADDLE_PRICE_STARTER_YEARLY }}
+          PADDLE_PRICE_PRO_MONTHLY: ${{ secrets.PADDLE_PRICE_PRO_MONTHLY }}
+          PADDLE_PRICE_PRO_YEARLY: ${{ secrets.PADDLE_PRICE_PRO_YEARLY }}
+          PADDLE_PRICE_ADVANCED_MONTHLY: ${{ secrets.PADDLE_PRICE_ADVANCED_MONTHLY }}
+          PADDLE_PRICE_ADVANCED_YEARLY: ${{ secrets.PADDLE_PRICE_ADVANCED_YEARLY }}
+        run: |
+          docker run -d --name burflow-healthcheck --network host \
             -e NODE_ENV=production \
             -e PORT=3000 \
-            -e DATABASE_PATH=/app/data/saas.db \
+            -e DATABASE_URL="$CI_DATABASE_URL" \
+            -e KNOWLEDGE_DB_PATH=/app/data/knowledge-saas.db \
             -e JWT_SECRET="$JWT_SECRET" \
             -e WIDGET_SECRET="$WIDGET_SECRET" \
-            -e STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
-            -e STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
+            -e INTERNAL_SYNC_KEY="$INTERNAL_SYNC_KEY" \
+            -e CORS_ORIGIN="$CORS_ORIGIN" \
+            -e APP_URL="$APP_URL" \
+            -e PIPELINE_URL=http://127.0.0.1:3456 \
+            -e OPENAI_API_KEY="$OPENAI_API_KEY" \
+            -e LLM_API_KEY="$LLM_API_KEY" \
+            -e SENDGRID_API_KEY="$SENDGRID_API_KEY" \
+            -e PADDLE_API_KEY="$PADDLE_API_KEY" \
+            -e PADDLE_WEBHOOK_SECRET="$PADDLE_WEBHOOK_SECRET" \
+            -e PADDLE_ENVIRONMENT=sandbox \
+            -e PADDLE_PRICE_STARTER_MONTHLY="$PADDLE_PRICE_STARTER_MONTHLY" \
+            -e PADDLE_PRICE_STARTER_YEARLY="$PADDLE_PRICE_STARTER_YEARLY" \
+            -e PADDLE_PRICE_PRO_MONTHLY="$PADDLE_PRICE_PRO_MONTHLY" \
+            -e PADDLE_PRICE_PRO_YEARLY="$PADDLE_PRICE_PRO_YEARLY" \
+            -e PADDLE_PRICE_ADVANCED_MONTHLY="$PADDLE_PRICE_ADVANCED_MONTHLY" \
+            -e PADDLE_PRICE_ADVANCED_YEARLY="$PADDLE_PRICE_ADVANCED_YEARLY" \
             burflow/app:${{ github.sha }}
 
-      - name: Deployment healthcheck (GET /api/health)
+      - name: Run explicit migrations (npm run db:migrate + status)
+        run: |
+          for i in $(seq 1 20); do
+            if docker exec burflow-healthcheck sh -c "cd /app && npm run db:migrate && npm run db:migrate:status"; then
+              echo "MIGRATIONS_OK"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "MIGRATIONS_FAILED"
+          docker logs burflow-healthcheck
+          exit 1
+
+      - name: Deployment readiness healthcheck (GET /ready)
         run: |
           for i in $(seq 1 30); do
-            if curl -fsS http://localhost:3000/api/health; then
+            if curl -fsS http://127.0.0.1:3000/ready; then
               echo "HEALTHCHECK_OK"
               exit 0
             fi
             sleep 2
           done
-          echo "HEALTHCHECK_FAILED: /api/health did not return 200 within 60s"
+          echo "HEALTHCHECK_FAILED: /ready did not return 200 within 60s"
           docker logs burflow-healthcheck
           exit 1

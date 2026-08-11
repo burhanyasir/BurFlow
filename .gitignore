@@ -1,10 +1,14 @@
-﻿# Node
+# Node
 node_modules/
 dist/
 .env
 .env.*
 !.env.example
+.neon.env
 engine/packages/saas-api/.env.local
+
+# Agent workspace (run docs, smoke-test launchers, preview logs)
+.freebuff/
 *.log
 npm-debug.log*
 pnpm-debug.log*
@@ -31,3 +35,10 @@ coverage/
 tmp-db-check*.js
 qa_extra*.js
 test_flows.js
+
+# Stray local server/vitest output and regression reports
+server-err.txt
+server-out.txt
+vitest-err.txt
+vitest-out.txt
+regression-report.txt

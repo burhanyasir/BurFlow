@@ -56,7 +56,7 @@ function makeApp() {
     new KnowledgeSuggestionRepository(db),
     new CitationAnalyticsRepository(db),
     new ConversationInsightsRepository(db),
-    tenantRepo, usageRepo, subRepo, conversationRepo,
+    tenantRepo, usageRepo, subRepo, conversationRepo, messageRepo,
   ));
   const leadService = new LeadService(leadRepo);
   a.use('/api/chat', auth, tenantGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, undefined, { leadService }, undefined, unansweredRepo));
@@ -143,6 +143,15 @@ describe('Admin session management', () => {
     expect(conversationRepo.findById(conv.id)!.endedAt).toBeTruthy();
   });
 
+  it('accepts CRM pipeline statuses from the detail page', async () => {
+    const conv = conversationRepo.create(tenantAId, 'admin-crmstatus-session');
+    for (const status of ['new', 'working', 'qualified', 'won', 'lost']) {
+      const res = await request('PUT', `/api/admin/sessions/${conv.id}/status`, { status }, tenantAToken);
+      expect(res.status).toBe(200);
+      expect(conversationRepo.findById(conv.id)!.status).toBe(status);
+    }
+  });
+
   it('rejects invalid session status', async () => {
     const conv = conversationRepo.create(tenantAId, 'admin-badstatus-session');
     const res = await request('PUT', `/api/admin/sessions/${conv.id}/status`, { status: 'paused' }, tenantAToken);
@@ -220,7 +229,7 @@ describe('Admin session management', () => {
     expect(types).toContain('handoff');
   });
 
-  it('returns conversation detail with turns built from messages and safe intelligence defaults', async () => {
+  it('returns conversation detail with turns built from messages and derived intelligence', async () => {
     const conv = conversationRepo.create(tenantAId, 'admin-detail-session');
     messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'user', content: 'Do you support SSO?', sequenceNumber: 1 });
     messageRepo.create({ conversationId: conv.id, tenantId: tenantAId, role: 'assistant', content: 'Yes, SAML 2.0 and OIDC are supported.', sequenceNumber: 2 });
@@ -231,20 +240,24 @@ describe('Admin session management', () => {
     const res = await request('GET', `/api/admin/sessions/${conv.id}`, undefined, tenantAToken);
     expect(res.status).toBe(200);
     expect(res.body.sessionId).toBe(conv.id);
-    expect(res.body.turnCount).toBe(2);
+    // Turn count is derived from the stored transcript (1 user+assistant pair).
+    expect(res.body.turnCount).toBe(1);
     expect(Array.isArray(res.body.turns)).toBe(true);
     expect(res.body.turns).toHaveLength(2);
     expect(res.body.turns[0]).toMatchObject({ role: 'user', content: 'Do you support SSO?', timestamp: expect.any(Number) });
     expect(res.body.turns[1]).toMatchObject({ role: 'assistant', content: 'Yes, SAML 2.0 and OIDC are supported.' });
-    // Intelligence is not persisted per conversation — must default safely so the UI renders.
-    expect(res.body.persona).toBe('');
-    expect(res.body.funnelStage).toBe('');
+    // Intelligence is derived at read time from the transcript — the SSO
+    // conversation has no buying-intent signal but is a real 1-turn flow.
+    expect(res.body.hasIntel).toBe(true);
+    expect(res.body.funnelStage).toBe('discovery');
     expect(res.body.buyingIntentDetected).toBe(false);
+    expect(res.body.conversationIntelligence.qualificationProgress).toBe('not_started');
     expect(Array.isArray(res.body.tags)).toBe(true);
     expect(res.body.tags).toContain('pricing');
     expect(Array.isArray(res.body.timeline)).toBe(true);
     expect(Array.isArray(res.body.notes)).toBe(true);
-    expect(res.body.conversationIntelligence).toMatchObject({ score: 0, qualificationProgress: 'not_started' });
+    // Score is derived (no lead, 1 turn → 2/10); qualification stays not_started.
+    expect(res.body.conversationIntelligence).toMatchObject({ score: 2, qualificationProgress: 'not_started' });
   });
 
   it('returns 404 for cross-tenant session access', async () => {
@@ -256,6 +269,71 @@ describe('Admin session management', () => {
   it('returns 404 for unknown session', async () => {
     const res = await request('PUT', '/api/admin/sessions/does-not-exist/status', { status: 'ended' }, tenantAToken);
     expect(res.status).toBe(404);
+  });
+
+  it('lists sessions enriched with intelligence derived from messages', async () => {
+    const conv = conversationRepo.findBySession(tenantAId, 'admin-session-1')!;
+    const res = await request('GET', '/api/admin/sessions?limit=50', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBeGreaterThanOrEqual(1);
+    const match = res.body.sessions.find((s: any) => s.sessionId === conv.id);
+    expect(match).toBeDefined();
+    // sessionId must be the conversation id so dashboard detail links resolve.
+    expect(match.sessionId).toBe(conv.id);
+    // Seeded conversation has one user message + one assistant reply.
+    expect(match.hasIntel).toBe(true);
+    expect(match.turnCount).toBe(1);
+    expect(match.funnelStage).toBe('discovery');
+    expect(typeof match.buyingIntentDetected).toBe('boolean');
+    expect(Array.isArray(match.tags)).toBe(true);
+    expect(match.status).toBe('active');
+  });
+
+  it('reports analytics in the dashboard AnalyticsResponse shape', async () => {
+    const res = await request('GET', '/api/admin/analytics', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    const body = res.body;
+    expect(body.totalSessions).toBeGreaterThanOrEqual(1);
+    expect(typeof body.avgTurns).toBe('number');
+    expect(typeof body.handoffRate).toBe('number');
+    expect(typeof body.escalationRate).toBe('number');
+    expect(typeof body.qualificationCompletionRate).toBe('number');
+    expect(typeof body.avgBuyingIntentRate).toBe('number');
+    expect(Array.isArray(body.stageDistribution)).toBe(true);
+    expect(Array.isArray(body.topObjections)).toBe(true);
+    for (const stage of body.stageDistribution) {
+      expect(typeof stage.stage).toBe('string');
+      expect(typeof stage.count).toBe('number');
+      expect(typeof stage.percentage).toBe('number');
+    }
+  });
+
+  it('returns conversation insights in the InsightsDashboard contract', async () => {
+    const res = await request('GET', '/api/admin/insights/overview', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    const insights = Array.isArray(res.body) ? res.body : res.body.insights || [];
+    expect(Array.isArray(insights)).toBe(true);
+    // Tenant A has seeded conversations, so real insights should be generated.
+    expect(insights.length).toBeGreaterThan(0);
+    for (const item of insights) {
+      expect(typeof item.id).toBe('string');
+      expect(typeof item.type).toBe('string');
+      expect(['info', 'warning', 'critical', 'success']).toContain(item.severity);
+      expect(typeof item.text).toBe('string');
+      expect(typeof item.dateGenerated).toBe('string');
+    }
+  });
+
+  it('returns insight trends in the TrendItem[] contract (no crash on render)', async () => {
+    const res = await request('GET', '/api/admin/insights/trend', undefined, tenantAToken);
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    for (const item of res.body) {
+      expect(typeof item.metric).toBe('string');
+      expect(typeof item.currentPeriod).toBe('number');
+      expect(typeof item.previousPeriod).toBe('number');
+      expect(typeof item.change).toBe('number');
+    }
   });
 });
 

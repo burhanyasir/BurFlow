@@ -1,11 +1,11 @@
 export type UserRole = 'owner' | 'admin' | 'member' | 'viewer';
-export type SubscriptionPlan = 'free' | 'starter' | 'professional' | 'enterprise';
+export type SubscriptionPlan = 'free' | 'starter' | 'professional' | 'enterprise' | 'pro' | 'advanced';
 
 export type BillingEventType =
   | 'subscription.created' | 'subscription.updated' | 'subscription.canceled'
   | 'subscription.resumed' | 'transaction.completed' | 'transaction.refunded'
   | 'payment.failed' | 'customer.updated';
-export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired';
+export type SubscriptionStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired' | 'paused';
 export type IngestionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'published' | 'queued' | 'parsing' | 'embedding';
 
 export interface User {
@@ -293,12 +293,24 @@ export interface Subscription {
   paddleCustomerId?: string;
   paddleSubscriptionId?: string;
   paddlePriceId?: string;
+  paddleProductId?: string;
   stripePriceId?: string;
+  scheduledChangeAction?: string;
+  scheduledChangeAt?: string;
   currentPeriodStart: string;
   currentPeriodEnd: string;
   trialStart?: string;
   trialEnd?: string;
   cancelledAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaddleCustomer {
+  customerId: string;
+  tenantId: string;
+  email: string;
+  name?: string;
   createdAt: string;
   updatedAt: string;
 }

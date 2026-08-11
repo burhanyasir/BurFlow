@@ -102,9 +102,11 @@ export default function ExecutiveDashboard() {
     return Math.round(sessions.reduce((sum: number, s: any) => sum + (s.confidence || 0), 0) / sessions.length);
   }, [sessions]);
 
-  const resolutionRate = analyticsData ? Math.round((analyticsData.qualificationCompletionRate || 0) * 100) : 0;
-  const handoffRate = analyticsData ? Math.round((analyticsData.handoffRate || 0) * 100) : 0;
-  const csat = analyticsData ? Math.round((analyticsData.avgConversationScore || 0) * 100) : null;
+  // These analytics fields are already 0-100 percentages per the
+  // AnalyticsResponse contract; multiplying by 100 inflated them 100x.
+  const resolutionRate = analyticsData ? Math.round(analyticsData.qualificationCompletionRate || 0) : 0;
+  const handoffRate = analyticsData ? Math.round(analyticsData.handoffRate || 0) : 0;
+  const csat = analyticsData ? Math.round(analyticsData.avgConversationScore || 0) : null;
 
   const indexedDocs = monitoring?.indexedDocuments || 0;
   const totalDocs = monitoring?.totalDocuments || 0;

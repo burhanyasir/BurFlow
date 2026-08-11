@@ -1,5 +1,5 @@
-import Database from 'better-sqlite3';
-import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState, SessionNote, WebsiteScan, ScannedPage, ScanStatus, ScanCrawlMode, ScanSchedule, ScannedPageStatus } from '../types';
+import type { SqlDatabase } from './types';
+import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantSettings, KnowledgeBase, KbDocument, OnboardingProgress, OnboardingStatus, WidgetConfig, RefreshToken, AnalyticsEvent, Subscription, SubscriptionPlan, Invoice, Payment, BillingEvent, PaddleCustomer, UnansweredQuestion, UnansweredQuestionCluster, KnowledgeSuggestion, CitationAnalytics, ConversationInsights, UnansweredQuestionStats, UsageAlert, TeamMember, Invitation, ActivityEvent, AuditLogEntry, EnhancedApiKey, ApiKeyPermission, ApiKeyUsageStats, Webhook, WebhookDelivery, UptimeHistory, SecurityStatus, Incident, ComplianceDocument, DpaDocument, Subprocessor, TopicResponseTemplate, TeamRole, WebhookEvent, SecurityStatusType, IncidentSeverity, IncidentStatus, Lead, QualificationStatus, BuyingIntentLevel, LeadSource, SessionState, SessionNote, WebsiteScan, ScannedPage, ScanStatus, ScanCrawlMode, ScanSchedule, ScannedPageStatus } from '../types';
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
@@ -10,7 +10,7 @@ const DEFAULT_SETTINGS: TenantSettings = {
 };
 
 export class UserRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { email: string; password: string; name: string; verificationToken?: string; verificationTokenExpiry?: string }): User {
     const id = generateId();
@@ -73,7 +73,7 @@ export class UserRepository {
 }
 
 export class TenantRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { name: string; ownerId: string; parentTenantId?: string; customDomain?: string }): Tenant {
     const id = generateId();
@@ -97,12 +97,12 @@ export class TenantRepository {
   }
 
   findBySlugLike(pattern: string): Tenant | null {
-    const row = this.db.prepare('SELECT * FROM tenants WHERE slug LIKE ? LIMIT 1').get(pattern) as any;
+    const row = this.db.prepare('SELECT * FROM tenants WHERE LOWER(slug) LIKE LOWER(?) LIMIT 1').get(pattern) as any;
     return row ? this.mapRow(row) : null;
   }
 
   findByNameLike(pattern: string): Tenant | null {
-    const row = this.db.prepare('SELECT * FROM tenants WHERE name LIKE ? LIMIT 1').get(pattern) as any;
+    const row = this.db.prepare('SELECT * FROM tenants WHERE LOWER(name) LIKE LOWER(?) LIMIT 1').get(pattern) as any;
     return row ? this.mapRow(row) : null;
   }
 
@@ -188,7 +188,7 @@ export class TenantRepository {
 }
 
 export class ApiKeyRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, label: string, role: TenantApiKey['role'] = 'end-user'): { key: string; record: TenantApiKey } {
     const id = generateId();
@@ -241,7 +241,7 @@ export class ApiKeyRepository {
 }
 
 export class ConversationRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, sessionId: string): Conversation {
     const id = generateId();
@@ -288,13 +288,20 @@ export class ConversationRepository {
    * last message content and its timestamp for last-activity sorting.
    */
   listActiveByTenant(tenantId: string, limit = 50): (Conversation & { lastMessage?: string; lastActivityAt?: string })[] {
+    // NOTE: the ORDER BY repeats the last-message subquery instead of
+    // referencing the `last_activity_at` output alias — PostgreSQL cannot
+    // resolve an output alias inside an ORDER BY expression (SQLite can), so
+    // the alias form would fail on the PG backend.
     const rows = this.db.prepare(
       `SELECT c.*,
         (SELECT m.content FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1) as last_message,
         (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1) as last_activity_at
        FROM conversations c
        WHERE c.tenant_id = ? AND c.status = 'active'
-       ORDER BY COALESCE(last_activity_at, c.started_at) DESC
+       ORDER BY COALESCE(
+         (SELECT m.created_at FROM messages m WHERE m.conversation_id = c.id ORDER BY m.sequence_number DESC LIMIT 1),
+         c.started_at
+       ) DESC
        LIMIT ?`
     ).all(tenantId, limit) as any[];
     return rows.map(r => ({ ...this.mapRow(r), lastMessage: r.last_message || undefined, lastActivityAt: r.last_activity_at || undefined }));
@@ -406,7 +413,7 @@ export class ConversationRepository {
 }
 
 export class MessageRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { conversationId: string; tenantId: string; role: Message['role']; content: string; sequenceNumber: number; tokenCount?: number; latencyMs?: number; safetyFlags?: string[]; sender?: 'agent' | 'bot' }): Message {
     const id = generateId();
@@ -451,7 +458,7 @@ export class MessageRepository {
 }
 
 export class UsageRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   getOrCreate(tenantId: string, period: string): UsageRecord {
     const existing = this.db.prepare('SELECT * FROM usage_records WHERE tenant_id = ? AND period = ?')
@@ -493,6 +500,11 @@ export class UsageRepository {
 
   getCurrentMonthConversations(tenantId: string): number {
     const month = new Date().toISOString().slice(0, 7);
+    return this.countByMonth(tenantId, month);
+  }
+
+  /** Conversations started in a specific 'YYYY-MM' period. */
+  countByMonth(tenantId: string, month: string): number {
     const row = this.db.prepare(
       "SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND substr(started_at, 1, 7) = ?"
     ).get(tenantId, month) as any;
@@ -520,7 +532,7 @@ export class UsageRepository {
 }
 
 export class KnowledgeBaseRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, name: string, description?: string): KnowledgeBase {
     const id = generateId();
@@ -570,7 +582,7 @@ export class KnowledgeBaseRepository {
 }
 
 export class KbDocumentRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { knowledgeBaseId: string; tenantId: string; filename: string; sourceType: KbDocument['sourceType']; sourceUrl?: string }): KbDocument {
     const id = generateId();
@@ -637,7 +649,7 @@ export class KbDocumentRepository {
 }
 
 export class OnboardingProgressRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   get(tenantId: string): OnboardingProgress | null {
     const row = this.db.prepare('SELECT * FROM onboarding_progress WHERE tenant_id = ?').get(tenantId) as any;
@@ -647,7 +659,7 @@ export class OnboardingProgressRepository {
   init(tenantId: string): OnboardingProgress {
     const now = new Date().toISOString();
     this.db.prepare(
-      'INSERT OR IGNORE INTO onboarding_progress (tenant_id, completed_steps, skipped_steps, completion_percentage, onboarding_status, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO onboarding_progress (tenant_id, completed_steps, skipped_steps, completion_percentage, onboarding_status, started_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT DO NOTHING'
     ).run(tenantId, '[]', '[]', 0, 'not_started', now, now);
     return this.get(tenantId)!;
   }
@@ -722,7 +734,8 @@ export class OnboardingProgressRepository {
   } {
     const progress = this.get(tenantId);
     const docCount = (this.db.prepare('SELECT COUNT(*) as c FROM kb_documents WHERE tenant_id = ? AND status = ?').get(tenantId, 'published') as any)?.c || 0;
-    const convToday = (this.db.prepare("SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND date(started_at) = date('now')").get(tenantId) as any)?.c || 0;
+    const todayUtc = new Date().toISOString().slice(0, 10);
+    const convToday = (this.db.prepare('SELECT COUNT(*) as c FROM conversations WHERE tenant_id = ? AND substr(started_at, 1, 10) = ?').get(tenantId, todayUtc) as any)?.c || 0;
     const avgConf = (this.db.prepare('SELECT COALESCE(AVG(avg_confidence), 0) as c FROM conversation_insights WHERE tenant_id = ?').get(tenantId) as any)?.c || 0;
     const totalAnswers = (this.db.prepare("SELECT COUNT(*) as c FROM messages WHERE tenant_id = ? AND role = 'assistant'").get(tenantId) as any)?.c || 0;
     const groundedAnswers = (this.db.prepare("SELECT COUNT(*) as c FROM messages m WHERE m.tenant_id = ? AND m.role = 'assistant' AND m.safety_flags IS NOT NULL").get(tenantId) as any)?.c || 0;
@@ -780,7 +793,7 @@ export class OnboardingProgressRepository {
 }
 
 export class WidgetConfigRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   get(tenantId: string): WidgetConfig | null {
     const row = this.db.prepare('SELECT * FROM widget_configs WHERE tenant_id = ?').get(tenantId) as any;
@@ -847,7 +860,7 @@ export class WidgetConfigRepository {
 }
 
 export class RefreshTokenRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(userId: string, rawToken: string, expiresAt: string): RefreshToken {
     const id = generateId();
@@ -894,7 +907,7 @@ export class RefreshTokenRepository {
 }
 
 export class AnalyticsRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   record(tenantId: string, event: string, properties: Record<string, unknown> = {}): void {
     const id = generateId();
@@ -925,7 +938,7 @@ export class AnalyticsRepository {
 }
 
 export class SubscriptionRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   init(tenantId: string, plan: SubscriptionPlan = 'free'): Subscription {
     const existing = this.findByTenant(tenantId);
@@ -979,7 +992,11 @@ export class SubscriptionRepository {
     if (data.paddleCustomerId) { sets.push('paddle_customer_id = ?'); vals.push(data.paddleCustomerId); }
     if (data.paddleSubscriptionId) { sets.push('paddle_subscription_id = ?'); vals.push(data.paddleSubscriptionId); }
     if (data.paddlePriceId) { sets.push('paddle_price_id = ?'); vals.push(data.paddlePriceId); }
+    if (data.paddleProductId) { sets.push('paddle_product_id = ?'); vals.push(data.paddleProductId); }
+    if (data.scheduledChangeAction !== undefined) { sets.push('scheduled_change_action = ?'); vals.push(data.scheduledChangeAction); }
+    if (data.scheduledChangeAt !== undefined) { sets.push('scheduled_change_at = ?'); vals.push(data.scheduledChangeAt); }
     if (data.stripePriceId) { sets.push('stripe_price_id = ?'); vals.push(data.stripePriceId); }
+    if (data.currentPeriodStart) { sets.push('current_period_start = ?'); vals.push(data.currentPeriodStart); }
     if (data.currentPeriodEnd) { sets.push('current_period_end = ?'); vals.push(data.currentPeriodEnd); }
     if (data.trialEnd) { sets.push('trial_end = ?'); vals.push(data.trialEnd); }
     if (data.cancelledAt !== undefined) { sets.push('cancelled_at = ?'); vals.push(data.cancelledAt); }
@@ -1000,7 +1017,9 @@ export class SubscriptionRepository {
       id: row.id, tenantId: row.tenant_id, plan: row.plan, status: row.status,
       stripeCustomerId: row.stripe_customer_id, stripeSubscriptionId: row.stripe_subscription_id,
       paddleCustomerId: row.paddle_customer_id, paddleSubscriptionId: row.paddle_subscription_id,
-      paddlePriceId: row.paddle_price_id, stripePriceId: row.stripe_price_id,
+      paddlePriceId: row.paddle_price_id, paddleProductId: row.paddle_product_id,
+      scheduledChangeAction: row.scheduled_change_action, scheduledChangeAt: row.scheduled_change_at,
+      stripePriceId: row.stripe_price_id,
       currentPeriodStart: row.current_period_start, currentPeriodEnd: row.current_period_end,
       trialStart: row.trial_start, trialEnd: row.trial_end, cancelledAt: row.cancelled_at,
       createdAt: row.created_at, updatedAt: row.updated_at,
@@ -1008,8 +1027,56 @@ export class SubscriptionRepository {
   }
 }
 
+/**
+ * Maps Paddle customer records to workspaces (upsert by Paddle customer id).
+ * Used by the Paddle webhook fulfillment layer to resolve tenants.
+ */
+export class PaddleCustomerRepository {
+  constructor(private db: SqlDatabase) {}
+
+  upsert(data: { customerId: string; tenantId: string; email: string; name?: string }): PaddleCustomer {
+    const now = new Date().toISOString();
+    this.db.prepare(
+      `INSERT INTO customers (customer_id, tenant_id, email, name, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON CONFLICT(customer_id) DO UPDATE SET
+         tenant_id = excluded.tenant_id,
+         email = excluded.email,
+         name = excluded.name,
+         updated_at = excluded.updated_at`
+    ).run(data.customerId, data.tenantId, data.email, data.name || null, now, now);
+    return this.findById(data.customerId)!;
+  }
+
+  findById(customerId: string): PaddleCustomer | null {
+    const row = this.db.prepare('SELECT * FROM customers WHERE customer_id = ?').get(customerId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  findByTenant(tenantId: string): PaddleCustomer | null {
+    const row = this.db.prepare('SELECT * FROM customers WHERE tenant_id = ? ORDER BY created_at DESC LIMIT 1').get(tenantId) as any;
+    return row ? this.mapRow(row) : null;
+  }
+
+  listByTenant(tenantId: string): PaddleCustomer[] {
+    const rows = this.db.prepare('SELECT * FROM customers WHERE tenant_id = ? ORDER BY created_at DESC').all(tenantId) as any[];
+    return rows.map(r => this.mapRow(r));
+  }
+
+  private mapRow(row: any): PaddleCustomer {
+    return {
+      customerId: row.customer_id,
+      tenantId: row.tenant_id,
+      email: row.email,
+      name: row.name || undefined,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+}
+
 export class InvoiceRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   findById(id: string): Invoice | null {
     const row = this.db.prepare('SELECT * FROM invoices WHERE id = ?').get(id) as any;
@@ -1056,7 +1123,7 @@ export class InvoiceRepository {
 }
 
 export class PaymentRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   findById(id: string): Payment | null {
     const row = this.db.prepare('SELECT * FROM payments WHERE id = ?').get(id) as any;
@@ -1097,7 +1164,7 @@ export class PaymentRepository {
 }
 
 export class BillingEventRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   findByPaddleEventId(paddleEventId: string): BillingEvent | null {
     const row = this.db.prepare('SELECT * FROM billing_events WHERE paddle_event_id = ?').get(paddleEventId) as any;
@@ -1137,7 +1204,7 @@ export class BillingEventRepository {
 }
 
 export class UnansweredQuestionRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { tenantId: string; conversationId: string; question: string; confidence: number; retrievalStatus?: string; escalationStatus?: string; clusterId?: string }): UnansweredQuestion {
     const id = generateId();
@@ -1160,9 +1227,10 @@ export class UnansweredQuestionRepository {
       if (filter.resolved) { conditions.push('resolved_at IS NOT NULL'); }
       else { conditions.push('resolved_at IS NULL'); }
     }
-    if (filter?.period === 'today') { conditions.push("created_at >= date('now')"); }
-    else if (filter?.period === 'week') { conditions.push("created_at >= date('now', '-7 days')"); }
-    else if (filter?.period === 'month') { conditions.push("created_at >= date('now', '-30 days')"); }
+    const dayUtc = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+    if (filter?.period === 'today') { conditions.push('created_at >= ?'); params.push(dayUtc(0)); }
+    else if (filter?.period === 'week') { conditions.push('created_at >= ?'); params.push(dayUtc(7)); }
+    else if (filter?.period === 'month') { conditions.push('created_at >= ?'); params.push(dayUtc(30)); }
     const rows = this.db.prepare(`SELECT * FROM unanswered_questions WHERE ${conditions.join(' AND ')} ORDER BY created_at DESC`).all(...params) as any[];
     return rows.map(r => this.mapRow(r));
   }
@@ -1173,15 +1241,18 @@ export class UnansweredQuestionRepository {
   }
 
   getStats(tenantId: string, period?: 'today' | 'week' | 'month'): UnansweredQuestionStats {
-    const dateFilter = period === 'today' ? "AND q.created_at >= date('now')" : period === 'week' ? "AND q.created_at >= date('now', '-7 days')" : period === 'month' ? "AND q.created_at >= date('now', '-30 days')" : '';
-    
-    const totalRow = this.db.prepare(`SELECT COUNT(*) as c FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter}`).get(tenantId) as any;
-    const resolvedRow = this.db.prepare(`SELECT COUNT(*) as c FROM unanswered_questions q WHERE tenant_id = ? AND resolved_at IS NOT NULL ${dateFilter}`).get(tenantId) as any;
-    const avgRow = this.db.prepare(`SELECT COALESCE(AVG(confidence), 0) as c FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter}`).get(tenantId) as any;
-    
+    const dayUtc = (daysAgo: number) => new Date(Date.now() - daysAgo * 86400000).toISOString().slice(0, 10);
+    const startParam = period === 'today' ? dayUtc(0) : period === 'week' ? dayUtc(7) : period === 'month' ? dayUtc(30) : null;
+    const dateFilter = startParam ? 'AND q.created_at >= ?' : '';
+    const dateParams = startParam ? [startParam] : [];
+
+    const totalRow = this.db.prepare(`SELECT COUNT(*) as c FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter}`).get(tenantId, ...dateParams) as any;
+    const resolvedRow = this.db.prepare(`SELECT COUNT(*) as c FROM unanswered_questions q WHERE tenant_id = ? AND resolved_at IS NOT NULL ${dateFilter}`).get(tenantId, ...dateParams) as any;
+    const avgRow = this.db.prepare(`SELECT COALESCE(AVG(confidence), 0) as c FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter}`).get(tenantId, ...dateParams) as any;
+
     const topTopic = this.db.prepare(`SELECT c.topic FROM unanswered_question_clusters c WHERE c.tenant_id = ? ORDER BY c.occurrence_count DESC LIMIT 1`).get(tenantId) as any;
-    
-    const trendRows = this.db.prepare(`SELECT date(created_at) as date, COUNT(*) as count FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter ? `AND ${dateFilter.replace('AND ', '')}` : ''} GROUP BY date(created_at) ORDER BY date ASC LIMIT 30`).all(tenantId) as any[];
+
+    const trendRows = this.db.prepare(`SELECT substr(created_at, 1, 10) as date, COUNT(*) as count FROM unanswered_questions q WHERE tenant_id = ? ${dateFilter} GROUP BY substr(created_at, 1, 10) ORDER BY date ASC LIMIT 30`).all(tenantId, ...dateParams) as any[];
 
     const total = totalRow?.c || 0;
     return {
@@ -1205,7 +1276,7 @@ export class UnansweredQuestionRepository {
 }
 
 export class UnansweredQuestionClusterRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   findOrCreate(tenantId: string, topic: string, questionPattern: string, confidence: number): UnansweredQuestionCluster {
     const existing = this.db.prepare('SELECT * FROM unanswered_question_clusters WHERE tenant_id = ? AND topic = ?').get(tenantId, topic) as any;
@@ -1242,7 +1313,7 @@ export class UnansweredQuestionClusterRepository {
 }
 
 export class KnowledgeSuggestionRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { tenantId: string; clusterId?: string; suggestionType: string; title: string; description?: string; impactScore: number }): KnowledgeSuggestion {
     const id = generateId();
@@ -1301,7 +1372,7 @@ export class KnowledgeSuggestionRepository {
 }
 
 export class CitationAnalyticsRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   recordCitation(tenantId: string, documentId: string, confidence: number): void {
     const existing = this.db.prepare('SELECT * FROM citation_analytics WHERE tenant_id = ? AND document_id = ?').get(tenantId, documentId) as any;
@@ -1337,7 +1408,7 @@ export class CitationAnalyticsRepository {
 }
 
 export class ConversationInsightsRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   upsertDaily(tenantId: string, date: string, data: Partial<ConversationInsights>): void {
     const existing = this.db.prepare('SELECT * FROM conversation_insights WHERE tenant_id = ? AND date = ?').get(tenantId, date) as any;
@@ -1401,7 +1472,7 @@ export class ConversationInsightsRepository {
 }
 
 export class TeamMemberRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   add(tenantId: string, userId: string, email: string, name: string, role: TeamRole, invitedBy: string): TeamMember {
     const id = generateId();
@@ -1465,7 +1536,7 @@ export class TeamMemberRepository {
 }
 
 export class InvitationRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, email: string, role: TeamRole, invitedBy: string, invitedByName: string, token: string, expiresAt: string): Invitation {
     const id = generateId();
@@ -1520,7 +1591,7 @@ export class InvitationRepository {
 }
 
 export class ActivityRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   record(tenantId: string, userId: string, userName: string, action: string, entityType: string, entityId?: string, metadata: Record<string, unknown> = {}): ActivityEvent {
     const id = generateId();
@@ -1553,7 +1624,7 @@ export class ActivityRepository {
 }
 
 export class AuditLogRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   record(tenantId: string, data: { userId?: string; userName?: string; eventType: string; resourceType: string; resourceId?: string; details?: string; ipAddress?: string; userAgent?: string }): AuditLogEntry {
     const id = generateId();
@@ -1576,7 +1647,7 @@ export class AuditLogRepository {
     if (filter?.resourceType) { conditions.push('resource_type = ?'); params.push(filter.resourceType); }
     if (filter?.from) { conditions.push('created_at >= ?'); params.push(filter.from); }
     if (filter?.to) { conditions.push('created_at <= ?'); params.push(filter.to); }
-    if (filter?.search) { conditions.push('(details LIKE ? OR user_name LIKE ? OR resource_type LIKE ?)'); const s = `%${filter.search}%`; params.push(s, s, s); }
+    if (filter?.search) { conditions.push('(LOWER(details) LIKE LOWER(?) OR LOWER(user_name) LIKE LOWER(?) OR LOWER(resource_type) LIKE LOWER(?))'); const s = `%${filter.search}%`; params.push(s, s, s); }
     const where = conditions.join(' AND ');
     const total = (this.db.prepare(`SELECT COUNT(*) as c FROM audit_logs WHERE ${where}`).get(...params) as any).c;
     const rows = this.db.prepare(`SELECT * FROM audit_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`)
@@ -1605,7 +1676,7 @@ export class AuditLogRepository {
 }
 
 export class EnhancedApiKeyRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, label: string, role: string, createdBy: string, expiresAt?: string, permissions?: ApiKeyPermission[]): { key: string; record: EnhancedApiKey } {
     const id = generateId();
@@ -1696,7 +1767,7 @@ export class EnhancedApiKeyRepository {
 }
 
 export class WebhookRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, url: string, events: WebhookEvent[], signingSecret: string): Webhook {
     const id = generateId();
@@ -1756,7 +1827,7 @@ export class WebhookRepository {
 }
 
 export class WebhookDeliveryRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(webhookId: string, tenantId: string, eventType: WebhookEvent, payload: string, maxAttempts = 3): WebhookDelivery {
     const id = generateId();
@@ -1826,7 +1897,7 @@ export class WebhookDeliveryRepository {
 }
 
 export class UptimeRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   record(tenantId: string, date: string, uptimePercentage: number, downtimeSeconds: number): UptimeHistory {
     const id = generateId();
@@ -1864,7 +1935,7 @@ export class UptimeRepository {
 }
 
 export class SecurityStatusRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   upsert(tenantId: string, status: SecurityStatusType, findings: string[]): SecurityStatus {
     const existing = this.db.prepare('SELECT * FROM security_status WHERE tenant_id = ?').get(tenantId) as any;
@@ -1896,7 +1967,7 @@ export class SecurityStatusRepository {
 }
 
 export class IncidentRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, title: string, description: string, severity: IncidentSeverity): Incident {
     const id = generateId();
@@ -1939,7 +2010,7 @@ export class IncidentRepository {
 }
 
 export class ComplianceDocumentRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, documentType: string, title: string, fileUrl: string, version: string, effectiveDate: string): ComplianceDocument {
     const id = generateId();
@@ -1970,7 +2041,7 @@ export class ComplianceDocumentRepository {
 }
 
 export class DpaRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   upsert(tenantId: string, version: string, fileUrl: string, signedAt?: string, expiresAt?: string): DpaDocument {
     const existing = this.db.prepare('SELECT * FROM dpa_documents WHERE tenant_id = ?').get(tenantId) as any;
@@ -2002,7 +2073,7 @@ export class DpaRepository {
 }
 
 export class SubprocessorRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(tenantId: string, name: string, purpose: string, location: string, dataProcessed: string): Subprocessor {
     const id = generateId();
@@ -2051,7 +2122,7 @@ export class SubprocessorRepository {
 }
 
 export class TopicResponseTemplateRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   upsert(tenantId: string, topic: string, depth: number, answer: string, sources?: string[]): TopicResponseTemplate {
     const id = generateId();
@@ -2102,7 +2173,7 @@ export interface HandoffRequest {
 }
 
 export class HandoffRequestRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: { tenantId: string; sessionId: string; visitorEmail?: string; conversationSummary?: string }): HandoffRequest {
     const id = generateId();
@@ -2153,7 +2224,7 @@ export class HandoffRequestRepository {
 }
 
 export class LeadRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: {
     tenantId: string;
@@ -2305,7 +2376,7 @@ export class LeadRepository {
     }
     if (params.search) {
       const term = `%${params.search}%`;
-      where.push('(name LIKE ? COLLATE NOCASE OR email LIKE ? COLLATE NOCASE OR company LIKE ? COLLATE NOCASE)');
+      where.push('(LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR LOWER(company) LIKE LOWER(?))');
       vals.push(term, term, term);
     }
 
@@ -2375,7 +2446,7 @@ export class LeadRepository {
 }
 
 export class WebsiteScanRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: {
     tenantId: string; rootUrl: string; crawlMode: ScanCrawlMode; schedule: ScanSchedule;
@@ -2524,7 +2595,7 @@ export class WebsiteScanRepository {
 }
 
 export class ScannedPageRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   create(data: {
     scanId: string; tenantId: string; url: string;
@@ -2581,7 +2652,7 @@ export class ScannedPageRepository {
 }
 
 export class KbChunkRepository {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   insertMany(knowledgeBaseId: string, tenantId: string, documentId: string, chunks: { content: string; metadata?: Record<string, unknown> }[]): number {
     const now = new Date().toISOString();

@@ -25,6 +25,10 @@ WORKDIR /app/engine
 # Install dependencies first for optimal layer caching
 COPY engine/package.json engine/package-lock.json ./
 COPY engine/packages ./packages
+# Migration SQL + CLI runners ship in the image so deployments can run
+# `npm run db:migrate` as an explicit step (the app never auto-migrates).
+COPY engine/migrations ./migrations
+COPY engine/scripts ./scripts
 RUN npm ci
 
 # Compile TypeScript across all workspaces (saas-core, saas-api,
@@ -62,6 +66,8 @@ ENV NODE_ENV=production \
 COPY --from=engine-builder /app/engine/node_modules ./node_modules
 COPY --from=engine-builder /app/engine/packages ./packages
 COPY --from=engine-builder /app/engine/package.json ./package.json
+COPY --from=engine-builder /app/engine/migrations ./migrations
+COPY --from=engine-builder /app/engine/scripts ./scripts
 
 # Persistent SQLite volume mount point, owned by the non-root user
 RUN mkdir -p /app/data && chown -R app:app /app

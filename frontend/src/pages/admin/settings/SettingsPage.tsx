@@ -39,19 +39,21 @@ const SESSION_TIMEOUTS = [
   { value: '0', label: 'Never' },
 ];
 
+// Category values map to the backend's resourceType filter.
 const EVENT_TYPE_OPTIONS = [
   { value: 'all', label: 'All Events' },
-  { value: 'workspace', label: 'Workspace' },
-  { value: 'team', label: 'Team' },
+  { value: 'tenant', label: 'Workspace' },
+  { value: 'user', label: 'Team' },
   { value: 'billing', label: 'Billing' },
   { value: 'security', label: 'Security' },
-  { value: 'api', label: 'API' },
+  { value: 'api_key', label: 'API' },
   { value: 'webhook', label: 'Webhook' },
 ];
 
+// Must match the backend's VALID_WEBHOOK_EVENTS exactly — anything else 400s.
 const WEBHOOK_EVENTS = [
-  'conversation.created', 'conversation.ended', 'message.received',
-  'knowledge.synced', 'error.occurred',
+  'conversation.created', 'conversation.completed', 'escalation.created',
+  'unanswered.created', 'feedback.received', 'lead.captured', 'lead.qualified',
 ];
 
 const API_KEY_PERMISSIONS = [
@@ -71,7 +73,7 @@ interface ApiKey {
 }
 
 interface Webhook {
-  id: string; url: string; events: string[]; active: boolean;
+  id: string; url: string; events: string[]; isActive: boolean;
   createdAt: string; deliveryLogsCount: number; lastDeliveryStatus: string | null;
 }
 
@@ -254,14 +256,17 @@ function TeamMembersSection() {
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('member');
+  // Backend roles: owner/admin/support_agent/viewer — 'member' is not valid.
+  const [inviteRole, setInviteRole] = useState('support_agent');
   const [inviting, setInviting] = useState(false);
 
   const loadMembers = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ members: TeamMember[] }>('/team/members');
-      setMembers(res.members || []);
+      // Backend returns a bare array; accept either that or a { members } wrapper.
+      const res = await apiClient.get<TeamMember[] | { members: TeamMember[] }>('/team/members');
+      const list = Array.isArray(res) ? res : (res.members || []);
+      setMembers(list.map(m => ({ ...m, status: m.status || 'active' })));
     } catch {
       addToast('Failed to load team members', 'error');
     } finally {
@@ -278,7 +283,7 @@ function TeamMembersSection() {
       await apiClient.post('/team/invite', { email: inviteEmail, role: inviteRole });
       addToast('Invitation sent', 'success');
       setInviteEmail('');
-      setInviteRole('member');
+      setInviteRole('support_agent');
       setShowInvite(false);
       loadMembers();
     } catch {
@@ -321,7 +326,7 @@ function TeamMembersSection() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <Input placeholder="colleague@company.com" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} label="Email" />
               <Select label="Role" options={[
-                { value: 'admin', label: 'Admin' }, { value: 'member', label: 'Member' }, { value: 'viewer', label: 'Viewer' },
+                { value: 'admin', label: 'Admin' }, { value: 'support_agent', label: 'Member' }, { value: 'viewer', label: 'Viewer' },
               ]} value={inviteRole} onChange={e => setInviteRole(e.target.value)} />
               <div className="flex items-end">
                 <Button onClick={handleInvite} loading={inviting} disabled={!inviteEmail}>Send Invite</Button>
@@ -384,8 +389,10 @@ function ApiKeysSection() {
   const loadKeys = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await apiClient.get<{ keys: ApiKey[] }>('/api-keys/');
-      setKeys(res.keys || []);
+      const res = await apiClient.get<{ keys: Array<{ id: string; label: string; keyPrefix: string; role: string; lastUsedAt: string | null; createdAt: string; expiresAt: string | null; permissions: string[] }> }>('/api-keys/');
+      // Map the API's label/keyPrefix/role fields onto the UI's name/prefix/status
+      // shape; listed keys are never revoked, so status is always active.
+      setKeys((res.keys || []).map(k => ({ id: k.id, name: k.label, prefix: k.keyPrefix, status: 'active', createdAt: k.createdAt, lastUsedAt: k.lastUsedAt, permissions: k.permissions })));
     } catch {
       addToast('Failed to load API keys', 'error');
     } finally {
@@ -399,7 +406,9 @@ function ApiKeysSection() {
     if (!newKeyName) return;
     setCreating(true);
     try {
-      const res = await apiClient.post<{ key: string; id: string }>('/api-keys/', { name: newKeyName, permissions: newKeyPerms });
+      // Backend contract: label + role (admin/operator/service/end-user) + permissions.
+      const role = newKeyPerms.includes('admin') ? 'admin' : newKeyPerms.includes('write') ? 'operator' : 'service';
+      const res = await apiClient.post<{ key: string; id: string }>('/api-keys/', { label: newKeyName, role, permissions: newKeyPerms });
       setGeneratedKey(res.key);
       addToast('API key created — copy it now, it will not be shown again', 'success');
       setNewKeyName('');
@@ -566,7 +575,7 @@ function WebhooksSection() {
   const openEdit = (wh: Webhook) => {
     setFormUrl(wh.url);
     setFormEvents(wh.events);
-    setFormActive(wh.active);
+    setFormActive(wh.isActive);
     setEditingId(wh.id);
     setShowForm(true);
   };
@@ -576,10 +585,10 @@ function WebhooksSection() {
     setSaving(true);
     try {
       if (editingId) {
-        await apiClient.put(`/webhooks/${editingId}`, { url: formUrl, events: formEvents, active: formActive });
+        await apiClient.put(`/webhooks/${editingId}`, { url: formUrl, events: formEvents, isActive: formActive });
         addToast('Webhook updated', 'success');
       } else {
-        await apiClient.post('/webhooks/', { url: formUrl, events: formEvents, active: formActive });
+        await apiClient.post('/webhooks/', { url: formUrl, events: formEvents, isActive: formActive });
         addToast('Webhook created', 'success');
       }
       resetForm();
@@ -670,7 +679,7 @@ function WebhooksSection() {
                   <tr key={wh.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)] transition-colors">
                     <td className="py-3 pr-4 text-white font-mono text-xs max-w-[200px] truncate">{wh.url}</td>
                     <td className="py-3 pr-4"><div className="flex gap-1 flex-wrap">{wh.events.map(ev => <Badge key={ev} variant="info" size="sm">{ev}</Badge>)}</div></td>
-                    <td className="py-3 pr-4"><Badge variant={wh.active ? 'success' : 'neutral'} dot size="sm">{wh.active ? 'Active' : 'Inactive'}</Badge></td>
+                    <td className="py-3 pr-4"><Badge variant={wh.isActive ? 'success' : 'neutral'} dot size="sm">{wh.isActive ? 'Active' : 'Inactive'}</Badge></td>
                     <td className="py-3 pr-4 text-[rgba(255,255,255,0.5)] text-xs">{wh.deliveryLogsCount}</td>
                     <td className="py-3 pr-4">
                       {wh.lastDeliveryStatus
@@ -1031,9 +1040,18 @@ function AuditLogsSection() {
     try {
       const params = new URLSearchParams({ limit: '50', page: String(page) });
       if (search) params.set('search', search);
-      if (eventType !== 'all') params.set('type', eventType);
-      const res = await apiClient.get<{ logs: AuditLog[]; total: number }>(`/audit?${params}`);
-      setLogs(res.logs || []);
+      if (eventType !== 'all') params.set('resourceType', eventType);
+      // Backend returns { entries } with createdAt/userName/eventType/resourceType
+      // — map onto the UI's timestamp/user/action/resource shape.
+      const res = await apiClient.get<{ entries: Array<{ id: string; createdAt: string; userName: string | null; eventType: string; resourceType: string; details: string }>; total: number }>(`/audit?${params}`);
+      setLogs((res.entries || []).map(e => ({
+        id: e.id,
+        timestamp: e.createdAt,
+        user: e.userName || '—',
+        action: e.eventType,
+        resource: e.resourceType,
+        details: e.details,
+      })));
       setTotalPages(res.total ? Math.ceil(res.total / 50) : 1);
     } catch {
       addToast('Failed to load audit logs', 'error');

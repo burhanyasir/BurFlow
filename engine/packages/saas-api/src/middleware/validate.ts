@@ -288,7 +288,7 @@ export const PASSWORD_MAX = 128;
 export const MESSAGE_MAX = 50000;
 
 export const VALID_API_KEY_ROLES = ['admin', 'operator', 'service', 'end-user'] as const;
-export const VALID_SUBSCRIPTION_PLANS = ['free', 'starter', 'professional', 'enterprise'] as const;
+export const VALID_SUBSCRIPTION_PLANS = ['free', 'starter', 'professional', 'enterprise', 'pro', 'advanced'] as const;
 export const VALID_KB_SOURCE_TYPES = ['pdf', 'docx', 'text', 'markdown', 'html', 'faq', 'url'] as const;
 export const VALID_DOC_SOURCE_TYPES = ['pdf', 'docx', 'url', 'faq', 'text'] as const;
 export const VALID_INGESTION_STATUSES = ['queued', 'parsing', 'normalizing', 'chunking', 'embedding', 'indexed', 'published', 'failed'] as const;

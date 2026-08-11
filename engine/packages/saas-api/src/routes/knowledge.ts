@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import Database from 'better-sqlite3';
+import type { SqlDatabase } from '@conversation-engine/saas-core';
 import { randomUUID } from 'crypto';
 import {
   KnowledgePipeline, ContentNormalizer, ContentChunker,
@@ -17,7 +18,16 @@ import Groq from 'groq-sdk';
 const logger = createLogger('saas-api:knowledge');
 
 export interface KnowledgeRouteDeps {
-  db: Database.Database;
+  /** Primary SaaS database (SQLite or PostgreSQL) — used for SaaS entities only. */
+  db: SqlDatabase;
+  /**
+   * Dedicated SQLite database for the knowledge pipeline stores (vector store,
+   * knowledge store, queue). The stores are SQLite-only (BLOB embeddings,
+   * INSERT OR REPLACE), so when the primary SaaS database is PostgreSQL they
+   * must live on their own SQLite file. When the primary db is SQLite (the
+   * existing default) this is omitted and the stores use `db` as before.
+   */
+  knowledgeDb?: SqlDatabase;
   embeddingApiKey?: string;
   embeddingDimension?: number;
   /** Optional repo for the unanswered-questions gap detector. When present, enables POST /unanswered/:id/convert. */
@@ -54,13 +64,24 @@ function clearCrawlProgress(tenantId: string) {
 let singletonVectorStore: SqliteVectorStore | null = null;
 let singletonKnowledgeStore: SqliteKnowledgeStore | null = null;
 
+/**
+ * The knowledge-pipeline stores are SQLite-only and need a raw better-sqlite3
+ * instance. When the primary SaaS db is PostgreSQL, `deps.knowledgeDb` is the
+ * dedicated SQLite file; otherwise the primary db itself is SQLite. The cast
+ * is safe because both branches hand over a real better-sqlite3 instance and
+ * the stores only use the prepare/exec/transaction subset.
+ */
+function getKnowledgeRawDb(deps: KnowledgeRouteDeps): Database.Database {
+  return (deps.knowledgeDb || deps.db) as unknown as Database.Database;
+}
+
 function getVectorStore(deps: KnowledgeRouteDeps): SqliteVectorStore {
-  if (!singletonVectorStore) singletonVectorStore = new SqliteVectorStore(deps.db, deps.embeddingDimension || 128);
+  if (!singletonVectorStore) singletonVectorStore = new SqliteVectorStore(getKnowledgeRawDb(deps), deps.embeddingDimension || 128);
   return singletonVectorStore;
 }
 
 function getKnowledgeStore(deps: KnowledgeRouteDeps): SqliteKnowledgeStore {
-  if (!singletonKnowledgeStore) singletonKnowledgeStore = new SqliteKnowledgeStore(deps.db);
+  if (!singletonKnowledgeStore) singletonKnowledgeStore = new SqliteKnowledgeStore(getKnowledgeRawDb(deps));
   return singletonKnowledgeStore;
 }
 
@@ -200,7 +221,7 @@ function createPipeline(deps: KnowledgeRouteDeps): KnowledgePipeline {
     embedder,
     vectorStore,
     knowledgeStore,
-    deps.db,
+    getKnowledgeRawDb(deps),
   );
 
   pipeline.registerParser(new TextParser());

@@ -19,9 +19,12 @@
     "test:regression": "vitest run packages/saas-api/src/__tests__/conversation-regression.test.ts",
     "test:metrics": "npx tsx packages/saas-api/src/orchestrator/conversation-metrics.ts",
     "start": "node packages/pipeline-orchestrator/dist/server.js",
-    "seed": "node scripts/seed-test-data.js"
+    "seed": "node scripts/seed-test-data.js",
+    "db:migrate": "node scripts/db-migrate.js",
+    "db:migrate:status": "node scripts/db-migrate-status.js"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.4",
     "@types/better-sqlite3": "^7.6.12",
     "@types/compression": "^1.8.1",
     "@types/express": "^5.0.0",

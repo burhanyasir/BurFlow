@@ -1,10 +1,13 @@
 import { Router, Request, Response } from 'express';
-import { StripeClient, SubscriptionRepository, TenantRepository, InvoiceRepository, PaymentRepository, BillingEventRepository, STRIPE_PLANS, getPlanConfig, ConversationRepository, UsageRepository, KbDocumentRepository } from '@conversation-engine/saas-core';
+import { PaddleClient, SubscriptionRepository, TenantRepository, InvoiceRepository, PaymentRepository, BillingEventRepository, getPlanConfig, getTierById, PADDLE_TIERS, PADDLE_TRIAL_DAYS, ConversationRepository, UsageRepository, KbDocumentRepository } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validationError, validateRequiredEnum, VALID_SUBSCRIPTION_PLANS } from '../middleware/validate';
 import type { SubscriptionPlan } from '@conversation-engine/saas-core';
 
 const logger = createLogger('saas-api:billing');
+
+/** Feature list for the free plan (Paddle catalog covers paid tiers only). */
+const FREE_PLAN_FEATURES = ['100 conversations/month', '5 documents', '1 knowledge base', '1 team member', 'Basic analytics'];
 
 export interface BillingRoutesDeps {
   subRepo: SubscriptionRepository;
@@ -26,24 +29,49 @@ export function createBillingRoutes(
   conversationRepo: ConversationRepository,
   usageRepo: UsageRepository,
   docRepo: KbDocumentRepository,
-  stripe?: StripeClient,
+  paddle?: PaddleClient,
 ): Router {
   const router = Router();
-  const client = stripe || new StripeClient();
+  // Paddle is the sole billing provider. The client is injectable for tests.
+  const client = paddle || new PaddleClient();
+
+  function planDisplay(planId: string): { name: string; features: string[] } {
+    if (planId === 'free') return { name: 'Free', features: FREE_PLAN_FEATURES };
+    const tier = getTierById(planId);
+    return { name: tier?.name || planId, features: tier?.features || [] };
+  }
 
   router.get('/plans', (_req: Request, res: Response) => {
     try {
-      const plans = Object.values(STRIPE_PLANS).map(p => ({
-        id: p.id,
-        name: p.name,
-        price: p.price,
-        currency: p.currency,
-        interval: p.interval,
-        stripePriceId: p.stripePriceId,
-        features: p.features,
-        limits: getPlanConfig(p.id),
-      }));
-      res.json({ plans });
+      const free = getPlanConfig('free');
+      const plans = [
+        {
+          id: 'free',
+          name: 'Free',
+          price: 0,
+          priceYearly: 0,
+          currency: 'USD',
+          interval: 'month' as const,
+          paddlePriceIds: { monthly: '', yearly: '' },
+          paddleProductId: '',
+          features: FREE_PLAN_FEATURES,
+          limits: getPlanConfig('free'),
+        },
+        ...PADDLE_TIERS.map(t => ({
+          id: t.id,
+          name: t.name,
+          price: t.monthly.price,
+          priceYearly: t.yearly.price,
+          currency: 'USD',
+          interval: 'month' as const,
+          paddlePriceIds: { monthly: t.monthly.paddlePriceId, yearly: t.yearly.paddlePriceId },
+          paddleProductId: t.paddleProductId,
+          trialDays: t.monthly.trialDays,
+          features: t.features,
+          limits: getPlanConfig(t.id),
+        })),
+      ];
+      res.json({ plans, trialDays: PADDLE_TRIAL_DAYS });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Plans fetch failed');
       res.status(500).json({ error: 'Failed to fetch plans' });
@@ -62,9 +90,9 @@ export function createBillingRoutes(
       const documentsUsed = docRepo.countByStatus(req.tenantId!).total;
       res.json({
         planId,
-        planName: STRIPE_PLANS[planId]?.name || planId,
+        planName: planDisplay(planId).name,
         status: sub?.status || 'active',
-        stripeSubscriptionId: sub?.stripeSubscriptionId || null,
+        paddleSubscriptionId: sub?.paddleSubscriptionId || null,
         currentPeriodStart: sub?.currentPeriodStart || null,
         currentPeriodEnd: sub?.currentPeriodEnd || null,
         trialEnd: sub?.trialEnd || null,
@@ -76,7 +104,7 @@ export function createBillingRoutes(
         documentsLimit: planConfig.documentsLimit,
         documentsUsed,
         teamMembers: planConfig.teamMembersLimit,
-        features: STRIPE_PLANS[planId]?.features || [],
+        features: planDisplay(planId).features,
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Current subscription fetch failed');
@@ -121,59 +149,11 @@ export function createBillingRoutes(
     }
   });
 
-  router.post('/checkout', requireJsonObject, async (req: Request, res: Response) => {
-    try {
-      const { plan } = req.body;
-      const error = validateRequiredEnum(plan, 'plan', VALID_SUBSCRIPTION_PLANS);
-      if (error) return validationError(res, [error]);
-
-      const planConfig = STRIPE_PLANS[plan as string];
-      if (!planConfig || !planConfig.stripePriceId) {
-        return res.status(400).json({ error: 'Plan not available for checkout. Configure Stripe price IDs in environment.' });
-      }
-
-      const tenantId = req.tenantId!;
-      const tenant = tenantRepo.findById(tenantId);
-      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
-
-      const customerEmail = req.user?.email || req.body.email;
-      if (!customerEmail) {
-        return res.status(400).json({ error: 'Email is required for billing. Update your profile first.' });
-      }
-
-      const successUrl = `${process.env.APP_URL || 'http://localhost:3457'}/dashboard/billing?checkout=success`;
-      const cancelUrl = `${process.env.APP_URL || 'http://localhost:3457'}/dashboard/billing?checkout=cancelled`;
-
-      try {
-        const session = await client.createCheckoutSession({
-          customerId: tenant.stripeCustomerId || undefined,
-          email: tenant.stripeCustomerId ? undefined : customerEmail,
-          priceId: planConfig.stripePriceId,
-          quantity: 1,
-          successUrl,
-          cancelUrl,
-          metadata: { tenantId },
-        });
-
-        if (session.id) {
-          eventRepo.create({
-            tenantId,
-            paddleEventId: 'cs-' + session.id,
-            eventType: 'checkout.session.created',
-            status: 'pending',
-            payload: JSON.stringify({ plan, sessionId: session.id }),
-          });
-        }
-
-        res.json({ url: session.url || '', plan, sessionId: session.id });
-      } catch (err: any) {
-        createContextLogger(logger).error({ err }, 'Stripe checkout session creation failed');
-        res.status(502).json({ error: 'Failed to create checkout session' });
-      }
-    } catch (err: any) {
-      createContextLogger(logger).error({ err }, 'Checkout failed');
-      res.status(500).json({ error: 'Failed to initiate checkout' });
-    }
+  // Paddle is the sole billing provider. Checkout is opened client-side via
+  // @paddle/paddle-js (openPaddleCheckout); there is deliberately no
+  // server-side redirect checkout anymore.
+  router.post('/checkout', (_req: Request, res: Response) => {
+    res.status(410).json({ error: 'Server-side checkout is discontinued. Subscriptions are managed through Paddle checkout from the dashboard.' });
   });
 
   router.post('/change-plan', requireJsonObject, async (req: Request, res: Response) => {
@@ -185,30 +165,30 @@ export function createBillingRoutes(
       const sub = subRepo.findByTenant(req.tenantId!);
       if (!sub) return res.status(404).json({ error: 'No active subscription' });
 
-      const planConfig = STRIPE_PLANS[plan as string];
-      if (!planConfig || !planConfig.stripePriceId) {
-        return res.status(400).json({ error: 'Target plan not configured with Stripe price ID' });
+      const newPlan = plan as SubscriptionPlan;
+      const tier = getTierById(newPlan);
+      const priceId = tier?.monthly.paddlePriceId || '';
+      if (!priceId) {
+        return res.status(400).json({ error: `Plan "${newPlan}" is not configured with a Paddle price ID` });
       }
 
-      const newPlan = plan as SubscriptionPlan;
-
-      if (sub.stripeSubscriptionId && planConfig.stripePriceId) {
+      if (sub.paddleSubscriptionId) {
         try {
-          await client.updateSubscriptionItems(sub.stripeSubscriptionId, planConfig.stripePriceId);
+          await client.updateSubscriptionItems(sub.paddleSubscriptionId, [{ priceId, quantity: 1 }]);
         } catch (err: any) {
-          createContextLogger(logger).error({ err }, 'Stripe subscription update failed');
-          return res.status(502).json({ error: 'Failed to update subscription with Stripe' });
+          createContextLogger(logger).error({ err }, 'Paddle subscription update failed');
+          return res.status(502).json({ error: 'Failed to update subscription with Paddle' });
         }
       }
 
       subRepo.update(req.tenantId!, {
         plan: newPlan,
-        stripePriceId: planConfig.stripePriceId,
+        paddlePriceId: priceId || undefined,
         currentPeriodEnd: sub.currentPeriodEnd,
       });
       tenantRepo.update(req.tenantId!, { plan: newPlan });
 
-      res.json({ message: `Plan changed to ${planConfig.name}`, plan: newPlan });
+      res.json({ message: `Plan changed to ${tier?.name || newPlan}`, plan: newPlan });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Plan change failed');
       res.status(500).json({ error: 'Failed to change plan' });
@@ -220,12 +200,12 @@ export function createBillingRoutes(
       const sub = subRepo.findByTenant(req.tenantId!);
       if (!sub) return res.status(404).json({ error: 'No active subscription' });
 
-      if (sub.stripeSubscriptionId) {
+      if (sub.paddleSubscriptionId) {
         try {
-          await client.cancelSubscription(sub.stripeSubscriptionId);
+          await client.cancelSubscription(sub.paddleSubscriptionId);
         } catch (err: any) {
-          createContextLogger(logger).error({ err }, 'Stripe cancellation failed');
-          return res.status(502).json({ error: 'Failed to cancel subscription with Stripe' });
+          createContextLogger(logger).error({ err }, 'Paddle cancellation failed');
+          return res.status(502).json({ error: 'Failed to cancel subscription with Paddle' });
         }
       }
 
@@ -247,12 +227,12 @@ export function createBillingRoutes(
       const sub = subRepo.findByTenant(req.tenantId!);
       if (!sub) return res.status(404).json({ error: 'No subscription found' });
 
-      if (sub.stripeSubscriptionId) {
+      if (sub.paddleSubscriptionId) {
         try {
-          await client.resumeSubscription(sub.stripeSubscriptionId);
+          await client.resumeSubscription(sub.paddleSubscriptionId);
         } catch (err: any) {
-          createContextLogger(logger).error({ err }, 'Stripe resume failed');
-          return res.status(502).json({ error: 'Failed to resume subscription with Stripe' });
+          createContextLogger(logger).error({ err }, 'Paddle resume failed');
+          return res.status(502).json({ error: 'Failed to resume subscription with Paddle' });
         }
       }
 
@@ -274,20 +254,18 @@ export function createBillingRoutes(
       const tenant = tenantRepo.findById(req.tenantId!);
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
 
-      if (!sub.stripeSubscriptionId && !tenant.stripeCustomerId) {
-        return res.status(400).json({ error: 'No Stripe subscription to manage' });
-      }
-
-      const customerId = tenant.stripeCustomerId || sub.stripeCustomerId;
+      const customerId = tenant.paddleCustomerId || sub.paddleCustomerId;
       if (!customerId) {
-        return res.status(400).json({ error: 'No Stripe customer linked to this workspace' });
+        return res.status(400).json({ error: 'No Paddle customer linked to this workspace' });
       }
+      const subscriptionIds = [sub.paddleSubscriptionId].filter((x): x is string => Boolean(x));
 
       try {
-        const portalSession = await client.createPortalSession(customerId);
-        res.json({ url: portalSession?.url || '' });
+        const portalSession = await client.createPortalSession(customerId, subscriptionIds);
+        // Paddle returns the portal URL under urls.general.overview.
+        res.json({ url: portalSession?.urls?.general?.overview || '' });
       } catch (err: any) {
-        createContextLogger(logger).error({ err }, 'Stripe portal session failed');
+        createContextLogger(logger).error({ err }, 'Paddle portal session failed');
         res.status(502).json({ error: 'Failed to create customer portal session' });
       }
     } catch (err: any) {

@@ -6,14 +6,8 @@ data/*.db
 data/*.db-shm
 data/*.db-wal
 *.env*
+!.env.example
 coverage/
 .cache/
 *.tsbuildinfo
 .DS_Store
-*.swp
-*.bak
-regression-report.txt
-server-err.txt
-server-out.txt
-vitest-err.txt
-vitest-out.txt

@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3';
+import type { SqlDatabase } from '../db/types';
 
 export interface AnalyticsTimeframe {
   startDate?: string;
@@ -76,7 +76,7 @@ export function classifyMessageIntent(message: string): VisitorIntentCategory {
 }
 
 export class AnalyticsService {
-  constructor(private db: Database.Database) {}
+  constructor(private db: SqlDatabase) {}
 
   getSummaryMetrics(tenantId: string, timeframe: AnalyticsTimeframe = {}): SummaryMetrics {
     const start = normalizeStartDate(timeframe.startDate);
@@ -142,8 +142,13 @@ export class AnalyticsService {
   }
 
   getStarterOptionStats(tenantId: string): StarterOptionStats {
+    // `properties` is JSON-as-TEXT on both backends; PostgreSQL needs an
+    // explicit cast to jsonb before `->>` (SQLite uses json_extract).
+    const optionExpr = this.db.dialect === 'postgres'
+      ? "CAST(properties AS jsonb)->>'option'"
+      : "json_extract(properties, '$.option')";
     const rows = this.db.prepare(`
-      SELECT json_extract(properties, '$.option') as option, COUNT(*) as clicks
+      SELECT ${optionExpr} as option, COUNT(*) as clicks
       FROM analytics_events
       WHERE tenant_id = ? AND event = 'starter_chip_click'
       GROUP BY option

@@ -119,7 +119,7 @@ function RoutesWithAnimation() {
         <Route path="/agent" element={<ProtectedRoute><AgentInboxPage /></ProtectedRoute>} />
         <Route path="/dashboard/executive" element={<ProtectedRoute><ExecutiveDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/conversations" element={<ProtectedRoute><ConversationDashboard /></ProtectedRoute>} />
-        <Route path="/dashboard/conversations/:id" element={<ProtectedRoute><ConversationDetailPage /></ProtectedRoute>} />
+        <Route path="/dashboard/conversations/:sessionId" element={<ProtectedRoute><ConversationDetailPage /></ProtectedRoute>} />
         <Route path="/dashboard/knowledge" element={<ProtectedRoute><KnowledgeDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/analytics" element={<ProtectedRoute><AnalyticsDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/leads" element={<ProtectedRoute><LeadInboxPage /></ProtectedRoute>} />

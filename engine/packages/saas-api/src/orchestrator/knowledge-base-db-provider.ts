@@ -6,7 +6,7 @@ import {
   fuzzyResolveTopic,
 } from '@conversation-engine/conversation-orchestrator';
 import { TopicResponseTemplateRepository } from '@conversation-engine/saas-core';
-import type Database from 'better-sqlite3';
+import type { SqlDatabase } from '@conversation-engine/saas-core';
 
 export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   private fallback: KnowledgeBaseProvider;
@@ -15,7 +15,7 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
 
   constructor(
     private repo: TopicResponseTemplateRepository,
-    private db?: Database.Database,
+    private db?: SqlDatabase,
     fallback?: KnowledgeBaseProvider,
   ) {
     this.fallback = fallback || new DefaultKnowledgeBaseProvider();

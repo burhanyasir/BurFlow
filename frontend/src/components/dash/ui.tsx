@@ -25,11 +25,13 @@ export function DashButton({
   variant = 'primary',
   onClick,
   className = '',
+  disabled = false,
 }: {
   children: ReactNode;
   variant?: 'primary' | 'ghost';
   onClick?: () => void;
   className?: string;
+  disabled?: boolean;
 }) {
   const styles =
     variant === 'primary'
@@ -37,8 +39,12 @@ export function DashButton({
       : 'border border-hairline bg-surface text-foreground hover:border-foreground/25';
   return (
     <button
-      onClick={onClick}
-      className={`inline-flex h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-all duration-200 ${styles} ${className}`}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-disabled={disabled || undefined}
+      className={`inline-flex h-10 items-center gap-2 rounded-full px-5 text-sm font-semibold transition-all duration-200 ${styles} ${
+        disabled ? 'pointer-events-none cursor-not-allowed opacity-60' : ''
+      } ${className}`}
     >
       {children}
     </button>

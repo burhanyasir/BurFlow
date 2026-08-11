@@ -47,6 +47,13 @@ function metaPayload(overrides: { messages?: any[]; statuses?: any[]; displayPho
   };
 }
 
+const APP_SECRET = 'whatsapp-app-secret-test';
+
+function hubSignature(body: unknown): string {
+  const { createHmac } = require('crypto');
+  return 'sha256=' + createHmac('sha256', APP_SECRET).update(JSON.stringify(body)).digest('hex');
+}
+
 const pipelineResult = {
   response: 'Sure! I can walk you through a demo.',
   strategy: 'answer',
@@ -74,14 +81,23 @@ describe('WhatsApp Business API integration', () => {
   let tenantAId: string;
   let fetchMock: ReturnType<typeof vi.fn>;
 
-  async function request(method: string, path: string, body?: any) {
+  /**
+   * signatureHeader: undefined → auto-sign the body with the test app secret;
+   * null → omit the header; string → use verbatim.
+   */
+  async function request(method: string, path: string, body?: any, signatureHeader?: string | null) {
     return new Promise<{ status: number; headers: any; body: any }>((resolve) => {
       const http = require('http');
       const server = app.listen(0, () => {
         const port = (server.address() as any).port;
+        const headers: any = {};
+        if (body) headers['Content-Type'] = 'application/json';
+        if (body !== undefined && signatureHeader !== null) {
+          headers['X-Hub-Signature-256'] = signatureHeader === undefined ? hubSignature(body) : signatureHeader;
+        }
         const r = http.request({
           hostname: '127.0.0.1', port, path, method,
-          headers: body ? { 'Content-Type': 'application/json' } : undefined,
+          headers: Object.keys(headers).length ? headers : undefined,
         }, (res: any) => {
           let data = '';
           res.setEncoding('utf8');
@@ -112,7 +128,7 @@ describe('WhatsApp Business API integration', () => {
     const leadService = new LeadService(leadRepo);
 
     const a = express();
-    a.use(express.json());
+    a.use(express.json({ verify: (req: any, _res: any, buf: Buffer) => { req.rawBody = buf; } }));
     a.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, 'whatsapp-test-secret'));
     app = a;
 
@@ -128,6 +144,7 @@ describe('WhatsApp Business API integration', () => {
       leadOptions: { leadService },
       whatsappClient: new WhatsAppClient({ phoneNumberId: '1010101010', token: 'meta-test-token' }),
       verifyToken: 'test-verify-token',
+      appSecret: APP_SECRET,
       tenantId: tenantAId,
     }));
   });
@@ -280,6 +297,44 @@ describe('WhatsApp Business API integration', () => {
       expect(res.status).toBe(400);
       expect(res.body.error).toBe('Message content is required');
       expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
+  // Runs last: these tests create real conversations and the tests above count
+  // whatsapp sessions globally, so the DB must be left as they expect.
+  describe('webhook signature verification (X-Hub-Signature-256)', () => {
+    it('rejects POSTs with a missing signature header', async () => {
+      const res = await request('POST', '/api/webhooks/whatsapp', metaPayload(), null);
+      expect(res.status).toBe(401);
+      expect(res.body.error).toBe('Invalid signature');
+    });
+
+    it('rejects a malformed signature header', async () => {
+      const res = await request('POST', '/api/webhooks/whatsapp', metaPayload(), 'not-a-signature');
+      expect(res.status).toBe(401);
+      const res2 = await request('POST', '/api/webhooks/whatsapp', metaPayload(), 'sha256=zzz');
+      expect(res2.status).toBe(401);
+    });
+
+    it('rejects a signature computed with the wrong secret', async () => {
+      const { createHmac } = require('crypto');
+      const bad = 'sha256=' + createHmac('sha256', 'wrong-secret').update(JSON.stringify(metaPayload())).digest('hex');
+      const res = await request('POST', '/api/webhooks/whatsapp', metaPayload(), bad);
+      expect(res.status).toBe(401);
+    });
+
+    it('rejects a tampered payload (signature no longer matches the body)', async () => {
+      const original = metaPayload();
+      const goodSignature = hubSignature(original); // signed while intact
+      const tampered = { ...original, entry: [{ id: 'tampered' }] };
+      const res = await request('POST', '/api/webhooks/whatsapp', tampered, goodSignature);
+      expect(res.status).toBe(401);
+    });
+
+    it('accepts a valid signature and processes the message', async () => {
+      const res = await request('POST', '/api/webhooks/whatsapp', metaPayload({ from: '15559990001', body: 'Signed hello' }));
+      expect(res.status).toBe(200);
+      expect(res.body.received).toBe(true);
     });
   });
 });

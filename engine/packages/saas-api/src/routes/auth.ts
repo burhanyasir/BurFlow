@@ -74,11 +74,16 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
       syncConfigToPipeline(tenant.id);
 
       const emailService = getEmailService();
+      // Email delivery is best-effort: a failure must NEVER crash the API
+      // (the global unhandledRejection handler shuts the process down), so the
+      // rejection is logged and swallowed here.
       emailService.send({
         to: user.email,
         subject: 'Verify your email',
         text: `Welcome! Use this link to verify your email:\n\n${process.env.APP_URL}/verify-email?token=${verificationToken}\n\nThis link expires in 24 hours.`,
         html: `<p>Welcome! Use this link to verify your email:</p><p><a href="${process.env.APP_URL}/verify-email?token=${verificationToken}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
+      }).catch((err: any) => {
+        createContextLogger(baseLogger).error({ err, to: user.email }, 'Verification email failed (non-fatal)');
       });
 
       const accessToken = generateToken({

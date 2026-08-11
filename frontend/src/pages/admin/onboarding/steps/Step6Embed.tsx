@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../../../../components/ui/Button';
 
@@ -51,6 +51,57 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewActive, setPreviewActive] = useState(false);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const widgetRef = useRef<{ unmount?: () => void } | null>(null);
+
+  // Tear the preview widget down when leaving this step so it never lingers
+  // on other onboarding screens.
+  useEffect(() => () => {
+    widgetRef.current?.unmount?.();
+    widgetRef.current = null;
+  }, []);
+
+  const loadWidgetBundle = (): Promise<void> =>
+    new Promise((resolve) => {
+      if ((window as any).ChatWidget) return resolve();
+      const script = document.createElement('script');
+      script.src = WIDGET_CDN;
+      script.onload = () => resolve();
+      script.onerror = () => resolve(); // surfaced as a preview error below
+      document.head.appendChild(script);
+    });
+
+  const startPreview = async () => {
+    setPreviewError(null);
+    setPreviewLoading(true);
+    try {
+      await loadWidgetBundle();
+      const Ctor = (window as any).ChatWidget as { new (config: Record<string, unknown>): { mount: () => void } };
+      if (!Ctor) throw new Error('Widget bundle failed to load — check that /widget/widget.js is reachable.');
+      const token = widgetToken || (await onGenerateToken());
+      const widget = new Ctor({
+        widgetToken: token,
+        apiUrl: WIDGET_API_URL,
+        primaryColor: '#A8244B',
+        position: 'right',
+      });
+      widget.mount();
+      widgetRef.current = widget as { unmount?: () => void };
+      setPreviewActive(true);
+    } catch (err: any) {
+      setPreviewError(err?.message || 'Preview failed to load');
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
+  const stopPreview = () => {
+    widgetRef.current?.unmount?.();
+    widgetRef.current = null;
+    setPreviewActive(false);
+  };
 
   const handleSetup = async () => {
     setError(null);
@@ -132,6 +183,28 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
               </div>
             </div>
             <pre className="p-4 text-sm text-[#e4e4f0] overflow-x-auto"><code>{displaySnippet}</code></pre>
+          </div>
+
+          <div className="rounded-xl border border-[var(--color-neutral-200)] bg-white p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-semibold text-[var(--color-neutral-700)]">Live Preview</h4>
+              {previewActive ? (
+                <Button size="sm" variant="ghost" onClick={stopPreview}>Hide preview</Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={startPreview} disabled={previewLoading}>
+                  {previewLoading ? 'Loading…' : 'Show live preview'}
+                </Button>
+              )}
+            </div>
+            {previewActive && (
+              <p className="text-xs text-[var(--color-neutral-500)]">
+                The bubble at the bottom-right of this page is your live widget — it loads the real {agentId} tenant
+                config. Open it to test questions against your knowledge base before installing.
+              </p>
+            )}
+            {previewError && (
+              <p className="mt-2 text-xs text-[var(--color-error-600)]">{previewError}</p>
+            )}
           </div>
 
           <div className="bg-[var(--color-neutral-50)] rounded-xl p-4 border border-[var(--color-neutral-100)]">

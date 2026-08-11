@@ -1,4 +1,5 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
+import { createHmac, timingSafeEqual } from 'crypto';
 import {
   ConversationRepository, MessageRepository, UsageRepository,
   LeadService, WhatsAppClient, WhatsAppNotConfiguredError,
@@ -54,8 +55,30 @@ export interface WhatsAppRouteOptions {
   whatsappClient?: WhatsAppClient;
   /** Verification token for GET challenge handshake. Defaults to WHATSAPP_VERIFY_TOKEN env. */
   verifyToken?: string;
+  /** App secret for X-Hub-Signature-256 verification of inbound webhooks. Defaults to WHATSAPP_APP_SECRET env. */
+  appSecret?: string;
   /** Tenant that owns the configured WhatsApp phone number. Defaults to WHATSAPP_TENANT_ID env. */
   tenantId?: string;
+}
+
+const HUB_SIGNATURE_HEADER = 'x-hub-signature-256';
+const SHA256_SIGNATURE_RE = /^[0-9a-f]{64}$/i;
+
+/**
+ * Verify Meta's X-Hub-Signature-256 header ("sha256=<hex-hmac>") over the RAW
+ * request body using the WhatsApp app secret. Constant-time comparison.
+ * Returns false for missing, malformed, or mismatched signatures — never logs
+ * the header value or the secret.
+ */
+export function verifyHubSignature(rawBody: Buffer | undefined, signatureHeader: string | undefined, appSecret: string): boolean {
+  if (!appSecret || !rawBody) return false;
+  if (!signatureHeader || !signatureHeader.startsWith('sha256=')) return false;
+  const provided = signatureHeader.slice('sha256='.length);
+  if (!SHA256_SIGNATURE_RE.test(provided)) return false;
+  const expected = createHmac('sha256', appSecret).update(rawBody).digest('hex');
+  const a = Buffer.from(provided.toLowerCase(), 'hex');
+  const b = Buffer.from(expected, 'hex');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 function isTextMessage(message: unknown): message is WhatsAppTextMessage {
@@ -266,7 +289,24 @@ export function createWhatsAppRoutes(options: WhatsAppRouteOptions): Router {
   });
 
   // ─── Inbound webhook events ──────────────────────────────────────
-  router.post('/', requireJsonObject, async (req: Request, res: Response) => {
+  // Fail closed: without an app secret there is no way to authenticate Meta's
+  // delivery, so inbound events are refused rather than processed unauthenticated.
+  const signatureGuard = (req: Request, res: Response, next: NextFunction): void => {
+    const appSecret = options.appSecret || process.env.WHATSAPP_APP_SECRET || '';
+    if (!appSecret) {
+      createContextLogger(logger).error('WHATSAPP_APP_SECRET not configured — refusing unauthenticated webhook');
+      res.status(500).json({ error: 'WhatsApp webhook signature verification is not configured' });
+      return;
+    }
+    const rawBody = (req as any).rawBody as Buffer | undefined;
+    if (!verifyHubSignature(rawBody, req.header(HUB_SIGNATURE_HEADER), appSecret)) {
+      res.status(401).json({ error: 'Invalid signature' });
+      return;
+    }
+    next();
+  };
+
+  router.post('/', signatureGuard, requireJsonObject, async (req: Request, res: Response) => {
     const payload = req.body as WhatsAppWebhookPayload;
 
     if (payload?.object !== 'whatsapp' || !Array.isArray(payload.entry)) {

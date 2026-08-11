@@ -25,11 +25,14 @@ export function createPasswordResetRoutes(userRepo: UserRepository): Router {
       userRepo.update(user.id, { resetToken: token, resetTokenExpiry: expiresAt });
 
       const emailService = getEmailService();
+      // Email delivery is best-effort: a failure must NEVER crash the API.
       emailService.send({
         to: user.email,
         subject: 'Reset your password',
         text: `You requested a password reset. Use this link to reset your password:\n\n${process.env.APP_URL}/reset-password?token=${token}\n\nThis link expires in 1 hour.\n\nIf you did not request this, please ignore this email.`,
         html: `<p>You requested a password reset. Use this link to reset your password:</p><p><a href="${process.env.APP_URL}/reset-password?token=${token}">Reset Password</a></p><p>This link expires in 1 hour.</p><p>If you did not request this, please ignore this email.</p>`,
+      }).catch((err: any) => {
+        createContextLogger(baseLogger).error({ err, to: user.email }, 'Password reset email failed (non-fatal)');
       });
 
       logAuditEvent(createContextLogger(baseLogger), { event: 'forgot_password', success: true, userId: user.id });

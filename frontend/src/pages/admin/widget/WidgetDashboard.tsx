@@ -20,6 +20,19 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const COLOR_PRESETS = ['#0F6E56', '#12866A', '#5DCAA5', '#0B4F3F', '#1F7A8C', '#B4762C', '#8A3D62', '#2E3A46'];
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const m = (hex || '').replace('#', '').trim();
+  const full = m.length === 3 ? m.split('').map(c => c + c).join('') : m;
+  const n = parseInt(full, 16);
+  if (Number.isNaN(n) || full.length !== 6) return { r: 128, g: 128, b: 128 };
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+function rgbToHex(r: number, g: number, b: number): string {
+  const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return `#${ch(r)}${ch(g)}${ch(b)}`;
+}
 const TABS = [{ id: 'vanilla', label: 'HTML' }, { id: 'react', label: 'React' }, { id: 'wordpress', label: 'WordPress' }, { id: 'shopify', label: 'Shopify' }, { id: 'webflow', label: 'Webflow' }] as const;
 const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || (typeof window !== 'undefined' ? `${window.location.origin}/widget/widget.js` : '/widget/widget.js');
 // The widget loader reaches the API (config, chat, token bootstrap) at this
@@ -155,12 +168,50 @@ export default function WidgetDashboard() {
                       />
                     ))}
                   </div>
-                  <input
-                    value={primaryColor}
-                    onChange={e => setPrimaryColor(e.target.value)}
-                    className="mt-4 h-10 w-full rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
-                    aria-label="Hex color"
-                  />
+                  <div className="mt-4 flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={rgbToHex(hexToRgb(primaryColor).r, hexToRgb(primaryColor).g, hexToRgb(primaryColor).b)}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      className="h-10 w-14 shrink-0 cursor-pointer rounded-full border border-hairline bg-transparent p-1"
+                      aria-label="Pick any color"
+                      title="Pick any color"
+                    />
+                    <input
+                      value={primaryColor}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      className="h-10 flex-1 rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
+                      aria-label="Hex color"
+                    />
+                  </div>
+                  <div className="mt-4 rounded-2xl border border-hairline bg-surface-2/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-muted-foreground">Mix your own color</p>
+                      <span className="rounded-full bg-surface px-2.5 py-0.5 font-mono text-[11px] tabular-nums" style={{ color: primaryColor }}>{rgbToHex(hexToRgb(primaryColor).r, hexToRgb(primaryColor).g, hexToRgb(primaryColor).b)}</span>
+                    </div>
+                    {(['R', 'G', 'B'] as const).map((channel, i) => {
+                      const value = [hexToRgb(primaryColor).r, hexToRgb(primaryColor).g, hexToRgb(primaryColor).b][i];
+                      const set = (v: number) => {
+                        const rgb = hexToRgb(primaryColor);
+                        setPrimaryColor(i === 0 ? rgbToHex(v, rgb.g, rgb.b) : i === 1 ? rgbToHex(rgb.r, v, rgb.b) : rgbToHex(rgb.r, rgb.g, v));
+                      };
+                      return (
+                        <label key={channel} className="mt-3 flex items-center gap-3">
+                          <span className="w-3 shrink-0 text-xs font-bold" style={{ color: channel === 'R' ? '#ef4444' : channel === 'G' ? '#22c55e' : '#3b82f6' }}>{channel}</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={255}
+                            value={value}
+                            onChange={e => set(Number(e.target.value))}
+                            className="flex-1 accent-[var(--color-primary)]"
+                            aria-label={`${channel} channel`}
+                          />
+                          <span className="w-8 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted-foreground">{value}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Launcher position</label>

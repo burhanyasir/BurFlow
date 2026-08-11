@@ -2,11 +2,23 @@ import { Router, Request, Response } from 'express';
 import { TenantRepository, UserRepository } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import {
-  requireJsonObject, validateUUID, validateRequiredString, validateOptionalString,
+  requireJsonObject, validateRequiredString, validateOptionalString,
   validateOptionalObject, validationError, NAME_MAX, DESCRIPTION_MAX,
 } from '../middleware/validate';
 
 const baseLogger = createLogger('saas-api:tenants');
+
+// Tenant ids are UUIDs (agency-created) or app-generated ids like
+// `tenant-1786006493162` / `tenant-demo-ecommerce` / `local-...`. A strict
+// UUID check would reject every app-created workspace, but arbitrary strings
+// must still be rejected (M-17 hardening).
+const TENANT_ID_RE = /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?:tenant|local)-[a-z0-9-]{1,40})$/i;
+function validateTenantId(value: unknown, field: string) {
+  if (typeof value !== 'string' || !TENANT_ID_RE.test(value)) {
+    return { field, message: `${field} must be a valid tenant id (UUID or tenant/local- prefixed)` };
+  }
+  return null;
+}
 
 export function createTenantRoutes(tenantRepo: TenantRepository, userRepo: UserRepository): Router {
   const router = Router();
@@ -26,7 +38,7 @@ export function createTenantRoutes(tenantRepo: TenantRepository, userRepo: UserR
     try {
       if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
 
-      const idErr = validateUUID(req.params.id, 'id');
+      const idErr = validateTenantId(req.params.id, 'id');
       if (idErr) return validationError(res, [idErr]);
 
       const tenant = tenantRepo.findById(req.params.id);
@@ -62,7 +74,7 @@ export function createTenantRoutes(tenantRepo: TenantRepository, userRepo: UserR
     try {
       if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
 
-      const idErr = validateUUID(req.params.id, 'id');
+      const idErr = validateTenantId(req.params.id, 'id');
       if (idErr) return validationError(res, [idErr]);
 
       const tenant = tenantRepo.findById(req.params.id);
@@ -90,7 +102,7 @@ export function createTenantRoutes(tenantRepo: TenantRepository, userRepo: UserR
     try {
       if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
 
-      const idErr = validateUUID(req.params.id, 'id');
+      const idErr = validateTenantId(req.params.id, 'id');
       if (idErr) return validationError(res, [idErr]);
 
       const tenant = tenantRepo.findById(req.params.id);
@@ -108,7 +120,7 @@ export function createTenantRoutes(tenantRepo: TenantRepository, userRepo: UserR
     try {
       if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
 
-      const idErr = validateUUID(req.params.id, 'id');
+      const idErr = validateTenantId(req.params.id, 'id');
       if (idErr) return validationError(res, [idErr]);
 
       const tenant = tenantRepo.findById(req.params.id);

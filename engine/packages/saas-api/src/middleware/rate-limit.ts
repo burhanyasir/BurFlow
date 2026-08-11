@@ -5,8 +5,8 @@ interface RateLimitEntry {
   resetAt: number;
 }
 
-export function createRateLimit(options: { windowMs: number; max: number; keyFn?: (req: Request) => string; message?: string }) {
-  const { windowMs, max, keyFn, message = 'Too many requests. Please try again later.' } = options;
+export function createRateLimit(options: { windowMs: number; max: number; keyFn?: (req: Request) => string; message?: string; skip?: (req: Request) => boolean }) {
+  const { windowMs, max, keyFn, message = 'Too many requests. Please try again later.', skip } = options;
   const store = new Map<string, RateLimitEntry>();
 
   const cleanup = setInterval(() => {
@@ -18,6 +18,9 @@ export function createRateLimit(options: { windowMs: number; max: number; keyFn?
   if (cleanup.unref) cleanup.unref();
 
   return (req: Request, res: Response, next: NextFunction) => {
+    // Skip untouched paths (e.g. /api/admin) so public widget traffic never
+    // shares a budget with dashboard polling; those routes get their own limiter.
+    if (skip && skip(req)) return next();
     const key = keyFn ? keyFn(req) : (req.ip || 'unknown');
     const now = Date.now();
     const entry = store.get(key);

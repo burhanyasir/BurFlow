@@ -19,6 +19,10 @@ RUN apk add --no-cache python3 make g++
 # Install dependencies first for optimal layer caching
 COPY package.json package-lock.json ./
 COPY packages packages/
+# Migration SQL + CLI runners ship in the image so deployments can run
+# `npm run db:migrate` as an explicit step (the app never auto-migrates).
+COPY migrations migrations/
+COPY scripts scripts/
 RUN npm ci
 
 # Compile TypeScript across all workspaces (saas-core, saas-api,
@@ -46,6 +50,8 @@ ENV NODE_ENV=production \
 COPY --from=builder /app/node_modules node_modules/
 COPY --from=builder /app/packages packages/
 COPY --from=builder /app/package.json ./
+COPY --from=builder /app/migrations migrations/
+COPY --from=builder /app/scripts scripts/
 
 # Persistent SQLite volume mount point, owned by the non-root user
 RUN mkdir -p /app/data && chown -R app:app /app

@@ -61,11 +61,14 @@ export function createVerifyRoutes(userRepo: UserRepository, jwtSecret: string):
       userRepo.update(user.id, { verificationToken: token, verificationTokenExpiry: expiresAt });
 
       const emailService = getEmailService();
+      // Email delivery is best-effort: a failure must NEVER crash the API.
       emailService.send({
         to: user.email,
         subject: 'Verify your email',
         text: `Use this link to verify your email:\n\n${process.env.APP_URL}/verify-email?token=${token}\n\nThis link expires in 24 hours.`,
         html: `<p>Use this link to verify your email:</p><p><a href="${process.env.APP_URL}/verify-email?token=${token}">Verify Email</a></p><p>This link expires in 24 hours.</p>`,
+      }).catch((err: any) => {
+        createContextLogger(baseLogger).error({ err, to: user.email }, 'Verification email failed (non-fatal)');
       });
 
       logAuditEvent(createContextLogger(baseLogger), { event: 'resend_verification', success: true, userId: user.id });

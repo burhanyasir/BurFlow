@@ -87,7 +87,8 @@ function loadSaved(): OnboardingData {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       const parsed = JSON.parse(saved);
-      return { ...defaultData, ...parsed, completedSteps: parsed.completedSteps || [] };
+      const currentStep = Math.min(Math.max(Number(parsed.currentStep) || 0, 0), STEPS.length - 1);
+      return { ...defaultData, ...parsed, currentStep, completedSteps: parsed.completedSteps || [] };
     }
   } catch {}
   return { ...defaultData };
@@ -106,7 +107,7 @@ export function useOnboardingState() {
 
   const goToStep = useCallback((step: number) => {
     setData(prev => {
-      const next = { ...prev, currentStep: Math.max(0, Math.min(step, 9)) };
+      const next = { ...prev, currentStep: Math.max(0, Math.min(step, STEPS.length - 1)) };
       persist(next);
       return next;
     });
@@ -115,7 +116,8 @@ export function useOnboardingState() {
   const markStepComplete = useCallback((step: number) => {
     setData(prev => {
       const completed = prev.completedSteps.includes(step) ? prev.completedSteps : [...prev.completedSteps, step];
-      const next = { ...prev, completedSteps: completed, currentStep: Math.min(step + 1, 9) };
+      // Advance to the next step, but never past the final (success) step.
+      const next = { ...prev, completedSteps: completed, currentStep: Math.min(step + 1, STEPS.length - 1) };
       console.log('[Onboarding] Step', step, 'completed, advancing to step', next.currentStep);
       persist(next);
       return next;
@@ -262,14 +264,19 @@ export function useOnboardingState() {
     try {
       const result = await apiClient.get<{ tenants: Array<{ id: string; name: string; slug: string; autoCreated?: boolean }> }>('/tenants');
       const tenants = result.tenants || [];
-      const markedWorkspace = tenants.find(t => t.autoCreated === false);
-      const workspace = markedWorkspace || (tenants.length > 1 ? tenants[0] : null);
-      if (!workspace) return;
-      const session = await apiClient.post<{ tenant: { id: string; slug: string }; token?: string }>('/tenants', { name: workspace.name });
-      if (session.token) storage.setToken(session.token);
+      if (tenants.length === 0) return;
+      // Prefer the tenant the current session is authenticated against so the
+      // onboarding flow operates in the same workspace as the rest of the app.
+      let activeTenantId: string | null = null;
       try {
-        await refreshUser();
+        const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        activeTenantId = typeof payload.tenantId === 'string' ? payload.tenantId : null;
       } catch {}
+      const workspace =
+        (activeTenantId && tenants.find(t => t.id === activeTenantId)) ||
+        tenants.find(t => t.autoCreated === false) ||
+        tenants[0];
+      if (!workspace) return;
       setData(prev => {
         if (prev.workspace.tenantId === workspace.id && prev.embed.agentId === workspace.slug) return prev;
         const next = {
@@ -298,7 +305,7 @@ export function useOnboardingState() {
         return next;
       });
     }
-  }, [persist, refreshUser]);
+  }, [persist]);
 
   const uploadFile = useCallback(async (file: File): Promise<void> => {
     const fileEntry: KnowledgeFile = {
@@ -488,7 +495,7 @@ export function useOnboardingState() {
       completedAt: new Date().toISOString(),
     });
     setData(prev => {
-      const next = { ...prev, currentStep: 9, completedSteps: [0, 1, 2, 3, 4, 5, 6, 7, 8], onboardingComplete: true };
+      const next = { ...prev, currentStep: STEPS.length - 1, completedSteps: [0, 1, 2, 3, 4, 5, 6, 7, 8], onboardingComplete: true };
       persist(next);
       return next;
     });

@@ -7,7 +7,11 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, ExternalLink, Sparkles } from 'lucide-react';
+import {
+  isPaddleConfigured, getPaddlePricePreview, openPaddleCheckout,
+  onPaddleCheckoutEvent, setPaddleClientCountry,
+} from '../../../lib/paddle';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -19,15 +23,31 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Onboarding', href: '/dashboard/onboarding' },
 ];
 
-interface Plan { id: string; name: string; price: number; currency: string; interval: string; stripePriceId: string; features: string[]; limits: { conversations: number; documents: number; knowledgeBases: number; teamMembers: number; apiCalls: number; storageMb: number; widgets: number; analytics: boolean; customBranding: boolean; prioritySupport: boolean }; }
-interface CurrentSubscription { planId: string; planName: string; status: string; stripeSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
+interface PlanLimits {
+  conversations: number; documents: number; knowledgeBases: number; teamMembers: number;
+  apiCalls: number; storageMb: number; widgets: number; analytics: boolean;
+  customBranding: boolean; prioritySupport: boolean;
+}
+
+interface Plan {
+  id: string; name: string; price: number; priceYearly: number; currency: string;
+  interval: string;
+  paddlePriceIds: { monthly: string; yearly: string };
+  paddleProductId?: string; trialDays?: number;
+  features: string[]; limits: PlanLimits;
+}
+// Paddle-only: stripeSubscriptionId was replaced by paddleSubscriptionId when
+// Stripe was removed as a billing provider.
+interface CurrentSubscription { planId: string; planName: string; status: string; paddleSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
 interface UsageRecord { date: string; conversations: number; messages: number; documentsUploaded: number; }
 
+type BillingPeriod = 'month' | 'year';
+
 const DEFAULT_PLANS: Plan[] = [
-  { id: 'free', name: 'Free', price: 0, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['100 conversations per month'], limits: { conversations: 100, documents: 3, knowledgeBases: 1, teamMembers: 1, apiCalls: 0, storageMb: 100, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
-  { id: 'starter', name: 'Starter', price: 29, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['1,000 conversations per month'], limits: { conversations: 1000, documents: 20, knowledgeBases: 3, teamMembers: 3, apiCalls: 5000, storageMb: 1024, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
-  { id: 'professional', name: 'Professional', price: 99, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['5,000 conversations per month', 'Custom branding'], limits: { conversations: 5000, documents: 100, knowledgeBases: 10, teamMembers: 10, apiCalls: 50000, storageMb: 10240, widgets: 3, analytics: true, customBranding: true, prioritySupport: true } },
-  { id: 'enterprise', name: 'Enterprise', price: 299, currency: 'usd', interval: 'mo', stripePriceId: '', features: ['White-label', 'SSO', 'Dedicated support'], limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 500000, storageMb: 102400, widgets: 10, analytics: true, customBranding: true, prioritySupport: true } },
+  { id: 'free', name: 'Free', price: 0, priceYearly: 0, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, features: ['100 conversations per month'], limits: { conversations: 100, documents: 3, knowledgeBases: 1, teamMembers: 1, apiCalls: 0, storageMb: 100, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'starter', name: 'Starter', price: 10, priceYearly: 100, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['1,000 conversations per month', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], limits: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5, apiCalls: 5000, storageMb: 500, widgets: 3, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'pro', name: 'Pro', price: 40, priceYearly: 400, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['5,000 conversations per month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10, analytics: true, customBranding: true, prioritySupport: true } },
+  { id: 'advanced', name: 'Advanced', price: 120, priceYearly: 1200, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['50,000 conversations per month', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50, analytics: true, customBranding: true, prioritySupport: true } },
 ];
 
 function usagePercent(used: number, limit: number) {
@@ -43,6 +63,11 @@ export default function BillingDashboard() {
   const [loading, setLoading] = useState(true);
   const [changePlanLoading, setChangePlanLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('month');
+  const [pricePreview, setPricePreview] = useState<Record<string, { formattedGrandTotal: string; currencyCode: string } | null>>({});
+  const [checkoutOpening, setCheckoutOpening] = useState<string | null>(null);
+
+  const paddleConfigured = isPaddleConfigured();
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null); try {
@@ -59,15 +84,59 @@ export default function BillingDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // Paddle: localized price previews for the active billing period. Only real
+  // price IDs are queried; when Paddle isn't configured we fall back to static
+  // catalog prices. Country stays unset so Paddle auto-detects from IP.
+  useEffect(() => {
+    if (!paddleConfigured || plans.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const next: Record<string, { formattedGrandTotal: string; currencyCode: string } | null> = {};
+      for (const plan of plans) {
+        const priceId = billingPeriod === 'year' ? plan.paddlePriceIds?.yearly : plan.paddlePriceIds?.monthly;
+        if (!priceId || plan.price === 0) continue;
+        try {
+          const preview = await getPaddlePricePreview(priceId);
+          if (preview) {
+            next[plan.id] = { formattedGrandTotal: preview.formattedGrandTotal, currencyCode: preview.currencyCode };
+          }
+        } catch { /* keep static fallback */ }
+      }
+      if (!cancelled) setPricePreview(next);
+    })();
+    return () => { cancelled = true; };
+  }, [plans, billingPeriod, paddleConfigured]);
+
+  // Redirect to the dashboard with a success flag once the overlay completes.
+  useEffect(() => {
+    const off = onPaddleCheckoutEvent('checkout.completed', () => {
+      addToast('Subscription activated — welcome aboard!', 'success');
+      navigate('/dashboard?checkout=success');
+    });
+    return off;
+  }, [navigate, addToast]);
+
   const handleChangePlan = async (planId: string) => {
     setChangePlanLoading(true); try { await apiClient.post('/billing/change-plan', { plan: planId }); await loadData(); }
     catch (err: any) { setError(err.message || 'Failed to change plan'); } finally { setChangePlanLoading(false); }
   };
 
-  const handleSelectPlan = async (plan: Plan) => {
+  const handleSubscribe = async (plan: Plan) => {
     if (plan.price === 0) { await handleChangePlan(plan.id); return; }
-    try { const res = await apiClient.post<{ url: string }>('/billing/checkout', { plan: plan.id }); if (res.url) window.open(res.url, '_blank'); else await handleChangePlan(plan.id); }
-    catch { await handleChangePlan(plan.id); }
+
+    const priceId = billingPeriod === 'year' ? plan.paddlePriceIds?.yearly : plan.paddlePriceIds?.monthly;
+    if (paddleConfigured && priceId) {
+      setCheckoutOpening(plan.id);
+      openPaddleCheckout({ priceId, email: user?.email });
+      return;
+    }
+    if (!priceId) {
+      addToast('Live checkout is not configured yet — set VITE_PADDLE_CLIENT_TOKEN and the Paddle price IDs to enable subscriptions.', 'warning');
+      return;
+    }
+    // Paddle is the only billing provider — there is no server-side checkout
+    // fallback anymore (the legacy Stripe /billing/checkout route was removed).
+    addToast('Paddle checkout is not configured (set VITE_PADDLE_CLIENT_TOKEN and the price IDs).', 'warning');
   };
 
   const handleManageBilling = async () => {
@@ -83,6 +152,14 @@ export default function BillingDashboard() {
   };
 
   const displayPlans = plans.length > 0 ? plans : DEFAULT_PLANS;
+
+  const planPriceLabel = (plan: Plan): string => {
+    if (plan.price === 0) return '$0';
+    const preview = pricePreview[plan.id];
+    if (preview?.formattedGrandTotal) return preview.formattedGrandTotal;
+    const amount = billingPeriod === 'year' ? plan.priceYearly : plan.price;
+    return `$${amount}`;
+  };
 
   if (loading) {
     return (
@@ -122,12 +199,11 @@ export default function BillingDashboard() {
           actions={
             <>
               <DashButton variant="ghost" onClick={loadData}><RefreshCw className="size-4" /> Refresh</DashButton>
-              {currentSub && <DashButton onClick={handleManageBilling}><ExternalLink className="size-4" /> Manage subscription</DashButton>}
+              {currentSub && currentSub.status === 'active' && <DashButton onClick={handleManageBilling}><ExternalLink className="size-4" /> Manage subscription</DashButton>}
             </>
           }
         />
 
-        {/* Error banner */}
         {error && (
           <div className="flex items-center gap-3 rounded-2xl border border-error-500/20 bg-error-300/25 px-4 py-3">
             <AlertTriangle className="size-5 shrink-0 text-error-500" />
@@ -136,7 +212,6 @@ export default function BillingDashboard() {
           </div>
         )}
 
-        {/* No subscription */}
         {!currentSub ? (
           <EmptyState
             icon={<CreditCard className="size-6" />}
@@ -146,14 +221,12 @@ export default function BillingDashboard() {
           />
         ) : (
           <>
-            {/* Key stats */}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard icon={<CreditCard className="size-4" />} label="Current plan" value={currentSub.planName} hint={statusLabel(currentSub)} />
               <StatCard icon={<MessageSquare className="size-4" />} label="Conversations this month" value={currentSub.conversationsUsed.toLocaleString()} hint={`${currentSub.conversationsLimit.toLocaleString()} included in your plan`} />
               <StatCard icon={<FileText className="size-4" />} label="Documents used" value={`${currentSub.documentsUsed.toLocaleString()} / ${currentSub.documentsLimit.toLocaleString()}`} hint="Across all knowledge bases" />
             </div>
 
-            {/* Usage this month */}
             <Panel>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-bold tracking-tight">Usage this month</h2>
@@ -169,11 +242,30 @@ export default function BillingDashboard() {
               <p className="mt-3 text-sm text-muted-foreground">{currentSub.conversationsUsed.toLocaleString()} / {currentSub.conversationsLimit.toLocaleString()} conversations this month</p>
             </Panel>
 
-            {/* Plans */}
             <Panel>
-              <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold tracking-tight">Plans</h2>
-                <span className="rounded-full bg-ember-soft px-3 py-1 text-xs font-semibold">{displayPlans.length} plans</span>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Plans</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {paddleConfigured ? 'Secure checkout powered by Paddle. 7-day free trial on every paid plan.' : 'Static pricing — configure VITE_PADDLE_CLIENT_TOKEN to enable live checkout.'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface-2 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setBillingPeriod('month')}
+                    className={cn('rounded-full px-4 py-1.5 text-sm font-semibold transition', billingPeriod === 'month' ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setBillingPeriod('year')}
+                    className={cn('rounded-full px-4 py-1.5 text-sm font-semibold transition', billingPeriod === 'year' ? 'bg-primary text-white shadow' : 'text-muted-foreground hover:text-foreground')}
+                  >
+                    Yearly <span className="text-emerald-500">−17%</span>
+                  </button>
+                </div>
               </div>
               <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {displayPlans.map(plan => {
@@ -184,9 +276,16 @@ export default function BillingDashboard() {
                     <div key={plan.id} className={cn('flex flex-col rounded-3xl border p-6 transition', isCurrent ? 'border-primary shadow-glow' : 'border-hairline')}>
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-display text-base font-bold">{plan.name}</h3>
-                        {isCurrent && <span className="inline-flex items-center rounded-full bg-ember-soft px-2.5 py-0.5 text-[11px] font-semibold">Current</span>}
+                        {isCurrent ? (
+                          <span className="inline-flex items-center rounded-full bg-ember-soft px-2.5 py-0.5 text-[11px] font-semibold">Current</span>
+                        ) : plan.trialDays && plan.price > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600"><Sparkles className="size-3" /> {plan.trialDays}-day trial</span>
+                        ) : null}
                       </div>
-                      <p className="mt-4 font-display text-3xl font-bold tracking-tight">${plan.price}<span className="text-sm font-normal text-muted-foreground">/{plan.interval || 'mo'}</span></p>
+                      <p className="mt-4 font-display text-3xl font-bold tracking-tight">
+                        {planPriceLabel(plan)}
+                        <span className="text-sm font-normal text-muted-foreground">/{billingPeriod === 'year' ? 'yr' : 'mo'}</span>
+                      </p>
                       <ul className="mt-5 flex-1 space-y-2.5 text-sm text-muted-foreground">
                         {plan.features.map((f, i) => (
                           <li key={i} className="flex items-start gap-2"><Check className="mt-0.5 size-4 shrink-0 text-primary" /> {f}</li>
@@ -196,8 +295,13 @@ export default function BillingDashboard() {
                         {isCurrent ? (
                           <DashButton variant="primary" className="pointer-events-none w-full opacity-60">Current plan</DashButton>
                         ) : canChange ? (
-                          <DashButton variant={isUpgrade ? 'primary' : 'ghost'} className="w-full" onClick={() => handleSelectPlan(plan)}>
-                            {changePlanLoading ? 'Loading…' : isUpgrade ? 'Upgrade' : `Switch to ${plan.name}`}
+                          <DashButton
+                            variant={isUpgrade ? 'primary' : 'ghost'}
+                            className="w-full"
+                            onClick={() => handleSubscribe(plan)}
+                            disabled={checkoutOpening === plan.id}
+                          >
+                            {checkoutOpening === plan.id ? 'Opening checkout…' : isUpgrade ? 'Start free trial' : `Switch to ${plan.name}`}
                           </DashButton>
                         ) : null}
                       </div>
@@ -207,7 +311,6 @@ export default function BillingDashboard() {
               </div>
             </Panel>
 
-            {/* Usage history */}
             {usage.length > 0 && (
               <Panel>
                 <h2 className="text-lg font-bold tracking-tight">Usage history</h2>

@@ -177,7 +177,7 @@ function migrate(db: Database.Database): void {
       tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       description TEXT,
-      status TEXT DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed')),
+      status TEXT DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed','published','queued','deleted')),
       document_count INTEGER DEFAULT 0,
       total_chunks INTEGER DEFAULT 0,
       created_at TEXT NOT NULL,
@@ -191,7 +191,7 @@ function migrate(db: Database.Database): void {
       filename TEXT NOT NULL,
       source_type TEXT NOT NULL CHECK (source_type IN ('pdf','docx','url','faq','text')),
       source_url TEXT,
-      status TEXT DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed')),
+      status TEXT DEFAULT 'pending' CHECK (status IN ('pending','processing','completed','failed','published','queued','deleted')),
       chunk_count INTEGER DEFAULT 0,
       error TEXT,
       created_at TEXT NOT NULL,
@@ -322,6 +322,43 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE conversations ADD COLUMN tags TEXT DEFAULT '[]';`); } catch {}
   try { db.exec(`ALTER TABLE conversations ADD COLUMN notes TEXT DEFAULT '[]';`); } catch {}
 
+  // Relax the conversations.status CHECK to also accept the CRM pipeline
+  // statuses agents set from the admin detail page (new/working/qualified/
+  // won/lost) alongside the engine lifecycle states (active/ended/escalated).
+  // SQLite can't ALTER a CHECK, so rebuild the table when the old constraint is
+  // present. Runs once per database, then no-ops.
+  const convDdl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='conversations'`).get() as { sql: string } | undefined;
+  if (convDdl && convDdl.sql.includes(`CHECK (status IN ('active','ended','escalated'))`)) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      BEGIN;
+      CREATE TABLE conversations_migrated (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+        session_id TEXT NOT NULL,
+        user_id TEXT,
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        message_count INTEGER DEFAULT 0,
+        status TEXT DEFAULT 'active' CHECK (status IN ('active','ended','escalated','new','working','qualified','won','lost')),
+        session_state TEXT DEFAULT 'ai_managed' CHECK (session_state IN ('ai_managed','human_takeover','closed')),
+        assigned_agent_id TEXT,
+        takeover_at TEXT,
+        updated_at TEXT,
+        flagged INTEGER DEFAULT 0,
+        archived INTEGER DEFAULT 0,
+        tags TEXT DEFAULT '[]',
+        notes TEXT DEFAULT '[]'
+      );
+      INSERT INTO conversations_migrated SELECT id, tenant_id, session_id, user_id, started_at, ended_at, message_count, status, session_state, assigned_agent_id, takeover_at, updated_at, flagged, archived, tags, notes FROM conversations;
+      DROP TABLE conversations;
+      ALTER TABLE conversations_migrated RENAME TO conversations;
+      CREATE INDEX IF NOT EXISTS idx_conversations_tenant ON conversations(tenant_id);
+      COMMIT;
+      PRAGMA foreign_keys=ON;
+    `);
+  }
+
   // Paddle billing tables
   db.exec(`
     CREATE TABLE IF NOT EXISTS invoices (
@@ -376,6 +413,65 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_subscription_id TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_price_id TEXT;`); } catch {}
   try { db.exec(`ALTER TABLE subscriptions ADD COLUMN stripe_price_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE subscriptions ADD COLUMN paddle_product_id TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE subscriptions ADD COLUMN scheduled_change_action TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE subscriptions ADD COLUMN scheduled_change_at TEXT;`); } catch {}
+
+  // Paddle customers — maps a Paddle customer (id + email) to a workspace so
+  // webhook events can resolve the tenant even without custom_data.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      customer_id TEXT PRIMARY KEY,
+      tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+      email TEXT NOT NULL,
+      name TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_customers_tenant ON customers(tenant_id);
+  `);
+
+  // Relax the subscriptions CHECK constraints: the modern Paddle catalog uses
+  // plan ids 'pro'/'advanced', and Paddle reports 'paused' subscriptions.
+  // SQLite can't ALTER a CHECK, so rebuild the table when the old constraint is
+  // present (mirrors the conversations.status rebuild above).
+  const subDdl = db.prepare(`SELECT sql FROM sqlite_master WHERE type='table' AND name='subscriptions'`).get() as { sql: string } | undefined;
+  if (subDdl && subDdl.sql.includes(`CHECK (plan IN ('free','starter','professional','enterprise'))`)) {
+    db.exec(`
+      PRAGMA foreign_keys=OFF;
+      BEGIN;
+      CREATE TABLE subscriptions_migrated (
+        id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
+        plan TEXT NOT NULL DEFAULT 'free' CHECK (plan IN ('free','starter','professional','enterprise','pro','advanced')),
+        status TEXT NOT NULL DEFAULT 'trialing' CHECK (status IN ('active','trialing','past_due','cancelled','expired','paused')),
+        stripe_customer_id TEXT,
+        stripe_subscription_id TEXT,
+        stripe_price_id TEXT,
+        paddle_customer_id TEXT,
+        paddle_subscription_id TEXT,
+        paddle_price_id TEXT,
+        paddle_product_id TEXT,
+        scheduled_change_action TEXT,
+        scheduled_change_at TEXT,
+        current_period_start TEXT NOT NULL,
+        current_period_end TEXT NOT NULL,
+        trial_start TEXT,
+        trial_end TEXT,
+        cancelled_at TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      INSERT INTO subscriptions_migrated SELECT id, tenant_id, plan, status, stripe_customer_id, stripe_subscription_id, stripe_price_id, paddle_customer_id, paddle_subscription_id, paddle_price_id, paddle_product_id, scheduled_change_action, scheduled_change_at, current_period_start, current_period_end, trial_start, trial_end, cancelled_at, created_at, updated_at FROM subscriptions;
+      DROP TABLE subscriptions;
+      ALTER TABLE subscriptions_migrated RENAME TO subscriptions;
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_tenant ON subscriptions(tenant_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_stripe ON subscriptions(stripe_subscription_id);
+      CREATE INDEX IF NOT EXISTS idx_subscriptions_paddle ON subscriptions(paddle_subscription_id);
+      COMMIT;
+      PRAGMA foreign_keys=ON;
+    `);
+  }
 
   // Auth feature columns (additive, safe to re-run with try-catch)
   try { db.exec(`ALTER TABLE users ADD COLUMN verification_token TEXT;`); } catch {}

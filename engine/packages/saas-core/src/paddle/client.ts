@@ -67,10 +67,17 @@ export class PaddleClient {
     return this.client.transactions.list({ customerId: [customerId] });
   }
 
-  verifyWebhook(requestBody: string, signatureHeader: string): any {
+  /**
+   * Verify a Paddle webhook and unmarshal it into an event entity.
+   * The SDK expects (body, secret, signature) — earlier callers swapped the
+   * last two args, which made every signature check fail.
+   * Returns null when the signature is invalid or the secret is unset.
+   */
+  async verifyWebhook(requestBody: string, signatureHeader: string): Promise<any | null> {
     const secret = process.env.PADDLE_WEBHOOK_SECRET || '';
+    if (!secret) return null;
     try {
-      return this.client.webhooks.unmarshal(requestBody, signatureHeader, secret);
+      return await this.client.webhooks.unmarshal(requestBody, secret, signatureHeader);
     } catch {
       return null;
     }

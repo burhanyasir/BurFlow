@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import Database from 'better-sqlite3';
+import type { SqlDatabase } from '@conversation-engine/saas-core';
 import { createLogger } from '@conversation-engine/logger';
 
 const logger = createLogger('saas-api:health');
@@ -7,7 +7,7 @@ const logger = createLogger('saas-api:health');
 const SERVICE_NAME = 'saas-api';
 const APP_VERSION = process.env.APP_VERSION || '1.0.0';
 
-function checkDatabase(db: Database.Database): { connected: boolean; latencyMs: number; error?: string } {
+function checkDatabase(db: SqlDatabase): { connected: boolean; latencyMs: number; error?: string } {
   const start = performance.now();
   try {
     db.prepare('SELECT 1').get();
@@ -24,7 +24,7 @@ function checkDatabase(db: Database.Database): { connected: boolean; latencyMs: 
  *  - GET /ready   → readiness: verifies database connectivity, 200/503
  *  - GET /live    → Kubernetes-style liveness alias
  */
-export function createHealthRoutes(db: Database.Database): Router {
+export function createHealthRoutes(db: SqlDatabase): Router {
   const router = Router();
   const startedAt = Date.now();
 

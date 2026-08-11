@@ -4,13 +4,15 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { join } from 'path';
 import {
-  createDatabase, UserRepository, TenantRepository, ApiKeyRepository,
+  createPrimaryDatabase, assertSaaSMigrationsApplied, isPostgresDatabase,
+  type SqlDatabase,
+  UserRepository, TenantRepository, ApiKeyRepository,
   ConversationRepository, MessageRepository, UsageRepository,
   KnowledgeBaseRepository, KbDocumentRepository, OnboardingProgressRepository,
   WidgetConfigRepository, RefreshTokenRepository, AnalyticsRepository,
   generateId,
   SubscriptionRepository, InvoiceRepository, PaymentRepository,
-  BillingEventRepository,
+  BillingEventRepository, PaddleCustomerRepository,
   UnansweredQuestionRepository, UnansweredQuestionClusterRepository,
   KnowledgeSuggestionRepository, CitationAnalyticsRepository,
   ConversationInsightsRepository,
@@ -51,7 +53,8 @@ import { createAdminRoutes } from './routes/admin';
 import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
 import { createAuditRoutes } from './routes/audit';
-import { createWebhookRoutes, createStripeWebhookRoutes } from './routes/webhooks';
+import { createWebhookRoutes } from './routes/webhooks';
+import { createPaddleWebhookRoutes } from './routes/paddle-webhooks';
 import { createWhatsAppRoutes } from './routes/whatsapp';
 import { WhatsAppClient } from '@conversation-engine/saas-core';
 import { createTrustRoutes } from './routes/trust';
@@ -85,6 +88,7 @@ const REQUIRED_ENV_VARS: { key: string; purpose: string }[] = [
 // In production, APP_URL and PIPELINE_URL are required
 if (NODE_ENV === 'production') {
   REQUIRED_ENV_VARS.push(
+    { key: 'DATABASE_URL', purpose: 'PostgreSQL connection string (production uses Neon; the app refuses to fall back to SQLite)' },
     { key: 'APP_URL', purpose: 'Public URL for email links and webhook redirects (no localhost fallback in production)' },
     { key: 'PIPELINE_URL', purpose: 'Internal URL for pipeline-orchestrator sync (no localhost fallback in production)' },
     { key: 'PADDLE_API_KEY', purpose: 'Paddle payment processing' },
@@ -93,8 +97,11 @@ if (NODE_ENV === 'production') {
     { key: 'INTERNAL_SYNC_KEY', purpose: 'Secure sync between API and pipeline services' },
     { key: 'SENDGRID_API_KEY', purpose: 'Sending auth emails (signup, password reset, verification)' },
     { key: 'PADDLE_PRICE_STARTER_MONTHLY', purpose: 'Paddle price ID for Starter plan monthly billing' },
-    { key: 'PADDLE_PRICE_PROFESSIONAL_MONTHLY', purpose: 'Paddle price ID for Professional plan monthly billing' },
-    { key: 'PADDLE_PRICE_ENTERPRISE_MONTHLY', purpose: 'Paddle price ID for Enterprise plan monthly billing' },
+    { key: 'PADDLE_PRICE_STARTER_YEARLY', purpose: 'Paddle price ID for Starter plan yearly billing' },
+    { key: 'PADDLE_PRICE_PRO_MONTHLY', purpose: 'Paddle price ID for Pro plan monthly billing' },
+    { key: 'PADDLE_PRICE_PRO_YEARLY', purpose: 'Paddle price ID for Pro plan yearly billing' },
+    { key: 'PADDLE_PRICE_ADVANCED_MONTHLY', purpose: 'Paddle price ID for Advanced plan monthly billing' },
+    { key: 'PADDLE_PRICE_ADVANCED_YEARLY', purpose: 'Paddle price ID for Advanced plan yearly billing' },
   );
 }
 
@@ -164,7 +171,53 @@ if (isNaN(PORT) || PORT < 1 || PORT > 65535) {
 }
 
 import Database from 'better-sqlite3';
-const db: Database.Database = createDatabase(DB_PATH);
+const DATABASE_URL = process.env.DATABASE_URL;
+const KNOWLEDGE_DB_PATH = process.env.KNOWLEDGE_DB_PATH || join(__dirname, '..', '..', '..', 'data', 'knowledge-saas.db');
+
+/**
+ * Database selection (documented precedence):
+ *   - DATABASE_URL set  → PostgreSQL via `PgDatabase` (the sync worker bridge
+ *     over `pg`). This is the production/Neon path. The schema must already be
+ *     migrated with `npm run db:migrate` — the app NEVER auto-migrates on
+ *     boot, and if the schema is missing it fails clearly instead of silently
+ *     falling back to SQLite (which could write production traffic to the
+ *     wrong database).
+ *   - otherwise → SQLite at DATABASE_PATH / DB_PATH (local/test fallback).
+ * Exactly one backend is ever active; DATABASE_URL always wins.
+ */
+function createSaaSDatabase(): SqlDatabase {
+  const db = createPrimaryDatabase({
+    databaseUrl: DATABASE_URL,
+    sqlitePath: DB_PATH,
+    nodeEnv: NODE_ENV,
+  });
+  try {
+    // Explicit deployment gate: the app never auto-migrates. If PostgreSQL is
+    // the active backend and migration 001 is missing, fail clearly instead of
+    // mutating the production schema on boot.
+    assertSaaSMigrationsApplied(db);
+  } catch (err) {
+    db.close();
+    throw err;
+  }
+  return db;
+}
+
+/**
+ * The knowledge pipeline stores (vector store, knowledge store, queue) are
+ * SQLite-only (BLOB embeddings, INSERT OR REPLACE). When the primary SaaS db
+ * is PostgreSQL they live on a dedicated SQLite file so the pipeline keeps
+ * working while SaaS data lives in Postgres.
+ */
+function createKnowledgePipelineDb(): SqlDatabase {
+  const sqlite = new Database(KNOWLEDGE_DB_PATH);
+  sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('busy_timeout = 5000');
+  sqlite.pragma('foreign_keys = ON');
+  return sqlite;
+}
+
+const db: SqlDatabase = createSaaSDatabase();
 const userRepo = new UserRepository(db);
 const tenantRepo = new TenantRepository(db);
 const apiKeyRepo = new ApiKeyRepository(db);
@@ -181,6 +234,7 @@ const subRepo = new SubscriptionRepository(db);
 const invoiceRepo = new InvoiceRepository(db);
 const paymentRepo = new PaymentRepository(db);
 const eventRepo = new BillingEventRepository(db);
+const customerRepo = new PaddleCustomerRepository(db);
 const unansweredRepo = new UnansweredQuestionRepository(db);
 const clusterRepo = new UnansweredQuestionClusterRepository(db);
 const suggestionRepo = new KnowledgeSuggestionRepository(db);
@@ -237,14 +291,18 @@ app.use(helmet({
 app.use(cors({ origin: CORS_ORIGIN === false ? false : (CORS_ORIGIN || false), credentials: true }));
 app.use(compression() as any);
 // Raw body parser for webhook signature verification (must come before json parser)
-app.use('/api/webhooks/stripe', express.raw({ type: 'application/json' }));
-app.use(express.json({ limit: MAX_BODY_SIZE }));
+app.use('/api/webhooks/paddle', express.raw({ type: 'application/json' }));
+app.use(express.json({ limit: MAX_BODY_SIZE, verify: (req, _res, buf) => { (req as any).rawBody = buf; } }));
 
 // ─── Global Rate Limiting ──────────────────────────────────────
+// Dashboard polling hits /api/admin/* every 15s; it gets its own dedicated,
+// higher-capacity limiter below, so the public widget budget never collides
+// with admin dashboard traffic (the source of spurious 429s).
 const globalRateLimit = createRateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: RATE_LIMIT_MAX,
   keyFn: (req) => req.ip || 'unknown',
+  skip: (req) => req.path.startsWith('/api/admin'),
 });
 app.use(globalRateLimit);
 
@@ -414,15 +472,20 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantG
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
 }, sessionHandoff, unansweredRepo, widgetConfigRepo));
-app.use('/api/webhooks/stripe', createStripeWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo }));
+// Paddle is the sole billing provider — there is no Stripe webhook route.
+app.use('/api/webhooks/paddle', createPaddleWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, customerRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));
+// Dedicated admin limiter: the dashboard polls sessions + analytics every 15s
+// (≈8 req/min per tenant); 300 req/min/IP leaves ample headroom without
+// exposing admin routes to public traffic.
+app.use('/api/admin', createRateLimit({ windowMs: 60_000, max: 300 }));
 app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo));
 
 // Customer Activation routes
 app.use('/api/admin', auth, tenantGuard, createActivationRoutes(
   unansweredRepo, clusterRepo, suggestionRepo, citationRepo, insightsRepo,
-  tenantRepo, usageRepo, subRepo, conversationRepo,
+  tenantRepo, usageRepo, subRepo, conversationRepo, messageRepo,
 ));
 
 // Website Scanner routes
@@ -441,6 +504,7 @@ app.use('/api/agency', auth, tenantGuard, createAgencyRoutes({
 // Knowledge pipeline routes (protected)
 const knowledgeDeps = {
   db,
+  knowledgeDb: isPostgresDatabase(db) ? createKnowledgePipelineDb() : undefined,
   embeddingApiKey: process.env.OPENAI_API_KEY,
   embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '128', 10),
   unansweredRepo,

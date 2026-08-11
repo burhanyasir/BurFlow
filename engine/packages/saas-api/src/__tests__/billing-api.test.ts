@@ -8,11 +8,14 @@ import {
   ConversationRepository, UsageRepository,
   KnowledgeBaseRepository, KbDocumentRepository, SubscriptionRepository,
   InvoiceRepository, PaymentRepository, BillingEventRepository,
+  PaddleCustomerRepository,
 } from '@conversation-engine/saas-core';
 import { authMiddleware } from '../middleware/auth';
 import { requireTenant } from '../middleware/tenant';
 import { createAuthRoutes } from '../routes/auth';
 import { createBillingRoutes } from '../routes/billing';
+import { createPaddleWebhookRoutes } from '../routes/paddle-webhooks';
+import express from 'express';
 
 // ─── Test Setup ───────────────────────────────────────────
 
@@ -31,7 +34,31 @@ let subRepo: SubscriptionRepository;
 let invoiceRepo: InvoiceRepository;
 let paymentRepo: PaymentRepository;
 let eventRepo: BillingEventRepository;
+let customerRepo: PaddleCustomerRepository;
 let app: express.Express;
+let paddleApp: express.Express;
+
+// The next event the stubbed Paddle client should verify/return.
+let paddleNextEvent: any = null;
+
+function makePaddleApp() {
+  const a = express();
+  // Raw body MUST come before the JSON parser so signatures verify the bytes.
+  a.use('/api/webhooks/paddle', express.raw({ type: 'application/json' }));
+  a.use(express.json({ limit: '10mb' }));
+  const stubClient = {
+    verifyWebhook: async () => paddleNextEvent,
+  };
+  a.use('/api/webhooks/paddle', createPaddleWebhookRoutes(
+    { subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, customerRepo },
+    { client: stubClient as any, webhookSecret: 'test-paddle-secret' },
+  ));
+  return a;
+}
+
+function makePaddleEvent(eventType: string, data: any, eventId = `evt-${Math.random().toString(36).slice(2)}`) {
+  return { eventId, eventType, occurredAt: new Date().toISOString(), data };
+}
 
 function makeApp() {
   const a = express();
@@ -46,12 +73,12 @@ function makeApp() {
   return a;
 }
 
-async function request(method: string, path: string, body?: any, token?: string) {
+async function requestOn(targetApp: express.Express, method: string, path: string, body?: any, token?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   return new Promise<{ status: number; body: any }>((resolve) => {
     const http = require('http');
-    const server = app.listen(0, () => {
+    const server = targetApp.listen(0, () => {
       const port = (server.address() as any).port;
       const r = http.request({ hostname: '127.0.0.1', port, path, method, headers }, (res: any) => {
         let data = '';
@@ -62,6 +89,31 @@ async function request(method: string, path: string, body?: any, token?: string)
         });
       });
       if (body) r.write(JSON.stringify(body));
+      r.end();
+    });
+  });
+}
+
+async function request(method: string, path: string, body?: any, token?: string) {
+  return requestOn(app, method, path, body, token);
+}
+
+async function paddleRequest(body: any, signature?: string) {
+  return new Promise<{ status: number; body: any }>((resolve) => {
+    const http = require('http');
+    const server = paddleApp.listen(0, () => {
+      const port = (server.address() as any).port;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (signature) headers['paddle-signature'] = signature;
+      const r = http.request({ hostname: '127.0.0.1', port, path: '/api/webhooks/paddle', method: 'POST', headers }, (res: any) => {
+        let data = '';
+        res.on('data', (c: string) => data += c);
+        res.on('end', () => {
+          server.close();
+          resolve({ status: res.statusCode, body: data ? JSON.parse(data) : null });
+        });
+      });
+      r.write(JSON.stringify(body));
       r.end();
     });
   });
@@ -82,6 +134,7 @@ async function freshTenant(): Promise<{ token: string; tenantId: string }> {
 let tenantAToken: string;
 let tenantAId: string;
 let tenantBToken: string;
+let tenantBId: string;
 
 beforeAll(async () => {
   if (existsSync(TEST_DB)) rmSync(TEST_DB);
@@ -97,7 +150,9 @@ beforeAll(async () => {
   invoiceRepo = new InvoiceRepository(db);
   paymentRepo = new PaymentRepository(db);
   eventRepo = new BillingEventRepository(db);
+  customerRepo = new PaddleCustomerRepository(db);
   app = makeApp();
+  paddleApp = makePaddleApp();
 
   const tenantA = await signupTenant('billing-a@test.com', 'Billing Corp A');
   tenantAToken = tenantA.token;
@@ -105,6 +160,7 @@ beforeAll(async () => {
 
   const tenantB = await signupTenant('billing-b@test.com', 'Billing Corp B');
   tenantBToken = tenantB.token;
+  tenantBId = tenantB.tenantId;
 });
 
 afterAll(() => {
@@ -120,19 +176,22 @@ describe('Billing plans', () => {
     expect(res.status).toBe(401);
   });
 
-  it('lists configured plans with limits', async () => {
+  it('lists the Paddle catalog (free/starter/pro/advanced) with price ids', async () => {
     const res = await request('GET', '/api/billing/plans', undefined, tenantAToken);
     expect(res.status).toBe(200);
     const ids = res.body.plans.map((p: any) => p.id);
-    expect(ids).toContain('free');
-    expect(ids).toContain('starter');
-    expect(ids).toContain('professional');
-    expect(ids).toContain('enterprise');
+    expect(ids).toEqual(['free', 'starter', 'pro', 'advanced']);
+    expect(res.body.trialDays).toBe(7);
     const free = res.body.plans.find((p: any) => p.id === 'free');
     expect(free.limits.conversationLimit).toBeGreaterThan(0);
     const starter = res.body.plans.find((p: any) => p.id === 'starter');
-    expect(starter.price).toBeGreaterThan(0);
-    expect(starter.stripePriceId).toBeDefined();
+    expect(starter.price).toBe(10);
+    expect(starter.priceYearly).toBe(100);
+    expect(starter.paddlePriceIds.monthly).toBeDefined();
+    expect(starter.paddlePriceIds.yearly).toBeDefined();
+    const advanced = res.body.plans.find((p: any) => p.id === 'advanced');
+    expect(advanced.price).toBe(120);
+    expect(advanced.priceYearly).toBe(1200);
   });
 });
 
@@ -221,17 +280,11 @@ describe('Billing usage metrics', () => {
 // ─── Checkout & Plan Changes ──────────────────────────────
 
 describe('Billing checkout and plan changes', () => {
-  it('rejects an invalid plan', async () => {
+  it('discontinues the server-side checkout route (Paddle-only overlay checkout)', async () => {
     const fresh = await freshTenant();
     const res = await request('POST', '/api/billing/checkout', { plan: 'ultra' }, fresh.token);
-    expect(res.status).toBe(400);
-  });
-
-  it('rejects checkout when no Paddle price ID is configured', async () => {
-    const fresh = await freshTenant();
-    const res = await request('POST', '/api/billing/checkout', { plan: 'professional' }, fresh.token);
-    expect(res.status).toBe(400);
-    expect(res.body.error).toContain('Plan not available for checkout');
+    expect(res.status).toBe(410);
+    expect(res.body.error).toContain('Paddle');
   });
 
   it('rejects change-plan when no subscription exists', async () => {
@@ -273,12 +326,12 @@ describe('Billing lifecycle', () => {
     expect(tenantRepo.findById(fresh.tenantId)!.subscriptionStatus).toBe('active');
   });
 
-  it('returns 400 for manage without a Paddle subscription', async () => {
+  it('returns 400 for manage without a Paddle customer', async () => {
     const fresh = await freshTenant();
     subRepo.init(fresh.tenantId, 'free');
     const res = await request('POST', '/api/billing/manage', {}, fresh.token);
     expect(res.status).toBe(400);
-    expect(res.body.error).toContain('No Stripe subscription');
+    expect(res.body.error).toContain('No Paddle customer');
   });
 });
 
@@ -313,5 +366,145 @@ describe('Billing payment history', () => {
     expect(other.status).toBe(200);
     expect(other.body.invoices).toHaveLength(0);
     expect(other.body.payments).toHaveLength(0);
+  });
+});
+
+// ─── Paddle Webhook ────────────────────────────────────────
+
+describe('Paddle webhook', () => {
+  it('rejects a request with no paddle-signature header', async () => {
+    paddleNextEvent = null;
+    const res = await paddleRequest({ event_id: 'evt-missing' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('paddle-signature');
+  });
+
+  it('rejects a request whose signature fails verification', async () => {
+    paddleNextEvent = null; // stub returns null ⇒ verification failure
+    const res = await paddleRequest({ event_id: 'evt-bad-sig' }, 'ts=1;h1=fakesignature');
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe('Invalid signature');
+  });
+
+  it('fulfills subscription.created: upserts subscription, tenant, and customer', async () => {
+    const subId = 'sub_01testcreated';
+    const custId = 'cus_01testcreated';
+    const now = new Date().toISOString();
+    paddleNextEvent = makePaddleEvent('subscription.created', {
+      id: subId,
+      status: 'active',
+      customerId: custId,
+      currencyCode: 'USD',
+      currentBillingPeriod: { startsAt: now, endsAt: new Date(Date.now() + 30 * 86400000).toISOString() },
+      items: [{
+        price: { id: 'pri_01testcreated', productId: 'pro_01testcreated' },
+        trialDates: { startsAt: now, endsAt: new Date(Date.now() + 7 * 86400000).toISOString() },
+      }],
+      customData: { tenantId: tenantAId },
+    });
+
+    const res = await paddleRequest({ id: 'notification-1' }, 'ts=1;h1=sig');
+    expect(res.status).toBe(200);
+    expect(res.body.received).toBe(true);
+
+    const sub = subRepo.findByTenant(tenantAId)!;
+    expect(sub.paddleSubscriptionId).toBe(subId);
+    expect(sub.paddleCustomerId).toBe(custId);
+    expect(sub.paddlePriceId).toBe('pri_01testcreated');
+    expect(sub.paddleProductId).toBe('pro_01testcreated');
+    expect(sub.status).toBe('active');
+    expect(sub.trialEnd).toBeTruthy();
+    expect(sub.currentPeriodEnd).toBeTruthy();
+    expect(tenantRepo.findById(tenantAId)!.paddleCustomerId).toBe(custId);
+
+    const customer = customerRepo.findById(custId);
+    expect(customer).toBeTruthy();
+    expect(customer!.tenantId).toBe(tenantAId);
+
+    // Event recorded exactly once.
+    const events = eventRepo.listByTenant(tenantAId).events;
+    expect(events.filter(e => e.eventType === 'subscription.created')).toHaveLength(1);
+  });
+
+  it('is idempotent: the same event id is not processed twice', async () => {
+    const subId = 'sub_01idem';
+    const event = makePaddleEvent('subscription.updated', {
+      id: subId,
+      status: 'trialing',
+      customerId: 'cus_01idem',
+      currentBillingPeriod: { startsAt: new Date().toISOString(), endsAt: new Date().toISOString() },
+      items: [{ price: { id: 'pri_01idem' } }],
+      customData: { tenantId: tenantAId },
+    }, 'evt-idem');
+    paddleNextEvent = event;
+    await paddleRequest({}, 'ts=1;h1=sig');
+
+    const before = eventRepo.findByPaddleEventId('evt-idem');
+    paddleNextEvent = event;
+    const second = await paddleRequest({}, 'ts=1;h1=sig');
+    expect(second.body.duplicate).toBe(true);
+    expect(eventRepo.findByPaddleEventId('evt-idem')).toEqual(before);
+  });
+
+  it('upserts a customer from customer.created', async () => {
+    const custId = 'cus_01created';
+    paddleNextEvent = makePaddleEvent('customer.created', {
+      id: custId,
+      email: 'paddle-buyer@test.com',
+      name: 'Paddle Buyer',
+      customData: { tenantId: tenantBId },
+    });
+    const res = await paddleRequest({}, 'ts=1;h1=sig');
+    expect(res.status).toBe(200);
+    const customer = customerRepo.findById(custId);
+    expect(customer).toBeTruthy();
+    expect(customer!.email).toBe('paddle-buyer@test.com');
+    expect(customer!.tenantId).toBe(tenantBId);
+    expect(tenantRepo.findById(tenantBId)!.paddleCustomerId).toBe(custId);
+  });
+
+  it('records invoice + payment from transaction.completed (minor units → dollars)', async () => {
+    const now = new Date().toISOString();
+    const txId = 'txn_01completed';
+    paddleNextEvent = makePaddleEvent('transaction.completed', {
+      id: txId,
+      status: 'completed',
+      customerId: 'cus_01completed',
+      subscriptionId: 'sub_01completed',
+      invoiceId: 'inv_01completed',
+      currencyCode: 'USD',
+      details: { totals: { grandTotal: 4000 } },
+      billingPeriod: { startsAt: now, endsAt: now },
+      billedAt: now,
+      createdAt: now,
+      customData: { tenantId: tenantAId },
+    });
+
+    const res = await paddleRequest({}, 'ts=1;h1=sig');
+    expect(res.status).toBe(200);
+
+    const invoice = invoiceRepo.findByPaddleInvoiceId('inv_01completed');
+    expect(invoice).toBeTruthy();
+    expect(invoice!.amount).toBe(40); // 4000 minor units / 100
+    expect(invoice!.status).toBe('paid');
+
+    const payments = paymentRepo.findByTenant(tenantAId).payments;
+    const payment = payments.find(p => p.paddlePaymentId === `${txId}-payment`);
+    expect(payment).toBeTruthy();
+    expect(payment!.amount).toBe(40);
+  });
+
+  it('skips transaction.completed when the tenant cannot be resolved', async () => {
+    paddleNextEvent = makePaddleEvent('transaction.completed', {
+      id: 'txn_orphan',
+      status: 'completed',
+      customerId: 'cus_orphan',
+      details: { totals: { grandTotal: 1000 } },
+      customData: null,
+    });
+    const res = await paddleRequest({}, 'ts=1;h1=sig');
+    expect(res.status).toBe(200);
+    expect(res.body.tenantResolved).toBe(false);
+    expect(invoiceRepo.findByPaddleInvoiceId('txn_orphan')).toBeNull();
   });
 });

@@ -197,7 +197,9 @@ export default function DashboardPage() {
     return Math.round(sessions.reduce((sum, s: any) => sum + (s.confidence || 0), 0) / sessions.length);
   }, [sessions]);
 
-  const resolutionRate = analyticsData ? Math.round((analyticsData.qualificationCompletionRate || 0) * 100) : 0;
+  // qualificationCompletionRate is already a 0-100 percentage (matches the
+  // AnalyticsResponse contract); multiplying by 100 inflated it 100x.
+  const resolutionRate = analyticsData ? Math.round(analyticsData.qualificationCompletionRate || 0) : 0;
 
   const indexedDocs = monitoring?.indexedDocuments || 0;
   const totalDocs = monitoring?.totalDocuments || 0;

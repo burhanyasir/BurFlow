@@ -29,7 +29,7 @@ import { KnowledgeAdminStore } from './knowledge-admin-store';
 import { createKnowledgeAdminRouter } from './knowledge-admin-api';
 import { KnowledgeWorker } from './knowledge-worker';
 import { KnowledgeRetriever } from '@conversation-engine/knowledge-pipeline';
-import { createDatabase, UserRepository, TenantRepository, generateToken, generateVerificationToken, comparePassword, WebsiteScanRepository, ScannedPageRepository, KnowledgeBaseRepository, KbDocumentRepository, KbChunkRepository } from '@conversation-engine/saas-core';
+import { createPrimaryDatabase, assertSaaSMigrationsApplied, UserRepository, TenantRepository, generateToken, generateVerificationToken, comparePassword, WebsiteScanRepository, ScannedPageRepository, KnowledgeBaseRepository, KbDocumentRepository, KbChunkRepository } from '@conversation-engine/saas-core';
 import { createWebsiteScanScheduler } from './scheduler';
 
 const logger = createLogger('pipeline-orchestrator');
@@ -720,8 +720,18 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is required. Refusing to start without a secure signing key.');
 }
-const authDbPath = join(DATA_DIR, 'saas.db');
-const authDb = createDatabase(authDbPath);
+// Primary SaaS database — SAME selection as saas-api so both services talk to
+// one database (DATABASE_URL → PostgreSQL/Neon; otherwise SQLite fallback).
+// This prevents split-brain where the orchestrator duplicated SaaS state into
+// its own SQLite saas.db. Genuinely internal stores (tenant-registry, sessions,
+// dedup, knowledge/vector) stay on SQLite below.
+const authDb = createPrimaryDatabase({
+  databaseUrl: process.env.DATABASE_URL,
+  sqlitePath: join(DATA_DIR, 'saas.db'),
+  nodeEnv: process.env.NODE_ENV,
+});
+// Never auto-migrate: fail loudly if the PostgreSQL database is not migrated.
+assertSaaSMigrationsApplied(authDb);
 const userRepo = new UserRepository(authDb);
 const tenantRepo = new TenantRepository(authDb);
 
