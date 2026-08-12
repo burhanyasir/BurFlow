@@ -18,7 +18,9 @@ RUN apk add --no-cache python3 make g++
 
 # Install dependencies first for optimal layer caching
 COPY package.json package-lock.json ./
-COPY packages packages/
+# Root TypeScript configs: `npm run build:all` runs `tsc -b` from the root
+# (requires tsconfig.json) and every package tsconfig extends tsconfig.base.json
+COPY tsconfig.json tsconfig.base.json ./
 # Migration SQL + CLI runners ship in the image so deployments can run
 # `npm run db:migrate` as an explicit step (the app never auto-migrates).
 COPY migrations migrations/
