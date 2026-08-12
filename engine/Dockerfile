@@ -25,8 +25,8 @@ COPY tsconfig.json tsconfig.base.json ./
 # Migration SQL + CLI runners ship in the image so deployments can run
 # `npm run db:migrate` as an explicit step (the app never auto-migrates).
 COPY migrations migrations/
-COPY scripts scripts/
 RUN npm ci
+COPY scripts scripts/
 
 # Compile TypeScript across all workspaces (saas-core, saas-api,
 # conversation-orchestrator, widget, pipeline stages, ...)
