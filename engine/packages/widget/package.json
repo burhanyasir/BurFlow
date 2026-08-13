@@ -6,10 +6,11 @@
   "types": "src/index.ts",
   "browser": "dist/widget.js",
   "scripts": {
-    "build": "tsc && esbuild --bundle --target=es2022 --format=iife --minify --sourcemap --outfile=dist/widget.js src/index.ts",
+    "build": "tsc && npx esbuild --bundle --target=es2022 --format=iife --minify --sourcemap --outfile=dist/widget.js src/index.ts",
     "test": "vitest run"
   },
   "devDependencies": {
+    "esbuild": "^0.21.5",
     "vitest": "^2.0.0"
   }
 }
