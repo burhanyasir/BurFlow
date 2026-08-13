@@ -9,12 +9,18 @@ declare global {
 const SCRIPT_ID = 'burflow-widget-script';
 const STYLE_ID = 'burflow-widget-styles';
 
+// Default to the seeded SaaS demo tenant so the widget appears on the landing
+// page immediately, with no per-deployment configuration. Override via
+// VITE_WIDGET_TENANT_ID in .env.production/.env.development.
+const DEFAULT_TENANT_ID = 'burflow-saas';
+
 export function WidgetLauncher() {
   useEffect(() => {
     // Tokenless bootstrap: the widget exchanges the public tenant id for a
     // fresh widget token at runtime. Configure via .env.development:
     //   VITE_WIDGET_TENANT_ID=<tenant id or slug>
-    const tenantId = import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined;
+    const tenantId =
+      (import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined) || DEFAULT_TENANT_ID;
     const apiUrl = (import.meta.env.VITE_WIDGET_API_URL as string | undefined) || '';
     if (!tenantId || document.getElementById(SCRIPT_ID)) return;
 
