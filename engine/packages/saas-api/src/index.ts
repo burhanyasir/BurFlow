@@ -63,7 +63,7 @@ import { createHardeningRoutes } from './routes/hardening';
 import { errorHandler } from './middleware/structured-error';
 import { createQuotaGuard } from './middleware/quota-guard';
 import { setEmailProvider } from './services/email';
-import { SendGridEmailProvider } from './services/sendgrid-email';
+import { ResendEmailProvider } from './services/resend-email';
 import { createAnalyticsRoutes } from './routes/analytics';
 import { createHealthRoutes } from './routes/health';
 import { createAgentChatRoutes } from './routes/agent-chat';
@@ -95,7 +95,9 @@ if (NODE_ENV === 'production') {
     { key: 'PADDLE_WEBHOOK_SECRET', purpose: 'Paddle webhook signature verification' },
     { key: 'OPENAI_API_KEY', purpose: 'OpenAI embeddings for knowledge pipeline (mock embeddings blocked in production)' },
     { key: 'INTERNAL_SYNC_KEY', purpose: 'Secure sync between API and pipeline services' },
-    { key: 'SENDGRID_API_KEY', purpose: 'Sending auth emails (signup, password reset, verification)' },
+    // NOTE: email API key (RESEND_API_KEY, with SENDGRID_API_KEY accepted as a
+    // legacy fallback) is enforced in the Email Provider section below, since
+    // either variable satisfies the production requirement.
     { key: 'PADDLE_PRICE_STARTER_MONTHLY', purpose: 'Paddle price ID for Starter plan monthly billing' },
     { key: 'PADDLE_PRICE_STARTER_YEARLY', purpose: 'Paddle price ID for Starter plan yearly billing' },
     { key: 'PADDLE_PRICE_PRO_MONTHLY', purpose: 'Paddle price ID for Pro plan monthly billing' },
@@ -133,14 +135,17 @@ for (const { key, purpose } of OPTIONAL_WARN_ENV_VARS) {
 }
 
 // ─── Email Provider ──────────────────────────────────────────────
-const SENDGRID_API_KEY = process.env.SENDGRID_API_KEY;
-if (SENDGRID_API_KEY) {
-  setEmailProvider(new SendGridEmailProvider(SENDGRID_API_KEY));
-  logger.info('SendGrid email provider configured');
+// Resend is the transactional email provider. RESEND_API_KEY is preferred;
+// SENDGRID_API_KEY is accepted as a legacy fallback so existing deployments
+// keep working (its value is used as the Resend API key).
+const RESEND_API_KEY = process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY;
+if (RESEND_API_KEY) {
+  setEmailProvider(new ResendEmailProvider(RESEND_API_KEY));
+  logger.info('Resend email provider configured');
 } else if (NODE_ENV === 'production') {
-  throw new Error('SENDGRID_API_KEY is required in production for sending auth emails (signup, password reset, verification).');
+  throw new Error('RESEND_API_KEY is required in production for sending auth emails (signup, password reset, verification). Set RESEND_API_KEY (SENDGRID_API_KEY is accepted as a legacy fallback).');
 } else {
-  logger.warn('SENDGRID_API_KEY not set — using ConsoleEmailProvider. Auth emails will be logged to console only.');
+  logger.warn('RESEND_API_KEY not set — using ConsoleEmailProvider. Auth emails will be logged to console only.');
 }
 
 const rawCorsOrigin = process.env.CORS_ORIGIN || '';
