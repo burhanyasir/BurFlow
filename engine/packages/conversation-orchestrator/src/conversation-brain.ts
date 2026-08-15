@@ -1781,17 +1781,31 @@ import Groq from 'groq-sdk';
 // provider fails or returns unparseable output, the brain degrades to the
 // heuristic template engine instead of erroring to the visitor.
 
-export type BrainProvider = 'GROQ' | 'GROK' | 'ANTHROPIC' | 'HEURISTIC_FALLBACK';
+export type BrainProvider = 'GROQ' | 'GROK' | 'OPENROUTER' | 'ANTHROPIC' | 'HEURISTIC_FALLBACK';
 
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
-const GROK_MODEL = 'grok-2-latest';
+const GROK_MODEL = process.env.GROK_MODEL || 'grok-2-latest';
+const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || 'openai/gpt-4o-mini';
 const ANTHROPIC_MODEL = 'claude-3-haiku-20240307';
 
+/**
+ * Resolves the active brain provider. `LLM_PROVIDER` explicitly pins one of
+ * 'anthropic' | 'openrouter' | 'grok' (only honored when its API key is
+ * configured). When unset — or when the pinned provider has no key — the
+ * provider is auto-detected from whichever API keys are available:
+ * Groq → Grok/xAI → OpenRouter → Anthropic.
+ */
 export function resolveBrainProvider(): BrainProvider {
+  const explicit = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
+  if (explicit === 'anthropic' && process.env.ANTHROPIC_API_KEY) return 'ANTHROPIC';
+  if (explicit === 'openrouter' && process.env.OPENROUTER_API_KEY) return 'OPENROUTER';
+  if (explicit === 'grok' && (process.env.XAI_API_KEY || process.env.GROK_API_KEY)) return 'GROK';
   if (process.env.GROQ_API_KEY) return 'GROQ';
   if (process.env.XAI_API_KEY || process.env.GROK_API_KEY) return 'GROK';
+  if (process.env.OPENROUTER_API_KEY) return 'OPENROUTER';
   if (process.env.ANTHROPIC_API_KEY) return 'ANTHROPIC';
   return 'HEURISTIC_FALLBACK';
 }
@@ -1825,6 +1839,11 @@ const groqClient = process.env.GROQ_API_KEY
 
 // Provider 5: xAI Grok — OpenAI-compatible (fetch, no SDK dependency)
 const grokApiKey = process.env.XAI_API_KEY || process.env.GROK_API_KEY || null;
+
+// Provider: OpenRouter — OpenAI-compatible (fetch, no SDK dependency).
+// Endpoint https://openrouter.ai/api/v1/chat/completions; model configurable
+// via OPENROUTER_MODEL (defaults to openai/gpt-4o-mini).
+const openrouterApiKey = process.env.OPENROUTER_API_KEY || null;
 
 // Provider 6: Groq Account 2
 const groqClient2 = process.env.GROQ_API_KEY_2
@@ -1923,6 +1942,36 @@ async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropi
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
+async function callOpenRouter(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
+  if (!apiKey) throw new Error('OpenRouter not configured');
+  const response = await fetch(`${OPENROUTER_BASE_URL}/chat/completions`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+      // OpenRouter attribution headers (recommended by OpenRouter for
+      // traffic stats; APP_URL falls back to a generic referer).
+      'HTTP-Referer': process.env.APP_URL || 'https://burflow.ai',
+      'X-Title': 'BurFlow',
+    },
+    body: JSON.stringify({
+      model: OPENROUTER_MODEL,
+      max_tokens: 300,
+      messages: [
+        { role: 'system' as const, content: systemPrompt },
+        ...mapMessagesForOpenAI(messages),
+      ],
+    }),
+    signal,
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    throw new Error(`OpenRouter request failed (status=${response.status}): ${body.slice(0, 300)}`);
+  }
+  const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return data.choices?.[0]?.message?.content?.trim() || '';
+}
+
 const LLM_PROVIDER_TIMEOUT_MS = 3500;
 const LLM_GLOBAL_BUDGET_MS = 7000;
 
@@ -1946,14 +1995,31 @@ function withAbortTimeout<T>(call: (signal: AbortSignal) => Promise<T>, ms: numb
   });
 }
 
+function pinnedProviders(systemPrompt: string, messages: Anthropic.MessageParam[]): Array<{ name: string; configured: boolean; call: (signal: AbortSignal) => Promise<string> }> {
+  const explicit = (process.env.LLM_PROVIDER || '').trim().toLowerCase();
+  if (explicit === 'anthropic') {
+    return [{ name: 'Anthropic', configured: !!anthropicClient, call: (signal: AbortSignal) => callAnthropic(systemPrompt, messages, signal) }];
+  }
+  if (explicit === 'openrouter') {
+    return [{ name: 'OpenRouter', configured: !!openrouterApiKey, call: (signal: AbortSignal) => callOpenRouter(openrouterApiKey!, systemPrompt, messages, signal) }];
+  }
+  if (explicit === 'grok') {
+    return [{ name: 'Grok', configured: !!grokApiKey, call: (signal: AbortSignal) => callGrok(grokApiKey!, systemPrompt, messages, signal) }];
+  }
+  return [];
+}
+
 async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.MessageParam[]): Promise<string> {
-  // BurFlow Brain provider chain: configured providers are tried in preference
-  // order (Groq → xAI Grok → Anthropic → secondary accounts), capped at the
-  // first two CONFIGURED providers with a hard global budget so a single
-  // transient outage cannot stall a chat turn for tens of seconds.
-  const providers = [
+  // BurFlow Brain provider chain: an explicit LLM_PROVIDER pin is tried first,
+  // then the auto-detected chain (Groq → xAI Grok → OpenRouter → Anthropic →
+  // secondary accounts), deduped and capped at the first two CONFIGURED
+  // providers with a hard global budget so a single transient outage cannot
+  // stall a chat turn for tens of seconds.
+  const chain = [
+    ...pinnedProviders(systemPrompt, messages),
     { name: 'Groq', configured: !!groqClient, call: (signal: AbortSignal) => callGroq(groqClient!, systemPrompt, messages, signal) },
     { name: 'Grok', configured: !!grokApiKey, call: (signal: AbortSignal) => callGrok(grokApiKey!, systemPrompt, messages, signal) },
+    { name: 'OpenRouter', configured: !!openrouterApiKey, call: (signal: AbortSignal) => callOpenRouter(openrouterApiKey!, systemPrompt, messages, signal) },
     { name: 'Anthropic', configured: !!anthropicClient, call: (signal: AbortSignal) => callAnthropic(systemPrompt, messages, signal) },
     { name: 'Groq-2', configured: !!groqClient2, call: (signal: AbortSignal) => callGroq(groqClient2!, systemPrompt, messages, signal) },
     { name: 'Groq-3', configured: !!groqClient3, call: (signal: AbortSignal) => callGroq(groqClient3!, systemPrompt, messages, signal) },
@@ -1961,7 +2027,15 @@ async function callLLMWithFallback(systemPrompt: string, messages: Anthropic.Mes
     { name: 'Groq-5', configured: !!groqClient5, call: (signal: AbortSignal) => callGroq(groqClient5!, systemPrompt, messages, signal) },
     { name: 'Gemini-1', configured: !!geminiClient1, call: (signal: AbortSignal) => callGemini(geminiClient1!, systemPrompt, messages, signal) },
     { name: 'Gemini-2', configured: !!geminiClient2, call: (signal: AbortSignal) => callGemini(geminiClient2!, systemPrompt, messages, signal) },
-  ].filter(p => p.configured).slice(0, 2);
+  ];
+  const seen = new Set<string>();
+  const providers = chain
+    .filter(p => {
+      if (!p.configured || seen.has(p.name)) return false;
+      seen.add(p.name);
+      return true;
+    })
+    .slice(0, 2);
 
   const deadline = Date.now() + LLM_GLOBAL_BUDGET_MS;
   const failures: string[] = [];
@@ -2278,7 +2352,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
   // the LLM (upstream failure, unparseable output, or no LLM key configured). This
   // is the signal downstream consumers use to record knowledge-base gaps.
   let usedFallback = false;
-  if (anthropicClient || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
+  if (anthropicClient || openrouterApiKey || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
     try {
       const tenantIdForLLM = tenantId || 'default';
       const availableTopics = kbProvider?.getAvailableTopics(tenantIdForLLM) || [];
