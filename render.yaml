@@ -1,0 +1,107 @@
+# Render blueprint for BurFlow backend (one-click deploy)
+#
+# Deploy: push this file to the default branch, then in Render:
+#   New -> Blueprint -> select the repo -> Apply.
+# Render creates the web service below, runs the build, and starts the
+# production supervisor (migration -> pipeline-orchestrator :3456 + saas-api :$PORT).
+#
+# Secrets (marked `sync: false`) are NOT stored in the blueprint — Render asks
+# for them on first apply and keeps them in its encrypted secret store.
+#
+# After the app is live:
+#   1. Create the Paddle webhook in sandbox.paddle.com -> Developer Tools ->
+#      Notifications -> Add destination -> https://<app>.onrender.com/api/webhooks/paddle
+#      and copy its secret into PADDLE_WEBHOOK_SECRET below.
+#   2. Set frontend/vercel.json's rewrite to point at https://<app>.onrender.com
+#      and add VITE_PADDLE_CLIENT_TOKEN / VITE_PADDLE_ENV to the Vercel build env.
+
+services:
+  - type: web
+    name: burflow-api
+    runtime: node
+    plan: starter
+    rootDir: engine
+    buildCommand: npm ci && npm run build:all
+    startCommand: node scripts/start-prod.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+
+      # --- Database (Neon PostgreSQL) ---
+      - key: DATABASE_URL
+        sync: false
+
+      # --- Auth / security ---
+      - key: JWT_SECRET
+        sync: false
+      - key: WIDGET_SECRET
+        sync: false
+      - key: INTERNAL_SYNC_KEY
+        sync: false
+
+      # --- URLs / CORS ---
+      - key: APP_URL
+        value: https://bur-flow.vercel.app
+      - key: PIPELINE_URL
+        value: http://localhost:3456
+      - key: CORS_ORIGIN
+        value: https://bur-flow.vercel.app
+
+      # --- AI / LLM (real brain answers; at least one key required) ---
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: ""
+
+      # --- Email (Resend; optional until a verified domain exists) ---
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: BurFlow <onboarding@resend.dev>
+      - key: SALES_NOTIFY_EMAIL
+        sync: false
+
+      # --- Billing (Paddle — the only billing provider) ---
+      - key: PADDLE_ENVIRONMENT
+        value: sandbox
+      - key: PADDLE_API_KEY
+        sync: false
+      - key: PADDLE_WEBHOOK_SECRET
+        sync: false
+      # Price/product IDs — create with:
+      #   PADDLE_API_KEY=<key> node engine/scripts/provision-paddle-catalog.js
+      # (sandbox IDs are non-secret but left blank so the provisioner is the source)
+      - key: PADDLE_PRODUCT_STARTER
+        sync: false
+      - key: PADDLE_PRODUCT_PRO
+        sync: false
+      - key: PADDLE_PRODUCT_ADVANCED
+        sync: false
+      - key: PADDLE_PRICE_STARTER_MONTHLY
+        sync: false
+      - key: PADDLE_PRICE_STARTER_YEARLY
+        sync: false
+      - key: PADDLE_PRICE_PRO_MONTHLY
+        sync: false
+      - key: PADDLE_PRICE_PRO_YEARLY
+        sync: false
+      - key: PADDLE_PRICE_ADVANCED_MONTHLY
+        sync: false
+      - key: PADDLE_PRICE_ADVANCED_YEARLY
+        sync: false
+
+      # --- Knowledge pipeline (internal SQLite store; leave unset for default) ---
+      - key: KNOWLEDGE_DB_PATH
+        value: ""
