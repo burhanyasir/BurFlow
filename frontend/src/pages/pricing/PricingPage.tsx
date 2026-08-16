@@ -6,7 +6,7 @@ import { cn } from '../../utils/cn';
 
 const monthlyTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
-  { name: 'Starter', price: '$29', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 Knowledge Bases', '100 Documents', 'Email Support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
+  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 Knowledge Bases', '100 Documents', 'Email Support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
   { name: 'Professional', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 messages / mo', '10 Knowledge Bases', '500 Documents', 'Priority Support + Analytics'], cta: 'Start Free Trial', ctaVariant: 'primary' },
   { name: 'Enterprise', price: 'Custom', variant: 'enterprise', features: ['Unlimited messages', 'Unlimited Knowledge Bases', 'Unlimited Documents', 'Dedicated SLA & SSO'], cta: 'Contact Sales', ctaVariant: 'primary' }
 ];

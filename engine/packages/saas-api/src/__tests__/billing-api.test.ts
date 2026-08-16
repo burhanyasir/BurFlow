@@ -185,10 +185,13 @@ describe('Billing plans', () => {
     const free = res.body.plans.find((p: any) => p.id === 'free');
     expect(free.limits.conversationLimit).toBeGreaterThan(0);
     const starter = res.body.plans.find((p: any) => p.id === 'starter');
-    expect(starter.price).toBe(10);
-    expect(starter.priceYearly).toBe(100);
+    expect(starter.price).toBe(49);
+    expect(starter.priceYearly).toBe(470);
     expect(starter.paddlePriceIds.monthly).toBeDefined();
     expect(starter.paddlePriceIds.yearly).toBeDefined();
+    const pro = res.body.plans.find((p: any) => p.id === 'pro');
+    expect(pro.price).toBe(99);
+    expect(pro.priceYearly).toBe(950);
     const advanced = res.body.plans.find((p: any) => p.id === 'advanced');
     expect(advanced.price).toBe(120);
     expect(advanced.priceYearly).toBe(1200);

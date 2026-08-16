@@ -84,7 +84,7 @@ const DEMOS = [
         section: 'Pricing',
         content: [
           'Free: $0/month — 100 messages per month, 1 site scan, community support.',
-          'Starter: $29/month — 1,000 messages per month, 3 site scans, email support.',
+          'Starter: $49/month — 1,000 messages per month, 3 site scans, email support.',
           'Professional: $99/month — 10,000 messages per month, unlimited scans, priority support. This is the most popular plan.',
           'Enterprise: custom pricing — unlimited usage, SSO and SLA, dedicated onboarding. Contact the sales team.',
           'You can start any paid plan with a free 14-day trial, no credit card required. All plans include the AI widget, knowledge base, and live observer.',

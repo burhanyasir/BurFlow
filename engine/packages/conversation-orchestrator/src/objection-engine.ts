@@ -77,7 +77,7 @@ export function handleObjection(message: string): ObjectionResult {
       isObjection: true,
       category: 'competition',
       groundedAnswer:
-        "Unlike raw ChatGPT wrappers which hallucinate facts, Conversation Engine strictly grounds every answer in your official docs with exact source citations. And unlike legacy platforms that charge steep per-resolution fees, we offer predictable flat monthly plans ($29–$99/mo) with 10-minute setup.",
+        "Unlike raw ChatGPT wrappers which hallucinate facts, Conversation Engine strictly grounds every answer in your official docs with exact source citations. And unlike legacy platforms that charge steep per-resolution fees, we offer predictable flat monthly plans ($49–$99/mo) with 10-minute setup.",
       sources: ['Competitive Positioning', 'Pricing Overview'],
       proof: 'Comparison summary and differentiation highlights',
       documentation: '/docs/compare',

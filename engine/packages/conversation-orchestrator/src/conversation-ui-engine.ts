@@ -52,7 +52,7 @@ export function generateConversationUI(
         data: {
           tiers: [
             { name: 'Free', price: '$0/mo', msgs: '100 msgs' },
-            { name: 'Starter', price: '$29/mo', msgs: '1,000 msgs' },
+            { name: 'Starter', price: '$49/mo', msgs: '1,000 msgs' },
             { name: 'Professional', price: '$99/mo', msgs: '10,000 msgs', popular: true },
             { name: 'Enterprise', price: 'Custom', msgs: 'Unlimited' }
           ]
@@ -61,7 +61,7 @@ export function generateConversationUI(
     }
 
     buttons.push(
-      { id: 'btn_trial_starter', label: '🚀 Try Starter ($29)', action: 'navigate', payload: '/signup', variant: 'outline' },
+      { id: 'btn_trial_starter', label: '🚀 Try Starter ($49)', action: 'navigate', payload: '/signup', variant: 'outline' },
       { id: 'btn_trial_pro', label: '🔥 Try Pro ($99)', action: 'navigate', payload: '/signup', variant: 'primary' },
       { id: 'btn_ent_sales', label: '💼 Contact Sales', action: 'navigate', payload: '/contact', variant: 'secondary' }
     );

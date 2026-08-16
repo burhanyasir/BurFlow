@@ -20,7 +20,7 @@ const SCRIPTED_QA: Record<string, { answer: string; sources: string[] }> = {
     sources: ['Integration Guide \u2014 Quick Start']
   },
   'what are your pricing tiers': {
-    answer: 'We offer Free (100 messages/mo), Starter ($29/mo), Professional ($99/mo), and Enterprise (custom). All paid tiers include a 14-day free trial.',
+    answer: 'We offer Free (100 messages/mo), Starter ($49/mo), Professional ($99/mo), and Enterprise (custom). All paid tiers include a 14-day free trial.',
     sources: ['Pricing Overview']
   },
   'do you support sso': {

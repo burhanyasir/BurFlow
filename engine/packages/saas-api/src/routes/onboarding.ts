@@ -125,7 +125,7 @@ export function createOnboardingRoutes(
       const demoDocs = [
         { filename: 'Getting Started Guide', sourceType: 'text' as const, content: 'Welcome to the platform. This guide covers setup, configuration, and best practices for using AI Customer Support.' },
         { filename: 'FAQ - Common Questions', sourceType: 'faq' as const, content: 'Q: How do I reset my password?\nA: Go to Settings > Security > Change Password.\n\nQ: What are your business hours?\nA: Mon-Fri 9AM-6PM EST.' },
-        { filename: 'Pricing Overview', sourceType: 'text' as const, content: 'We offer three plans: Free (100 messages/mo), Starter ($29/mo, 1000 messages), Professional ($99/mo, 10000 messages), and Enterprise (custom).' },
+        { filename: 'Pricing Overview', sourceType: 'text' as const, content: 'We offer three plans: Free (100 messages/mo), Starter ($49/mo, 1000 messages), Professional ($99/mo, 10000 messages), and Enterprise (custom).' },
       ];
       for (const doc of demoDocs) {
         const kb = kbDocRepo.create({ knowledgeBaseId: 'demo', tenantId: tenantId!, filename: doc.filename, sourceType: doc.sourceType });

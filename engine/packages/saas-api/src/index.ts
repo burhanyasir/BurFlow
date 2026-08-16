@@ -294,6 +294,15 @@ app.use(helmet({
   },
   crossOriginEmbedderPolicy: false,
 }));
+// Public widget/chat/lead endpoints are called from arbitrary customer sites
+// where the widget is embedded (bearer tokens, no cookies), so they reflect
+// the request origin and must run BEFORE the CORS_ORIGIN-gated global cors —
+// otherwise a missing CORS_ORIGIN would emit no Access-Control-Allow-Origin
+// header and every embedded widget would be blocked by the browser.
+const publicCors = cors({ origin: true, credentials: false });
+app.use('/api/widget', publicCors);
+app.use('/api/chat', publicCors);
+app.use('/api/public', publicCors);
 app.use(cors({ origin: CORS_ORIGIN === false ? false : (CORS_ORIGIN || false), credentials: true }));
 app.use(compression() as any);
 // Raw body parser for webhook signature verification (must come before json parser)

@@ -74,7 +74,7 @@ const compare = [
 
 const plans = [
   { name: 'Free', price: '$0', note: 'Try it on one site', f: ['100 messages / mo', '1 site scan', 'Community support'], cta: 'Get started' },
-  { name: 'Starter', price: '$29', note: 'For growing sites', f: ['1,000 messages / mo', '3 site scans', 'Email support'], cta: 'Start free' },
+  { name: 'Starter', price: '$49', note: 'For growing sites', f: ['1,000 messages / mo', '3 site scans', 'Email support'], cta: 'Start free' },
   {
     name: 'Professional',
     price: '$99',

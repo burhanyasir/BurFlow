@@ -27,7 +27,7 @@ export function detectBuyingIntent(message: string): BuyingIntentResult {
     targetTier = 'enterprise';
   } else if (/professional|\$99|10,000|10k/i.test(text)) {
     targetTier = 'professional';
-  } else if (/starter|\$29|1,000|1k/i.test(text)) {
+  } else if (/starter|\$49|1,000|1k/i.test(text)) {
     targetTier = 'starter';
   } else if (/free plan|free tier|\$0/i.test(text)) {
     targetTier = 'free';

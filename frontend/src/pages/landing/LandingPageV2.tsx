@@ -92,7 +92,7 @@ const faqItems = [
 
 const previewTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 site scan', 'Community support'], cta: 'Get Started', ctaVariant: 'ghost' },
-  { name: 'Starter', price: '$29', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 site scans', 'Email support'], cta: 'Start free', ctaVariant: 'secondary' },
+  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 site scans', 'Email support'], cta: 'Start free', ctaVariant: 'secondary' },
   { name: 'Professional', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 messages / mo', 'Unlimited scans', 'Priority support'], cta: 'Start free', ctaVariant: 'primary' },
   { name: 'Enterprise', price: 'Custom', variant: 'enterprise', features: ['Unlimited usage', 'SSO + SLA', 'Dedicated onboarding'], cta: 'Talk to Sales', ctaVariant: 'primary' },
 ];
