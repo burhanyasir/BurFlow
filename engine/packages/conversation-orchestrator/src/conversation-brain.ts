@@ -584,7 +584,7 @@ const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
     { id: 'qr_related', label: 'Related Features', payload: 'What related features do you have?', variant: 'outline' },
   ],
   handle_objection: [
-    { id: 'qr_demo', label: 'Book a Demo', payload: '/demo', variant: 'primary', action: 'navigate' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
     { id: 'qr_case_study', label: 'See Case Studies', payload: 'Show me customer success stories', variant: 'secondary' },
   ],
   qualify: [
@@ -593,7 +593,7 @@ const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
   ],
   advance_funnel: [
     { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
-    { id: 'qr_demo', label: 'Watch Demo', payload: '/demo', variant: 'primary', action: 'navigate' },
+    { id: 'qr_demo', label: 'Watch Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
   ],
   recommend_plan: [
     { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
@@ -687,7 +687,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
       link: '/signup',
       secondaryCTA: 'book_demo',
       secondaryLabel: 'Book a Demo',
-      secondaryLink: '/demo',
+      secondaryLink: '/signup',
     };
   }
 
@@ -703,7 +703,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
         link: '/signup',
         secondaryCTA: 'book_demo',
         secondaryLabel: 'Book a Demo',
-        secondaryLink: '/demo',
+        secondaryLink: '/signup',
       };
     }
     if (hasBuyingSignal) {
@@ -713,14 +713,14 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
         link: '/signup',
         secondaryCTA: 'book_demo',
         secondaryLabel: 'Book a Demo',
-        secondaryLink: '/demo',
+        secondaryLink: '/signup',
       };
     }
     if (hasProofGap || isCTARejected(memory, 'start_free_trial')) {
       return {
         primaryCTA: 'book_demo',
         label: 'Book a Demo',
-        link: '/demo',
+        link: '/signup',
         secondaryCTA: 'contact_sales',
         secondaryLabel: 'Talk to Sales',
         secondaryLink: '/contact',
@@ -729,7 +729,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
     return {
       primaryCTA: 'book_demo',
       label: 'See a Demo',
-      link: '/demo',
+      link: '/signup',
       secondaryCTA: 'contact_sales',
       secondaryLabel: 'Talk to Sales',
       secondaryLink: '/contact',
@@ -741,7 +741,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
     return {
       primaryCTA: 'book_demo',
       label: 'Book a Quick Demo',
-      link: '/demo',
+      link: '/signup',
       secondaryCTA: 'contact_sales',
       secondaryLabel: 'Special Offer',
       secondaryLink: '/contact',
@@ -762,7 +762,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
 
   ctaOptions.push(
     { primary: 'start_free_trial', label: 'Start Free Trial', link: '/signup' },
-    { primary: 'book_demo', label: 'Book a Demo', link: '/demo' },
+    { primary: 'book_demo', label: 'Book a Demo', link: '/signup' },
     { primary: 'contact_sales', label: 'Talk to Sales', link: '/contact' },
   );
 
@@ -774,7 +774,7 @@ function selectCTAByPlan(persona: PersonaType, plan: { goal: ConversationGoal; f
         link: opt.link,
         secondaryCTA: plan.goal === 'qualify' ? undefined : 'book_demo',
         secondaryLabel: plan.goal === 'qualify' ? undefined : 'Book a Demo',
-        secondaryLink: plan.goal === 'qualify' ? undefined : '/demo',
+        secondaryLink: plan.goal === 'qualify' ? undefined : '/signup',
       };
     }
   }
@@ -1322,7 +1322,7 @@ interface ButtonCandidate extends SmartButton {
 
 const BUTTON_CATALOG: ButtonCandidate[] = [
   { id: 'btn_pricing', label: 'Tell me about pricing', payload: 'Tell me about pricing', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 45, icon: 'price-tag', locale: 'en-US', tags: ['pricing', 'cost', 'plans'] },
-  { id: 'btn_book_demo', label: 'Book a demo', payload: '/demo', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 55, icon: 'calendar', locale: 'en-US', tags: ['demo', 'sales'] },
+  { id: 'btn_book_demo', label: 'Book a demo', payload: '/signup', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 55, icon: 'calendar', locale: 'en-US', tags: ['demo', 'sales'] },
   { id: 'btn_features', label: 'Features', payload: 'What features do you offer?', action: 'send_text', variant: 'secondary', category: 'features', defaultScore: 40, icon: 'sparkles', locale: 'en-US', tags: ['features', 'capabilities'] },
   { id: 'btn_help_choose', label: 'Help me choose', payload: 'Help me choose the right plan', action: 'send_text', variant: 'primary', category: 'qualification', defaultScore: 45, icon: 'lightbulb', locale: 'en-US', tags: ['help', 'choose', 'plan'] },
   { id: 'btn_compare_plans', label: 'Compare plans', payload: 'Compare plans', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 35, icon: 'compare', locale: 'en-US', tags: ['compare', 'plans', 'pricing'] },
@@ -1343,7 +1343,7 @@ const BUTTON_CATALOG: ButtonCandidate[] = [
   { id: 'btn_use_cases', label: 'Use cases', payload: 'What are the use cases?', action: 'send_text', variant: 'secondary', category: 'features', defaultScore: 37, icon: 'lightbulb', locale: 'en-US', tags: ['use cases', 'case studies'] },
   { id: 'btn_customer_stories', label: 'Customer stories', payload: 'Tell me about customer stories', action: 'send_text', variant: 'secondary', category: 'trust', defaultScore: 36, icon: 'users', locale: 'en-US', tags: ['customers', 'stories'] },
   { id: 'btn_compare_competitors', label: 'Compare competitors', payload: 'Compare to competitors', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 40, icon: 'balance-scale', locale: 'en-US', tags: ['compare', 'competition'] },
-  { id: 'btn_live_demo', label: 'Live demo', payload: '/demo', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 45, icon: 'play', locale: 'en-US', tags: ['demo', 'live'] },
+  { id: 'btn_live_demo', label: 'Live demo', payload: '/signup', action: 'navigate', variant: 'primary', category: 'demo', defaultScore: 45, icon: 'play', locale: 'en-US', tags: ['demo', 'live'] },
   { id: 'btn_under_10', label: 'We\'re under 10 people', payload: 'We are under 10 people', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
   { id: 'btn_10_50', label: '10-50 employees', payload: 'We have 10-50 employees', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
   { id: 'btn_50_200', label: '50-200 employees', payload: 'We have 50-200 employees', action: 'send_text', variant: 'secondary', category: 'qualification', defaultScore: 40, icon: 'users', locale: 'en-US', tags: ['size', 'company size'] },
@@ -2531,7 +2531,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
     } else {
       const llmCtaLabels: Record<CTAType, { label: string; link: string }> = {
       start_free_trial: { label: 'Start Free Trial', link: '/signup' },
-      book_demo: { label: 'Book a Demo', link: '/demo' },
+      book_demo: { label: 'Book a Demo', link: '/signup' },
       contact_sales: { label: 'Talk to Sales', link: '/contact' },
       pricing: { label: 'See Pricing', link: '/pricing' },
       support: { label: 'Contact Support', link: '/support' },
