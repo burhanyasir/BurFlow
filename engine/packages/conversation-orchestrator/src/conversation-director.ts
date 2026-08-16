@@ -306,7 +306,16 @@ export function processConversationDirector(
 
   const hasPendingUnanswered = pending.some(p => !p.answered);
 
-  const qualification = shouldAskQualification(plan, memory);
+  // Direct pricing inquiries must be answered with the pricing strategy —
+  // don't tack a qualification question onto a pricing answer (that's the
+  // "drift" where "how much does it cost?" turns into "what's your company
+  // size?"). Non-pricing turns still qualify normally.
+  const isPricingInquiry =
+    /\b(pric(?:e|ing|es)|plans?|cost|how much|tier|subscription|per month|monthly)\b/i.test(message) &&
+    !ciResult.objection.isObjection &&
+    plan.customerIntent !== 'objection' &&
+    plan.customerIntent !== 'buying';
+  const qualification = isPricingInquiry ? { ask: false, question: '' } : shouldAskQualification(plan, memory);
 
   const loopDetected = detectLoop(memory);
 
@@ -318,7 +327,17 @@ export function processConversationDirector(
   }
 
   let topicToAnswer: DiscernedTopic | null = null;
-  if (newTopics.length > 0) {
+
+  // Pricing keyword queries stay anchored on the pricing topic — even when
+  // pricing was explained earlier, a re-ask must re-answer pricing instead of
+  // drifting into feature/workflow/helpdesk templates.
+  const pricingMention = newTopics.includes('pricing') && isPricingInquiry;
+  if (pricingMention) {
+    topicToAnswer = 'pricing';
+    reasoning.push('Anchoring on pricing topic for pricing inquiry');
+  }
+
+  if (!topicToAnswer && newTopics.length > 0) {
     const explicitReask = newTopics.some(topic => isTopicExplained(memory, topic) && /tell me more|again|revisit|back to|explain/i.test(message.toLowerCase()));
     const unhandled = newTopics.filter(t => !isTopicExplained(memory, t));
     if (explicitReask) {

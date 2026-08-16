@@ -246,8 +246,19 @@ describe('Qualification Timing', () => {
       { turnNumber: 2, message: 'Tell me about features', response: 'Here are features.', customerIntent: 'learning', goal: 'answer_question', funnelStage: 'interest', timestamp: Date.now() },
       { turnNumber: 3, message: 'What about pricing?', response: 'Pricing starts at $29.', customerIntent: 'learning', goal: 'answer_question', funnelStage: 'interest', timestamp: Date.now() },
     );
-    const strategy = processConversationDirector('Tell me about pricing', mem, makeCIResult(), makePlan({ missingQualification: ['company size'] }));
+    const strategy = processConversationDirector('What are your features?', mem, makeCIResult(), makePlan({ missingQualification: ['company size'] }));
     expect(strategy.qualificationQuestion).toBeTruthy();
+  });
+
+  it('does not push a qualification question onto a direct pricing inquiry', async () => {
+    const mem = createMemory({ turnCount: 4 });
+    mem.turns.push(
+      { turnNumber: 1, message: 'hi', response: 'hi', customerIntent: 'greeting', goal: 'build_trust', funnelStage: 'greeting', timestamp: Date.now() },
+      { turnNumber: 2, message: 'Tell me about features', response: 'Here are features.', customerIntent: 'learning', goal: 'answer_question', funnelStage: 'interest', timestamp: Date.now() },
+      { turnNumber: 3, message: 'What about pricing?', response: 'Pricing starts at $29.', customerIntent: 'learning', goal: 'answer_question', funnelStage: 'interest', timestamp: Date.now() },
+    );
+    const strategy = processConversationDirector('How much does it cost?', mem, makeCIResult(), makePlan({ missingQualification: ['company size'], customerIntent: 'evaluating' }));
+    expect(strategy.qualificationQuestion).toBeNull();
   });
 
   it('does not ask qualification after it is completed', async () => {

@@ -541,7 +541,20 @@ export function planConversation(
   const funnelStage = detectFunnelStageExtended(message, memory, ciResult);
   const conversationStage = detectConversationStage(message, memory, ciResult);
   const buyerRole = detectBuyerRole(message, memory);
-  const goal = chooseGoal(customerIntent, funnelStage, memory, ciResult);
+  let goal = chooseGoal(customerIntent, funnelStage, memory, ciResult);
+
+  // Pricing keyword queries ("price", "pricing", "plans", "cost", "how much")
+  // must be answered directly with the pricing strategy — never drift into
+  // qualification or unrelated feature/workflow templates. Objections and
+  // outright buying intent keep their own goals.
+  const isPricingInquiry =
+    /\b(pric(?:e|ing|es)|plans?|cost|how much|tier|subscription|per month|monthly)\b/i.test(message) &&
+    !ciResult.objection.isObjection &&
+    customerIntent !== 'objection' &&
+    customerIntent !== 'buying';
+  if (isPricingInquiry) {
+    goal = memory.qualificationCollected.completed ? 'recommend_plan' : 'answer_question';
+  }
   const missingQualification = findMissingQualification(memory);
   const newTopics = discernTopics(message);
   const explainedTopics = memory.topicsExplained.map(t => t.topic);

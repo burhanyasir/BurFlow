@@ -383,8 +383,18 @@ describe('Conversation Planner', () => {
     const { brain } = makeBrainMemory(4);
     brain.qualificationCollected.questionsAskedCount = 0;
     const ciResult = { objection: { isObjection: false }, funnelStage: 'evaluation', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
-    const plan = planConversation('Tell me about pricing', brain, ciResult);
+    const plan = planConversation('What about a demo?', brain, ciResult);
     expect(plan.goal).toBe('qualify');
+  });
+
+  it('keeps pricing keyword queries on the pricing strategy instead of drifting to qualify', async () => {
+    const { brain } = makeBrainMemory(4);
+    brain.qualificationCollected.questionsAskedCount = 0;
+    const ciResult = { objection: { isObjection: false }, funnelStage: 'evaluation', sentiment: { polarity: 0, frustration: 'low', urgency: 'low' }, trustSignal: { shouldInject: false } } as any;
+    const plan = planConversation('How much does it cost?', brain, ciResult);
+    expect(plan.goal).not.toBe('qualify');
+    expect(plan.goal).toBe('answer_question');
+    expect(plan.topicsToDiscuss).toContain('pricing');
   });
 
   it('sets goal to close_trial with buying intent when qualified', async () => {
@@ -633,7 +643,7 @@ describe('Conversation Brain', () => {
   it('generates dynamic quick replies for qualify goal', async () => {
     const { legacy } = makeBrainMemory(4);
     const result = await processConversationBrain({
-      message: 'What plan should I pick?',
+      message: 'What about a demo?',
       responseText: 'Let me help you find the right plan.',
       legacyMemory: legacy,
     });
@@ -945,7 +955,7 @@ describe('Conversation Brain', () => {
 
     const r2 = await processConversationBrain({ message: 'What features?', responseText: 'Here are features.', legacyMemory: r1.legacyMemory });
 
-    const r3 = await processConversationBrain({ message: 'How much?', responseText: 'Pricing starts at $29.', legacyMemory: r2.legacyMemory });
+    const r3 = await processConversationBrain({ message: 'What about a demo?', responseText: 'We can walk you through it.', legacyMemory: r2.legacyMemory });
     expect(r3.plan.goal).toBe('qualify');
 
     const r4 = await processConversationBrain({ message: 'Yes, about 200 employees', responseText: 'Thanks! And what industry?', legacyMemory: r3.legacyMemory });
@@ -1130,7 +1140,7 @@ describe('Conversation Brain', () => {
     const { legacy } = makeBrainMemory(3);
     legacy.qualificationState.completed = false;
     const result = await processConversationBrain({
-      message: 'What is the right plan for our team?',
+      message: 'What about a demo?',
       responseText: 'To recommend the best plan, I need a little information.',
       legacyMemory: legacy,
     });

@@ -18,6 +18,7 @@ import WidgetPage from './pages/docs/WidgetPage';
 import ApiPage from './pages/docs/ApiPage';
 import TrustCenterPage from './pages/trust/TrustCenterPage';
 import DemoPage from './pages/demo/DemoPage';
+import DesignSystemPage from './pages/dev/DesignSystemPage';
 import PrivacyPage from './pages/trust/PrivacyPage';
 import ChangelogPage from './pages/trust/ChangelogPage';
 import StatusPage from './pages/trust/StatusPage';
@@ -106,6 +107,7 @@ function RoutesWithAnimation() {
         <Route path="/terms" element={<PublicRoute><TermsPage /></PublicRoute>} />
         <Route path="/cookies" element={<PublicRoute><CookiesPage /></PublicRoute>} />
         <Route path="/demo" element={<PublicRoute><DemoPage /></PublicRoute>} />
+        <Route path="/design-system" element={<PublicRoute><DesignSystemPage /></PublicRoute>} />
 
         {/* Auth Routes */}
         <Route path="/login" element={<PublicOnlyRoute><LoginPage /></PublicOnlyRoute>} />
