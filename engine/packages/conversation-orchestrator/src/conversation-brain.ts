@@ -2716,7 +2716,11 @@ funnelStage: ciResult.funnelStage,
   };
 }
 
-const BRAIN_HARD_CEILING_MS = 5000;
+// Must exceed the slowest provider timeout (8s) so a real LLM response that
+// arrives late is kept, not discarded for a canned fallback. Provider timeouts
+// were raised to 8s; this global ceiling is 12s so the provider gets its full
+// budget and only a genuinely hung pipeline falls back.
+const BRAIN_HARD_CEILING_MS = 12000;
 
 function buildTimeoutFallback(input: BrainInput): BrainOutput {
   const memory = fromLegacyMemory(input.legacyMemory);

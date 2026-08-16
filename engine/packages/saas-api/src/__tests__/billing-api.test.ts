@@ -241,9 +241,13 @@ describe('Billing current subscription', () => {
 // ─── Usage Metrics ────────────────────────────────────────
 
 describe('Billing usage metrics', () => {
-  it('returns 404 when no subscription exists', async () => {
+  it('returns free-plan defaults when no subscription exists', async () => {
     const res = await request('GET', '/api/billing/usage', undefined, tenantBToken);
-    expect(res.status).toBe(404);
+    expect(res.status).toBe(200);
+    expect(res.body.plan).toBe('free');
+    expect(res.body.subscription).toBeNull();
+    expect(res.body.usage).toHaveLength(1);
+    expect(res.body.usage[0].conversations).toBe(0);
   });
 
   it('returns real monthly conversation, message, and document counts', async () => {

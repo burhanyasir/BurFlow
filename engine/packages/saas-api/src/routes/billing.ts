@@ -115,10 +115,11 @@ export function createBillingRoutes(
   router.get('/usage', async (req: Request, res: Response) => {
     try {
       const sub = subRepo.findByTenant(req.tenantId!);
-      if (!sub) {
-        return res.status(404).json({ error: 'No subscription found' });
-      }
-      const limits = getPlanConfig(sub.plan);
+      // Tenants without a subscription row are on the free plan — return free
+      // usage defaults instead of 404 so a fresh workspace's billing page
+      // renders cleanly (mirrors /current).
+      const plan = sub?.plan || 'free';
+      const limits = getPlanConfig(plan);
       const tenantId = req.tenantId!;
 
       const convByMonth = new Map(conversationRepo.countByMonth(tenantId).map(r => [r.month, r.count]));
@@ -142,7 +143,7 @@ export function createBillingRoutes(
         usage.push({ date: new Date().toISOString().slice(0, 7) + '-01', conversations: 0, messages: 0, documentsUploaded: 0 });
       }
 
-      res.json({ usage, plan: sub.plan, limits, subscription: sub });
+      res.json({ usage, plan, limits, subscription: sub || null });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Usage fetch failed');
       res.status(500).json({ error: 'Failed to fetch usage' });
