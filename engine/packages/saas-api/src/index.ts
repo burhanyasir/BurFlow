@@ -48,6 +48,7 @@ import { createOnboardingRoutes } from './routes/onboarding';
 import { createChatRoutes } from './routes/chat';
 import { DbKnowledgeBaseProvider } from './orchestrator';
 import { createWidgetRoutes } from './routes/widget';
+import { createPublicRoutes } from './routes/public';
 import { createBillingRoutes } from './routes/billing';
 import { createAdminRoutes } from './routes/admin';
 import { createActivationRoutes } from './routes/admin-activation';
@@ -465,6 +466,10 @@ const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
     createContextLogger(logger).error({ err }, 'Lead alert dispatch failed');
   }
 };
+// Public inbound lead capture (contact / demo / scan forms) — unauthenticated,
+// rate-limited so marketing traffic can never drown the API.
+app.use('/api/public', createRateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `public:${req.ip || 'unknown'}` }), createPublicRoutes(leadRepo, tenantRepo));
+
 app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), requireTenant(tenantRepo, { allowDemoTenants: true }), chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
   leadService,
   webhookRepo,

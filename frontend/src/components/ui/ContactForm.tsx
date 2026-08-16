@@ -4,6 +4,7 @@ import { Textarea } from './Textarea';
 import { Select } from './Select';
 import { Button } from './Button';
 import { useToast } from './Toast';
+import { apiClient } from '../../lib/api-client';
 import { cn } from '../../utils/cn';
 
 export interface ContactFormProps {
@@ -50,10 +51,22 @@ export function ContactForm({ className }: ContactFormProps) {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    await new Promise(r => setTimeout(r, 1500));
-    setSubmitting(false);
-    addToast('Message sent successfully!', 'success');
-    setForm({ name: '', email: '', company: '', volume: '', message: '' });
+    try {
+      await apiClient.post('/public/leads', {
+        source: 'contact',
+        name: form.name,
+        email: form.email,
+        company: form.company,
+        volume: form.volume,
+        message: form.message,
+      });
+      addToast('Message sent successfully!', 'success');
+      setForm({ name: '', email: '', company: '', volume: '', message: '' });
+    } catch {
+      addToast('Could not send your message. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (

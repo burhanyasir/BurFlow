@@ -9,6 +9,7 @@ import { WidgetLauncher } from '../../components/landing/WidgetLauncher';
 import { LiveActivity, RatingProof, TrustMarquee } from '../../components/landing/social';
 import { StickyCta } from '../../components/landing/sticky-cta';
 import { initAnalytics, track, trackOnce } from '../../lib/analytics';
+import { apiClient } from '../../lib/api-client';
 
 const outcomes = [
   {
@@ -132,6 +133,10 @@ export default function LandingPageV3() {
       raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
     setScan({ status: 'scanning', stage: SCAN_STAGES[0]![1], progress: 2, url });
     track('scan_submit', { url });
+    // Record the scan request as an inbound lead (best-effort, never blocks the demo).
+    apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {
+      /* non-fatal: the scan preview continues regardless */
+    });
     document
       .getElementById('scan-preview')
       ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

@@ -6,6 +6,7 @@ import { Select } from '../../components/ui/Select';
 import { Textarea } from '../../components/ui/Textarea';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/Toast';
+import { apiClient } from '../../lib/api-client';
 import { cn } from '../../utils/cn';
 
 interface FormState {
@@ -72,13 +73,24 @@ export default function DemoPage() {
     e.preventDefault();
     if (!validate()) return;
     setSubmitting(true);
-    // Booking is currently a lead-capture placeholder: the request is queued
-    // for the sales team. Swap this for a Calendly-style embed or webhook
-    // when a real scheduling backend is wired up.
-    await new Promise((r) => setTimeout(r, 1200));
-    setSubmitting(false);
-    addToast('Demo requested! Our team will confirm your slot by email.', 'success');
-    setForm({ name: '', email: '', company: '', teamSize: '', date: '', message: '' });
+    try {
+      await apiClient.post('/public/leads', {
+        source: 'demo',
+        name: form.name,
+        email: form.email,
+        company: form.company,
+        teamSize: form.teamSize,
+        preferredDate: form.date,
+        preferredTime: timeSlot,
+        focus: form.message,
+      });
+      addToast('Demo requested! Our team will confirm your slot by email.', 'success');
+      setForm({ name: '', email: '', company: '', teamSize: '', date: '', message: '' });
+    } catch {
+      addToast('Could not submit your demo request. Please try again.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const inputBase = 'w-full bg-[var(--color-neutral-0)] border border-[var(--color-neutral-200)] rounded-xl px-4 py-3 text-sm text-[var(--color-neutral-900)] placeholder-[var(--color-neutral-300)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition';

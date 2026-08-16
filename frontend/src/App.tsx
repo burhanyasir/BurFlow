@@ -16,6 +16,9 @@ import BlogArticlePage from './pages/blog/BlogArticlePage';
 import DocsPage from './pages/docs/DocsPage';
 import WidgetPage from './pages/docs/WidgetPage';
 import ApiPage from './pages/docs/ApiPage';
+import QuickStartPage from './pages/docs/QuickStartPage';
+import KnowledgePage from './pages/docs/KnowledgePage';
+import IntegrationsPage from './pages/docs/IntegrationsPage';
 import TrustCenterPage from './pages/trust/TrustCenterPage';
 import DemoPage from './pages/demo/DemoPage';
 import DesignSystemPage from './pages/dev/DesignSystemPage';
@@ -91,6 +94,9 @@ function RoutesWithAnimation() {
         <Route path="/docs" element={<PublicRoute><DocsPage /></PublicRoute>} />
         <Route path="/docs/widget" element={<PublicRoute><WidgetPage /></PublicRoute>} />
         <Route path="/docs/api" element={<PublicRoute><ApiPage /></PublicRoute>} />
+        <Route path="/docs/quick-start" element={<PublicRoute><QuickStartPage /></PublicRoute>} />
+        <Route path="/docs/knowledge" element={<PublicRoute><KnowledgePage /></PublicRoute>} />
+        <Route path="/docs/integrations" element={<PublicRoute><IntegrationsPage /></PublicRoute>} />
         <Route path="/trust" element={<PublicRoute><TrustCenterPage /></PublicRoute>} />
         <Route path="/trust/security" element={<PublicRoute><SecurityPage /></PublicRoute>} />
         <Route path="/trust/compliance" element={<PublicRoute><CompliancePage /></PublicRoute>} />
