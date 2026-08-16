@@ -200,6 +200,43 @@ describe('repo parity — users, tenants, api keys', () => {
     });
     expect(out).toEqual({ first: true, second: false, listedCount: 0 });
   });
+
+  it('TenantRepository ensureDemoTenant bootstraps idempotently', () => {
+    const out = parity((db) => {
+      const repo = new TenantRepository(db);
+      const before = repo.findById('burflow-saas');
+      repo.ensureDemoTenant('burflow-saas');
+      const afterFirst = repo.findById('burflow-saas');
+      // Rerun must be a clean no-op (ON CONFLICT DO NOTHING) on both backends.
+      repo.ensureDemoTenant('burflow-saas');
+      const afterSecond = repo.findById('burflow-saas');
+      const bySlug = repo.findBySlug('burflow-saas');
+      // The demo tenant must be usable by child tables — conversations FK.
+      const convRepo = new ConversationRepository(db);
+      const conv = convRepo.create('burflow-saas', 'demo-session');
+      const found = convRepo.findBySession('burflow-saas', 'demo-session');
+      return {
+        existedBefore: before !== null,
+        createdFirst: afterFirst?.id === 'burflow-saas',
+        name: afterFirst?.name,
+        slug: afterFirst?.slug,
+        plan: afterFirst?.plan,
+        stableAfterRerun: afterFirst?.id === afterSecond?.id && afterFirst?.name === afterSecond?.name,
+        bySlugId: bySlug?.id,
+        convPersisted: found?.id === conv.id,
+      };
+    });
+    expect(out).toEqual({
+      existedBefore: false, // no scenario creates the burflow-saas row beforehand
+      createdFirst: true,
+      name: 'BurFlow AI',
+      slug: 'burflow-saas',
+      plan: 'free',
+      stableAfterRerun: true,
+      bySlugId: 'burflow-saas',
+      convPersisted: true,
+    });
+  });
 });
 
 describe('repo parity — conversations, messages, cascades', () => {

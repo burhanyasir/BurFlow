@@ -119,4 +119,48 @@ describe('widget token verification', () => {
     const unknown = await requestPath('/api/widget/public-token?tenantId=nope', tenantRepo);
     expect(unknown.statusCode).toBe(404);
   });
+
+  it('mints a fallback demo token for burflow-saas when the tenant is not seeded yet', async () => {
+    process.env.WIDGET_SECRET = REAL_WIDGET_SECRET;
+    const tenantRepo = {
+      findById: () => null,
+      findBySlug: () => null,
+    };
+
+    const res = await requestPath('/api/widget/public-token?tenantId=burflow-saas', tenantRepo);
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.token).toBeTruthy();
+    expect(body.tenantId).toBe('burflow-saas');
+  });
+
+  it('mints a fallback demo token for demo-tenant when the tenant is not seeded yet', async () => {
+    process.env.WIDGET_SECRET = REAL_WIDGET_SECRET;
+    const tenantRepo = {
+      findById: () => null,
+      findBySlug: () => null,
+    };
+
+    const res = await requestPath('/api/widget/public-token?tenantId=demo-tenant', tenantRepo);
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.token).toBeTruthy();
+    expect(body.tenantId).toBe('demo-tenant');
+  });
+
+  it('prefers the real tenant id over the demo fallback when the tenant exists', async () => {
+    process.env.WIDGET_SECRET = REAL_WIDGET_SECRET;
+    const tenantRepo = {
+      findById: () => null,
+      findBySlug: (slug: string) => (slug === 'burflow-saas' ? { id: 'tenant-999', slug: 'burflow-saas' } : null),
+    };
+
+    const res = await requestPath('/api/widget/public-token?tenantId=burflow-saas', tenantRepo);
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.tenantId).toBe('tenant-999');
+  });
 });

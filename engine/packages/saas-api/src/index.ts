@@ -465,7 +465,7 @@ const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
     createContextLogger(logger).error({ err }, 'Lead alert dispatch failed');
   }
 };
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), tenantGuard, chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), requireTenant(tenantRepo, { allowDemoTenants: true }), chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
   leadService,
   webhookRepo,
   webhookDeliveryRepo,

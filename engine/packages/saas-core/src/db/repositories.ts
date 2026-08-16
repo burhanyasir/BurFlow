@@ -86,6 +86,29 @@ export class TenantRepository {
     return this.findById(id)!;
   }
 
+  /**
+   * Idempotently bootstraps a demo tenant row (and its owner user) so public
+   * demo widgets — e.g. `burflow-saas` on the landing page — can persist
+   * conversations before the seed script has run. Safe to call on every demo
+   * request; becomes a no-op once the row exists. Uses `ON CONFLICT DO NOTHING`
+   * so it is safe to rerun on both SQLite and PostgreSQL.
+   */
+  ensureDemoTenant(demoTenantId: string, opts?: { demoUserId?: string; demoUserEmail?: string; tenantName?: string }): void {
+    if (this.findById(demoTenantId)) return;
+    const demoUserId = opts?.demoUserId || 'user-burflow-demo';
+    const demoUserEmail = opts?.demoUserEmail || 'burflow-demo@internal.local';
+    const tenantName = opts?.tenantName || 'BurFlow AI';
+    const now = new Date().toISOString();
+    this.db.transaction(() => {
+      this.db.prepare(
+        'INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?) ON CONFLICT (id) DO NOTHING'
+      ).run(demoUserId, demoUserEmail, 'demo-account-no-login', 'BurFlow Demo', now, now);
+      this.db.prepare(
+        'INSERT INTO tenants (id, name, slug, owner_id, plan, subscription_status, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING'
+      ).run(demoTenantId, tenantName, demoTenantId, demoUserId, 'free', 'trialing', JSON.stringify(DEFAULT_SETTINGS), now, now);
+    })();
+  }
+
   findById(id: string): Tenant | null {
     const row = this.db.prepare('SELECT * FROM tenants WHERE id = ?').get(id) as any;
     return row ? this.mapRow(row) : null;

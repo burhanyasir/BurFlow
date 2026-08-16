@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validateRequiredString, validationError, LABEL_MAX } from '../middleware/validate';
 import { authMiddleware } from '../middleware/auth';
+import { DEMO_TENANT_IDS } from '../middleware/tenant';
 import { createHmac, timingSafeEqual } from 'crypto';
 
 const logger = createLogger('saas-api:widget');
@@ -218,7 +219,6 @@ function signWidgetToken(encoded: string, secret: string): string {
 export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string, tenantRepo?: TenantRepository): Router {
   const router = Router();
   const widgetAuth = jwtSecret ? authMiddleware(jwtSecret) : undefined;
-  const LOCAL_DEMO_TENANT = 'demo-tenant';
 
   function generateWidgetToken(tenantId: string): string {
     const secret = getWidgetSecret();
@@ -319,10 +319,14 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       let resolvedTenantId = tenantId;
       if (tenantRepo) {
         const tenant = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
-        if (!tenant) {
+        if (tenant) {
+          resolvedTenantId = tenant.id;
+        } else if (!DEMO_TENANT_IDS.has(tenantId)) {
           return res.status(404).json({ error: 'Tenant not found' });
         }
-        resolvedTenantId = tenant.id;
+        // Known demo tenants (e.g. `burflow-saas` on a fresh database before
+        // the seed script has run) fall through and mint a token carrying the
+        // requested demo tenant id instead of failing the bootstrap.
       }
       const token = generateWidgetToken(resolvedTenantId);
       res.json({ token, tenantId: resolvedTenantId, expiresIn: 86400 });
@@ -366,7 +370,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       }
       const config = widgetConfigRepo.get(tenantId);
       if (!config) {
-        if (tenantId === LOCAL_DEMO_TENANT) {
+        if (DEMO_TENANT_IDS.has(tenantId)) {
           const demoConfig = getDemoWidgetConfig();
           return res.json(demoConfig);
         }
