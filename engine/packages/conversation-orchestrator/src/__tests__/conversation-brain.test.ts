@@ -668,6 +668,28 @@ describe('Conversation Brain', () => {
     expect(r3.plan.customerIntent).toBe('evaluating');
   });
 
+  it('suppresses repeated "especially relevant" context boilerplate across turns', async () => {
+    // Turn 1: industry known, no prior usage — the context prefix is expected.
+    const legacy1 = makeLegacyMemory({ industry: 'small business' });
+    const r1 = await processConversationBrain({
+      message: 'Tell me more about your product',
+      responseText: 'Here is what we offer.',
+      legacyMemory: legacy1,
+    });
+    const countInR1 = (r1.responseText.match(/especially relevant/gi) || []).length;
+    expect(countInR1).toBeGreaterThanOrEqual(1);
+
+    // Turn 2: the previous response already contains the phrase — it must
+    // not be appended again in this turn's heuristic response.
+    const r2 = await processConversationBrain({
+      message: 'What about pricing?',
+      responseText: r1.responseText,
+      legacyMemory: r1.legacyMemory,
+    });
+    const countInR2 = (r2.responseText.match(/especially relevant/gi) || []).length;
+    expect(countInR2).toBe(0);
+  });
+
   it('does not repeat topics already explained', async () => {
     const { legacy } = makeBrainMemory(2);
     legacy.topics = ['features'];

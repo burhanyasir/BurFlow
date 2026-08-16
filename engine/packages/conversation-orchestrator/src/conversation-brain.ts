@@ -557,13 +557,20 @@ interface RelevantKnownFacts {
   userContext: string[];
 }
 
-function getContextPrefix(memory: ConversationMemoryData, relevantFacts: RelevantKnownFacts): string | null {
+function getContextPrefix(memory: ConversationMemoryData, relevantFacts: RelevantKnownFacts, previousResponses: string[] = []): string | null {
   const persona = memory.persona && memory.persona !== 'unknown' ? memory.persona.replace(/_/g, ' ') : null;
-  if (relevantFacts.industry) return `For ${relevantFacts.industry} teams, this is especially relevant.`;
-  if (persona) return `For ${persona} teams, this is especially relevant.`;
-  if (relevantFacts.useCase) return `For ${relevantFacts.useCase} use cases, this is especially relevant.`;
-  if (relevantFacts.companySize) return `For a ${relevantFacts.companySize}-person team, this is especially relevant.`;
-  return null;
+  let phrase: string | null = null;
+  if (relevantFacts.industry) phrase = `For ${relevantFacts.industry} teams, this is especially relevant.`;
+  else if (persona) phrase = `For ${persona} teams, this is especially relevant.`;
+  else if (relevantFacts.useCase) phrase = `For ${relevantFacts.useCase} use cases, this is especially relevant.`;
+  else if (relevantFacts.companySize) phrase = `For a ${relevantFacts.companySize}-person team, this is especially relevant.`;
+  if (!phrase) return null;
+
+  // Never repeat the same context boilerplate if it was already used in an
+  // earlier turn of this conversation (detected via the telltale phrase).
+  const lower = phrase.toLowerCase().trim();
+  const alreadyUsed = previousResponses.some((r) => r.toLowerCase().includes(lower));
+  return alreadyUsed ? null : phrase;
 }
 
 const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
@@ -793,6 +800,7 @@ function buildStrategyResponse(
   tenantId?: string,
   kbProvider?: KnowledgeBaseProvider,
   profile?: TenantCtaProfile,
+  previousResponses: string[] = [],
 ): string {
   const parts: string[] = [];
 
@@ -930,7 +938,7 @@ function buildStrategyResponse(
   const opening = getOpening(strategy.primaryGoal, memory);
   let response = parts.join(' ').trim();
   if (response.length > 5) {
-    const contextPrefix = getContextPrefix(memory, relevantFacts);
+    const contextPrefix = getContextPrefix(memory, relevantFacts, previousResponses);
     if (contextPrefix && !response.toLowerCase().includes(contextPrefix.toLowerCase().trim())) {
       response = `${contextPrefix} ${response}`;
     }
@@ -1819,7 +1827,7 @@ function logActiveProvider(): void {
 logActiveProvider();
 
 const anthropicClient = process.env.ANTHROPIC_API_KEY
-  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 3500 })
+  ? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: 8000 })
   : null;
 
 // Provider 2: Gemini Account 1
@@ -1834,7 +1842,7 @@ const geminiClient2 = process.env.GEMINI_API_KEY_2
 
 // Provider 4: Groq (Llama) — OpenAI-compatible
 const groqClient = process.env.GROQ_API_KEY
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY, timeout: 8000 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 // Provider 5: xAI Grok — OpenAI-compatible (fetch, no SDK dependency)
@@ -1847,22 +1855,22 @@ const openrouterApiKey = process.env.OPENROUTER_API_KEY || null;
 
 // Provider 6: Groq Account 2
 const groqClient2 = process.env.GROQ_API_KEY_2
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_2, timeout: 8000 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 // Provider 7: Groq Account 3
 const groqClient3 = process.env.GROQ_API_KEY_3
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_3, timeout: 8000 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 // Provider 8: Groq Account 4
 const groqClient4 = process.env.GROQ_API_KEY_4
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_4, timeout: 8000 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 // Provider 9: Groq Account 5
 const groqClient5 = process.env.GROQ_API_KEY_5
-  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 3500 }) // SDK default base URL is https://api.groq.com/openai/v1
+  ? new Groq({ apiKey: process.env.GROQ_API_KEY_5, timeout: 8000 }) // SDK default base URL is https://api.groq.com/openai/v1
   : null;
 
 async function callAnthropic(systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
@@ -1972,8 +1980,8 @@ async function callOpenRouter(apiKey: string, systemPrompt: string, messages: An
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
-const LLM_PROVIDER_TIMEOUT_MS = 3500;
-const LLM_GLOBAL_BUDGET_MS = 7000;
+const LLM_PROVIDER_TIMEOUT_MS = 8000;
+const LLM_GLOBAL_BUDGET_MS = 12000;
 
 /**
  * Runs a provider call with an AbortSignal-backed timeout. Aborting the signal
@@ -2062,6 +2070,12 @@ async function processConversationBrainInner(input: BrainInput): Promise<BrainOu
   const { message, responseText, legacyMemory, tenantId, knowledgeBaseProvider: kbProvider, businessProfile } = input;
 
   const memory = fromLegacyMemory(legacyMemory);
+
+  // Responses from earlier turns, used to suppress repetitive heuristic
+  // boilerplate (e.g. "For X teams, this is especially relevant.").
+  const previousResponses: string[] = (legacyMemory.turns || [])
+    .map((t) => t.response)
+    .filter((r): r is string => typeof r === 'string' && r.length > 0);
 
   if (input.rejectedCTAs) {
     for (const cta of input.rejectedCTAs) {
@@ -2397,10 +2411,11 @@ If you don't know something, say so honestly and offer to connect them with some
 CRITICAL RULES:
 1. Answer the question directly first. No filler openers like "For teams, this is especially relevant."
 2. Do not repeat filler phrases like "For small business teams..." and do not repeat questions that were already asked in previous turns of this conversation — vary your wording and only ask something new.
-3. Use the specific business information below — don't give generic answers.
-4. If the visitor asks about pricing, services, or products, reference the actual business details provided.
-5. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
-6. Be warm and helpful, not pushy.
+3. Be concise, direct, and natural. Do not repeat greeting phrases, boilerplate intro lines, or questions that were already asked in previous turns.
+4. Use the specific business information below — don't give generic answers.
+5. If the visitor asks about pricing, services, or products, reference the actual business details provided.
+6. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
+7. Be warm and helpful, not pushy.
 
 LEAD CAPTURE:
 If the visitor shares contact details or company info in this message (email, phone, their name, or company), also include an "extractedLead" object with the fields email, phone, name, company (leave null when not provided). Never invent contact details.
@@ -2442,7 +2457,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
         // LLM responded with unparseable output — degrade gracefully to the
         // heuristic template engine instead of failing the visitor's turn.
         usedFallback = true;
-        enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
+        enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile, previousResponses);
       }
     } catch (error: unknown) {
       const err = error as { status?: number; message?: string; provider?: string };
@@ -2456,12 +2471,12 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       // Upstream exhaustion must not fail the visitor's turn — degrade
       // gracefully to the heuristic template engine.
       usedFallback = true;
-      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
+      enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile, previousResponses);
     }
   } else {
     // No LLM provider configured — the heuristic engine answers this turn.
     usedFallback = true;
-    enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile);
+    enrichedResponse = buildStrategyResponse(strategy, message, memory, plan, ciResult, relevantFacts, tenantId, kbProvider, businessProfile, previousResponses);
   }
 
   // Surface the degradation signal to the CI result so callers can detect
