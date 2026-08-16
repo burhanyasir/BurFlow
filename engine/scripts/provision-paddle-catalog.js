@@ -71,7 +71,7 @@ function toCountryOverrides(overrides) {
   const grouped = new Map();
   for (const o of overrides || []) {
     if (!grouped.has(o.countryCode)) {
-      grouped.set(o.countryCode, { countryCodes: [], currencyCode: o.currencyCode, unitPrice: { amount: o.unitPrice, currencyCode: o.currencyCode } });
+      grouped.set(o.countryCode, { countryCodes: [], unitPrice: { amount: o.unitPrice, currency_code: o.currencyCode } });
     }
     const entry = grouped.get(o.countryCode);
     if (!entry.countryCodes.includes(o.countryCode)) entry.countryCodes.push(o.countryCode);
@@ -82,8 +82,7 @@ function toCountryOverrides(overrides) {
   }
   return [...grouped.values()].map((g) => ({
     country_codes: g.countryCodes,
-    currency_code: g.currencyCode,
-    unit_price: { amount: g.unitPrice.amount, currency_code: g.currencyCode },
+    unit_price: g.unitPrice,
   }));
 }
 
@@ -99,8 +98,9 @@ async function ensurePrice(product, tier, priceConfig) {
     trial_period: { interval: 'day', frequency: priceConfig.trialDays || TRIAL_DAYS },
     unit_price: { amount: priceConfig.amount, currency_code: 'USD' },
     unit_price_overrides: toCountryOverrides(priceConfig.countryOverrides),
-    quantity: { maximum: 1 },
-    status: 'active',
+    quantity: { minimum: 1, maximum: 1 },
+    // Products/prices are created active by default — the Paddle API rejects
+    // an explicit `status` field in the create body.
   };
   const res = await paddle('/prices', { method: 'POST', body });
   console.log(`  created price ${description}: ${res.data.id}`);
@@ -116,7 +116,7 @@ async function ensureProduct(tier) {
       name: tier.name,
       description: tier.description,
       tax_category: 'standard',
-      status: 'active',
+      // Products are created active by default — `status` is not allowed here.
     },
   });
   console.log(`  created product ${tier.name}: ${res.data.id}`);
