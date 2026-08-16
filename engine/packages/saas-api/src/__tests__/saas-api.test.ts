@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import {
-  createDatabase, UserRepository, TenantRepository, ApiKeyRepository, RefreshTokenRepository,
+  createDatabase, UserRepository, TenantRepository, ApiKeyRepository, RefreshTokenRepository, WidgetConfigRepository,
   ConversationRepository, MessageRepository, UsageRepository,
   KnowledgeBaseRepository, KbDocumentRepository,
 } from '@conversation-engine/saas-core';
@@ -24,6 +24,7 @@ let userRepo: UserRepository;
 let tenantRepo: TenantRepository;
 let apiKeyRepo: ApiKeyRepository;
 let refreshTokenRepo: RefreshTokenRepository;
+let widgetConfigRepo: WidgetConfigRepository;
 let conversationRepo: ConversationRepository;
 let messageRepo: MessageRepository;
 let usageRepo: UsageRepository;
@@ -34,7 +35,7 @@ let app: express.Express;
 function makeApp() {
   const a = express();
   a.use(express.json());
-  a.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET));
+  a.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo));
   const auth = authMiddleware(JWT_SECRET);
   a.use('/api/tenants', auth, createTenantRoutes(tenantRepo, userRepo));
   a.use('/api/api-keys', auth, createApiKeyRoutes(apiKeyRepo, tenantRepo));
@@ -73,6 +74,7 @@ beforeAll(() => {
   tenantRepo = new TenantRepository(db);
   apiKeyRepo = new ApiKeyRepository(db);
   refreshTokenRepo = new RefreshTokenRepository(db);
+  widgetConfigRepo = new WidgetConfigRepository(db);
   conversationRepo = new ConversationRepository(db);
   messageRepo = new MessageRepository(db);
   usageRepo = new UsageRepository(db);
@@ -98,6 +100,18 @@ describe('Auth', () => {
     expect(res.body.user.email).toBe('test@example.com');
     expect(res.body.tenant.name).toBe('Test Co');
     expect(res.body.token).toBeTruthy();
+  });
+
+  it('signup auto-creates the default widget config', async () => {
+    const res = await request('POST', '/api/auth/signup', {
+      email: 'widget-signup@example.com', password: 'password123', name: 'Widget User', companyName: 'Widget Co',
+    });
+    expect(res.status).toBe(201);
+    const config = widgetConfigRepo.get(res.body.tenant.id);
+    expect(config).not.toBeNull();
+    expect(config!.companyName).toBe('Widget Co');
+    expect(config!.position).toBe('right');
+    expect(config!.primaryColor).toBe('#6366f1');
   });
 
   it('signup rejects duplicate email', async () => {

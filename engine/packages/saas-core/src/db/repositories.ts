@@ -1408,23 +1408,26 @@ export class CitationAnalyticsRepository {
     }
   }
 
-  getOverview(tenantId: string): { totalCitations: number; avgConfidence: number; topDocuments: any[]; unusedDocuments: any[] } {
+  getOverview(tenantId: string): { totalCitations: number; avgConfidence: number; averageConfidence: number; uniqueDocuments: number; topDocuments: any[]; unusedDocuments: any[] } {
     const totalRow = this.db.prepare('SELECT COALESCE(SUM(total_citations), 0) as c FROM citation_analytics WHERE tenant_id = ?').get(tenantId) as any;
     const avgRow = this.db.prepare('SELECT COALESCE(AVG(avg_confidence), 0) as c FROM citation_analytics WHERE tenant_id = ?').get(tenantId) as any;
+    const uniqueRow = this.db.prepare('SELECT COUNT(DISTINCT document_id) as c FROM citation_analytics WHERE tenant_id = ?').get(tenantId) as any;
     const topDocs = this.db.prepare('SELECT c.*, d.filename FROM citation_analytics c LEFT JOIN kb_documents d ON d.id = c.document_id WHERE c.tenant_id = ? ORDER BY c.total_citations DESC LIMIT 10').all(tenantId) as any[];
     const unusedDocs = this.db.prepare('SELECT d.id, d.filename FROM kb_documents d WHERE d.tenant_id = ? AND d.id NOT IN (SELECT document_id FROM citation_analytics WHERE tenant_id = ?)').all(tenantId, tenantId) as any[];
     return {
       totalCitations: totalRow?.c || 0,
       avgConfidence: avgRow?.c || 0,
-      topDocuments: topDocs.map(r => ({ id: r.id, filename: r.filename, citations: r.total_citations, avgConfidence: r.avg_confidence })),
+      averageConfidence: avgRow?.c || 0,
+      uniqueDocuments: uniqueRow?.c || 0,
+      topDocuments: topDocs.map(r => ({ id: r.id, filename: r.filename, documentName: r.filename, citationCount: r.total_citations, citations: r.total_citations, avgConfidence: r.avg_confidence, lastCited: r.last_cited_at })),
       unusedDocuments: unusedDocs.map(r => ({ id: r.id, filename: r.filename })),
     };
   }
 
   getConfidenceDistribution(tenantId: string): { range: string; count: number }[] {
     const rows = this.db.prepare(`
-      SELECT CASE WHEN confidence < 0.3 THEN 'low' WHEN confidence < 0.7 THEN 'medium' ELSE 'high' END as range, COUNT(*) as count
-      FROM messages WHERE tenant_id = ? AND role = 'assistant' GROUP BY range
+      SELECT CASE WHEN avg_confidence < 0.3 THEN 'low' WHEN avg_confidence < 0.7 THEN 'medium' ELSE 'high' END as range, COUNT(*) as count
+      FROM citation_analytics WHERE tenant_id = ? GROUP BY range
     `).all(tenantId) as any[];
     return rows.map(r => ({ range: r.range, count: r.count }));
   }

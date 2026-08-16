@@ -159,11 +159,23 @@ export function createActivationRoutes(
 
   router.get('/citations/confidence-distribution', adminOnly, (req: Request, res: Response) => {
     try {
-      const dist = citationRepo.getConfidenceDistribution(req.tenantId!);
-      res.json(dist);
+      const raw = citationRepo.getConfidenceDistribution(req.tenantId!);
+      const total = raw.reduce((sum, r) => sum + r.count, 0);
+      const distribution = raw.map(r => ({ ...r, percentage: total > 0 ? Math.round((r.count / total) * 100) : 0 }));
+      res.json({ distribution });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Confidence dist failed');
       res.status(500).json({ error: 'Failed to fetch confidence distribution' });
+    }
+  });
+
+  router.get('/citations/top-documents', adminOnly, (req: Request, res: Response) => {
+    try {
+      const overview = citationRepo.getOverview(req.tenantId!);
+      res.json({ documents: overview.topDocuments });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Top documents failed');
+      res.status(500).json({ error: 'Failed to fetch top cited documents' });
     }
   });
 

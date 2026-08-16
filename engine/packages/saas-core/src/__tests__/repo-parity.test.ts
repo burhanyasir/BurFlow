@@ -44,6 +44,7 @@ import {
   TeamMemberRepository, InvitationRepository, ActivityRepository,
   AuditLogRepository, WebhookRepository, HandoffRequestRepository,
   LeadRepository,
+  CitationAnalyticsRepository,
 } from '../db/repositories';
 
 const { migrate } = require('../../../../scripts/migrate-core.js');
@@ -665,6 +666,47 @@ describe('repo parity — leads', () => {
       byEmailScore: 80,
       deleted: true,
       afterTotal: 0,
+    });
+  });
+});
+
+describe('repo parity — citation analytics', () => {
+  it('CitationAnalyticsRepository record/getOverview/getConfidenceDistribution', () => {
+    const out = parity((db) => {
+      const repo = new CitationAnalyticsRepository(db);
+      const kbRepo = new KnowledgeBaseRepository(db);
+      const docRepo = new KbDocumentRepository(db);
+      const t = makeTenant(db, 'Citation Co');
+      const kb = kbRepo.create(t.id, 'Docs KB', 'docs');
+      const d1 = docRepo.create({ knowledgeBaseId: kb.id, tenantId: t.id, filename: 'pricing.pdf', sourceType: 'pdf' });
+      const d2 = docRepo.create({ knowledgeBaseId: kb.id, tenantId: t.id, filename: 'faq.pdf', sourceType: 'pdf' });
+      repo.recordCitation(t.id, d1.id, 0.9);
+      repo.recordCitation(t.id, d1.id, 0.8);
+      repo.recordCitation(t.id, d2.id, 0.2);
+      const overview = repo.getOverview(t.id);
+      const dist = repo.getConfidenceDistribution(t.id);
+      const byRange: Record<string, number> = {};
+      for (const d of dist) byRange[d.range] = d.count;
+      return {
+        totalCitations: overview.totalCitations,
+        uniqueDocuments: overview.uniqueDocuments,
+        topDocName: overview.topDocuments[0]?.documentName,
+        topDocCount: overview.topDocuments[0]?.citationCount,
+        topDocHasLastCited: typeof overview.topDocuments[0]?.lastCited === 'string',
+        high: byRange['high'] || 0,
+        low: byRange['low'] || 0,
+        unused: overview.unusedDocuments.length,
+      };
+    });
+    expect(out).toEqual({
+      totalCitations: 3,
+      uniqueDocuments: 2,
+      topDocName: 'pricing.pdf',
+      topDocCount: 2,
+      topDocHasLastCited: true,
+      high: 1,
+      low: 1,
+      unused: 0,
     });
   });
 });

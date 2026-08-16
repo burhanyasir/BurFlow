@@ -68,10 +68,11 @@ export function createTeamRoutes(
       if (roleErr) errors.push(roleErr);
       if (errors.length > 0) return validationError(res, errors);
 
-      const user = userRepo.findByEmail(email);
-      if (!user) return res.status(404).json({ error: 'User not found' });
+      // Invite by email — the invitee does NOT need an existing account. If they
+      // already have one (or sign up later), they accept via the invite token.
+      const existingUser = userRepo.findByEmail(email);
 
-      const existingMember = teamRepo.findByTenantAndUser(tenantId, user.id);
+      const existingMember = existingUser ? teamRepo.findByTenantAndUser(tenantId, existingUser.id) : undefined;
       if (existingMember) return res.status(409).json({ error: 'User is already a team member' });
 
       const existingInvite = invitationRepo.listByTenant(tenantId, 'pending')

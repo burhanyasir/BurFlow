@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { UserRepository, TenantRepository, RefreshTokenRepository, generateToken, comparePassword, hashPassword, generateVerificationToken, hashToken } from '@conversation-engine/saas-core';
+import { UserRepository, TenantRepository, RefreshTokenRepository, WidgetConfigRepository, generateToken, comparePassword, hashPassword, generateVerificationToken, hashToken } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
 import { authMiddleware } from '../middleware/auth';
 import {
@@ -45,7 +45,7 @@ function generateRefreshToken(): { token: string; hash: string; expiresAt: strin
   return { token, hash: token, expiresAt };
 }
 
-export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string): Router {
+export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository): Router {
   const router = Router();
   const auth = authMiddleware(jwtSecret);
 
@@ -70,6 +70,19 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
       const { token: verificationToken, expiresAt: verificationTokenExpiry } = generateVerificationToken();
       const user = userRepo.create({ email, password, name, verificationToken, verificationTokenExpiry });
       const tenant = tenantRepo.create({ name: companyName || `${name}'s Organization`, ownerId: user.id });
+
+      // Create the default widget config so the widget settings page (and the
+      // widget itself) never 404 on first visit.
+      widgetConfigRepo?.upsert(tenant.id, {
+        companyName: tenant.name,
+        primaryColor: '#6366f1',
+        position: 'right',
+        greeting: 'Hi there! How can I help you today?',
+        launcherText: 'Type your message here…',
+        starterOptions: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+      });
 
       syncConfigToPipeline(tenant.id);
 

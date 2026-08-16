@@ -246,7 +246,7 @@ export interface WidgetConfig {
   id: string;
   tenantId: string;
   theme: 'light' | 'dark' | 'auto';
-  position: 'bottom-right' | 'bottom-left';
+  position: 'right' | 'left' | 'bottom-right' | 'bottom-left';
   primaryColor: string;
   logoUrl?: string;
   avatarUrl?: string;

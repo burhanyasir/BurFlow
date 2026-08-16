@@ -353,7 +353,7 @@ app.use('/api/auth/signup', createRateLimit({ windowMs: 900000, max: 10 }));
 app.use('/api/auth/forgot-password', createRateLimit({ windowMs: 900000, max: 5 }));
 
 // Public routes
-app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET));
+app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo));
 app.use('/api/auth', createPasswordResetRoutes(userRepo));
 app.use('/api/auth', createVerifyRoutes(userRepo, JWT_SECRET));
 
