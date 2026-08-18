@@ -259,6 +259,8 @@ export class ApiKeyRepository {
       keyPrefix: row.key_prefix, keyHash: row.key_hash, salt: row.salt,
       role: row.role, lastUsedAt: row.last_used_at, expiresAt: row.expires_at,
       createdAt: row.created_at, revokedAt: row.revoked_at,
+      createdBy: row.created_by, permissions: row.permissions ? JSON.parse(row.permissions) : undefined,
+      totalRequests: row.total_requests, updatedAt: row.updated_at,
     };
   }
 }

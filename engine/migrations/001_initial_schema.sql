@@ -59,7 +59,11 @@ CREATE TABLE tenant_api_keys (
   last_used_at TEXT,
   expires_at TEXT,
   created_at TEXT NOT NULL,
-  revoked_at TEXT
+  revoked_at TEXT,
+  created_by TEXT,
+  permissions TEXT DEFAULT '[]',
+  total_requests INTEGER DEFAULT 0,
+  updated_at TEXT
 );
 
 -- ────────────────────────────── conversations / messages ───────────────────

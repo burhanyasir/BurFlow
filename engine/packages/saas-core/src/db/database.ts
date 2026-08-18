@@ -923,4 +923,10 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE tenants ADD COLUMN notification_email TEXT;`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_tenants_parent_tenant ON tenants(parent_tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_tenants_custom_domain ON tenants(custom_domain);`); } catch {}
+
+  // tenant_api_keys extended columns (additive, safe to re-run)
+  try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN created_by TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN permissions TEXT DEFAULT '[]';`); } catch {}
+  try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN total_requests INTEGER DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN updated_at TEXT;`); } catch {}
 }

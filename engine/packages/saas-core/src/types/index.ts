@@ -93,6 +93,10 @@ export interface TenantApiKey {
   expiresAt?: string;
   createdAt: string;
   revokedAt?: string;
+  createdBy?: string;
+  permissions?: string[];
+  totalRequests?: number;
+  updatedAt?: string;
 }
 
 export type SessionState = 'ai_managed' | 'human_takeover' | 'closed';
