@@ -10,6 +10,7 @@ export interface PageSectionProps {
   containerClassName?: string;
   align?: 'center' | 'left';
   size?: 'sm' | 'md' | 'lg';
+  titleAs?: 'h1' | 'h2';
   id?: string;
 }
 
@@ -33,8 +34,10 @@ export function PageSection({
   containerClassName,
   align = 'center',
   size = 'md',
+  titleAs = 'h2',
   id
 }: PageSectionProps) {
+  const TitleTag = titleAs;
   return (
     <section className={cn('py-12 md:py-20', className)} id={id}>
       <Container className={containerClassName}>
@@ -44,12 +47,12 @@ export function PageSection({
             align === 'center' && 'mx-auto text-center'
           )}>
             {title && (
-              <h2 className={cn(
+              <TitleTag className={cn(
                 'font-bold text-[var(--color-neutral-900)] tracking-tight',
                 titleSizeStyles[size]
               )}>
                 {title}
-              </h2>
+              </TitleTag>
             )}
             {description && (
               <p className={cn(

@@ -9,6 +9,9 @@ engine/packages/saas-api/.env.local
 
 # Agent workspace (run docs, smoke-test launchers, preview logs)
 .freebuff/
+
+# Local tool shims for environments without Node/npm (bun-based)
+.toolbin/
 *.log
 npm-debug.log*
 pnpm-debug.log*

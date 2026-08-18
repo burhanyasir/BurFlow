@@ -1792,7 +1792,10 @@ import Groq from 'groq-sdk';
 export type BrainProvider = 'GROQ' | 'GROK' | 'OPENROUTER' | 'ANTHROPIC' | 'HEURISTIC_FALLBACK';
 
 const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// llama-3.3-70b-versatile was retired from Groq; compound-mini is its
+// successor (a fast routing model over the same family) and returns clean
+// JSON in the message content — verified against the live API.
+const GROQ_MODEL = process.env.GROQ_MODEL || 'groq/compound-mini';
 const GROK_BASE_URL = 'https://api.x.ai/v1';
 const GROK_MODEL = process.env.GROK_MODEL || 'grok-2-latest';
 const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';

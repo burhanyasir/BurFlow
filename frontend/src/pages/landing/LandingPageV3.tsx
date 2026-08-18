@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { SEO } from '../../components/SEO';
 import { CTA, Check, Eyebrow, Pill } from '../../components/landing/primitives';
 import { ScanCard, type ScanStatus } from '../../components/landing/scan-card';
 import { Reveal } from '../../components/landing/reveal';
@@ -112,6 +114,35 @@ const SCAN_STAGES: Array<[number, string]> = [
   [88, 'Building your sales agent…'],
 ];
 
+const softwareApplicationSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'BurFlow',
+  url: 'https://burflow.vercel.app',
+  applicationCategory: 'BusinessApplication',
+  operatingSystem: 'Web',
+  description:
+    'BurFlow is an autonomous AI sales agent platform that scans your website, learns your products and pricing, qualifies visitors in real time, and books demos automatically.',
+  offers: {
+    '@type': 'Offer',
+    price: '0',
+    priceCurrency: 'USD',
+    description: 'Free tier — try it on one site',
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'BurFlow',
+    url: 'https://burflow.vercel.app',
+  },
+  featureList: [
+    'Autonomous website scan and offer extraction',
+    'AI visitor qualification and buying-intent detection',
+    'Grounded, site-specific answers for every visitor',
+    'Automated demo booking and lead capture',
+    'Human handover and conversation analytics',
+  ],
+};
+
 export default function LandingPageV3() {
   const sectionsRef = useRef<HTMLElement | null>(null);
   const [scan, setScan] = useState<{ status: ScanStatus; stage: string; progress: number; url: string }>({
@@ -188,6 +219,14 @@ export default function LandingPageV3() {
 
   return (
     <main ref={sectionsRef} className="landing min-h-screen bg-background">
+      <SEO
+        title="BurFlow — Autonomous AI Sales Agents That Turn Traffic Into Demos"
+        description="BurFlow scans your website, learns your offer, and helps visitors compare options, qualify themselves, and book a demo — automatically, without friction or dead-end chat."
+        canonicalPath="/"
+      />
+      <Helmet>
+        <script type="application/ld+json">{JSON.stringify(softwareApplicationSchema)}</script>
+      </Helmet>
       <SiteHeader />
 
       {/* ─── Hero ───────────────────────────────────────────────── */}

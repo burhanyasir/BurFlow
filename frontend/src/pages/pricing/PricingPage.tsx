@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { SEO } from '../../components/SEO';
 import { PageSection } from '../../components/ui/PageSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
@@ -23,10 +24,16 @@ export default function PricingPage() {
 
   return (
     <>
+      <SEO
+        title="Pricing | BurFlow"
+        description="Simple, transparent pricing that scales from your first website visitor to millions of monthly conversations. Start free — no credit card required."
+        canonicalPath="/pricing"
+      />
       <PageSection
         title="Transparent Plans for Growing Operations."
         description="Scale seamlessly from your first website visitor to millions of monthly conversations."
         size="lg"
+        titleAs="h1"
         className="pt-20 md:pt-28 relative z-10"
       >
         <div className="flex items-center justify-center gap-3 mb-12">

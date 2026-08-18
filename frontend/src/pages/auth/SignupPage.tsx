@@ -1,5 +1,6 @@
 import { useState, useMemo, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { SEO } from '../../components/SEO';
 import { AuthLayout } from './AuthLayout';
 import { useAuth } from '../../lib/auth-context';
 import { useToast } from '../../components/ui/Toast';
@@ -95,11 +96,17 @@ export default function SignupPage() {
   }
 
   return (
-    <AuthLayout
-      title="Create your account"
-      subtitle="Start your free trial — no credit card required. Join 1,200+ teams."
-      showTrustBadges
-    >
+    <>
+      <SEO
+        title="Sign Up | BurFlow"
+        description="Create your BurFlow account and start your free trial — no credit card required. Live on your site in under 10 minutes."
+        canonicalPath="/signup"
+      />
+      <AuthLayout
+        title="Create your account"
+        subtitle="Start your free trial — no credit card required. Join 1,200+ teams."
+        showTrustBadges
+      >
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label htmlFor="signup-name" className="block text-sm font-medium text-[var(--color-neutral-900)] mb-1.5">
@@ -257,6 +264,7 @@ export default function SignupPage() {
           </Link>
         </p>
       </form>
-    </AuthLayout>
+      </AuthLayout>
+    </>
   );
 }

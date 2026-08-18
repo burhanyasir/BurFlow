@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
+import { SEO } from '../../components/SEO';
 import { PageSection } from '../../components/ui/PageSection';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
@@ -96,12 +97,19 @@ export default function DemoPage() {
   const inputBase = 'w-full bg-[var(--color-neutral-0)] border border-[var(--color-neutral-200)] rounded-xl px-4 py-3 text-sm text-[var(--color-neutral-900)] placeholder-[var(--color-neutral-300)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition';
 
   return (
-    <PageSection
-      title="Book a Live Demo"
-      description="See BurFlow in action — grounded AI answers, lead capture, and human handover, set up for your business in a 20-minute walkthrough."
-      size="md"
-      className="pt-20 md:pt-28"
-    >
+    <>
+      <SEO
+        title="Book a Live Demo | BurFlow"
+        description="See BurFlow in action — grounded AI answers, lead capture, and human handover, set up for your business in a 20-minute walkthrough."
+        canonicalPath="/demo"
+      />
+      <PageSection
+        title="Book a Live Demo"
+        description="See BurFlow in action — grounded AI answers, lead capture, and human handover, set up for your business in a 20-minute walkthrough."
+        size="md"
+        titleAs="h1"
+        className="pt-20 md:pt-28"
+      >
       <div className="grid md:grid-cols-5 gap-8 items-start max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -185,6 +193,7 @@ export default function DemoPage() {
           </p>
         </motion.form>
       </div>
-    </PageSection>
+      </PageSection>
+    </>
   );
 }

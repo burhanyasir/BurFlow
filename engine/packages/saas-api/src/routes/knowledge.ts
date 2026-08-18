@@ -179,7 +179,9 @@ Examples by industry:
   try {
     const groq = new Groq({ apiKey: groqKey, timeout: LLM_STARTER_OPTIONS_TIMEOUT_MS });
     const response = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      // llama-3.3-70b-versatile was retired from Groq — compound-mini is its
+      // successor and returns plain JSON content.
+      model: process.env.GROQ_MODEL || 'groq/compound-mini',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Here is content from the business website:\n\n${contentSummary}` },

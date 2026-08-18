@@ -39,7 +39,7 @@ export function WidgetLauncher() {
     // The widget's autoInit reads these attributes and bootstraps itself.
     script.setAttribute('data-tenant-id', tenantId);
     if (apiUrl) script.setAttribute('data-api-url', apiUrl);
-    script.setAttribute('data-primary-color', '#016248');
+    script.setAttribute('data-primary-color', '#006248');
     script.setAttribute('data-position', 'bottom-right');
     script.setAttribute('data-title', 'BurFlow');
     document.body.appendChild(script);

@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -5,59 +6,64 @@ import { ThemeProvider } from './theme/ThemeProvider';
 import { ToastProvider } from './components/ui/Toast';
 import { AuthProvider } from './lib/auth-context';
 import { PublicLayout } from './layouts/PublicLayout';
-import LandingPage from './pages/landing/LandingPageV3';
-import FeaturesPage from './pages/features/FeaturesPage';
-import PricingPage from './pages/pricing/PricingPage';
-import AboutPage from './pages/about/AboutPage';
-import ContactPage from './pages/contact/ContactPage';
-import FAQPage from './pages/faq/FAQPage';
-import BlogPage from './pages/blog/BlogPage';
-import BlogArticlePage from './pages/blog/BlogArticlePage';
-import DocsPage from './pages/docs/DocsPage';
-import WidgetPage from './pages/docs/WidgetPage';
-import ApiPage from './pages/docs/ApiPage';
-import QuickStartPage from './pages/docs/QuickStartPage';
-import KnowledgePage from './pages/docs/KnowledgePage';
-import IntegrationsPage from './pages/docs/IntegrationsPage';
-import TrustCenterPage from './pages/trust/TrustCenterPage';
-import DemoPage from './pages/demo/DemoPage';
-import DesignSystemPage from './pages/dev/DesignSystemPage';
-import PrivacyPage from './pages/trust/PrivacyPage';
-import ChangelogPage from './pages/trust/ChangelogPage';
-import StatusPage from './pages/trust/StatusPage';
-import MethodologyPage from './pages/trust/MethodologyPage';
-import SecurityPage from './pages/trust/SecurityPage';
-import CompliancePage from './pages/trust/CompliancePage';
-import UptimePage from './pages/trust/UptimePage';
-import SubprocessorsPage from './pages/trust/SubprocessorsPage';
-import DpaPage from './pages/trust/DpaPage';
-import ResponsibleAIPage from './pages/trust/ResponsibleAIPage';
-import GroundedAnswersPage from './pages/trust/GroundedAnswersPage';
-import TermsPage from './pages/legal/TermsPage';
-import CookiesPage from './pages/legal/CookiesPage';
-
-import DashboardPage from './pages/admin/dashboard/DashboardPage';
-import AnalyticsDashboard from './pages/admin/analytics/AnalyticsDashboard';
-import BillingDashboard from './pages/admin/billing/BillingDashboard';
-import CitationDashboard from './pages/admin/citations/CitationDashboard';
-import ConversationDashboard from './pages/admin/conversations/ConversationDashboard';
-import ConversationDetailPage from './pages/admin/conversations/ConversationDetailPage';
-import InsightsDashboard from './pages/admin/insights/InsightsDashboard';
-import KnowledgeDashboard from './pages/admin/knowledge/KnowledgeDashboard';
-import LeadInboxPage from './pages/admin/leads/LeadInboxPage';
-import AgentInboxPage from './pages/admin/agent/AgentInboxPage';
-import UnansweredDashboard from './pages/admin/unanswered/UnansweredDashboard';
-import WidgetDashboard from './pages/admin/widget/WidgetDashboard';
-import FollowUpQueuePage from './pages/admin/followups/FollowUpQueuePage';
-import SettingsPage from './pages/admin/settings/SettingsPage';
-import LoginPage from './pages/auth/LoginPage';
-import SignupPage from './pages/auth/SignupPage';
-import VerifyEmailPage from './pages/auth/VerifyEmailPage';
-import ResetPasswordPage from './pages/auth/ResetPasswordPage';
-import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import { ProtectedRoute, PublicOnlyRoute, AdminRoute } from './lib/protected-route';
-import { OnboardingPage } from './pages/admin/onboarding/OnboardingPage';
-import ExecutiveDashboard from './pages/admin/dashboard/ExecutiveDashboard';
+// The landing page is eager — it's the first paint. Everything else loads on
+// demand so the marketing site ships a fraction of the JavaScript.
+import LandingPage from './pages/landing/LandingPageV3';
+
+const FeaturesPage = lazy(() => import('./pages/features/FeaturesPage'));
+const PricingPage = lazy(() => import('./pages/pricing/PricingPage'));
+const AboutPage = lazy(() => import('./pages/about/AboutPage'));
+const ContactPage = lazy(() => import('./pages/contact/ContactPage'));
+const FAQPage = lazy(() => import('./pages/faq/FAQPage'));
+const BlogPage = lazy(() => import('./pages/blog/BlogPage'));
+const BlogArticlePage = lazy(() => import('./pages/blog/BlogArticlePage'));
+const DocsPage = lazy(() => import('./pages/docs/DocsPage'));
+const WidgetPage = lazy(() => import('./pages/docs/WidgetPage'));
+const ApiPage = lazy(() => import('./pages/docs/ApiPage'));
+const QuickStartPage = lazy(() => import('./pages/docs/QuickStartPage'));
+const KnowledgePage = lazy(() => import('./pages/docs/KnowledgePage'));
+const IntegrationsPage = lazy(() => import('./pages/docs/IntegrationsPage'));
+const TrustCenterPage = lazy(() => import('./pages/trust/TrustCenterPage'));
+const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
+const DesignSystemPage = lazy(() => import('./pages/dev/DesignSystemPage'));
+const PrivacyPage = lazy(() => import('./pages/trust/PrivacyPage'));
+const ChangelogPage = lazy(() => import('./pages/trust/ChangelogPage'));
+const StatusPage = lazy(() => import('./pages/trust/StatusPage'));
+const MethodologyPage = lazy(() => import('./pages/trust/MethodologyPage'));
+const SecurityPage = lazy(() => import('./pages/trust/SecurityPage'));
+const CompliancePage = lazy(() => import('./pages/trust/CompliancePage'));
+const UptimePage = lazy(() => import('./pages/trust/UptimePage'));
+const SubprocessorsPage = lazy(() => import('./pages/trust/SubprocessorsPage'));
+const DpaPage = lazy(() => import('./pages/trust/DpaPage'));
+const ResponsibleAIPage = lazy(() => import('./pages/trust/ResponsibleAIPage'));
+const GroundedAnswersPage = lazy(() => import('./pages/trust/GroundedAnswersPage'));
+const TermsPage = lazy(() => import('./pages/legal/TermsPage'));
+const CookiesPage = lazy(() => import('./pages/legal/CookiesPage'));
+
+const DashboardPage = lazy(() => import('./pages/admin/dashboard/DashboardPage'));
+const AnalyticsDashboard = lazy(() => import('./pages/admin/analytics/AnalyticsDashboard'));
+const BillingDashboard = lazy(() => import('./pages/admin/billing/BillingDashboard'));
+const CitationDashboard = lazy(() => import('./pages/admin/citations/CitationDashboard'));
+const ConversationDashboard = lazy(() => import('./pages/admin/conversations/ConversationDashboard'));
+const ConversationDetailPage = lazy(() => import('./pages/admin/conversations/ConversationDetailPage'));
+const InsightsDashboard = lazy(() => import('./pages/admin/insights/InsightsDashboard'));
+const KnowledgeDashboard = lazy(() => import('./pages/admin/knowledge/KnowledgeDashboard'));
+const LeadInboxPage = lazy(() => import('./pages/admin/leads/LeadInboxPage'));
+const AgentInboxPage = lazy(() => import('./pages/admin/agent/AgentInboxPage'));
+const UnansweredDashboard = lazy(() => import('./pages/admin/unanswered/UnansweredDashboard'));
+const WidgetDashboard = lazy(() => import('./pages/admin/widget/WidgetDashboard'));
+const FollowUpQueuePage = lazy(() => import('./pages/admin/followups/FollowUpQueuePage'));
+const SettingsPage = lazy(() => import('./pages/admin/settings/SettingsPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const SignupPage = lazy(() => import('./pages/auth/SignupPage'));
+const VerifyEmailPage = lazy(() => import('./pages/auth/VerifyEmailPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'));
+const OnboardingPage = lazy(() =>
+  import('./pages/admin/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage }))
+);
+const ExecutiveDashboard = lazy(() => import('./pages/admin/dashboard/ExecutiveDashboard'));
 
 const pageVariants = {
   initial: { opacity: 0, y: 12 },
@@ -77,11 +83,20 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <PublicLayout><AnimatedPage>{children}</AnimatedPage></PublicLayout>;
 }
 
+function PageLoader() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--color-accent-600)] border-t-transparent" aria-label="Loading" />
+    </div>
+  );
+}
+
 function RoutesWithAnimation() {
   const location = useLocation();
   return (
-    <AnimatePresence mode="wait">
-      <Routes location={location} key={location.pathname}>
+    <Suspense fallback={<PageLoader />}>
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
         {/* Public Routes */}
         <Route path="/" element={<AnimatedPage><LandingPage /></AnimatedPage>} />
         <Route path="/features" element={<PublicRoute><FeaturesPage /></PublicRoute>} />
@@ -150,8 +165,9 @@ function RoutesWithAnimation() {
             </a>
           </div>
         </PublicRoute>} />
-      </Routes>
-    </AnimatePresence>
+        </Routes>
+      </AnimatePresence>
+    </Suspense>
   );
 }
 

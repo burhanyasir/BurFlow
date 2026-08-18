@@ -50,11 +50,11 @@ module.exports = {
         accent: {
           DEFAULT: 'var(--accent)',
           foreground: 'var(--accent-foreground)',
-          '200': '#E8C7CE',
-          '400': '#B96478',
-          '500': '#93304A',
-          '600': '#7A2038',
-          '700': '#5C1729'
+          '200': '#def7ec',
+          '400': '#52967c',
+          '500': '#28795e',
+          '600': '#006248',
+          '700': '#004a34'
         },
         card: {
           DEFAULT: 'var(--card)',

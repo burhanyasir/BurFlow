@@ -12,12 +12,13 @@
   --color-neutral-900: #151518;
   --color-neutral-950: #0A0A0C;
 
-  --color-accent-200: #E8C7CE;
-  --color-accent-400: #B96478;
-  --color-accent-500: #93304A;
-  --color-accent-600: #7A2038;
-  --color-accent-700: #5C1729;
-  --color-accent-800: #3F0F1D;
+  /* Ember green accent — unified with the landing page & widget primary (#006248). */
+  --color-accent-200: #def7ec;
+  --color-accent-400: #52967c;
+  --color-accent-500: #28795e;
+  --color-accent-600: #006248;
+  --color-accent-700: #004a34;
+  --color-accent-800: #003321;
 
   --color-success-300: #7FB08F;
   --color-success-500: #3F7855;
@@ -84,7 +85,7 @@
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.06);
   --shadow-md: 0 4px 12px 0 rgb(0 0 0 / 0.08);
   --shadow-lg: 0 16px 32px 0 rgb(0 0 0 / 0.1);
-  --shadow-focus: 0 0 0 3px rgba(122, 32, 56, 0.35);
+  --shadow-focus: 0 0 0 3px rgba(0, 98, 72, 0.35);
 
   --z-base: 0;
   --z-dropdown: 100;

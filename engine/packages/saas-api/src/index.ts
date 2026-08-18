@@ -67,6 +67,7 @@ import { setEmailProvider } from './services/email';
 import { ResendEmailProvider } from './services/resend-email';
 import { createAnalyticsRoutes } from './routes/analytics';
 import { createHealthRoutes } from './routes/health';
+import { createSitemapRoutes } from './routes/sitemap';
 import { createAgentChatRoutes } from './routes/agent-chat';
 import { createWebsiteScannerRoutes } from './routes/website-scanner';
 import { createAgencyRoutes } from './routes/agency';
@@ -596,6 +597,9 @@ app.use('/api', createHardeningRoutes(() => [
 // Mounted at both / and /api so legacy probes keep working.
 app.use(createHealthRoutes(db));
 app.use('/api', createHealthRoutes(db));
+
+// Public marketing sitemap (base URL from SITE_URL env, default https://burflow.vercel.app)
+app.use(createSitemapRoutes());
 
 // ─── Global Error Handler ─────────────────────────────────────
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {

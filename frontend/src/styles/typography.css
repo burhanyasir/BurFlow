@@ -57,13 +57,13 @@
 }
 
 .prose a {
-  color: #7A2038;
+  color: #006248;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .prose a:hover {
-  color: #5C1729;
+  color: #004a34;
 }
 
 .prose code {
