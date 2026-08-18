@@ -317,9 +317,10 @@
       html[data-cw-theme='dark'] .cw-preopen-panel div { color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-highlight { background: rgba(255,255,255,0.1) !important; }
       @media (max-width:640px) {
-        .cw-container { bottom:0 !important; left:0 !important; right:0 !important; width:100vw !important; height:100vh !important; border-radius:0 !important; }
-        .cw-bubble { bottom:16px !important; }
-        .cw-preopen-panel { bottom:80px !important; left:16px !important; right:16px !important; max-width:none !important; }
+        .cw-container { bottom:0 !important; left:0 !important; right:0 !important; width:100vw !important; height:100dvh !important; border-radius:0 !important; }
+        .cw-bubble { bottom:20px !important; }
+        .cw-preopen-panel { bottom:88px !important; left:16px !important; right:16px !important; max-width:none !important; border-radius:20px !important; }
+        .cw-preopen-pill { padding:10px 16px !important; font-size:13px !important; }
       }
     `;
       document.head.appendChild(style);
@@ -530,10 +531,10 @@
       const panel = document.createElement("div");
       panel.className = "cw-preopen-panel";
       const pos = this.config.position === "bottom-left" ? "left:92px;" : "right:92px;";
-      panel.style.cssText = `position:fixed;bottom:84px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1.5px solid #E8F5E9;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06);cursor:pointer;`;
+      panel.style.cssText = `position:fixed;bottom:84px;${pos}z-index:999998;display:none;max-width:300px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1.5px solid #E8F5E9;border-left:3px solid #006248;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,98,72,0.15),0 8px 32px rgba(0,0,0,0.08);cursor:pointer;`;
       const header = document.createElement("div");
-      header.style.cssText = "padding:14px 16px 8px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#006248;";
-      header.textContent = "Suggested questions";
+      header.style.cssText = "padding:14px 16px 6px;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#006248;display:flex;align-items:center;gap:6px;";
+      header.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006248" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Suggested questions';
       panel.appendChild(header);
       const optionsWrap = document.createElement("div");
       optionsWrap.className = "cw-preopen-options";
@@ -556,19 +557,26 @@
       if (!wrap) return;
       wrap.innerHTML = "";
       const options = this.config.starterOptions?.length ? this.config.starterOptions : this.defaultStarterOptions();
+      const icons = ["\u{1F4AC}", "\u{1F680}", "\u{1F4C5}", "\u{1F4A1}", "\u{1F3AF}"];
       options.forEach((text, i) => {
         const row = document.createElement("div");
-        row.style.cssText = `padding:10px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;gap:8px;${i < options.length - 1 ? "border-bottom:1px solid #F0F4F0;" : ""}transition:background 0.15s ease;border-radius:8px;margin:2px 4px;`;
+        row.style.cssText = `padding:10px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;gap:10px;${i < options.length - 1 ? "border-bottom:1px solid #F0F4F0;" : ""}transition:all 0.2s ease;border-radius:10px;margin:2px 6px;cursor:pointer;`;
+        const icon = document.createElement("span");
+        icon.style.cssText = "font-size:14px;flex-shrink:0;";
+        icon.textContent = icons[i % icons.length];
+        row.appendChild(icon);
         const pill = document.createElement("span");
         pill.className = "cw-preopen-pill";
-        pill.style.cssText = "display:inline-flex;align-items:center;padding:6px 14px;border-radius:9999px;background:#E8F5E9;color:#006248;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.2s ease;";
+        pill.style.cssText = "display:inline-flex;align-items:center;padding:7px 14px;border-radius:10px;background:#E8F5E9;color:#006248;font-size:13px;font-weight:500;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.2s ease;line-height:1.3;";
         pill.textContent = text;
         row.appendChild(pill);
         row.addEventListener("mouseenter", () => {
-          row.style.background = "#F9FAFB";
+          row.style.background = "#F0FAF4";
+          row.style.transform = "translateX(4px)";
         });
         row.addEventListener("mouseleave", () => {
           row.style.background = "transparent";
+          row.style.transform = "translateX(0)";
         });
         row.addEventListener("click", (e) => {
           e.stopPropagation();

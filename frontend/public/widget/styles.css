@@ -1,56 +1,122 @@
-/*
- * BurFlow widget default styles.
- * The widget bundle (widget.js) renders fully with inline styles and injects
- * a <style id="cw-widget-styles"> element at runtime, so this file only
- * carries loading-time defaults and the brand color variable used by the
- * embed snippet. Custom branding is applied at runtime from the tenant
- * widget configuration.
- */
-:root {
+/* BurFlow Widget Default Styles — Ember Green Theme */
+
+.cw-widget-root {
   --cw-primary-color: #006248;
+  --cw-primary-hover: #004d38;
+  --cw-radius: 12px;
+  --cw-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.cw-bubble,
+.cw-widget-root *,
+.cw-widget-root *::before,
+.cw-widget-root *::after {
+  box-sizing: border-box;
+}
+
+/* Bubble */
+.cw-bubble {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  height: 52px;
+  padding: 0 22px;
+  border-radius: 26px;
+  background: linear-gradient(135deg, var(--cw-primary-color, #006248) 0%, var(--cw-primary-color, #004d38) 100%);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 8px 32px rgba(0,98,72,0.45), 0 2px 8px rgba(0,0,0,0.1);
+  z-index: 999999;
+  transition: transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;
+  border: 2px solid rgba(255,255,255,0.2);
+  font-family: var(--cw-font);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.cw-bubble:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 40px rgba(0,98,72,0.55), 0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* Send button */
 .cw-send {
   background: linear-gradient(135deg, var(--cw-primary-color, #006248) 0%, var(--cw-primary-color, #004d38) 100%);
   color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
 }
 
-/* Pre-open suggested questions panel */
+.cw-send:hover {
+  transform: scale(1.08);
+}
+
+/* Input focus */
+.cw-input:focus {
+  border-color: var(--cw-primary-color, #006248) !important;
+  box-shadow: 0 0 0 3px rgba(0,98,72,0.12) !important;
+}
+
+/* Pre-open panel */
 .cw-preopen-panel {
-  border: 1.5px solid #E8F5E9;
-  box-shadow: 0 20px 60px rgba(0,98,72,0.12), 0 4px 20px rgba(0,0,0,0.06);
+  border: 1.5px solid #E8F5E9 !important;
+  border-left: 3px solid #006248 !important;
+  box-shadow: 0 20px 60px rgba(0,98,72,0.15), 0 8px 32px rgba(0,0,0,0.08) !important;
 }
 
+/* Pre-open pills */
 .cw-preopen-pill {
-  background: #E8F5E9;
-  color: #006248;
-  border: 1px solid #C8E6C9;
-  transition: all 0.2s ease;
+  background: #E8F5E9 !important;
+  color: #006248 !important;
+  border: 1px solid #C8E6C9 !important;
+  transition: all 0.2s ease !important;
 }
 
 .cw-preopen-pill:hover {
-  background: #006248;
-  color: #fff;
+  background: #006248 !important;
+  color: #fff !important;
+  border-color: #006248 !important;
+}
+
+/* Action buttons */
+.cw-action-button {
+  transition: all 0.15s ease;
+}
+
+.cw-action-button:hover {
+  transform: translateY(-1px);
+}
+
+.cw-action-button:active {
+  transform: scale(0.96);
 }
 
 /* Mobile responsive */
 @media (max-width: 640px) {
-  .cw-container {
-    bottom: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    width: 100vw !important;
-    height: 100dvh !important;
-    border-radius: 0 !important;
-  }
   .cw-bubble {
-    bottom: 16px !important;
+    bottom: 20px !important;
   }
   .cw-preopen-panel {
-    bottom: 80px !important;
+    bottom: 88px !important;
     left: 16px !important;
     right: 16px !important;
     max-width: none !important;
+    border-radius: 20px !important;
+  }
+  .cw-preopen-pill {
+    padding: 10px 16px !important;
+    font-size: 13px !important;
   }
 }
