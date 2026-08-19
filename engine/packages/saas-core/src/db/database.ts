@@ -259,6 +259,8 @@ function migrate(db: Database.Database): void {
       custom_css TEXT,
       notification_email TEXT,
       slack_webhook_url TEXT,
+      custom_webhook_url TEXT,
+      alert_emails TEXT,
       notify_threshold TEXT DEFAULT 'all' CHECK (notify_threshold IN ('all','sales_qualified_only')),
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL

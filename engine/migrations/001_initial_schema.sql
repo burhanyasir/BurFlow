@@ -215,6 +215,8 @@ CREATE TABLE widget_configs (
   custom_css TEXT,
   notification_email TEXT,
   slack_webhook_url TEXT,
+  custom_webhook_url TEXT,
+  alert_emails TEXT,
   notify_threshold TEXT DEFAULT 'all' CHECK (notify_threshold IN ('all','sales_qualified_only')),
   avatar_url TEXT,
   created_at TEXT NOT NULL,

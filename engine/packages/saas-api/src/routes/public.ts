@@ -13,13 +13,15 @@ const logger = createLogger('saas-api:public');
  */
 const SALES_TENANT_ID = 'burflow-saas';
 
-const SOURCES = ['contact', 'demo', 'scan'] as const;
+const SOURCES = ['contact', 'demo', 'scan', 'tool'] as const;
 
 /**
  * Public inbound lead capture used by the marketing site:
  *   - /contact  (ContactForm): name + work email (+ company, message, volume)
  *   - /demo     (DemoPage booking): name + work email + company + slot details
  *   - / (landing scan CTA): website URL only (no email required)
+ *   - /tools/* (LeadCaptureModal): email (+ name) + tool context — the
+ *     visitor's calculation result is summarized into the lead metadata
  * No auth. Rate-limited at the mount point. Best-effort email notification to
  * SALES_NOTIFY_EMAIL when configured — a mail failure must never break capture.
  */
@@ -28,7 +30,7 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
 
   router.post('/leads', requireJsonObject, (req: Request, res: Response) => {
     try {
-      const { source, name, email, company, message, websiteUrl, teamSize, preferredDate, preferredTime, focus, volume } = req.body;
+      const { source, name, email, company, message, websiteUrl, teamSize, preferredDate, preferredTime, focus, volume, tool, toolName, resultType, resultSummary } = req.body;
 
       const errors = [
         validateRequiredEnum(source, 'source', SOURCES as unknown as string[]),
@@ -43,6 +45,21 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         const emailErr = validateEmail(email, 'email');
         if (nameErr) errors.push(nameErr);
         if (emailErr) errors.push(emailErr);
+      }
+
+      if (source === 'tool') {
+        if (tool && (typeof tool !== 'string' || tool.length > 120)) {
+          errors.push({ field: 'tool', message: 'tool must be a short string' });
+        }
+        if (toolName && (typeof toolName !== 'string' || toolName.length > 120)) {
+          errors.push({ field: 'toolName', message: 'toolName must be a short string' });
+        }
+        if (resultType && (typeof resultType !== 'string' || resultType.length > 80)) {
+          errors.push({ field: 'resultType', message: 'resultType must be a short string' });
+        }
+        if (resultSummary !== undefined && (typeof resultSummary !== 'string' || resultSummary.length > 1000)) {
+          errors.push({ field: 'resultSummary', message: 'resultSummary must be a string of at most 1000 characters' });
+        }
       }
 
       if (errors.length > 0) return validationError(res, errors as any);
@@ -69,6 +86,10 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
           preferredTime: preferredTime || undefined,
           focus: focus || undefined,
           volume: volume || undefined,
+          tool: tool || undefined,
+          toolName: toolName || undefined,
+          resultType: resultType || undefined,
+          resultSummary: resultSummary || undefined,
         },
       });
 
@@ -81,6 +102,9 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
           company ? `Company: ${company}` : null,
           websiteUrl ? `Website: ${websiteUrl}` : null,
           message ? `Message: ${message}` : null,
+          toolName ? `Tool: ${toolName}` : null,
+          resultType ? `Result: ${resultType}` : null,
+          resultSummary ? `Summary: ${resultSummary}` : null,
         ].filter(Boolean).join('\n');
         getEmailService().send({
           to: notifyTo,

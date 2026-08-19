@@ -277,7 +277,8 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
         ? { email: brainOutput.extractedLead.email ?? undefined, phone: brainOutput.extractedLead.phone ?? undefined }
         : null,
       state.knownFacts.useCase || state.knownFacts.industry || '',
-      [...state.ledger.topicsCovered, ...state.ledger.topicsPending]
+      [...state.ledger.topicsCovered, ...state.ledger.topicsPending],
+      { config: input.getLeadAlertConfig ? input.getLeadAlertConfig(state.tenantId ?? input.tenantId) ?? null : null }
     );
   } catch {}
 

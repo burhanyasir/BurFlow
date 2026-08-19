@@ -265,6 +265,9 @@ export interface WidgetConfig {
   customCss?: string;
   notificationEmail?: string;
   slackWebhookUrl?: string;
+  customWebhookUrl?: string;
+  /** Comma-separated alert recipients (in addition to notificationEmail). */
+  alertEmails?: string;
   notifyThreshold?: 'all' | 'sales_qualified_only';
   createdAt: string;
   updatedAt: string;

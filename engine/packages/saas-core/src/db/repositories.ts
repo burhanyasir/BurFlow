@@ -858,6 +858,8 @@ export class WidgetConfigRepository {
     if (data.customCss) { cols.push('custom_css'); vals.push(data.customCss); }
     if (data.notificationEmail) { cols.push('notification_email'); vals.push(data.notificationEmail); }
     if (data.slackWebhookUrl) { cols.push('slack_webhook_url'); vals.push(data.slackWebhookUrl); }
+    if (data.customWebhookUrl) { cols.push('custom_webhook_url'); vals.push(data.customWebhookUrl); }
+    if (data.alertEmails) { cols.push('alert_emails'); vals.push(data.alertEmails); }
     if (data.notifyThreshold !== undefined) { cols.push('notify_threshold'); vals.push(data.notifyThreshold); }
     this.db.prepare(`INSERT INTO widget_configs (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`).run(...vals);
     return this.get(tenantId)!;
@@ -878,6 +880,8 @@ export class WidgetConfigRepository {
       customCss: row.custom_css,
       notificationEmail: row.notification_email || undefined,
       slackWebhookUrl: row.slack_webhook_url || undefined,
+      customWebhookUrl: row.custom_webhook_url || undefined,
+      alertEmails: row.alert_emails || undefined,
       notifyThreshold: row.notify_threshold || 'all',
       createdAt: row.created_at, updatedAt: row.updated_at,
     };

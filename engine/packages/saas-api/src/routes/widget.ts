@@ -75,6 +75,7 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
     'greeting', 'greetingText', 'avatarUrl', 'logoUrl', 'companyName',
     'launcherText', 'starterOptions', 'allowedDomains', 'autoOpen',
     'autoOpenDelay', 'customCss', 'notificationEmail', 'slackWebhookUrl',
+    'customWebhookUrl', 'alertEmails',
     'notifyThreshold', 'businessProfile',
   ]);
   for (const key of Object.keys(raw)) {
@@ -189,6 +190,27 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
     if (typeof clean !== 'string') return clean;
     if (clean && !clean.startsWith('https://')) return { ok: false, error: 'slackWebhookUrl must be an https URL' };
     data.slackWebhookUrl = clean || undefined;
+  }
+
+  if (raw.customWebhookUrl !== undefined) {
+    const clean = sanitizeString(raw.customWebhookUrl, 'customWebhookUrl', 2048);
+    if (typeof clean !== 'string') return clean;
+    if (clean && !clean.startsWith('https://')) return { ok: false, error: 'customWebhookUrl must be an https URL' };
+    data.customWebhookUrl = clean || undefined;
+  }
+
+  if (raw.alertEmails !== undefined) {
+    if (typeof raw.alertEmails !== 'string') return { ok: false, error: 'alertEmails must be a string' };
+    const emails = raw.alertEmails
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (emails.length === 0) return { ok: false, error: 'alertEmails must contain at least one email address' };
+    if (emails.length > 20) return { ok: false, error: 'alertEmails can contain at most 20 email addresses' };
+    for (const email of emails) {
+      if (!EMAIL_RE.test(email)) return { ok: false, error: `alertEmails contains an invalid email: ${email}` };
+    }
+    data.alertEmails = emails.join(', ');
   }
 
   if (raw.notifyThreshold !== undefined) {

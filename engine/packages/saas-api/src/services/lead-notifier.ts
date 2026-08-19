@@ -9,6 +9,10 @@ export type NotifyThreshold = 'all' | 'sales_qualified_only';
 export interface LeadNotificationConfig {
   notificationEmail?: string;
   slackWebhookUrl?: string;
+  /** Generic HTTPS endpoint that receives the serialized lead as JSON. */
+  customWebhookUrl?: string;
+  /** Comma-separated additional email recipients (in addition to notificationEmail). */
+  alertEmails?: string;
   notifyThreshold?: NotifyThreshold;
 }
 
@@ -146,11 +150,34 @@ export async function sendEmailNotification(recipientEmail: string, lead: Lead):
 
 export function shouldNotifyLead(config: LeadNotificationConfig | null | undefined, lead: Lead): boolean {
   if (!config) return false;
-  if (!config.notificationEmail && !config.slackWebhookUrl) return false;
+  if (!config.notificationEmail && !config.slackWebhookUrl && !config.customWebhookUrl && !config.alertEmails) return false;
   if (config.notifyThreshold === 'sales_qualified_only' && lead.qualificationStatus !== 'sales_qualified') {
     return false;
   }
   return true;
+}
+
+export async function sendCustomWebhookNotification(webhookUrl: string, lead: Lead): Promise<void> {
+  const res = await fetch(webhookUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ ...toLeadAlertData(lead), event: 'lead.alert', timestamp: new Date().toISOString() }),
+  });
+  if (!res.ok) {
+    throw new Error(`Custom webhook responded with ${res.status}: ${(await res.text()).slice(0, 200)}`);
+  }
+}
+
+function alertEmailRecipients(config: LeadNotificationConfig): string[] {
+  const explicit = (config.notificationEmail || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const extra = (config.alertEmails || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return [...new Set([...explicit, ...extra])];
 }
 
 export function dispatchLeadNotifications(config: LeadNotificationConfig | null | undefined, lead: Lead): number {
@@ -162,9 +189,16 @@ export function dispatchLeadNotifications(config: LeadNotificationConfig | null 
       createContextLogger(logger).error({ err }, 'Slack lead notification failed');
     });
   }
-  if (config!.notificationEmail) {
+  if (config!.customWebhookUrl) {
     dispatched += 1;
-    void sendEmailNotification(config!.notificationEmail, lead).catch((err: unknown) => {
+    void sendCustomWebhookNotification(config!.customWebhookUrl, lead).catch((err: unknown) => {
+      createContextLogger(logger).error({ err }, 'Custom webhook lead notification failed');
+    });
+  }
+  const recipients = alertEmailRecipients(config!);
+  for (const recipient of recipients) {
+    dispatched += 1;
+    void sendEmailNotification(recipient, lead).catch((err: unknown) => {
       createContextLogger(logger).error({ err }, 'Email lead notification failed');
     });
   }
@@ -182,12 +216,16 @@ export interface LeadAlertContext {
  * Resolves alert recipients: an explicit notification email wins (widget config
  * or tenant.notification_email); otherwise all team member emails are used.
  */
-export function resolveLeadNotificationRecipients(opts: { notificationEmail?: string; teamEmails?: string[] }): string[] {
+export function resolveLeadNotificationRecipients(opts: { notificationEmail?: string; alertEmails?: string; teamEmails?: string[] }): string[] {
   const explicit = (opts.notificationEmail || '')
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
-  const candidates = explicit.length > 0 ? explicit : (opts.teamEmails || []);
+  const extra = (opts.alertEmails || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean);
+  const candidates = explicit.length > 0 ? [...explicit, ...extra] : [...extra, ...(opts.teamEmails || [])];
   return [...new Set(candidates.filter(Boolean))];
 }
 
@@ -238,6 +276,7 @@ export function dispatchLeadAlerts(
   let dispatched = 0;
   const recipients = resolveLeadNotificationRecipients({
     notificationEmail: opts.config.notificationEmail || opts.tenantNotificationEmail,
+    alertEmails: opts.config.alertEmails,
     teamEmails: opts.teamEmails,
   });
   if (recipients.length > 0) {

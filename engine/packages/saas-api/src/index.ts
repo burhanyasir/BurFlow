@@ -461,6 +461,8 @@ const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
     const config: LeadNotificationConfig = {
       notificationEmail: widgetConfig?.notificationEmail,
       slackWebhookUrl: widgetConfig?.slackWebhookUrl,
+      customWebhookUrl: widgetConfig?.customWebhookUrl,
+      alertEmails: widgetConfig?.alertEmails,
       notifyThreshold: widgetConfig?.notifyThreshold,
     };
     const tenant = tenantRepo.findById(lead.tenantId);
@@ -487,7 +489,15 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), require
   notifyLeadCaptured,
   getNotificationConfig: (tenantId) => {
     const wc = widgetConfigRepo.get(tenantId);
-    return wc ? { notificationEmail: wc.notificationEmail, slackWebhookUrl: wc.slackWebhookUrl, notifyThreshold: wc.notifyThreshold } : null;
+    return wc
+      ? {
+          notificationEmail: wc.notificationEmail,
+          slackWebhookUrl: wc.slackWebhookUrl,
+          customWebhookUrl: wc.customWebhookUrl,
+          alertEmails: wc.alertEmails,
+          notifyThreshold: wc.notifyThreshold,
+        }
+      : null;
   },
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,

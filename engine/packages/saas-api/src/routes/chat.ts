@@ -312,6 +312,9 @@ export function createChatRoutes(
         // Defense-in-depth: if an agent took over between the route-level
         // guard above and pipeline execution, the pipeline skips the LLM.
         isHumanTookOver: handoff ? !handoff.isAiManaged(tenantId!, convSessionId) : false,
+        getLeadAlertConfig: leadOptions?.getNotificationConfig
+          ? (tid) => leadOptions.getNotificationConfig!(tid)
+          : undefined,
         policy: {
           qualification: DEFAULT_TENANT_POLICY.qualification,
           cta: DEFAULT_TENANT_POLICY.cta,
