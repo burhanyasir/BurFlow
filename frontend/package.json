@@ -9,6 +9,7 @@
     "prebuild": "node scripts/sync-widget.js",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
+    "sitemap": "bun scripts/generate-sitemap.ts",
     "lint": "oxlint",
     "prepreview": "node scripts/sync-widget.js",
     "preview": "vite preview"
