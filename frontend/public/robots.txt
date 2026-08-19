@@ -4,4 +4,13 @@ Disallow: /api/
 Disallow: /dashboard/
 Disallow: /admin/
 
-Sitemap: https://burflow.vercel.app/sitemap.xml
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+Sitemap: https://bur-flow.vercel.app/sitemap.xml

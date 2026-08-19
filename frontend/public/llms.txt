@@ -1,0 +1,70 @@
+# BurFlow
+
+> BurFlow is an AI website sales agent platform: a chat widget that answers visitor questions, qualifies leads, and captures pipeline on your website — deployed in minutes.
+
+- Homepage: https://bur-flow.vercel.app/
+- Free tools (50+, no sign-up): https://bur-flow.vercel.app/free-tools
+- Pricing: https://bur-flow.vercel.app/pricing
+- Live demo: https://bur-flow.vercel.app/demo
+- Blog: https://bur-flow.vercel.app/blog
+
+## Key pages
+
+- AI sales agent platform: https://bur-flow.vercel.app/
+- AI Chatbot vs AI Sales Agent: https://bur-flow.vercel.app/blog/ai-chatbot-vs-ai-sales-agent
+- How to Convert Website Visitors Into Demos: https://bur-flow.vercel.app/blog/how-to-convert-website-visitors-into-demos
+- Guide to AI sales agents: https://bur-flow.vercel.app/guides/ai-sales-agents
+
+## Free tools (no sign-up, processed locally in the browser)
+
+### AI Generators
+- AI FAQ Generator: https://bur-flow.vercel.app/tools/faq-generator
+- AI Chatbot Conversation Analysis: https://bur-flow.vercel.app/tools/conversation-analysis
+- AI Prompt Generator: https://bur-flow.vercel.app/tools/ai-prompt-generator
+- AI Prompt Optimizer: https://bur-flow.vercel.app/tools/prompt-optimizer
+- AI Chat with Text Data: https://bur-flow.vercel.app/tools/chat-text-data
+- AI Chat with Website Data: https://bur-flow.vercel.app/tools/ai-chat-with-website
+- AI Chat with Documents: https://bur-flow.vercel.app/tools/chat-document-data
+- AI Chat with PDF: https://bur-flow.vercel.app/tools/chat-pdf-data
+- AI Chat with Word Docs: https://bur-flow.vercel.app/tools/chat-word-data
+- AI Reply Generator: https://bur-flow.vercel.app/tools/reply-generator
+- AI Answer Generator: https://bur-flow.vercel.app/tools/answer-generator
+- AI Email Response Generator: https://bur-flow.vercel.app/tools/email-response-generator
+- AI Letter Generator: https://bur-flow.vercel.app/tools/letter-generator
+- AI Blog Title Generator: https://bur-flow.vercel.app/tools/blog-title-generator
+- AI Chatbot Name Generator: https://bur-flow.vercel.app/tools/chatbot-name-generator
+- AI SaaS Brand Name Generator: https://bur-flow.vercel.app/tools/saas-brand-name-generator
+- Email Signature Generator: https://bur-flow.vercel.app/tools/email-signature-generator
+- Website FAQ Generator: https://bur-flow.vercel.app/tools/website-faq-generator
+- Customer Service Script Generator: https://bur-flow.vercel.app/tools/customer-service-script-generator
+
+### Markdown Converters (all local, all free)
+- Document to Markdown: https://bur-flow.vercel.app/tools/document-to-markdown
+- Webpage to Markdown: https://bur-flow.vercel.app/tools/webpage-to-markdown
+- PDF to Markdown: https://bur-flow.vercel.app/tools/pdf-to-markdown
+- CSV to Markdown: https://bur-flow.vercel.app/tools/csv-to-markdown
+- JSON to Markdown: https://bur-flow.vercel.app/tools/json-to-markdown
+- DOCX to Markdown: https://bur-flow.vercel.app/tools/docx-to-markdown
+- RTF to Markdown: https://bur-flow.vercel.app/tools/rtf-to-markdown
+- HTML to Markdown: https://bur-flow.vercel.app/tools/html-to-markdown
+- Paste to Markdown: https://bur-flow.vercel.app/tools/paste-to-markdown
+- Notion to Markdown: https://bur-flow.vercel.app/tools/notion-to-markdown
+- Google Docs to Markdown: https://bur-flow.vercel.app/tools/google-docs-to-markdown
+- XML to Markdown: https://bur-flow.vercel.app/tools/xml-to-markdown
+
+### SEO & Sitemaps
+- Sitemap Validator: https://bur-flow.vercel.app/tools/sitemap-validator
+- Sitemap Finder & Checker: https://bur-flow.vercel.app/tools/sitemap-finder
+- XML Sitemap Generator: https://bur-flow.vercel.app/tools/xml-sitemap-generator
+- Sitemap URL Extractor: https://bur-flow.vercel.app/tools/sitemap-url-extractor
+- Sitemap URLs Comparison: https://bur-flow.vercel.app/tools/sitemap-url-comparison
+- Sitemap Split/Merger: https://bur-flow.vercel.app/tools/sitemap-split-merger
+- Sitemap Analytics: https://bur-flow.vercel.app/tools/sitemap-analytics
+- Sitemap Index Generator: https://bur-flow.vercel.app/tools/sitemap-index-generator
+- Sitemap to Robots.txt Generator: https://bur-flow.vercel.app/tools/sitemap-robots-generator
+- Sitemap Frequency Analyzer: https://bur-flow.vercel.app/tools/sitemap-frequency-analyzer
+- Website URL Extractor: https://bur-flow.vercel.app/tools/website-url-extractor
+
+## Business model
+
+BurFlow is a SaaS platform. Free plan: 100 AI chat messages per month. Paid plans add more messages, advanced analytics, and integrations.

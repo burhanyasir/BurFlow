@@ -114,6 +114,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What does conversation analysis find?', a: 'It detects unanswered visitor questions (knowledge gaps), repeated high-intent topics, greeting and closing handling, and average message lengths.' },
       { q: 'What format should the log be in?', a: 'One message per line, prefixed with "Visitor:" or "Agent:" — "User:", "Customer:", "Bot:", and "Support:" work too.' },
+      { q: 'How do I interpret the confidence ratings?', a: 'Messages the bot answers confidently are marked green, partial coverage is amber, and unanswered questions are red — the red items are your knowledge-gap backlog.' },
+      { q: 'Is the conversation data uploaded?', a: 'No — the log is analyzed locally in your browser and never sent to a server.' },
     ],
   }),
   live({
@@ -150,6 +152,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What does the prompt optimizer do?', a: 'It rewrites your existing prompt into a chosen framework (APE, RACE, CREATE, or SPARK), adding role, context, expectations, and evaluation steps.' },
       { q: 'Will my prompt intent be preserved?', a: 'Yes — your original instruction becomes the core action, wrapped in structure that makes the AI follow it more reliably.' },
+      { q: 'Can I optimize prompts for any AI model?', a: 'Yes — the optimized output is model-agnostic and works with ChatGPT, Claude, Gemini, and other major models.' },
+      { q: 'What makes the optimized version better?', a: 'It adds an explicit role, goal, audience, constraints, output format, and evaluation criteria — the ingredients most prompts lack.' },
     ],
   }),
   live({
@@ -262,6 +266,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What channels are supported?', a: 'Email, LinkedIn, Twitter/X, text messages, Slack, and review responses — pick a channel and tone for tailored drafts.' },
       { q: 'Can I use the drafts commercially?', a: 'Yes — generated replies are yours to edit and send anywhere.' },
+      { q: 'Which tones are available?', a: 'Professional, Friendly, Assertive, and Empathetic — pick one and the phrasing adapts to it.' },
+      { q: 'How long are the replies?', a: 'Drafts are concise by default (2–5 sentences); choose "Detailed" for longer, more thorough responses.' },
     ],
   }),
   live({
@@ -279,6 +285,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What depth options are available?', a: 'Quick (2–3 sentences), Balanced (one paragraph), or Detailed with a practical example.' },
       { q: 'Is the answer generator free?', a: 'Yes — free with no sign-up and no usage limits.' },
+      { q: 'Where do the answers come from?', a: 'Answers are generated locally from structured knowledge patterns — they work offline and are private by design.' },
+      { q: 'Can I use the answers in my work?', a: 'Yes — answers are provided as research starting points and are yours to use and verify.' },
     ],
   }),
   live({
@@ -296,6 +304,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Who is this for?', a: 'Anyone who writes email replies regularly — customer support, sales, recruiting, and general business correspondence.' },
       { q: 'Can I edit the drafts?', a: 'Yes — treat them as a starting point and tailor them to your voice before sending.' },
+      { q: 'Which tones are supported?', a: 'Warm, Direct, Formal, and Apologetic — each produces a distinct draft suited to the relationship and situation.' },
+      { q: 'How do I get the best results?', a: 'Include the original email and a one-line note on your intent — the draft will follow that context closely.' },
     ],
   }),
   live({
@@ -313,6 +323,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What kinds of letters can I generate?', a: 'Cover letters, business letters, formal correspondence, and personal letters — describe the purpose and add key details.' },
       { q: 'Is there a charge?', a: 'No — completely free with no sign-up.' },
+      { q: 'Can I generate formal complaint or resignation letters?', a: 'Yes — describe the situation and any key dates, and the generator produces a professional, structured draft.' },
+      { q: 'What details should I include?', a: 'Recipient, purpose, and specifics like dates or amounts. The more context you give, the more relevant the letter.' },
     ],
   }),
   live({
@@ -330,6 +342,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What angles are available?', a: 'How-to, Listicle, Problem/Solution, Data-driven, and Comparison — each produces 3 titles per run.' },
       { q: 'Are the titles SEO-ready?', a: 'They follow proven headline formulas. Add your primary keyword to the topic line for maximum SEO impact.' },
+      { q: 'How many titles do I get per run?', a: 'Three per angle — run it multiple times or switch angles to build a shortlist of 9–15 candidates.' },
+      { q: 'Can I use the titles for paid ads?', a: 'Yes — the headlines also work as ad copy hooks and email subject lines.' },
     ],
   }),
   live({
@@ -347,6 +361,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How does the generator work?', a: 'It combines curated prefixes, cores, and suffixes with your optional seed word to produce short, brandable names.' },
       { q: 'Can I use the names commercially?', a: 'Yes — generated names are yours to use, though you should check domain and trademark availability.' },
+      { q: 'Can I use my brand name as a seed?', a: 'Yes — enter your brand or a keyword and the generator blends it into the name candidates.' },
+      { q: 'How many names does it produce?', a: 'Twelve per run, mixing different structural patterns for variety.' },
     ],
   }),
   live({
@@ -364,6 +380,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What makes a good SaaS name?', a: 'Short (under 12 characters when possible), easy to spell, and available as a .com. The generator favors these patterns.' },
       { q: 'Do you check domain availability?', a: 'No — the generator produces candidates. Check availability at your registrar of choice.' },
+      { q: 'How many names are generated per run?', a: 'Twelve candidates across different patterns — short, coined, and compound styles.' },
+      { q: 'Can I generate names for a specific industry?', a: 'Yes — include an industry keyword (e.g., "finance" or "health") and results lean in that direction.' },
     ],
   }),
   live({
@@ -381,6 +399,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How do I install the signature?', a: 'Gmail: Settings → Signature. Outlook: Settings → Mail → Signature. Copy the HTML version with formatting for best results.' },
       { q: 'Which email clients support HTML signatures?', a: 'Gmail, Outlook, Apple Mail, and most desktop clients. Some mobile clients only show plain text.' },
+      { q: 'Can I add social media links?', a: 'Yes — LinkedIn, X/Twitter, and website links are included as icons in the signature.' },
+      { q: 'Is the signature responsive?', a: 'The generated HTML is designed to render cleanly on mobile email clients too.' },
     ],
   }),
   live({
@@ -398,6 +418,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How many pages can I use as sources?', a: 'Up to 3 URLs. The generator combines them into one question set covering what, how, pricing, setup, and support.' },
       { q: 'What if a URL is blocked?', a: 'The generator falls back to a topic-based question set derived from your domain name.' },
+      { q: 'Do the FAQs include pricing questions?', a: 'Yes — pricing, setup, and support questions are part of the standard question set when detected on the source pages.' },
+      { q: 'Can I generate FAQs for my competitors?', a: 'Yes — running your competitors\' pages through the generator reveals the questions they answer, useful for positioning research.' },
     ],
   }),
   live({
@@ -415,6 +437,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What does a script include?', a: 'An opening, information-gathering, resolution framing, prevention note, and closing — adapted to live chat, phone, email, or social.' },
       { q: 'Are the scripts ready to use?', a: 'Yes — they follow proven de-escalation and resolution patterns, ready to adapt to your brand voice.' },
+      { q: 'Which channels are supported?', a: 'Live chat, phone, email, and social media — the script structure adapts to the channel.' },
+      { q: 'Can I use the structure for other situations?', a: 'Yes — the same structure adapts well to onboarding and account-management conversations.' },
     ],
   }),
   live({
@@ -432,6 +456,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Which PDFs work best?', a: 'Text-based PDFs — manuals, reports, and whitepapers. Scanned (image-only) PDFs cannot be read in the browser.' },
       { q: 'Does the PDF leave my machine?', a: 'No — everything is extracted and analyzed locally.' },
+      { q: 'What kinds of documents work best?', a: 'Product manuals, onboarding docs, policies, and research papers — anything text-based with clear structure.' },
+      { q: 'Can I copy the generated FAQ?', a: 'Yes — the output is plain text ready to copy, paste, and format into your help center or docs.' },
     ],
   }),
   live({
@@ -449,6 +475,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How does it extract the page content?', a: 'The URL is fetched in your browser; if the site blocks cross-origin access, pasting the page text always works instead.' },
       { q: 'Can I publish the FAQs?', a: 'Yes — the output is ready to publish, and pairs well with FAQPage structured data for SEO.' },
+      { q: 'Which pages work best?', a: 'Product pages, pricing pages, and help docs — pages that answer common visitor questions convert best into FAQs.' },
+      { q: 'Does it work on pages behind a login?', a: 'No — the URL must be public. For private content, paste the page text directly instead.' },
     ],
   }),
   live({
@@ -466,6 +494,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Which files are supported?', a: '.docx files are read locally in the browser; legacy .doc binary files are not supported.' },
       { q: 'Is the document uploaded?', a: 'No — it is unpacked and analyzed entirely in your browser.' },
+      { q: 'What document types work best?', a: 'Manuals, handbooks, and training documents — structured documents with clear headings convert cleanly into FAQs.' },
+      { q: 'Can I generate FAQs for multiple documents?', a: 'One at a time — but you can merge the outputs into a single knowledge base afterward.' },
     ],
   }),
   live({
@@ -483,6 +513,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How do I use it?', a: 'Paste page source HTML or upload an .html file — headings, paragraphs, and lists are converted into question sets.' },
       { q: 'Is it free?', a: 'Yes — free with no sign-up and no usage limits.' },
+      { q: 'Does it work with any HTML structure?', a: 'Yes — semantic HTML (headings, lists, paragraphs) converts best; minified or script-heavy pages may produce fewer questions.' },
+      { q: 'Can I convert a full website page source?', a: 'Yes — paste the raw HTML of any page, including saved "View Source" output.' },
     ],
   }),
   live({
@@ -500,6 +532,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Does the document need to be public?', a: 'Yes — set sharing to "Anyone with the link can view". If Google blocks browser fetching, paste the text instead.' },
       { q: 'Is my document stored?', a: 'No — processing happens in your browser.' },
+      { q: 'Can I generate FAQs from shared templates?', a: 'Yes — any public Google Doc works, including templates and planning docs.' },
+      { q: 'How accurate are the questions?', a: 'Questions are derived from your document\'s actual headings and content, so they reflect what the doc covers.' },
     ],
   }),
   live({
@@ -517,6 +551,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Does the Notion page need to be public?', a: 'Yes — share with "Anyone with the link". If Notion blocks browser fetching, paste the page text instead.' },
       { q: 'Is this free?', a: 'Yes — free with no sign-up and no usage limits.' },
+      { q: 'Does it work with Notion databases?', a: 'Public database views that render as pages can work; blocked views fall back to the demo conversion.' },
+      { q: 'Can I use the FAQs for a help center?', a: 'Yes — the output is ready to adapt into your help center or docs site.' },
     ],
   }),
 
@@ -785,6 +821,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Which locations are checked?', a: '/sitemap.xml, /sitemap_index.xml, /sitemap-index.xml, /sitemap1.xml, /sitemap/, /sitemaps/sitemap.xml, and /wp-sitemap.xml.' },
       { q: 'Why might a sitemap not be found?', a: 'The site may use a custom location, or it may block cross-origin browser requests — the checker reports "blocked" in that case.' },
+      { q: 'Does it work on any website?', a: 'Any public site — though sites that block cross-origin requests report "blocked" rather than a result.' },
+      { q: 'What do I do after finding the sitemap?', a: 'Validate it with the sitemap validator or extract its URLs to audit which pages are indexed.' },
     ],
   }),
   live({
@@ -802,6 +840,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How do I use the generated sitemap?', a: 'Save the output as sitemap.xml, upload it to your site root, and submit it in Google Search Console.' },
       { q: 'What options can I set?', a: 'Change frequency (always to never), priority (0.1–1.0), and last-modified date — applied to all URLs.' },
+      { q: 'Which URLs should I include?', a: 'Canonical, indexable pages — exclude login, admin, and parameter-heavy URLs that add no crawl value.' },
+      { q: 'How many URLs can I generate?', a: 'Unlimited input — but keep each sitemap under 50,000 URLs, the limit Google enforces.' },
     ],
   }),
   live({
@@ -819,6 +859,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Does it work with sitemap indexes?', a: 'Yes — for index files, the child sitemap locations are extracted and listed.' },
       { q: 'Is my sitemap uploaded?', a: 'No — extraction happens locally in your browser.' },
+      { q: 'What format is the output?', a: 'One URL per line — ready to paste into spreadsheets, scripts, or the sitemap comparison tool.' },
+      { q: 'Does it handle gzipped sitemaps?', a: 'Paste the decompressed XML content — .xml.gz files are not fetched automatically by the browser.' },
     ],
   }),
   live({
@@ -836,6 +878,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What does the comparison show?', a: 'A diff of URLs: added in the new sitemap, removed, and unchanged — perfect for tracking site migrations.' },
       { q: 'Does it compare metadata too?', a: 'No — it compares URL sets only, which is what matters for content tracking.' },
+      { q: 'How are URLs normalized?', a: 'Each URL is normalized for scheme and trailing slashes before comparison, so http vs https differences are flagged clearly.' },
+      { q: 'Can I export the diff?', a: 'Yes — the added, removed, and unchanged lists can be copied as plain text.' },
     ],
   }),
   live({
@@ -853,6 +897,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Why split a sitemap?', a: 'Google caps sitemaps at 50,000 URLs and 50MB — larger sites must split into multiple files.' },
       { q: 'Are lastmod and priority preserved when splitting?', a: 'Yes — each chunk keeps the original lastmod and priority values from the source file.' },
+      { q: 'Can I merge files with different namespaces?', a: 'Yes — standard sitemap and sitemapindex namespaces are handled automatically.' },
+      { q: 'Does splitting generate an index file?', a: 'Yes — when a split creates multiple chunks, a sitemap index referencing them is included.' },
     ],
   }),
   live({
@@ -870,6 +916,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What metrics are reported?', a: 'Total URLs, distribution by extension and URL depth, changefreq and priority distributions, plus actionable recommendations.' },
       { q: 'Is this free?', a: 'Yes — all analytics run locally in your browser with no sign-up.' },
+      { q: 'What SEO recommendations does it make?', a: 'It flags missing lastmod, low-priority pages in deep paths, and inconsistent changefreq values across similar pages.' },
+      { q: 'Can I analyze another site\'s sitemap?', a: 'Yes — paste any sitemap, including competitors\', and the same analytics apply.' },
     ],
   }),
   live({
@@ -887,6 +935,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What is a sitemap index?', a: 'A sitemapindex XML file that lists your individual sitemaps — required when you have more than one sitemap file.' },
       { q: 'How is lastmod set?', a: 'Each entry gets today\'s date automatically, so you can submit the index right away.' },
+      { q: 'How many sitemaps can I reference?', a: 'Unlimited — each sitemap URL becomes one <sitemap> entry with today\'s lastmod.' },
+      { q: 'Is validation included?', a: 'Each URL is checked for well-formedness; reachability checks are left to your crawler.' },
     ],
   }),
   live({
@@ -904,6 +954,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What does robots.txt do?', a: 'It tells search engine crawlers which parts of your site they may and may not crawl, and points them to your sitemap.' },
       { q: 'Where do I put the file?', a: 'In your site root — https://example.com/robots.txt. Most crawlers pick up changes within 24 hours.' },
+      { q: 'Should I block the /admin path?', a: 'Yes — private sections like admin and dashboard should be disallowed, as the generator does by default.' },
+      { q: 'Can I add crawl-delay rules?', a: 'Yes — an optional Crawl-delay line is included for hosts that support it.' },
     ],
   }),
   live({
@@ -921,6 +973,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Why does changefreq matter?', a: 'Accurate changefreq helps Google schedule crawls — pages that change daily should say "daily", not "yearly".' },
       { q: 'What does the report include?', a: 'The distribution of changefreq and priority values across your URLs, with percentage shares and recommendations.' },
+      { q: 'What is the ideal changefreq mix?', a: 'Daily for news and changelogs, weekly for blogs, monthly for evergreen pages — the report shows your current mix.' },
+      { q: 'Is my sitemap uploaded?', a: 'No — everything is analyzed locally in your browser.' },
     ],
   }),
   live({
@@ -938,6 +992,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How are URLs extracted?', a: 'The homepage is fetched in your browser and internal links are collected. Blocked sites fall back to a demo crawl of typical URLs.' },
       { q: 'Does it crawl the whole site?', a: 'The free tool reads the homepage. For full site-wide crawling with AI cleanup, BurFlow Free handles entire sites.' },
+      { q: 'Are external links included?', a: 'No — only internal links (same-domain) are extracted, which is what sitemap building needs.' },
+      { q: 'How many URLs can I extract?', a: 'All internal links found on the homepage — hundreds on most sites, with no hard cap.' },
     ],
   }),
 ];
