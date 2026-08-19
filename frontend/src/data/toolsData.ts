@@ -165,6 +165,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What can I chat with?', a: 'Any plain text — articles, notes, transcripts, meeting summaries, or reports. Analysis runs locally in your browser.' },
       { q: 'Is there a question limit?', a: 'No — unlimited questions, no sign-up. The text never leaves your machine.' },
+      { q: 'What can I ask about the text?', a: 'Anything — or tap a quick action to generate an executive summary, extract key FAQs, or list action items.' },
+      { q: 'Is my data stored anywhere?', a: 'No. Everything is processed locally in your browser and nothing is sent to a server.' },
     ],
   }),
   live({
@@ -201,6 +203,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Which document formats are supported?', a: 'TXT, Markdown, HTML, CSV, JSON, XML, RTF, and DOCX. The file is read locally and never uploaded.' },
       { q: 'What can I ask about the document?', a: 'Anything — a quick action button also generates an executive summary, key FAQs, and action items.' },
+      { q: 'How does the chat work?', a: 'The document text is indexed in your browser and every answer is generated locally against that content — unlimited questions.' },
+      { q: 'Is the analysis really local?', a: 'Yes — your document never leaves your machine.' },
     ],
   }),
   live({
@@ -218,6 +222,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Are scanned PDFs supported?', a: 'Text-based PDFs are extracted locally. Image-only (scanned) PDFs need OCR, which this browser tool does not perform.' },
       { q: 'Does the PDF leave my machine?', a: 'No — the file is read and analyzed entirely in your browser.' },
+      { q: 'How is the AI answer generated?', a: 'The PDF text is analyzed locally with rule-based AI — summaries, FAQs, and action items are extracted from the actual content of your document.' },
+      { q: 'Can I ask unlimited questions?', a: 'Yes — unlimited questions with no sign-up.' },
     ],
   }),
   live({
@@ -235,6 +241,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Which Word formats are supported?', a: '.docx files are unpacked and read locally; legacy .doc binary files are not supported.' },
       { q: 'How accurate are the answers?', a: 'Answers are generated from your document text locally — accurate for questions answered directly by the content.' },
+      { q: 'Does the document leave my machine?', a: 'No — the .docx file is read and analyzed entirely in your browser.' },
+      { q: 'What can I ask?', a: 'Anything about the document — plus one-click quick actions for summaries, key FAQs, and action items.' },
     ],
   }),
   live({
@@ -564,6 +572,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How is the PDF converted?', a: 'Text is extracted locally from the PDF\'s embedded text streams and converted to Markdown. Nothing is uploaded.' },
       { q: 'Can scanned PDFs be converted?', a: 'No — image-based (scanned) PDFs need OCR, which this browser tool does not perform. Paste the text instead.' },
+      { q: 'Is PDF to Markdown conversion free?', a: 'Yes — completely free with unlimited conversions and no sign-up. All processing happens in your browser.' },
+      { q: 'What can I do with the converted Markdown?', a: 'Use it for documentation, content migration, AI training data, or publishing to Markdown-based platforms like GitHub, Notion, or Obsidian.' },
     ],
   }),
   live({
@@ -581,6 +591,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What happens to my CSV data?', a: 'It is converted locally in your browser and never uploaded.' },
       { q: 'Are quoted fields and commas handled?', a: 'Yes — the parser respects double-quoted fields, embedded commas, and newlines.' },
+      { q: 'Can I convert CSV to a Markdown table for GitHub?', a: 'Yes — the output uses GitHub-flavored Markdown table syntax with a header row and aligned columns, ready to paste into README files.' },
+      { q: 'Does it handle large CSV files?', a: 'Yes — files are processed locally in your browser, so even files with hundreds of thousands of rows work, though very large files may take a moment.' },
     ],
   }),
   live({
@@ -598,6 +610,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How does the conversion work?', a: 'Arrays of objects become Markdown tables; other structures become nested headings and lists, with indentation preserved.' },
       { q: 'Is my JSON uploaded?', a: 'No — conversion happens locally in your browser.' },
+      { q: 'Why would I convert JSON to Markdown?', a: 'For readable API documentation, changelogs, or turning JSON datasets into shareable tables inside docs and wikis.' },
+      { q: 'Does it handle nested JSON?', a: 'Yes — nested objects and arrays become headings and indented lists, while flat arrays of objects become tables.' },
     ],
   }),
   live({
@@ -615,6 +629,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How does DOCX conversion work?', a: 'The .docx file is unpacked in your browser (it is a ZIP of XML) and the document text is converted to Markdown.' },
       { q: 'Does the file leave my machine?', a: 'No — it never leaves your browser.' },
+      { q: 'Which Word versions are supported?', a: 'Any modern .docx file (Word 2007 and later). The tool reads the document XML directly — no Office installation is needed.' },
+      { q: 'What happens to images and tables?', a: 'Tables convert to Markdown tables; embedded images are not extracted, only the text content.' },
     ],
   }),
   live({
@@ -632,6 +648,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What is RTF?', a: 'Rich Text Format — a legacy word-processing format still used by many desktop editors and email clients.' },
       { q: 'How accurate is the conversion?', a: 'Bold, italics, headings, and paragraph structure are preserved; advanced formatting like embedded images is dropped.' },
+      { q: 'Why convert RTF to Markdown?', a: 'To modernize legacy documents — Markdown works natively with GitHub, Notion, Obsidian, and most developer documentation tools.' },
+      { q: 'Is the RTF converter free?', a: 'Yes — free with no sign-up, and nothing leaves your browser.' },
     ],
   }),
   live({
@@ -649,6 +667,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What HTML elements are supported?', a: 'Headings, paragraphs, links, lists, tables, blockquotes, code blocks, and inline formatting.' },
       { q: 'Is the conversion local?', a: 'Yes — everything happens in your browser. Nothing is uploaded.' },
+      { q: 'Can I convert an entire webpage to Markdown?', a: 'Paste the page\'s HTML source here, or use the URL-based converters for public Notion pages and Google Docs.' },
+      { q: 'How are images in the HTML handled?', a: 'They become standard Markdown image references (![alt text](src)) when a source URL is present.' },
     ],
   }),
   live({
@@ -666,6 +686,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'What can I paste?', a: 'Anything — plain text, HTML, CSV, JSON, or XML. The format is detected automatically.' },
       { q: 'Is there a size limit?', a: 'No hard limit — very large documents may slow the browser slightly.' },
+      { q: 'Does it preserve code?', a: 'Yes — fenced code blocks and inline code are kept intact when detected.' },
+      { q: 'Is the paste converter really free?', a: 'Yes — free forever with no sign-up. All processing happens locally in your browser.' },
     ],
   }),
   live({
@@ -683,6 +705,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Does the page need to be public?', a: 'Yes — share it with "Anyone with the link" first. If Notion blocks browser fetching, a demo conversion is shown.' },
       { q: 'Is the conversion free?', a: 'Yes — free with no sign-up.' },
+      { q: 'What Notion content converts?', a: 'Headings, paragraphs, bullet and numbered lists, to-dos, quotes, callouts, and code blocks.' },
+      { q: 'Why does a demo conversion sometimes appear?', a: 'Some pages block browser-side fetching. When that happens, a representative demo conversion is shown so you can preview the output format.' },
     ],
   }),
   live({
@@ -700,6 +724,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'Does the document need to be public?', a: 'Yes — set sharing to "Anyone with the link can view". If Google blocks browser fetching, a demo conversion is shown.' },
       { q: 'Are tables and lists preserved?', a: 'Yes — headings, lists, and tables convert to standard Markdown.' },
+      { q: 'Can I convert a shared Google Doc without downloading?', a: 'Yes — paste the share link and the converter reads the published content directly, no download or export needed.' },
+      { q: 'Is there a sign-up?', a: 'No sign-up, no uploads — the conversion happens in your browser.' },
     ],
   }),
   live({
@@ -717,6 +743,8 @@ export const TOOLS: ToolDefinition[] = [
     faqs: [
       { q: 'How does XML convert to Markdown?', a: 'Nested elements become headings and lists, attributes become metadata lines, and repeated elements become tables.' },
       { q: 'Is my XML uploaded?', a: 'No — conversion happens locally in your browser.' },
+      { q: 'Does it handle XML attributes?', a: 'Yes — attributes are preserved as metadata lines under each element.' },
+      { q: 'Why convert XML to Markdown?', a: 'For readable data documentation, API payload examples, or turning XML exports into shareable docs.' },
     ],
   }),
 

@@ -6,22 +6,21 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(here, '..', 'public');
-const prerenderDir = join(publicDir, 'prerendered');
 
 const BASE = process.env.PRERENDER_BASE ?? 'http://127.0.0.1:4173';
 const CHROME =
   process.env.CHROME_PATH ??
   'C:/Users/FAHAM/.agent-browser/browsers/chrome-152.0.7977.42/chrome.exe';
 
-const coreRoutes = ['/', '/pricing', '/demo', '/free-tools', '/features', '/compare', '/alternatives', '/blog', '/integrations', '/faq', '/guides/ai-sales-agents', '/case-studies', '/about', '/contact', '/trust'];
+const coreRoutes = ['/free-tools'];
 
 const toolRoutes = TOOLS.filter((t) => t.status === 'active').map((t) => t.route ?? `/tools/${t.slug}`);
 
 const routes = [...coreRoutes, ...toolRoutes];
 
 function outputPath(route: string): string {
-  const rel = route === '/' ? 'index' : route.replace(/^\//, '').replace(/\/$/, '');
-  return join(prerenderDir, rel === 'index' ? 'index.html' : join(rel, 'index.html'));
+  const rel = route.replace(/^\//, '').replace(/\/$/, '');
+  return join(publicDir, rel, 'index.html');
 }
 
 for (const route of routes) {
@@ -49,4 +48,4 @@ for (const route of routes) {
   console.log(`ok ${route} (${(html.length / 1024).toFixed(0)}KB)`);
 }
 
-console.log(`\nprerendered ${routes.length} routes into ${prerenderDir}`);
+console.log(`\nprerendered ${routes.length} routes into ${publicDir}`);
