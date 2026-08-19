@@ -96,19 +96,25 @@ async function extractPdfText(bytes: Uint8Array): Promise<string> {
   let parsed = 0;
   while ((match = streamRe.exec(raw)) !== null && parsed < 120) {
     parsed += 1;
-    const data = match[1];
-    const chunk = new TextEncoder().encode(data);
+    const whole = match[0];
+    const startIn = whole.indexOf('\n') + 1;
+    const endMark = whole.indexOf('endstream');
+    let endIn = endMark;
+    if (whole[endIn - 1] === '\n') endIn -= 1;
+    if (whole[endIn - 1] === '\r') endIn -= 1;
+    const dataBytes = bytes.subarray(match.index + startIn, match.index + endIn);
+    const dataStr = latin.decode(dataBytes);
     let decoded = '';
-    let isText = /Tj|TJ/.test(data);
+    let isText = /Tj|TJ/.test(dataStr);
     try {
-      const zlib = await inflate(chunk, INFLATE_ZLIB);
-      const text = new TextDecoder('latin1').decode(zlib);
+      const zlib = await inflate(dataBytes, INFLATE_ZLIB);
+      const text = latin.decode(zlib);
       if (/Tj|TJ/.test(text)) {
         decoded = text;
         isText = true;
       }
     } catch {
-      if (isText) decoded = data;
+      if (isText) decoded = dataStr;
     }
     if (isText && decoded.length > 0) {
       const extracted = extractPdfTextFromStream(decoded);
