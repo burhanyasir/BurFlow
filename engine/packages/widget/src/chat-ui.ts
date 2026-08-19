@@ -1035,6 +1035,7 @@ export class ChatWidget {
     this.dismissPreOpenPanel();
     if (!this.container) return;
     this.container.style.display = this.isOpen ? 'flex' : 'none';
+    if (this.bubbleEl) this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
     if (this.isOpen) {
       this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
       this.unreadCount = 0;

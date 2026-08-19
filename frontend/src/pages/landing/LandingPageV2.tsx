@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -213,34 +213,79 @@ function openWidget() {
 export default function LandingPage() {
   const [siteUrl, setSiteUrl] = useState('https://acme.com');
   const [scanState, setScanState] = useState<'idle' | 'scanning' | 'done'>('idle');
-  const [scanSummary, setScanSummary] = useState({ pages: 184, products: 6, intents: 18, readyIn: '4 min' });
+  const [scanStage, setScanStage] = useState('');
+  const [scanProgress, setScanProgress] = useState(0);
+  const [scanSummary, setScanSummary] = useState({ pages: 0, products: 0, services: 0, pricing: 0, faqs: 0, intents: 0, readyIn: '4 min' });
+  const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { if (scanTimerRef.current) clearInterval(scanTimerRef.current); }, []);
+
+  const SCAN_STAGES: [number, string][] = [
+    [0, 'Connecting to site…'],
+    [10, 'Discovering pages…'],
+    [25, 'Crawling content…'],
+    [45, 'Analyzing products & services…'],
+    [65, 'Reading pricing & plans…'],
+    [80, 'Mapping buyer intents…'],
+    [92, 'Building knowledge graph…'],
+  ];
 
   const scanPreview = useMemo(() => {
     if (scanState === 'done') {
       return [
         { label: 'Pages scanned', value: `${scanSummary.pages}+` },
-        { label: 'Products identified', value: `${scanSummary.products}` },
-        { label: 'Buyer intents found', value: `${scanSummary.intents}` },
+        { label: 'Products found', value: `${scanSummary.products}` },
+        { label: 'Services found', value: `${scanSummary.services}` },
+        { label: 'Pricing pages', value: `${scanSummary.pricing}` },
+        { label: 'FAQs detected', value: `${scanSummary.faqs}` },
+        { label: 'Buyer intents', value: `${scanSummary.intents}` },
       ];
     }
     return [
       { label: 'Pages scanned', value: '—' },
-      { label: 'Products identified', value: '—' },
-      { label: 'Buyer intents found', value: '—' },
+      { label: 'Products found', value: '—' },
+      { label: 'Services found', value: '—' },
+      { label: 'Pricing pages', value: '—' },
+      { label: 'FAQs detected', value: '—' },
+      { label: 'Buyer intents', value: '—' },
     ];
   }, [scanState, scanSummary]);
 
   const handleScanDemo = (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (!siteUrl || siteUrl === 'https://') return;
     setScanState('scanning');
-    window.setTimeout(() => {
-      setScanSummary({ pages: 184, products: 6, intents: 18, readyIn: '4 min' });
-      setScanState('done');
-    }, 900);
+    setScanProgress(0);
+    setScanStage(SCAN_STAGES[0]![1]);
+
+    // Derive realistic-looking counts from the domain length (deterministic per URL)
+    const domain = siteUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    const seed = domain.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
+    const pages = 40 + (seed % 160);
+    const products = 2 + (seed % 8);
+    const services = 1 + (seed % 5);
+    const pricing = 1 + (seed % 3);
+    const faqs = 3 + (seed % 12);
+    const intents = 8 + (seed % 15);
+
+    let p = 0;
+    if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+    scanTimerRef.current = window.setInterval(() => {
+      p = Math.min(p + 2 + Math.random() * 4, 100);
+      const stage = [...SCAN_STAGES].reverse().find(([at]) => p >= at)?.[1] ?? SCAN_STAGES[0]![1];
+      setScanProgress(p);
+      setScanStage(stage);
+      if (p >= 100) {
+        if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+        scanTimerRef.current = null;
+        setScanSummary({ pages, products, services, pricing, faqs, intents, readyIn: '4 min' });
+        setScanState('done');
+      }
+    }, 120);
   };
 
   return (
-    <div>
+    <div className="pb-24 md:pb-0">
       <section className="relative overflow-hidden pt-20 pb-16 md:pt-28 md:pb-20">
         <Container>
           <div className="grid grid-cols-1 lg:grid-cols-[1.08fr_0.92fr] gap-10 lg:gap-16 items-center">
@@ -294,8 +339,8 @@ export default function LandingPage() {
                     className="h-12 flex-1 rounded-2xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-50)] px-4 text-sm text-[var(--color-neutral-800)] outline-none focus:border-[var(--color-accent-400)] focus:ring-2 focus:ring-[var(--color-accent-200)]"
                     placeholder="https://yourcompany.com"
                   />
-                  <button type="submit" className="h-12 rounded-2xl bg-[var(--color-accent-600)] px-5 text-sm font-semibold text-white shadow-lg shadow-[rgba(99,102,241,0.18)] transition hover:bg-[var(--color-accent-700)]">
-                    Scan My Website
+                  <button type="submit" disabled={scanState === 'scanning'} className="h-12 rounded-2xl bg-[var(--color-accent-600)] px-5 text-sm font-semibold text-white shadow-lg shadow-[rgba(99,102,241,0.18)] transition hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed">
+                    {scanState === 'scanning' ? 'Scanning…' : scanState === 'done' ? 'Rescan' : 'Scan My Website'}
                   </button>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-[var(--color-neutral-500)]">
@@ -334,11 +379,11 @@ export default function LandingPage() {
 
                 <div className="mt-4 rounded-2xl bg-[var(--color-neutral-50)] p-4">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-[var(--color-neutral-500)]">Sales agent readiness</span>
-                    <span className="font-semibold text-[var(--color-neutral-900)]">{scanState === 'done' ? '97% ready' : 'Preparing…'}</span>
+                    <span className="text-[var(--color-neutral-500)]">{scanState === 'scanning' ? scanStage : scanState === 'done' ? 'Scan complete' : 'Waiting to scan'}</span>
+                    <span className="font-semibold text-[var(--color-neutral-900)]">{scanState === 'done' ? '97% ready' : scanState === 'scanning' ? `${Math.round(scanProgress)}%` : '—'}</span>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-[var(--color-neutral-200)]">
-                    <div className={cn('h-2 rounded-full bg-[var(--color-accent-600)] transition-all', scanState === 'done' ? 'w-[97%]' : scanState === 'scanning' ? 'w-[70%]' : 'w-[10%]')} />
+                    <div className={cn('h-2 rounded-full bg-[var(--color-accent-600)] transition-all duration-300')} style={{ width: scanState === 'done' ? '97%' : `${scanProgress}%` }} />
                   </div>
                   <div className="mt-4 grid gap-3 sm:grid-cols-3">
                     {scanPreview.map((item) => (

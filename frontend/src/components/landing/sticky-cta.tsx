@@ -13,7 +13,7 @@ export function StickyCta() {
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-background/90 px-4 py-3 backdrop-blur-md transition-transform duration-300 md:hidden ${
+      className={`fixed inset-x-0 bottom-0 z-50 border-t border-hairline bg-background/90 pl-4 pr-[210px] py-3 backdrop-blur-md transition-transform duration-300 md:hidden ${
         show ? 'translate-y-0' : 'translate-y-full'
       }`}
     >
