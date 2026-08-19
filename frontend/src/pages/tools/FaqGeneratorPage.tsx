@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Copy, Sparkles } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import { track } from '../../lib/analytics';
 import { useToast } from '../../components/ui/Toast';
 
 const tool = getToolBySlug('faq-generator')!;
@@ -51,6 +52,7 @@ export default function FaqGeneratorPage() {
 
   const handleGenerate = (e: FormEvent) => {
     e.preventDefault();
+    track('tool_used', { tool_id: tool.slug, category: tool.category, action: 'generate_faqs', count });
     const topicLabel = topic === 'your product' ? 'our product' : topic;
     const faqs = QUESTION_TEMPLATES.slice(0, count).map((q, i) => ({
       q: q(topicLabel),
@@ -63,6 +65,7 @@ export default function FaqGeneratorPage() {
     if (generated.length === 0) return;
     try {
       await navigator.clipboard.writeText(generated.join('\n\n'));
+      track('tool_result_copied', { tool_id: tool.slug, category: tool.category, result: 'faqs' });
       addToast('FAQ copied to clipboard', 'success');
     } catch {
       addToast('Could not copy. Please copy manually.', 'error');
@@ -121,7 +124,11 @@ export default function FaqGeneratorPage() {
           <div className="mt-6 rounded-2xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-100)]/50 p-4 text-xs leading-relaxed text-[var(--color-neutral-500)]">
             <p>
               Need FAQs generated from your full website, PDFs, or docs at scale?{' '}
-              <Link to="/signup" className="font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]">
+              <Link
+                to="/signup"
+                onClick={() => track('tool_cta_click', { tool_id: tool.slug, location: 'sidebar_note' })}
+                className="font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]"
+              >
                 BurFlow’s AI FAQ generator
               </Link>{' '}
               crawls up to 5 sources and outputs schema-ready FAQs automatically.

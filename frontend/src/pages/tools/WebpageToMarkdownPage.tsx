@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, Copy, Globe, Wand2 } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import { track } from '../../lib/analytics';
 import { useToast } from '../../components/ui/Toast';
 
 const tool = getToolBySlug('webpage-to-markdown')!;
@@ -59,6 +60,7 @@ export default function WebpageToMarkdownPage() {
       addToast('Please enter a valid URL starting with http:// or https://', 'error');
       return;
     }
+    track('tool_used', { tool_id: tool.slug, category: tool.category, action: 'convert_webpage', url: trimmed });
     setOutput(buildSampleMarkdown(trimmed));
   };
 
@@ -66,6 +68,7 @@ export default function WebpageToMarkdownPage() {
     if (!output) return;
     try {
       await navigator.clipboard.writeText(output);
+      track('tool_result_copied', { tool_id: tool.slug, category: tool.category, result: 'markdown' });
       addToast('Markdown copied to clipboard', 'success');
     } catch {
       addToast('Could not copy. Please copy manually.', 'error');
@@ -110,7 +113,11 @@ export default function WebpageToMarkdownPage() {
             <p>
               This is an instant demo conversion generated in your browser. For full site-wide extraction
               with AI cleanup — including Notion, Google Docs, PDF, and DOCX —{' '}
-              <Link to="/signup" className="font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]">
+              <Link
+                to="/signup"
+                onClick={() => track('tool_cta_click', { tool_id: tool.slug, location: 'sidebar_note' })}
+                className="font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]"
+              >
                 try BurFlow Free
               </Link>
               .

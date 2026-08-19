@@ -6,6 +6,7 @@ import { composeResponse, CompositionResult } from './response-composer';
 import { TenantPolicy } from './types';
 import { TAKEOVER_ACKNOWLEDGEMENT } from '@conversation-engine/saas-core';
 import { KnowledgeBaseProvider, PayloadValidationError, UpstreamLLMError } from '@conversation-engine/conversation-orchestrator';
+import { maybeTrigger } from '../services/lead-alert-service';
 
 export interface PipelineInput {
   message: string;
@@ -265,6 +266,20 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
   } else {
     stateManager.recordTurn(state, message, finalResponse, state.ledger.questionsAnswered);
   }
+
+  // Non-blocking lead qualification alert
+  // Fires when funnelStage transitions to 'qualify'/'booking' or when contact details are provided.
+  try {
+    await maybeTrigger(
+      state.tenantId ?? input.tenantId,
+      state.stage,
+      brainOutput?.extractedLead
+        ? { email: brainOutput.extractedLead.email ?? undefined, phone: brainOutput.extractedLead.phone ?? undefined }
+        : null,
+      state.knownFacts.useCase || state.knownFacts.industry || '',
+      [...state.ledger.topicsCovered, ...state.ledger.topicsPending]
+    );
+  } catch {}
 
   // Log metrics
   stateManager.logMetrics(state, traceId);

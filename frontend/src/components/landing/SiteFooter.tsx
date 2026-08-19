@@ -11,6 +11,16 @@ const footerColumns = [
     ],
   },
   {
+    h: 'Free Tools',
+    l: [
+      { label: 'All Free Tools', to: '/free-tools' },
+      { label: 'Lead Leak Calculator', to: '/tools/lead-leak-calculator' },
+      { label: 'Chatbot ROI Calculator', to: '/tools/chatbot-roi-calculator' },
+      { label: 'AI Prompt Generator', to: '/tools/ai-prompt-generator' },
+      { label: 'Document to Markdown', to: '/tools/document-to-markdown' },
+    ],
+  },
+  {
     h: 'Platform',
     l: [
       { label: 'API docs', to: '/docs/api' },
@@ -42,7 +52,7 @@ const footerColumns = [
 export function SiteFooter() {
   return (
     <footer className="border-t border-hairline px-6 py-14">
-      <div className="mx-auto grid w-full max-w-6xl gap-10 md:grid-cols-[1.4fr_repeat(4,1fr)]">
+      <div className="mx-auto grid w-full max-w-6xl gap-10 md:grid-cols-[1.4fr_repeat(5,1fr)]">
         <div>
           <Logo />
           <p className="mt-4 max-w-xs text-sm text-muted-foreground">

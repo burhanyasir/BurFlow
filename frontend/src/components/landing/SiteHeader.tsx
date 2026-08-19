@@ -7,6 +7,7 @@ const navLinks = [
   { label: 'Product', to: '/features' },
   { label: 'Pricing', to: '/pricing' },
   { label: 'Docs', to: '/docs' },
+  { label: 'Free Tools', to: '/free-tools' },
   { label: 'Blog', to: '/blog' },
   { label: 'Compare', to: '/compare' },
   { label: 'Alternatives', to: '/alternatives' },

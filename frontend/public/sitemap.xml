@@ -39,7 +39,15 @@
   <url><loc>https://burflow.vercel.app/integrations/calendly</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
 
   <!-- Tools -->
-  <url><loc>https://burflow.vercel.app/tools/roi-calculator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/free-tools</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/lead-leak-calculator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/chatbot-roi-calculator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/faq-generator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/webpage-to-markdown</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/sitemap-validator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/ai-prompt-generator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/ai-chat-with-website</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/tools/document-to-markdown</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
 
   <!-- Guides -->
   <url><loc>https://burflow.vercel.app/guides/ai-sales-agents</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>

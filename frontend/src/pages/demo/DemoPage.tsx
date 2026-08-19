@@ -102,6 +102,7 @@ export default function DemoPage() {
         title="Book a Live Demo | BurFlow"
         description="See BurFlow in action — grounded AI answers, lead capture, and human handover, set up for your business in a 20-minute walkthrough."
         canonicalPath="/demo"
+        schema='{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://burflow.vercel.app"},{"@type":"ListItem","position":2,"name":"Demo","item":"https://burflow.vercel.app/demo"}]}'
       />
       <PageSection
         title="Book a Live Demo"

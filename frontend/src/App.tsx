@@ -1,6 +1,6 @@
 import { Suspense, lazy } from 'react';
 import { useLocation } from 'react-router-dom';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { ToastProvider } from './components/ui/Toast';
@@ -40,6 +40,9 @@ const ChatbotRoiCalculatorPage = lazy(() => import('./pages/tools/ChatbotRoiCalc
 const FaqGeneratorPage = lazy(() => import('./pages/tools/FaqGeneratorPage'));
 const WebpageToMarkdownPage = lazy(() => import('./pages/tools/WebpageToMarkdownPage'));
 const SitemapValidatorPage = lazy(() => import('./pages/tools/SitemapValidatorPage'));
+const AiPromptGeneratorPage = lazy(() => import('./pages/tools/AiPromptGeneratorPage'));
+const AiChatWithWebsitePage = lazy(() => import('./pages/tools/AiChatWithWebsitePage'));
+const DocumentToMarkdownPage = lazy(() => import('./pages/tools/DocumentToMarkdownPage'));
 const DesignSystemPage = lazy(() => import('./pages/dev/DesignSystemPage'));
 const PrivacyPage = lazy(() => import('./pages/trust/PrivacyPage'));
 const ChangelogPage = lazy(() => import('./pages/trust/ChangelogPage'));
@@ -150,12 +153,16 @@ function RoutesWithAnimation() {
         <Route path="/terms" element={<PublicRoute><TermsPage /></PublicRoute>} />
         <Route path="/cookies" element={<PublicRoute><CookiesPage /></PublicRoute>} />
         <Route path="/demo" element={<PublicRoute><DemoPage /></PublicRoute>} />
-        <Route path="/tools" element={<PublicRoute><ToolsPage /></PublicRoute>} />
+        <Route path="/free-tools" element={<PublicRoute><ToolsPage /></PublicRoute>} />
+        <Route path="/tools" element={<Navigate to="/free-tools" replace />} />
         <Route path="/tools/lead-leak-calculator" element={<PublicRoute><LeadLeakCalculatorPage /></PublicRoute>} />
         <Route path="/tools/chatbot-roi-calculator" element={<PublicRoute><ChatbotRoiCalculatorPage /></PublicRoute>} />
         <Route path="/tools/faq-generator" element={<PublicRoute><FaqGeneratorPage /></PublicRoute>} />
         <Route path="/tools/webpage-to-markdown" element={<PublicRoute><WebpageToMarkdownPage /></PublicRoute>} />
         <Route path="/tools/sitemap-validator" element={<PublicRoute><SitemapValidatorPage /></PublicRoute>} />
+        <Route path="/tools/ai-prompt-generator" element={<PublicRoute><AiPromptGeneratorPage /></PublicRoute>} />
+        <Route path="/tools/ai-chat-with-website" element={<PublicRoute><AiChatWithWebsitePage /></PublicRoute>} />
+        <Route path="/tools/document-to-markdown" element={<PublicRoute><DocumentToMarkdownPage /></PublicRoute>} />
         <Route path="/design-system" element={<PublicRoute><DesignSystemPage /></PublicRoute>} />
 
         {/* Auth Routes */}

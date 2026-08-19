@@ -1,0 +1,21 @@
+{
+  "environment": "sandbox",
+  "generatedAt": "2026-08-16T16:41:03.810Z",
+  "catalog": {
+    "starter": {
+      "productId": "pro_01m05q4qh0m76ejj48498ndngx",
+      "monthlyPriceId": "pri_01m05q57jmqwh52skjcrc9wz9b",
+      "yearlyPriceId": "pri_01m05q59km3mep9jwk2hrq41v1"
+    },
+    "pro": {
+      "productId": "pro_01m05q5ajnczy33vy2k3jvce6m",
+      "monthlyPriceId": "pri_01m05q5bft466c6s12acwpb9vw",
+      "yearlyPriceId": "pri_01m05q5cdh05fk99g19wp5mdhw"
+    },
+    "advanced": {
+      "productId": "pro_01m05q5dbgpwct5yy4n7mnv940",
+      "monthlyPriceId": "pri_01m05q5e7js84jnjydqcne1991",
+      "yearlyPriceId": "pri_01m05q5f9hkcy2n9e8qrqab17h"
+    }
+  }
+}

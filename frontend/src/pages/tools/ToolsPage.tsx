@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, ArrowRight, Check } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 import { Badge } from '../../components/ui/Badge';
+import { track } from '../../lib/analytics';
 import { TOOLS, TOOL_CATEGORIES, TOOL_CATEGORY_ORDER, buildBreadcrumbSchema, type ToolCategory } from '../../data/toolsData';
 import { ToolIcon } from './toolIcons';
 import { cn } from '../../utils/cn';
@@ -23,7 +24,7 @@ const BADGE_VARIANT = {
 
 const SITEMAP_SCHEMA = buildBreadcrumbSchema([
   { name: 'Home', path: '/' },
-  { name: 'Free Tools', path: '/tools' },
+  { name: 'Free Tools', path: '/free-tools' },
 ]);
 
 export default function ToolsPage() {
@@ -46,9 +47,9 @@ export default function ToolsPage() {
   return (
     <>
       <SEO
-        title="Free B2B SaaS Sales & Conversion Tools | BurFlow"
+        title="Free Tools | BurFlow — Free B2B SaaS Sales & Conversion Tools"
         description="Discover a suite of free, powerful tools tailored for SaaS companies — lead leak calculators, ROI estimators, AI FAQ generators, Markdown converters, and sitemap validators."
-        canonicalPath="/tools"
+        canonicalPath="/free-tools"
         schema={SITEMAP_SCHEMA}
       />
 
@@ -60,7 +61,7 @@ export default function ToolsPage() {
           <div className="mx-auto max-w-3xl text-center">
             <Badge variant="info" size="sm" dot className="mb-5">Free forever · No sign-up needed</Badge>
             <h1 className="text-4xl font-bold tracking-tight text-[var(--color-neutral-900)] md:text-5xl">
-              Free Tools Hub
+              Free Tools
             </h1>
             <p className="mt-4 text-lg text-[var(--color-neutral-500)]">
               Discover a suite of free, powerful tools tailored for SaaS companies, designed to streamline
@@ -127,7 +128,7 @@ export default function ToolsPage() {
                   transition={{ duration: 0.4, delay: Math.min(i % 3, 2) * 0.06 }}
                   className={cn(
                     'group relative flex flex-col rounded-2xl border bg-[var(--color-neutral-0)] p-6 transition-all duration-300',
-                    tool.status === 'live'
+                    tool.status === 'active'
                       ? 'border-[var(--color-neutral-200)] shadow-sm hover:-translate-y-1 hover:shadow-lg hover:border-[var(--color-accent-600)]/30'
                       : 'border-dashed border-[var(--color-neutral-300)] opacity-80'
                   )}
@@ -154,7 +155,7 @@ export default function ToolsPage() {
                   </div>
 
                   <div className="mt-5">
-                    {tool.status === 'live' && tool.route ? (
+                    {tool.status === 'active' && tool.route ? (
                       <Link
                         to={tool.route}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent-600)] px-4 py-2 text-sm font-semibold text-white transition-all hover:bg-[var(--color-accent-700)]"
@@ -184,6 +185,7 @@ export default function ToolsPage() {
             </p>
             <Link
               to="/signup"
+              onClick={() => track('tool_cta_click', { tool_id: 'tools_hub', location: 'hub_bottom_cta' })}
               className="mt-7 inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent-600)] px-7 py-3.5 text-base font-semibold text-white shadow-lg transition-all hover:bg-[var(--color-accent-700)] hover:shadow-xl"
             >
               Try BurFlow Free

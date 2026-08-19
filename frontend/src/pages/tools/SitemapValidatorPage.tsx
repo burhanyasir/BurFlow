@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowRight, CheckCircle2, ClipboardPaste, ShieldAlert, XCircle } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import { track } from '../../lib/analytics';
 import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../utils/cn';
 
@@ -116,7 +117,16 @@ export default function SitemapValidatorPage() {
       addToast('Paste a sitemap XML first', 'error');
       return;
     }
-    setResult(validateSitemap(trimmed));
+    const result = validateSitemap(trimmed);
+    setResult(result);
+    track('tool_used', {
+      tool_id: tool.slug,
+      category: tool.category,
+      action: 'validate_sitemap',
+      url_count: result.urlCount,
+      score: result.score,
+      valid: result.valid,
+    });
   };
 
   const scoreColor = (score: number) =>
@@ -229,6 +239,7 @@ export default function SitemapValidatorPage() {
                     </p>
                     <Link
                       to="/signup"
+                      onClick={() => track('tool_cta_click', { tool_id: tool.slug, location: 'error_card' })}
                       className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-[var(--color-accent-600)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-accent-700)]"
                     >
                       Try BurFlow Free

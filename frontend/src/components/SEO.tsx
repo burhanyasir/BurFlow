@@ -1,10 +1,12 @@
 import { Helmet } from 'react-helmet-async';
 
-interface SEOProps {
+export interface SEOProps {
   title: string;
   description: string;
   canonicalPath: string;
   ogImage?: string;
+  schema?: string | string[];
+  path?: string;
 }
 
 const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'https://burflow.vercel.app';
@@ -20,9 +22,15 @@ function toCanonicalUrl(canonicalPath: string): string {
   return `${SITE_URL}${path === '/' ? '/' : path.replace(/\/+$/, '')}`;
 }
 
-export function SEO({ title, description, canonicalPath, ogImage = DEFAULT_OG_IMAGE }: SEOProps) {
+export function SEO({ title, description, canonicalPath, ogImage = DEFAULT_OG_IMAGE, schema }: SEOProps) {
   const canonicalUrl = toCanonicalUrl(canonicalPath);
   const imageUrl = toAbsoluteUrl(ogImage);
+
+  const schemaRender =
+    schema &&
+    (Array.isArray(schema)
+      ? schema.map((s) => <script key={s} type="application/ld+json">{s}</script>)
+      : <script type="application/ld+json">{schema}</script>);
 
   return (
     <Helmet>
@@ -40,6 +48,8 @@ export function SEO({ title, description, canonicalPath, ogImage = DEFAULT_OG_IM
       <meta name="twitter:title" content={title} />
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={imageUrl} />
+
+      {schemaRender}
     </Helmet>
   );
 }

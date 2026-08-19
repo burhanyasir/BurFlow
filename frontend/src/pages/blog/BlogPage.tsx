@@ -2,7 +2,22 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { PageSection } from '../../components/ui/PageSection';
 import { SEO } from '../../components/SEO';
-import { blogArticles, getBlogByCategory } from '../../config/blog-articles';
+import { blogArticles, type BlogArticle } from '../../config/blog-articles';
+import { estimateReadTime, getMarkdownArticles } from '../../lib/blog-content';
+
+const markdownArticles: BlogArticle[] = getMarkdownArticles().map((article) => ({
+  slug: article.slug,
+  title: article.title,
+  excerpt: article.description,
+  category: article.category,
+  readTime: estimateReadTime(article.content),
+  publishDate: article.date,
+}));
+
+const allArticles: BlogArticle[] = [
+  ...markdownArticles,
+  ...blogArticles.filter((article) => !markdownArticles.some((m) => m.slug === article.slug)),
+];
 
 const CATEGORY_COLORS: Record<string, string> = {
   Comparison: 'bg-blue-100 text-blue-700',
@@ -12,7 +27,12 @@ const CATEGORY_COLORS: Record<string, string> = {
 };
 
 export default function BlogPage() {
-  const byCategory = getBlogByCategory();
+  const featured = blogArticles[0]!;
+  const byCategory = allArticles.reduce<Record<string, BlogArticle[]>>((groups, article) => {
+    if (!groups[article.category]) groups[article.category] = [];
+    groups[article.category]!.push(article);
+    return groups;
+  }, {});
   const categories = Object.keys(byCategory);
 
   return (
@@ -33,16 +53,16 @@ export default function BlogPage() {
 
           {/* Featured article */}
           <Link
-            to={`/blog/${blogArticles[0]!.slug}`}
+            to={`/blog/${featured.slug}`}
             className="mt-10 block rounded-2xl border border-[var(--color-neutral-200)] bg-gradient-to-br from-[var(--color-accent-600)]/5 to-white p-8 shadow-sm transition hover:border-[var(--color-accent-600)] hover:shadow-md"
           >
             <span className="inline-block rounded-full bg-[var(--color-accent-600)]/10 px-3 py-1 text-xs font-semibold text-[var(--color-accent-600)]">
-              {blogArticles[0]!.category}
+              {featured.category}
             </span>
             <h2 className="mt-3 text-2xl font-bold text-[var(--color-neutral-900)]">
-              {blogArticles[0]!.title}
+              {featured.title}
             </h2>
-            <p className="mt-2 text-[var(--color-neutral-500)]">{blogArticles[0]!.excerpt}</p>
+            <p className="mt-2 text-[var(--color-neutral-500)]">{featured.excerpt}</p>
             <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-[var(--color-accent-600)]">
               Read article →
             </span>
@@ -55,30 +75,32 @@ export default function BlogPage() {
                 {cat}
               </h2>
               <div className="mt-4 space-y-3">
-                {byCategory[cat]!.slice(cat === blogArticles[0]!.category ? 1 : 0).map((article) => (
-                  <Link
-                    key={article.slug}
-                    to={`/blog/${article.slug}`}
-                    className="block rounded-2xl border border-[var(--color-neutral-200)] bg-white p-5 shadow-sm transition hover:border-[var(--color-accent-600)] hover:shadow-md"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-700'}`}>
-                          {cat}
+                {byCategory[cat]!
+                  .filter((article) => article.slug !== featured.slug)
+                  .map((article) => (
+                    <Link
+                      key={article.slug}
+                      to={`/blog/${article.slug}`}
+                      className="block rounded-2xl border border-[var(--color-neutral-200)] bg-white p-5 shadow-sm transition hover:border-[var(--color-accent-600)] hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${CATEGORY_COLORS[cat] ?? 'bg-gray-100 text-gray-700'}`}>
+                            {cat}
+                          </span>
+                          <h3 className="mt-2 text-base font-semibold text-[var(--color-neutral-900)]">
+                            {article.title}
+                          </h3>
+                          <p className="mt-1 text-sm text-[var(--color-neutral-500)]">
+                            {article.excerpt}
+                          </p>
+                        </div>
+                        <span className="shrink-0 text-xs text-[var(--color-neutral-400)]">
+                          {article.readTime}
                         </span>
-                        <h3 className="mt-2 text-base font-semibold text-[var(--color-neutral-900)]">
-                          {article.title}
-                        </h3>
-                        <p className="mt-1 text-sm text-[var(--color-neutral-500)]">
-                          {article.excerpt}
-                        </p>
                       </div>
-                      <span className="shrink-0 text-xs text-[var(--color-neutral-400)]">
-                        {article.readTime}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
+                    </Link>
+                  ))}
               </div>
             </div>
           ))}

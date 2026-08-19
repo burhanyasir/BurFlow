@@ -1,21 +1,31 @@
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { Seo } from '../../components/seo/Seo';
+import { track } from '../../lib/analytics';
+import { getBlogArticle } from '../../config/blog-articles';
+import {
+  estimateReadTime,
+  formatDate,
+  getMarkdownArticle,
+  renderMarkdown,
+} from '../../lib/blog-content';
 
 interface BlogArticle {
   slug: string;
   title: string;
   category: string;
   excerpt: string;
-  content: string;
+  content?: string;
   author: string;
   authorTitle: string;
   date: string;
   readingTime: string;
+  body?: string;
 }
 
-const articles: BlogArticle[] = [
+const legacyArticles: BlogArticle[] = [
   {
     slug: 'confidence-guarded-ai-responses',
     title: 'Introducing Confidence-Guarded AI Responses',
@@ -59,15 +69,7 @@ The full grounding specification is available in our documentation. Implementati
     title: 'SOC 2 Compliance: What It Means for Our Customers',
     category: 'Security',
     excerpt: 'We completed our SOC 2 Type II audit. Here is what the certification covers, how it protects your data, and why it matters for AI-powered support.',
-    content: `Security is the foundation of trusted AI. We are proud to announce that Conversation Engine has completed its SOC 2 Type II audit with zero exceptions.
-
-SOC 2 Type II evaluates the effectiveness of controls over a sustained period — six months in our case. The audit covered five trust service criteria: security, availability, processing integrity, confidentiality, and privacy. We opted for the full set rather than the narrower "security only" baseline.
-
-What this means for your organization: every AI response your customers see is generated within an audited control environment. Data at rest is encrypted with AES-256 using tenant-isolated keys. Data in transit uses TLS 1.3 with mandatory mutual authentication. Access to the inference pipeline is logged, monitored, and gated by role-based policies reviewed quarterly.
-
-We also publish our SOC 2 report under NDA for enterprise customers. The report covers 187 individual controls across infrastructure, application, data, and organizational domains.
-
-SOC 2 compliance is part of a broader trust program that includes GDPR readiness, ISO 27001 certification in progress for Q4 2026, and a dedicated Trust Center at trust.conversationengine.com.`,
+    body: 'A Data Processing Agreement (DPA) is a legally binding contract that defines how a data processor handles personal data on behalf of a data controller. Under GDPR Article 28, a DPA is required whenever a processor handles personal data of EU residents. Our DPA ensures that both parties understand their obligations regarding data protection, security, and confidentiality.',
     author: 'Security Team',
     authorTitle: 'Security Team, Conversation Engine',
     date: 'July 5, 2026',
@@ -191,11 +193,112 @@ function CategoryBadge({ label }: { label: string }) {
 
 export default function BlogArticlePage() {
   const { slug } = useParams<{ slug: string }>();
-  const article = articles.find((a) => a.slug === slug) ?? articles[0];
+  const navigate = useNavigate();
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const slugKey = slug ?? '';
+
+  const markdown = getMarkdownArticle(slugKey);
+  const legacy = legacyArticles.find((a) => a.slug === slugKey);
+  const config = getBlogArticle(slugKey);
+  const fallback = legacyArticles[0]!;
+
+  const title = markdown?.title ?? legacy?.title ?? config?.title ?? fallback.title;
+  const category = markdown?.category ?? legacy?.category ?? config?.category ?? fallback.category;
+  const excerpt = markdown?.description ?? legacy?.excerpt ?? config?.excerpt ?? fallback.excerpt;
+  const author = markdown?.author ?? legacy?.author ?? 'BurFlow Team';
+  const authorTitle = markdown
+    ? `${markdown.author}, BurFlow`
+    : (legacy?.authorTitle ?? 'BurFlow Team');
+  const date = markdown
+    ? formatDate(markdown.date)
+    : (legacy?.date ?? (config ? formatDate(config.publishDate) : fallback.date));
+  const readingTime = markdown
+    ? estimateReadTime(markdown.content)
+    : (legacy?.readingTime ?? config?.readTime ?? fallback.readingTime);
+  const bodyHtml = markdown ? renderMarkdown(markdown.content) : undefined;
+  const cta = markdown?.toolPath
+    ? { path: markdown.toolPath, name: markdown.toolName ?? 'Free Tool' }
+    : undefined;
+
+  // Keep internal links inside markdown-rendered content on the SPA router.
+  useEffect(() => {
+    const container = bodyRef.current;
+    if (!container) return;
+    const onClick = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest?.(
+        'a[href^="/"]'
+      ) as HTMLAnchorElement | null;
+      const href = anchor?.getAttribute('href');
+      if (!href) return;
+      event.preventDefault();
+      navigate(href);
+    };
+    container.addEventListener('click', onClick);
+    return () => container.removeEventListener('click', onClick);
+  }, [navigate]);
 
   return (
     <div className="bg-[#08080A] min-h-screen">
-      <Seo title={article.title} description={article.excerpt} path={`/blog/${article.slug}`} />
+      <style>{`
+        .blog-article-body h2 {
+          font-size: 1.5rem; font-weight: 700; color: #F5F5F7;
+          margin: 2.5rem 0 1rem; letter-spacing: -0.01em;
+        }
+        .blog-article-body h3 {
+          font-size: 1.15rem; font-weight: 600; color: #F5F5F7;
+          margin: 2rem 0 0.75rem;
+        }
+        .blog-article-body p { margin-bottom: 1.5rem; line-height: 1.8; font-size: 15px; color: #C4C4CF; }
+        .blog-article-body ul, .blog-article-body ol {
+          margin: 0 0 1.5rem; padding-left: 1.4rem;
+          display: flex; flex-direction: column; gap: 0.5rem; color: #C4C4CF;
+        }
+        .blog-article-body ul { list-style: disc; }
+        .blog-article-body ol { list-style: decimal; }
+        .blog-article-body li { line-height: 1.7; font-size: 15px; }
+        .blog-article-body a { color: #C94F72; text-decoration: underline; text-underline-offset: 3px; }
+        .blog-article-body strong { color: #F5F5F7; font-weight: 600; }
+        .blog-article-body blockquote {
+          border-left: 2px solid rgba(201, 79, 114, 0.5); padding: 0.75rem 1.25rem;
+          margin: 0 0 1.5rem; color: #A1A1AA; font-style: italic;
+        }
+        .blog-article-body code {
+          font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.85em;
+          padding: 0.15em 0.4em; border-radius: 6px;
+          background: rgba(255, 255, 255, 0.06); color: #E8A0B5;
+        }
+        .blog-article-body pre {
+          overflow-x: auto; margin: 0 0 1.5rem; padding: 1rem 1.25rem;
+          border-radius: 12px; background: rgba(255, 255, 255, 0.04);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .blog-article-body pre code { background: transparent; padding: 0; color: #C4C4CF; }
+        .blog-article-body hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.08); margin: 2.5rem 0; }
+        .blog-article-body img { max-width: 100%; border-radius: 12px; margin: 1rem 0 1.5rem; }
+      `}</style>
+      <Seo
+        title={title}
+        description={excerpt}
+        // @ts-ignore
+        schema={JSON.stringify({
+          '@context': 'https://schema.org',
+          '@type': 'BlogPosting',
+          mainEntityOfPage: 'https://burflow.vercel.app/blog',
+          title,
+          description: excerpt,
+          image: 'https://burflow.vercel.app',
+          author: {
+            '@type': 'Organization',
+            name: 'Conversation Engine',
+          },
+          datePublished: date,
+          publisher: {
+            '@type': 'Organization',
+            name: 'Conversation Engine',
+            url: 'https://burflow.vercel.app',
+          },
+        })}
+      />
       {/* ── BACK LINK ─────────────────────────────────────── */}
       <div className="mx-auto px-4 md:px-8 pt-28 md:pt-36" style={{ maxWidth: 800 }}>
         <motion.div
@@ -223,25 +326,25 @@ export default function BlogArticlePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
         >
-          <CategoryBadge label={article.category} />
+          <CategoryBadge label={category} />
           <h1 className="mt-4 text-3xl md:text-4xl font-bold tracking-tight text-[#F5F5F7] leading-tight">
-            {article.title}
+            {title}
           </h1>
           <p className="mt-4 text-base md:text-lg text-[#6B6B76] leading-relaxed">
-            {article.excerpt}
+            {excerpt}
           </p>
           <div className="mt-6 flex items-center gap-4 text-sm text-[#6B6B76]">
             <div className="flex items-center gap-3">
-              <AuthorAvatar name={article.author} />
+              <AuthorAvatar name={author} />
               <div>
-                <p className="font-medium text-[#A1A1AA]">{article.author}</p>
-                <p className="text-xs">{article.authorTitle}</p>
+                <p className="font-medium text-[#A1A1AA]">{author}</p>
+                <p className="text-xs">{authorTitle}</p>
               </div>
             </div>
             <span className="ml-auto flex items-center gap-2 text-xs">
-              <span>{article.date}</span>
+              <span>{date}</span>
               <span className="w-1 h-1 rounded-full bg-[#6B6B76]" />
-              <span>{article.readingTime}</span>
+              <span>{readingTime}</span>
             </span>
           </div>
         </motion.div>
@@ -258,16 +361,69 @@ export default function BlogArticlePage() {
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.2, ease: [0.22, 1, 0.36, 1] }}
-          className="prose prose-sm prose-invert max-w-none"
+          className="max-w-none"
           style={{ color: '#C4C4CF' }}
         >
-          {article.content.split('\n\n').map((paragraph, i) => (
-            <p key={i} className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">
-              {paragraph}
-            </p>
-          ))}
+          {bodyHtml ? (
+            <div ref={bodyRef} className="blog-article-body" dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+          ) : (
+            <div ref={bodyRef} className="blog-article-body">
+              {legacy?.content
+                ? legacy.content.split('\n\n').map((paragraph, i) => (
+                    <p key={i} className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">
+                      {paragraph}
+                    </p>
+                  ))
+                : (
+                    <>
+                      <p className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">{excerpt}</p>
+                      <p className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">
+                        The full article is coming soon. Meanwhile, try our free tools — no signup
+                        required.
+                      </p>
+                    </>
+                  )}
+            </div>
+          )}
         </motion.div>
 
+        {/* ── TOOL CTA BANNER ──────────────────────────────── */}
+        {cta && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.3 }}
+            className="mt-12 overflow-hidden rounded-2xl border border-[rgba(201,79,114,0.35)] bg-gradient-to-br from-[rgba(168,36,75,0.2)] to-[rgba(18,18,24,0.9)] p-6 md:p-8"
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider text-[#C94F72]">
+              Free tool
+            </p>
+            <h3 className="mt-2 text-xl font-bold text-[#F5F5F7]">Try the {cta.name} — free</h3>
+            <p className="mt-2 max-w-xl text-sm text-[#A1A1AA]">
+              Run the numbers on your own funnel in under a minute. No signup required.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                to={cta.path}
+                onClick={() =>
+                  track('tool_cta_click', { tool_id: cta.name, location: 'blog_article_banner' })
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-[#C94F72] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 hover:bg-[#E05F84]"
+              >
+                Open {cta.name}
+              </Link>
+              <Link
+                to="/signup"
+                onClick={() =>
+                  track('cta_click', { label: 'Try BurFlow', location: 'blog_article_banner' })
+                }
+                className="inline-flex items-center gap-2 rounded-xl border border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.04)] px-5 py-2.5 text-sm font-medium text-[#F5F5F7] transition-all duration-200 hover:bg-[rgba(255,255,255,0.08)]"
+              >
+                Try BurFlow free
+              </Link>
+            </div>
+          </motion.div>
+        )}
         {/* ── SOCIAL SHARE ────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0 }}

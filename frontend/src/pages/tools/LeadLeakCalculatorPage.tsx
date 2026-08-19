@@ -3,9 +3,14 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, ArrowRight, TrendingUp, Wallet } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import { track } from '../../lib/analytics';
 import { formatNumber } from '../../utils/formatters';
 
 const tool = getToolBySlug('lead-leak-calculator')!;
+
+const trackCalculation = (field: string, value: number) => {
+  track('tool_calculated', { tool_id: tool.slug, category: tool.category, field, value });
+};
 
 const BENCHMARK_CONVERSION = 0.02; // B2B SaaS median visitor → qualified lead rate
 const LIFT_LOW = 0.15;
@@ -40,7 +45,10 @@ function SliderField({ label, hint, value, min, max, step, display, onChange }: 
         max={max}
         step={step}
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
+        onChange={(e) => {
+          onChange(Number(e.target.value));
+          trackCalculation(label, Number(e.target.value));
+        }}
         aria-label={label}
         className="mt-3 w-full cursor-pointer"
         style={{ accentColor: 'var(--color-accent-600)' }}
@@ -161,6 +169,7 @@ export default function LeadLeakCalculatorPage() {
             </p>
             <Link
               to="/signup"
+              onClick={() => track('tool_cta_click', { tool_id: tool.slug, location: 'results_card' })}
               className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent-600)] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[var(--color-accent-700)]"
             >
               Deploy BurFlow in 5 minutes

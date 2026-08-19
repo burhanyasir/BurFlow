@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { ArrowRight } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 import { CTA, Check, Eyebrow, Pill } from '../../components/landing/primitives';
 import { ScanCard, type ScanStatus } from '../../components/landing/scan-card';
@@ -13,6 +14,12 @@ import { LiveActivity, RatingProof, TrustMarquee } from '../../components/landin
 import { StickyCta } from '../../components/landing/sticky-cta';
 import { initAnalytics, track, trackOnce } from '../../lib/analytics';
 import { apiClient } from '../../lib/api-client';
+import { getActiveTools } from '../../data/toolsData';
+import { ToolIcon } from '../tools/toolIcons';
+
+const toolHighlights = getActiveTools().filter((tool) =>
+  ['lead-leak-calculator', 'chatbot-roi-calculator', 'ai-prompt-generator', 'document-to-markdown'].includes(tool.slug)
+);
 
 const outcomes = [
   {
@@ -657,6 +664,54 @@ export default function LandingPageV3() {
                 No credit card · No training on your data · Cancel anytime
               </p>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ─── Free Tools ─────────────────────────────────────── */}
+      <section className="border-t border-hairline bg-surface-2/60 px-6 py-24 md:py-32">
+        <div className="mx-auto w-full max-w-6xl">
+          <div className="flex flex-wrap items-end justify-between gap-6">
+            <div>
+              <Eyebrow>Free tools</Eyebrow>
+              <h2 className="mt-5 text-4xl font-bold leading-tight">
+                Free B2B SaaS growth tools
+              </h2>
+              <p className="mt-4 max-w-xl text-muted-foreground">
+                Calculate your lead leak, model chatbot ROI, or generate conversion-ready AI
+                prompts — all free, no signup required.
+              </p>
+            </div>
+            <Link
+              to="/free-tools"
+              onClick={() => track('tool_cta_click', { tool_id: 'tools_hub', location: 'landing_section' })}
+              className="inline-flex h-11 items-center rounded-full border border-hairline bg-surface px-6 text-sm font-semibold text-foreground transition-all hover:-translate-y-0.5"
+            >
+              Browse all free tools
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </div>
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {toolHighlights.map((tool) => (
+              <Link
+                key={tool.slug}
+                to={`/tools/${tool.slug}`}
+                onClick={() => track('tool_cta_click', { tool_id: tool.slug, location: 'landing_section' })}
+                className="group flex flex-col rounded-2xl border border-hairline bg-surface p-6 transition-all hover:-translate-y-0.5 hover:border-foreground/20 hover:shadow-lift"
+              >
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                  <ToolIcon name={tool.icon} className="h-5 w-5" />
+                </span>
+                <h3 className="mt-4 font-semibold">{tool.name}</h3>
+                <p className="mt-1.5 flex-1 text-sm text-muted-foreground">
+                  {tool.shortDescription}
+                </p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary">
+                  Use free tool
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

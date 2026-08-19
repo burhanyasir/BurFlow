@@ -28,6 +28,7 @@ export default function PricingPage() {
         title="Pricing | BurFlow"
         description="Simple, transparent pricing that scales from your first website visitor to millions of monthly conversations. Start free — no credit card required."
         canonicalPath="/pricing"
+        schema='{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://burflow.vercel.app"},{"@type":"ListItem","position":2,"name":"Pricing","item":"https://burflow.vercel.app/pricing"}]}'
       />
       <PageSection
         title="Transparent Plans for Growing Operations."

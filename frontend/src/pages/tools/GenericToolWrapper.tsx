@@ -1,8 +1,9 @@
-import { type ReactNode } from 'react';
+﻿import { useEffect, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowRight, Home, Sparkles, ChevronRight } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 import { Badge } from '../../components/ui/Badge';
+import { track } from '../../lib/analytics';
 import {
   TOOL_CATEGORIES,
   buildBreadcrumbSchema,
@@ -28,9 +29,22 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
   const related = getRelatedTools(tool, 3);
   const faqs = tool.faqs ?? [];
 
+  useEffect(() => {
+    track('tool_viewed', {
+      tool_id: tool.slug,
+      tool_name: tool.name,
+      category: tool.category,
+      path: route,
+    });
+  }, [tool.slug, tool.name, tool.category, route]);
+
+  const trackCta = (location: string) => {
+    track('tool_cta_click', { tool_id: tool.slug, location });
+  };
+
   const breadcrumbSchema = buildBreadcrumbSchema([
     { name: 'Home', path: '/' },
-    { name: 'Free Tools', path: '/tools' },
+    { name: 'Free Tools', path: '/free-tools' },
     { name: tool.name, path: route },
   ]);
 
@@ -62,7 +76,7 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
               </li>
               <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
               <li>
-                <Link to="/tools" className="hover:text-[var(--color-accent-600)]">Free Tools</Link>
+                <Link to="/free-tools" className="hover:text-[var(--color-accent-600)]">Free Tools</Link>
               </li>
               <li aria-hidden="true"><ChevronRight className="h-3.5 w-3.5" /></li>
               <li aria-current="page" className="font-medium text-[var(--color-neutral-700)]">{tool.name}</li>
@@ -108,6 +122,7 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
             </p>
             <Link
               to="/signup"
+              onClick={() => trackCta('powered_by_banner')}
               className="mt-6 inline-flex items-center gap-2 rounded-xl bg-white px-7 py-3.5 text-base font-semibold text-[var(--color-accent-700)] shadow-lg transition-all hover:bg-[var(--color-neutral-100)] hover:shadow-xl"
             >
               Try BurFlow Free
@@ -140,7 +155,7 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
             <div className="flex items-center justify-between">
               <h2 className="text-2xl font-bold text-[var(--color-neutral-900)]">Related tools</h2>
-              <Link to="/tools" className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]">
+              <Link to="/free-tools" className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--color-accent-600)] hover:text-[var(--color-accent-700)]">
                 View all tools
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
@@ -149,10 +164,10 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
               {related.map((item) => (
                 <Link
                   key={item.slug}
-                  to={item.route ?? '/tools'}
+                  to={item.route ?? '/free-tools'}
                   className={cn(
                     'group flex flex-col rounded-2xl border bg-[var(--color-neutral-0)] p-5 transition-all duration-300',
-                    item.status === 'live'
+                    item.status === 'active'
                       ? 'border-[var(--color-neutral-200)] shadow-sm hover:-translate-y-1 hover:shadow-md hover:border-[var(--color-accent-600)]/30'
                       : 'border-dashed border-[var(--color-neutral-300)]'
                   )}
@@ -165,8 +180,8 @@ export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }
                     {item.shortDescription}
                   </p>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-accent-600)]">
-                    {item.status === 'live' ? 'Try tool' : `Coming soon · ${TOOL_CATEGORIES[item.category].label}`}
-                    {item.status === 'live' && <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                    {item.status === 'active' ? 'Try tool' : `Coming soon · ${TOOL_CATEGORIES[item.category].label}`}
+                    {item.status === 'active' && <ArrowRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
                   </span>
                 </Link>
               ))}
