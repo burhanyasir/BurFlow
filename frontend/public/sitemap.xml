@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <!-- Core pages -->
+  <url><loc>https://burflow.vercel.app/</loc><lastmod>2026-08-18</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>
+  <url><loc>https://burflow.vercel.app/pricing</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>https://burflow.vercel.app/demo</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://burflow.vercel.app/signup</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://burflow.vercel.app/features</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+
+  <!-- Comparison pages -->
+  <url><loc>https://burflow.vercel.app/compare</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://burflow.vercel.app/compare/burflow-vs-intercom</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/compare/burflow-vs-drift</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/compare/burflow-vs-hubspot-chatbot</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/compare/burflow-vs-tidio</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/compare/burflow-vs-custom-build</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+
+  <!-- Alternatives -->
+  <url><loc>https://burflow.vercel.app/alternatives</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>
+
+  <!-- Blog -->
+  <url><loc>https://burflow.vercel.app/blog</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/best-ai-sales-agent-for-saas-2026</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/ai-chatbot-vs-ai-sales-agent</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/how-to-convert-website-visitors-into-demos</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/how-to-qualify-leads-with-ai-chatbot</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/automated-lead-qualification-website</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/reduce-customer-support-costs-with-ai</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/automate-demo-bookings-from-website</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/blog/why-your-chatbot-is-leaving-money-on-the-table</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+
+  <!-- Integrations -->
+  <url><loc>https://burflow.vercel.app/integrations</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/hubspot</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/salesforce</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/slack</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/zapier</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/intercom</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/integrations/calendly</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+
+  <!-- Tools -->
+  <url><loc>https://burflow.vercel.app/tools/roi-calculator</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>
+
+  <!-- Guides -->
+  <url><loc>https://burflow.vercel.app/guides/ai-sales-agents</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>
+
+  <!-- Case studies -->
+  <url><loc>https://burflow.vercel.app/case-studies</loc><lastmod>2026-08-18</lastmod><changefreq>weekly</changefreq><priority>0.7</priority></url>
+
+  <!-- Other pages -->
+  <url><loc>https://burflow.vercel.app/about</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://burflow.vercel.app/contact</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+  <url><loc>https://burflow.vercel.app/faq</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://burflow.vercel.app/trust</loc><lastmod>2026-08-18</lastmod><changefreq>monthly</changefreq><priority>0.5</priority></url>
+</urlset>

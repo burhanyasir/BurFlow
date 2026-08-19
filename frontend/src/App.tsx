@@ -22,6 +22,10 @@ const ComparisonPage = lazy(() => import('./pages/comparison/ComparisonPage'));
 const ComparisonArticle = lazy(() => import('./pages/comparison/ComparisonArticle'));
 const IntegrationsHub = lazy(() => import('./pages/integrations/IntegrationsHub'));
 const IntegrationArticle = lazy(() => import('./pages/integrations/IntegrationArticle'));
+const AlternativesPage = lazy(() => import('./pages/alternatives/AlternativesPage'));
+const CaseStudiesPage = lazy(() => import('./pages/case-studies/CaseStudiesPage'));
+const ROICalculator = lazy(() => import('./pages/tools/ROICalculator'));
+const DefinitiveGuide = lazy(() => import('./pages/guides/DefinitiveGuide'));
 const DocsPage = lazy(() => import('./pages/docs/DocsPage'));
 const WidgetPage = lazy(() => import('./pages/docs/WidgetPage'));
 const ApiPage = lazy(() => import('./pages/docs/ApiPage'));
@@ -120,6 +124,10 @@ function RoutesWithAnimation() {
         <Route path="/compare/:slug" element={<PublicRoute><ComparisonArticle /></PublicRoute>} />
         <Route path="/integrations" element={<PublicRoute><IntegrationsHub /></PublicRoute>} />
         <Route path="/integrations/:slug" element={<PublicRoute><IntegrationArticle /></PublicRoute>} />
+        <Route path="/alternatives" element={<PublicRoute><AlternativesPage /></PublicRoute>} />
+        <Route path="/case-studies" element={<PublicRoute><CaseStudiesPage /></PublicRoute>} />
+        <Route path="/tools/roi-calculator" element={<PublicRoute><ROICalculator /></PublicRoute>} />
+        <Route path="/guides/ai-sales-agents" element={<PublicRoute><DefinitiveGuide /></PublicRoute>} />
         <Route path="/docs" element={<PublicRoute><DocsPage /></PublicRoute>} />
         <Route path="/docs/widget" element={<PublicRoute><WidgetPage /></PublicRoute>} />
         <Route path="/docs/api" element={<PublicRoute><ApiPage /></PublicRoute>} />
