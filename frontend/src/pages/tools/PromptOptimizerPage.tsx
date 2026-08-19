@@ -6,78 +6,47 @@ import LeadCaptureModal from '../../components/LeadCaptureModal';
 import { track } from '../../lib/analytics';
 import { useToast } from '../../components/ui/Toast';
 import { cn } from '../../utils/cn';
+import { FRAMEWORKS, TONES, optimizePrompt, type FrameworkId } from '../../lib/tools/prompt';
 
-const tool = getToolBySlug('ai-prompt-generator')!;
+const tool = getToolBySlug('prompt-optimizer')!;
 
-type FrameworkId = 'ape' | 'race' | 'create' | 'spark';
-
-interface FrameworkInfo {
-  id: FrameworkId;
-  name: string;
-  expansion: string;
-}
-
-const FRAMEWORKS: FrameworkInfo[] = [
-  { id: 'ape', name: 'APE', expansion: 'Action · Purpose · Expectation' },
-  { id: 'race', name: 'RACE', expansion: 'Role · Action · Context · Execution' },
-  { id: 'create', name: 'CREATE', expansion: 'Context · Request · Examples · Action · Transform · Evaluate' },
-  { id: 'spark', name: 'SPARK', expansion: 'Scenario · Purpose · Audience · Requirements · Keep' },
-];
-
-const TONES = ['Professional', 'Friendly', 'Persuasive', 'Concise', 'Authoritative', 'Casual'];
-
-function buildPrompt(framework: FrameworkId, task: string, audience: string, tone: string): string {
-  const audienceLine = audience.trim() || 'the intended audience';
-  const toneLine = tone.toLowerCase();
-  switch (framework) {
-    case 'ape':
-      return `ACTION\n${task.trim() || '[Describe the specific action you want performed]'}\n\nPURPOSE\nExplain the outcome this action should achieve — the problem it solves or the value it delivers.\n\nEXPECTATION\nDeliver the result in a ${toneLine} tone, tailored to ${audienceLine}. Include exactly what is required so it can be used immediately.`;
-    case 'race':
-      return `ROLE\nAct as an experienced professional who specializes in serving ${audienceLine}.\n\nACTION\n${task.trim() || '[Describe the action or task to perform]'}\n\nCONTEXT\nYou are helping ${audienceLine}. Use a ${toneLine} tone, draw on best practices, and stay focused on their goals.\n\nEXECUTION\nComplete the action step by step. Format the output so it is ready to use, and state any assumptions you made.`;
-    case 'create':
-      return `CONTEXT\nThis prompt is for ${audienceLine}. The desired tone is ${toneLine}.\n\nREQUEST\n${task.trim() || '[Describe your request clearly and specifically]'}\n\nEXAMPLES\nInclude 2–3 concrete examples that illustrate the expected quality and style of the output.\n\nACTION\nWork through the request in logical steps before producing the final version.\n\nTRANSFORM\nReturn the result in a clean, structured format — headings, bullets, and short paragraphs as appropriate.\n\nEVALUATE\nReview the output against the request: Is it accurate, complete, and tailored to ${audienceLine}? Fix any gaps before presenting it.`;
-    case 'spark':
-      return `SCENARIO\nSet the scene: ${task.trim() || '[Describe the situation this prompt is about]'}\n\nPURPOSE\nState clearly why this output matters and what the audience should take away from it.\n\nAUDIENCE\nTailor the response for ${audienceLine}.\n\nREQUIREMENTS\n- Use a ${toneLine} tone\n- Keep sentences short and direct\n- Structure the answer with headings or bullets\n- Avoid jargon unless it is defined\n\nKEEP IT\nDeliver a focused, high-quality result that requires no follow-up.`;
-  }
-}
-
-export default function AiPromptGeneratorPage() {
+export default function PromptOptimizerPage() {
   const { addToast } = useToast();
   const [framework, setFramework] = useState<FrameworkId>('ape');
-  const [task, setTask] = useState('');
+  const [existing, setExisting] = useState('');
   const [audience, setAudience] = useState('');
   const [tone, setTone] = useState('Professional');
   const [showLeadModal, setShowLeadModal] = useState(false);
 
-  const prompt = useMemo(() => buildPrompt(framework, task, audience, tone), [framework, task, audience, tone]);
+  const prompt = useMemo(() => optimizePrompt(framework, existing, audience, tone), [framework, existing, audience, tone]);
   const wordCount = useMemo(() => prompt.split(/\s+/).filter(Boolean).length, [prompt]);
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
-      track('tool_result_copied', { tool_id: tool.slug, category: tool.category, result: 'prompt', framework });
-      addToast('Prompt copied to clipboard', 'success');
+      track('tool_result_copied', { tool_id: tool.slug, category: tool.category, result: 'optimized_prompt', framework });
+      addToast('Optimized prompt copied to clipboard', 'success');
     } catch {
       addToast('Could not copy. Please copy manually.', 'error');
     }
   };
 
-  const handleGenerate = (e: FormEvent) => {
+  const handleOptimize = (e: FormEvent) => {
     e.preventDefault();
-    track('tool_used', { tool_id: tool.slug, category: tool.category, action: 'generate_prompt', framework });
-    addToast('Your prompt is ready below — copy it into any AI tool', 'success');
+    track('tool_used', { tool_id: tool.slug, category: tool.category, action: 'optimize_prompt', framework });
+    addToast('Your optimized prompt is ready below', 'success');
   };
 
   return (
     <GenericToolWrapper
       tool={tool}
-      subtitle="Create high-quality AI prompts with proven frameworks — APE, RACE, CREATE, and SPARK — for ChatGPT, Claude, and any AI model."
+      subtitle="Paste any prompt and get it rewritten with a proven framework — APE, RACE, CREATE, or SPARK — to get better AI answers."
     >
-      <form onSubmit={handleGenerate} className="grid grid-cols-1 gap-10 lg:grid-cols-2">
+      <form onSubmit={handleOptimize} className="grid grid-cols-1 gap-10 lg:grid-cols-2">
         {/* Inputs */}
         <div className="space-y-6">
           <div>
-            <span className="text-sm font-semibold text-[var(--color-neutral-900)]">Prompt framework</span>
+            <span className="text-sm font-semibold text-[var(--color-neutral-900)]">Target framework</span>
             <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4" role="tablist" aria-label="Choose a prompt framework">
               {FRAMEWORKS.map((f) => (
                 <button
@@ -103,39 +72,39 @@ export default function AiPromptGeneratorPage() {
           </div>
 
           <div>
-            <label htmlFor="pg-task" className="text-sm font-semibold text-[var(--color-neutral-900)]">
-              Goal / Task
+            <label htmlFor="po-existing" className="text-sm font-semibold text-[var(--color-neutral-900)]">
+              Your existing prompt
             </label>
             <textarea
-              id="pg-task"
-              value={task}
-              onChange={(e) => setTask(e.target.value)}
-              placeholder="e.g. Write a 3-email sequence to re-engage SaaS trial users who didn't convert"
-              rows={4}
+              id="po-existing"
+              value={existing}
+              onChange={(e) => setExisting(e.target.value)}
+              placeholder="e.g. Write a sales email for my product"
+              rows={5}
               className="mt-2 w-full rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-4 py-3 text-sm text-[var(--color-neutral-900)] placeholder-[var(--color-neutral-300)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition"
             />
           </div>
 
           <div>
-            <label htmlFor="pg-audience" className="text-sm font-semibold text-[var(--color-neutral-900)]">
+            <label htmlFor="po-audience" className="text-sm font-semibold text-[var(--color-neutral-900)]">
               Target audience
             </label>
             <input
-              id="pg-audience"
+              id="po-audience"
               type="text"
               value={audience}
               onChange={(e) => setAudience(e.target.value)}
-              placeholder="e.g. SaaS founders with less than 50 employees"
+              placeholder="e.g. B2B SaaS founders"
               className="mt-2 w-full rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-4 py-3 text-sm text-[var(--color-neutral-900)] placeholder-[var(--color-neutral-300)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition"
             />
           </div>
 
           <div>
-            <label htmlFor="pg-tone" className="text-sm font-semibold text-[var(--color-neutral-900)]">
+            <label htmlFor="po-tone" className="text-sm font-semibold text-[var(--color-neutral-900)]">
               Tone of voice
             </label>
             <select
-              id="pg-tone"
+              id="po-tone"
               value={tone}
               onChange={(e) => setTone(e.target.value)}
               className="mt-2 w-full rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-4 py-3 text-sm text-[var(--color-neutral-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition"
@@ -151,14 +120,14 @@ export default function AiPromptGeneratorPage() {
             className="inline-flex items-center gap-2 rounded-xl bg-[var(--color-accent-600)] px-6 py-3 text-sm font-semibold text-white shadow-md transition-all hover:bg-[var(--color-accent-700)]"
           >
             <Sparkles className="h-4 w-4" aria-hidden="true" />
-            Generate prompt
+            Optimize prompt
           </button>
         </div>
 
         {/* Output */}
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold text-[var(--color-neutral-900)]">Prompt preview</h2>
+            <h2 className="text-sm font-semibold text-[var(--color-neutral-900)]">Optimized prompt</h2>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -195,7 +164,7 @@ export default function AiPromptGeneratorPage() {
         toolSlug={tool.slug}
         toolName={tool.name}
         resultType="prompt"
-        resultSummary={`${FRAMEWORKS.find((f) => f.id === framework)?.name} prompt for ${audience.trim() || 'general audience'} (${tone} tone):\n\n${prompt}`}
+        resultSummary={`Optimized ${FRAMEWORKS.find((f) => f.id === framework)?.name} prompt for ${audience.trim() || 'general audience'} (${tone} tone):\n\n${prompt}`}
       />
     </GenericToolWrapper>
   );

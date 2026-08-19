@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, ArrowRight, TrendingUp, Wallet } from 'lucide-react';
+import { AlertTriangle, ArrowRight, Mail, TrendingUp, Wallet } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import LeadCaptureModal from '../../components/LeadCaptureModal';
 import { track } from '../../lib/analytics';
 import { formatNumber } from '../../utils/formatters';
 
@@ -62,6 +63,7 @@ export default function LeadLeakCalculatorPage() {
   const [visitors, setVisitors] = useNumberState(10000);
   const [acv, setAcv] = useNumberState(12000);
   const [qualifiedLeads, setQualifiedLeads] = useNumberState(50);
+  const [showLeadModal, setShowLeadModal] = useState(false);
 
   const results = useMemo(() => {
     const benchmarkLeads = Math.round(visitors * BENCHMARK_CONVERSION);
@@ -176,8 +178,28 @@ export default function LeadLeakCalculatorPage() {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              track('tool_cta_click', { tool_id: tool.slug, location: 'lead_capture_button' });
+              setShowLeadModal(true);
+            }}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-6 py-3 text-sm font-semibold text-[var(--color-neutral-700)] shadow-sm transition-all hover:border-[var(--color-accent-600)]/40 hover:text-[var(--color-accent-700)]"
+          >
+            <Mail className="h-4 w-4" aria-hidden="true" />
+            Email me this calculation
+          </button>
         </div>
       </div>
+      <LeadCaptureModal
+        open={showLeadModal}
+        onClose={() => setShowLeadModal(false)}
+        toolSlug={tool.slug}
+        toolName={tool.name}
+        resultType="calculation"
+        resultSummary={`You're leaking ${usd(results.lostPerMonth)}/mo (${formatNumber(results.leak)} qualified leads). Recovered with BurFlow: ${usd(results.recoveredLow)}–${usd(results.recoveredHigh)}/mo at a ${results.captureRate.toFixed(0)}% capture rate.`}
+      />
     </GenericToolWrapper>
   );
 }

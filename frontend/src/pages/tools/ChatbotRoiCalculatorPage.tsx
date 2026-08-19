@@ -1,8 +1,9 @@
 import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, PiggyBank, Repeat, Wallet } from 'lucide-react';
+import { ArrowRight, Mail, PiggyBank, Repeat, Wallet } from 'lucide-react';
 import { getToolBySlug } from '../../data/toolsData';
 import { GenericToolWrapper } from './GenericToolWrapper';
+import LeadCaptureModal from '../../components/LeadCaptureModal';
 import { track } from '../../lib/analytics';
 import { formatNumber } from '../../utils/formatters';
 
@@ -60,6 +61,7 @@ export default function ChatbotRoiCalculatorPage() {
   const [hourlyRate, setHourlyRate] = useState(25);
   const [deflectionRate, setDeflectionRate] = useState(40);
   const [chatbotCost, setChatbotCost] = useState(99);
+  const [showLeadModal, setShowLeadModal] = useState(false);
 
   const results = useMemo(() => {
     const hoursPerMonth = (tickets * minutesPerTicket) / 60;
@@ -192,8 +194,28 @@ export default function ChatbotRoiCalculatorPage() {
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              track('tool_cta_click', { tool_id: tool.slug, location: 'lead_capture_button' });
+              setShowLeadModal(true);
+            }}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-6 py-3 text-sm font-semibold text-[var(--color-neutral-700)] shadow-sm transition-all hover:border-[var(--color-accent-600)]/40 hover:text-[var(--color-accent-700)]"
+          >
+            <Mail className="h-4 w-4" aria-hidden="true" />
+            Email me this calculation
+          </button>
         </div>
       </div>
+      <LeadCaptureModal
+        open={showLeadModal}
+        onClose={() => setShowLeadModal(false)}
+        toolSlug={tool.slug}
+        toolName={tool.name}
+        resultType="calculation"
+        resultSummary={`Net savings: ${usd(results.netMonthly)}/mo (${usd(results.netAnnual)}/yr) after ${usd(chatbotCost)}/mo chatbot cost. ${results.roiPct.toFixed(0)}% monthly ROI, ${results.paybackMonths === 0 ? 'immediate' : `${results.paybackMonths.toFixed(1)}-month`} payback at ${deflectionRate}% deflection.`}
+      />
     </GenericToolWrapper>
   );
 }
