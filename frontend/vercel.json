@@ -5,6 +5,15 @@
       "destination": "https://burflow.onrender.com/api/:match*"
     },
     {
+      "source": "/",
+      "destination": "/prerendered/index.html"
+    },
+    {
+      "source": "/tools/:path*",
+      "destination": "/prerendered/tools/:path*/index.html",
+      "has": [{ "type": "file", "value": "prerendered/tools/:path*/index.html" }]
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }
