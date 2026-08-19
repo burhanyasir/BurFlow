@@ -16,6 +16,7 @@ import { initAnalytics, track, trackOnce } from '../../lib/analytics';
 import { apiClient } from '../../lib/api-client';
 import { getActiveTools } from '../../data/toolsData';
 import { ToolIcon } from '../tools/toolIcons';
+import { SITE_URL } from '../../lib/site';
 
 const toolHighlights = getActiveTools().filter((tool) =>
   ['lead-leak-calculator', 'chatbot-roi-calculator', 'ai-prompt-generator', 'document-to-markdown'].includes(tool.slug)
@@ -126,7 +127,7 @@ const softwareApplicationSchema = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
   name: 'BurFlow',
-  url: 'https://burflow.vercel.app',
+  url: SITE_URL,
   applicationCategory: 'BusinessApplication',
   operatingSystem: 'Web',
   description:
@@ -140,7 +141,7 @@ const softwareApplicationSchema = {
   publisher: {
     '@type': 'Organization',
     name: 'BurFlow',
-    url: 'https://burflow.vercel.app',
+    url: SITE_URL,
   },
   featureList: [
     'Autonomous website scan and offer extraction',

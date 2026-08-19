@@ -1,11 +1,12 @@
 import { TOOLS } from '../src/data/toolsData';
+import { SITE_URL } from '../src/lib/site';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(here, '..', 'public');
-const SITE = 'https://burflow.vercel.app';
+const SITE = SITE_URL;
 const TODAY = new Date().toISOString().slice(0, 10);
 
 const coreUrls: Array<{ loc: string; priority: string; changefreq: string }> = [

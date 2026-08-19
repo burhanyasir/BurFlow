@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SEO } from '../../components/SEO';
 import { Helmet } from 'react-helmet-async';
+import { SITE_URL } from '../../lib/site';
 
 export default function ROICalculator() {
   const [monthlyVisitors, setMonthlyVisitors] = useState(10000);
@@ -36,7 +37,7 @@ export default function ROICalculator() {
           '@type': 'WebApplication',
           name: 'BurFlow ROI Calculator',
           applicationCategory: 'BusinessApplication',
-          url: 'https://burflow.vercel.app/tools/roi-calculator',
+          url: `${SITE_URL}/tools/roi-calculator`,
           description: 'Calculate the ROI of AI sales agents for your website.',
         })}</script>
       </Helmet>

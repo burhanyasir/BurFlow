@@ -14,6 +14,7 @@ import {
 } from '../../data/toolsData';
 import { ToolIcon } from './toolIcons';
 import { cn } from '../../utils/cn';
+import { SITE_URL } from '../../lib/site';
 
 export interface GenericToolWrapperProps {
   tool: ToolDefinition;
@@ -21,8 +22,6 @@ export interface GenericToolWrapperProps {
   children: ReactNode;
   showFaqs?: boolean;
 }
-
-const SITE_URL = 'https://burflow.vercel.app';
 
 export function GenericToolWrapper({ tool, subtitle, children, showFaqs = true }: GenericToolWrapperProps) {
   const route = tool.route ?? `/tools/${tool.slug}`;

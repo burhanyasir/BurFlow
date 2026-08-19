@@ -85,7 +85,7 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
     { done: !!data.workspace.tenantId, label: 'Workspace Created', desc: `${data.workspace.name} — ${data.workspace.website}` },
     { done: data.knowledge.files.length > 0 || data.knowledge.websites.length > 0 || !!data.knowledge.faqs.trim(), label: 'Knowledge Added', desc: `${data.knowledge.files.length} files, ${data.knowledge.websites.length} websites, ${data.knowledge.faqs ? 'FAQs' : 'no FAQs'}` },
     { done: data.processing.sourceIds.length > 0, label: 'Content Indexed', desc: `${data.processing.completedIds.length} of ${data.processing.sourceIds.length} sources ready` },
-    { done: true, label: 'Widget Customized', desc: `${data.custom.primaryColor} · ${data.custom.position === 'right' ? 'Bottom Right' : 'Bottom Left'}` },
+    { done: true, label: 'Widget Customized', desc: `${data.custom.primaryColor} · ${data.custom.position === 'right' || data.custom.position === 'bottom-right' ? 'Bottom Right' : 'Bottom Left'}` },
     { done: !!data.embed.widgetToken, label: 'Widget Code Generated', desc: 'Embed snippet ready for your website' },
     { done: data.embed.widgetVerified, label: 'Installation Verified', desc: data.embed.widgetVerified ? 'Widget confirmed active on your site' : 'Not yet verified — you can verify later' },
     { done: data.testMessages.length > 0, label: 'Chatbot Tested', desc: `${data.testMessages.filter(m => m.role === 'user').length} test messages sent` },

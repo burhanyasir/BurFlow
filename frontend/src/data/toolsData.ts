@@ -1,3 +1,5 @@
+import { SITE_URL } from '../lib/site';
+
 export type ToolCategory = 'sales-roi' | 'ai-generators' | 'markdown' | 'seo-sitemaps';
 export type ToolStatus = 'active' | 'coming-soon';
 export type ToolBadge = 'Interactive' | 'Free' | 'Popular';
@@ -955,7 +957,7 @@ export function buildBreadcrumbSchema(items: Array<{ name: string; path: string 
       '@type': 'ListItem',
       position: index + 1,
       name: item.name,
-      item: `https://burflow.vercel.app${item.path}`,
+      item: `${SITE_URL}${item.path}`,
     })),
   });
 }
@@ -966,13 +968,13 @@ export function buildWebApplicationSchema(tool: ToolDefinition): string {
     '@type': 'WebApplication',
     name: tool.name,
     description: tool.shortDescription,
-    url: `https://burflow.vercel.app${tool.route ?? `/tools/${tool.slug}`}`,
+    url: `${SITE_URL}${tool.route ?? `/tools/${tool.slug}`}`,
     applicationCategory: 'BusinessApplication',
     offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
     provider: {
       '@type': 'Organization',
       name: 'BurFlow',
-      url: 'https://burflow.vercel.app',
+      url: SITE_URL,
     },
   });
 }

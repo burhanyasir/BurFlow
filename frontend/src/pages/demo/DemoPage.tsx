@@ -8,6 +8,7 @@ import { Textarea } from '../../components/ui/Textarea';
 import { Button } from '../../components/ui/Button';
 import { useToast } from '../../components/ui/Toast';
 import { apiClient } from '../../lib/api-client';
+import { SITE_URL } from '../../lib/site';
 import { cn } from '../../utils/cn';
 
 interface FormState {
@@ -102,7 +103,7 @@ export default function DemoPage() {
         title="Book a Live Demo | BurFlow"
         description="See BurFlow in action — grounded AI answers, lead capture, and human handover, set up for your business in a 20-minute walkthrough."
         canonicalPath="/demo"
-        schema='{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://burflow.vercel.app"},{"@type":"ListItem","position":2,"name":"Demo","item":"https://burflow.vercel.app/demo"}]}'
+        schema={`{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE_URL}"},{"@type":"ListItem","position":2,"name":"Demo","item":"${SITE_URL}/demo"}]}`}
       />
       <PageSection
         title="Book a Live Demo"

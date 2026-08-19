@@ -1,4 +1,5 @@
 import { Helmet } from 'react-helmet-async';
+import { SITE_URL } from '../lib/site';
 
 export interface SEOProps {
   title: string;
@@ -9,7 +10,6 @@ export interface SEOProps {
   path?: string;
 }
 
-const SITE_URL: string = import.meta.env.VITE_SITE_URL ?? 'https://burflow.vercel.app';
 const DEFAULT_OG_IMAGE = `${SITE_URL}/og-image.png`;
 
 function toAbsoluteUrl(value: string): string {

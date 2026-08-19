@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { cn } from '../../utils/cn';
 import { Seo } from '../../components/seo/Seo';
 import { track } from '../../lib/analytics';
+import { SITE_URL } from '../../lib/site';
 import { getBlogArticle } from '../../config/blog-articles';
 import {
   estimateReadTime,
@@ -283,10 +284,10 @@ export default function BlogArticlePage() {
         schema={JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'BlogPosting',
-          mainEntityOfPage: 'https://burflow.vercel.app/blog',
+          mainEntityOfPage: `${SITE_URL}/blog`,
           title,
           description: excerpt,
-          image: 'https://burflow.vercel.app',
+          image: SITE_URL,
           author: {
             '@type': 'Organization',
             name: 'Conversation Engine',
@@ -295,7 +296,7 @@ export default function BlogArticlePage() {
           publisher: {
             '@type': 'Organization',
             name: 'Conversation Engine',
-            url: 'https://burflow.vercel.app',
+            url: SITE_URL,
           },
         })}
       />

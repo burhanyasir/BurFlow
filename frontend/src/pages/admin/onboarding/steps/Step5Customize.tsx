@@ -10,7 +10,7 @@ import { deriveBusinessIntelligenceSnapshot } from '../../../../utils/business-p
 interface Props {
   data: {
     primaryColor: string;
-    position: 'right' | 'left';
+    position: 'right' | 'left' | 'bottom-right' | 'bottom-left';
     welcomeMessage: string;
     placeholder: string;
     suggestedQuestions: string[];
@@ -131,7 +131,7 @@ export function Step5Customize({ data, businessProfile, onChange }: Props) {
               </div>
             </div>
 
-            <div className={`absolute bottom-4 ${data.position === 'right' ? 'right-4' : 'left-4'} transition-all`}>
+            <div className={`absolute bottom-4 ${data.position === 'right' || data.position === 'bottom-right' ? 'right-4' : 'left-4'} transition-all`}>
               <div className="bg-white rounded-2xl shadow-lg border border-[var(--color-neutral-200)] w-[240px] overflow-hidden">
                 <div className="p-3 flex items-center gap-3" style={{ backgroundColor: data.primaryColor }}>
                   <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-white text-sm font-bold">A</div>

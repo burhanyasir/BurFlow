@@ -47,7 +47,7 @@ export interface OnboardingData {
   };
   custom: {
     primaryColor: string;
-    position: 'right' | 'left';
+    position: 'right' | 'left' | 'bottom-right' | 'bottom-left';
     welcomeMessage: string;
     placeholder: string;
     suggestedQuestions: string[];
@@ -71,9 +71,9 @@ const defaultData: OnboardingData = {
   knowledge: { files: [], websites: [], faqs: '', uploaded: false, knowledgeBaseId: null },
   processing: { sourceIds: [], completedIds: [], statuses: {}, error: null },
   custom: {
-    primaryColor: '#6366f1', position: 'right',
-    welcomeMessage: 'Hi there! How can I help you today?',
-    placeholder: 'Type your message here…',
+    primaryColor: '#006248', position: 'bottom-right',
+    welcomeMessage: 'Hi! What brings you here today?',
+    placeholder: 'Ask anything about BurFlow...',
     suggestedQuestions: [], logo: '',
   },
   embed: { agentId: '', widgetToken: null, snippet: null, widgetVerified: false },
@@ -536,4 +536,6 @@ export const INDUSTRIES = [
 export const WIDGET_POSITIONS = [
   { value: 'right' as const, label: 'Bottom Right' },
   { value: 'left' as const, label: 'Bottom Left' },
+  { value: 'bottom-right' as const, label: 'Bottom Right (Corner)' },
+  { value: 'bottom-left' as const, label: 'Bottom Left (Corner)' },
 ];

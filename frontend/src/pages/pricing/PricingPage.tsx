@@ -4,6 +4,7 @@ import { SEO } from '../../components/SEO';
 import { PageSection } from '../../components/ui/PageSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
+import { SITE_URL } from '../../lib/site';
 
 const monthlyTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
@@ -28,7 +29,7 @@ export default function PricingPage() {
         title="Pricing | BurFlow"
         description="Simple, transparent pricing that scales from your first website visitor to millions of monthly conversations. Start free — no credit card required."
         canonicalPath="/pricing"
-        schema='{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"https://burflow.vercel.app"},{"@type":"ListItem","position":2,"name":"Pricing","item":"https://burflow.vercel.app/pricing"}]}'
+        schema={`{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Home","item":"${SITE_URL}"},{"@type":"ListItem","position":2,"name":"Pricing","item":"${SITE_URL}/pricing"}]}`}
       />
       <PageSection
         title="Transparent Plans for Growing Operations."

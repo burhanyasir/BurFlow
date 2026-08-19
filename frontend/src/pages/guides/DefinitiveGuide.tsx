@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { SEO } from '../../components/SEO';
 import { Helmet } from 'react-helmet-async';
+import { SITE_URL } from '../../lib/site';
 
 const sections = [
   {
@@ -151,7 +152,7 @@ export default function DefinitiveGuide() {
           datePublished: '2026-08-18',
           author: { '@type': 'Organization', name: 'BurFlow' },
           publisher: { '@type': 'Organization', name: 'BurFlow' },
-          mainEntityOfPage: { '@type': 'WebPage', '@id': 'https://burflow.vercel.app/guides/ai-sales-agents' },
+          mainEntityOfPage: { '@type': 'WebPage', '@id': `${SITE_URL}/guides/ai-sales-agents` },
         })}</script>
         <script type="application/ld+json">{JSON.stringify({
           '@context': 'https://schema.org',

@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { SITE_URL } from '../../lib/site';
 
 export interface SeoProps {
   title: string;
@@ -10,7 +11,7 @@ export interface SeoProps {
 }
 
 const SITE_NAME = 'BurFlow';
-const BASE_URL = 'https://conversationengine.ai';
+const BASE_URL = SITE_URL;
 const DEFAULT_OG_IMAGE = '/og-default.png';
 
 function upsertTag(tagName: string, attributes: Record<string, string>, parent: HTMLElement = document.head) {
