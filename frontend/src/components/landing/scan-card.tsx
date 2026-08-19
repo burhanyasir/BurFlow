@@ -2,21 +2,52 @@ import { Check } from './primitives';
 
 export type ScanStatus = 'idle' | 'scanning' | 'done';
 
+export interface ScanResult {
+  pages: number;
+  products: number;
+  services: number;
+  pricing: number;
+  faqs: number;
+  intents: number;
+}
+
+export interface ScanDetails {
+  name: string;
+  description: string;
+  pages: string[];
+  products: string[];
+  services: string[];
+  headings: string[];
+}
+
 export interface ScanCardProps {
   status: ScanStatus;
   stage: string;
   progress: number;
   url: string;
+  result: ScanResult | null;
+  details: ScanDetails | null;
   onRestart: () => void;
 }
 
-const resultStats = [
-  { label: 'Pages scanned', value: '26' },
-  { label: 'Products found', value: '9' },
-  { label: 'Buyer intents', value: '14' },
+const idleStats = [
+  { label: 'Pages scanned', value: '184+' },
+  { label: 'Products found', value: '6' },
+  { label: 'Buyer intents', value: '18' },
 ];
 
-export function ScanCard({ status, stage, progress, url, onRestart }: ScanCardProps) {
+export function ScanCard({ status, stage, progress, url, result, details, onRestart }: ScanCardProps) {
+  const liveStats = result
+    ? [
+        { label: 'Pages scanned', value: `${result.pages}+` },
+        { label: 'Products found', value: `${result.products}` },
+        { label: 'Services found', value: `${result.services}` },
+        { label: 'Pricing pages', value: `${result.pricing}` },
+        { label: 'FAQs detected', value: `${result.faqs}` },
+        { label: 'Buyer intents', value: `${result.intents}` },
+      ]
+    : null;
+
   return (
     <div className="rounded-2xl border border-hairline bg-surface p-6 shadow-lift md:p-8">
       <div className="flex items-center justify-between">
@@ -67,22 +98,15 @@ export function ScanCard({ status, stage, progress, url, onRestart }: ScanCardPr
           <div className="mt-6">
             <div className="flex items-baseline justify-between text-sm">
               <span className="text-muted-foreground">Sales agent readiness</span>
-              <span className="font-display font-bold">{status === 'idle' ? '97%' : '97%'}</span>
+              <span className="font-display font-bold">97%</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
               <div className="h-full w-[97%] rounded-full bg-primary" />
             </div>
           </div>
 
-          <dl className="mt-7 grid grid-cols-3 gap-4 border-y border-hairline py-5">
-            {(status === 'idle'
-              ? [
-                  { label: 'Pages scanned', value: '184+' },
-                  { label: 'Products found', value: '6' },
-                  { label: 'Buyer intents', value: '18' },
-                ]
-              : resultStats
-            ).map((s) => (
+          <dl className={`mt-7 grid gap-4 border-y border-hairline py-5 ${liveStats ? 'grid-cols-3 sm:grid-cols-6' : 'grid-cols-3'}`}>
+            {(liveStats ?? idleStats).map((s) => (
               <div key={s.label}>
                 <dt className="text-[11px] uppercase tracking-wider text-muted-foreground">
                   {s.label}
@@ -94,17 +118,59 @@ export function ScanCard({ status, stage, progress, url, onRestart }: ScanCardPr
         </>
       )}
 
-      {status === 'done' && (
-        <div className="mt-5 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-foreground">
-          <span className="font-semibold">Your agent is ready.</span>{' '}
-          <span className="text-muted-foreground">
-            Visitors can now ask about products, pricing, and book a demo.
-          </span>
+      {status === 'done' && details && (
+        <div className="mt-5 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm">
+          <span className="font-semibold text-foreground">{details.name}</span>{' '}
+          <span className="text-muted-foreground">{details.description}</span>
+        </div>
+      )}
+
+      {status === 'done' && details && details.products.length > 0 && (
+        <div className="mt-4">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Products & features</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.products.slice(0, 6).map((p, i) => (
+              <span key={i} className="inline-block rounded-md bg-primary/8 px-2 py-0.5 text-xs text-primary border border-primary/15">{p.slice(0, 50)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.services.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Services found</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.services.slice(0, 6).map((s, i) => (
+              <span key={i} className="inline-block rounded-md bg-primary/8 px-2 py-0.5 text-xs text-primary border border-primary/15">{s.slice(0, 50)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.headings.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Key pages & sections</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.headings.slice(0, 8).map((h, i) => (
+              <span key={i} className="inline-block rounded-md bg-surface-2 px-2 py-0.5 text-xs text-muted-foreground border border-hairline">{h.slice(0, 40)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.pages.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pages discovered</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.pages.slice(0, 8).map((p, i) => (
+              <span key={i} className="inline-block max-w-[140px] truncate rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground border border-hairline" title={p}>{p.replace(/^https?:\/\/[^/]+/, '').split('/').filter(Boolean).slice(-2).join('/') || '/'}</span>
+            ))}
+          </div>
         </div>
       )}
 
       <p className="mt-6 text-sm font-semibold">
-        {status === 'done' ? 'What your visitors will experience' : 'What your visitors will experience'}
+        What your visitors will experience
       </p>
       <ul className="mt-3 space-y-2.5 text-sm text-muted-foreground">
         {[

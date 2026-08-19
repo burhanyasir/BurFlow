@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 import { ArrowRight } from 'lucide-react';
 import { SEO } from '../../components/SEO';
 import { CTA, Check, Eyebrow, Pill } from '../../components/landing/primitives';
-import { ScanCard, type ScanStatus } from '../../components/landing/scan-card';
+import { ScanCard, type ScanStatus, type ScanResult, type ScanDetails } from '../../components/landing/scan-card';
 import { Reveal } from '../../components/landing/reveal';
 import { SiteHeader } from '../../components/landing/SiteHeader';
 import { SiteFooter } from '../../components/landing/SiteFooter';
@@ -207,7 +207,56 @@ export default function LandingPageV3() {
     progress: 0,
     url: 'https://yourcompany.com/',
   });
+  const [scanResult, setScanResult] = useState<ScanResult | null>(null);
+  const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
   const scanTimer = useRef<number | null>(null);
+
+  /** Fetch a page through a CORS proxy and parse its content. */
+  const fetchPage = useCallback(async (pageUrl: string): Promise<string> => {
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    return res.text();
+  }, []);
+
+  /** Extract structured info from HTML. */
+  const parsePage = useCallback((html: string, baseUrl: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const title = doc.querySelector('title')?.textContent?.trim() || '';
+    const description = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+    const origin = new URL(baseUrl).origin;
+    const links = Array.from(doc.querySelectorAll('a[href]'))
+      .map((a) => a.getAttribute('href') || '')
+      .filter((href) => href.startsWith('/') || href.startsWith(origin))
+      .map((href) => { try { return new URL(href, origin).pathname; } catch { return href; } })
+      .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
+    const headings = Array.from(doc.querySelectorAll('h1,h2,h3'))
+      .map((h) => h.textContent?.trim() || '').filter(Boolean);
+    const paragraphs = Array.from(doc.querySelectorAll('p'))
+      .map((p) => p.textContent?.trim() || '')
+      .filter((t) => t.length > 20 && t.length < 300).slice(0, 30);
+    const lists = Array.from(doc.querySelectorAll('li'))
+      .map((li) => li.textContent?.trim() || '')
+      .filter((t) => t.length > 5 && t.length < 200).slice(0, 30);
+    return { title, description, links: [...new Set(links)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20), paragraphs, lists };
+  }, []);
+
+  /** Classify pages and extract products/services. */
+  const classifyContent = useCallback((pages: string[], headings: string[], paragraphs: string[], lists: string[]) => {
+    const productKeywords = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
+    const serviceKeywords = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
+    const pricingKeywords = /pric|plan|cost|tier|subscription|fee|rate|package/i;
+    const faqKeywords = /faq|question|answer|help|support|contact/i;
+    const products = headings.filter((h) => productKeywords.test(h)).slice(0, 8);
+    const productPatterns = paragraphs.filter((p) => /(?:our|the|introducing|new|popular|best|flagship)\s+(?:product|feature|tool|platform|solution|app|software)/i.test(p)).slice(0, 4);
+    products.push(...productPatterns.map((p) => p.slice(0, 60)));
+    const services = headings.filter((h) => serviceKeywords.test(h)).slice(0, 8);
+    const servicePatterns = paragraphs.filter((p) => /(?:our|the|offering|providing|delivering)\s+(?:service|support|consulting|help|training)/i.test(p)).slice(0, 4);
+    services.push(...servicePatterns.map((p) => p.slice(0, 60)));
+    const pricing = pages.filter((p) => pricingKeywords.test(p)).length || headings.filter((h) => pricingKeywords.test(h)).length || (paragraphs.filter((p) => /pricing|plan|tier|subscription/i.test(p)).length > 0 ? 1 : 0);
+    const faqs = pages.filter((p) => faqKeywords.test(p)).length + headings.filter((h) => faqKeywords.test(h)).length;
+    return { products: [...new Set(products)].slice(0, 8), services: [...new Set(services)].slice(0, 8), pricing, faqs };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -215,32 +264,72 @@ export default function LandingPageV3() {
     };
   }, []);
 
-  const startScan = (raw: string) => {
-    const url =
-      raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
+  const startScan = useCallback(async (raw: string) => {
+    let url = raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
+    if (!url.startsWith('http')) url = 'https://' + url;
     setScan({ status: 'scanning', stage: SCAN_STAGES[0]![1], progress: 2, url });
+    setScanResult(null);
+    setScanDetails(null);
     track('scan_submit', { url });
-    // Record the scan request as an inbound lead (best-effort, never blocks the demo).
-    apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {
-      /* non-fatal: the scan preview continues regardless */
-    });
-    document
-      .getElementById('scan-preview')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    let p = 2;
-    if (scanTimer.current) window.clearInterval(scanTimer.current);
-    scanTimer.current = window.setInterval(() => {
-      p = Math.min(p + 2 + Math.random() * 3, 100);
-      const stage = [...SCAN_STAGES].reverse().find(([at]) => p >= at)?.[1] ?? SCAN_STAGES[0]![1];
-      setScan((prev) => ({ ...prev, progress: p, stage }));
-      if (p >= 100) {
-        if (scanTimer.current) window.clearInterval(scanTimer.current);
-        scanTimer.current = null;
-        setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete' }));
-        trackOnce('scan_complete');
+    apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {});
+    document.getElementById('scan-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+    try {
+      setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 5 }));
+      const html = await fetchPage(url);
+      setScan((prev) => ({ ...prev, stage: 'Parsing content…', progress: 25 }));
+      const parsed = parsePage(html, url);
+
+      setScan((prev) => ({ ...prev, stage: 'Discovering pages…', progress: 45 }));
+      const subPages = parsed.links.slice(0, 12);
+      const discoveredPages = [url, ...subPages.map((p) => { try { return new URL(p, url).toString(); } catch { return p; } })];
+
+      setScan((prev) => ({ ...prev, stage: 'Analyzing products & services…', progress: 65 }));
+      const extraHeadings = [...parsed.headings];
+      const extraParagraphs = [...parsed.paragraphs];
+      const extraLists = [...parsed.lists];
+      const pagesToFetch = subPages.filter((p) => /product|service|pricing|about|feature/i.test(p)).slice(0, 3);
+      for (const page of pagesToFetch) {
+        try {
+          const pageUrl = new URL(page, url).toString();
+          const pageHtml = await fetchPage(pageUrl);
+          const pageParsed = parsePage(pageHtml, pageUrl);
+          extraHeadings.push(...pageParsed.headings);
+          extraParagraphs.push(...pageParsed.paragraphs);
+          extraLists.push(...pageParsed.lists);
+        } catch { /* skip failed pages */ }
       }
-    }, 110);
-  };
+
+      setScan((prev) => ({ ...prev, stage: 'Classifying content…', progress: 85 }));
+      const classified = classifyContent(parsed.links, extraHeadings, extraParagraphs, extraLists);
+      const intents = Math.max(5, classified.products.length * 3 + classified.services.length * 2 + classified.pricing * 2);
+
+      setScanResult({
+        pages: discoveredPages.length,
+        products: classified.products.length || 1,
+        services: classified.services.length || 1,
+        pricing: classified.pricing || 1,
+        faqs: classified.faqs || 1,
+        intents,
+      });
+      setScanDetails({
+        name: parsed.title || new URL(url).hostname,
+        description: parsed.description || 'No meta description found.',
+        pages: discoveredPages.slice(0, 8),
+        products: classified.products,
+        services: classified.services,
+        headings: [...new Set(extraHeadings)].slice(0, 12),
+      });
+
+      setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
+      trackOnce('scan_complete');
+    } catch {
+      const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
+      setScanDetails({ name: domain, description: 'Could not fully fetch the website. The agent will learn more during setup.', pages: [url], products: [], services: [], headings: [] });
+      setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
+    }
+  }, [fetchPage, parsePage, classifyContent]);
 
   useEffect(() => {
     initAnalytics();
@@ -377,9 +466,13 @@ export default function LandingPageV3() {
                   stage={scan.stage}
                   progress={scan.progress}
                   url={scan.url}
-                  onRestart={() =>
-                    setScan({ status: 'idle', stage: '', progress: 0, url: 'https://yourcompany.com/' })
-                  }
+                  result={scanResult}
+                  details={scanDetails}
+                  onRestart={() => {
+                    setScan({ status: 'idle', stage: '', progress: 0, url: 'https://yourcompany.com/' });
+                    setScanResult(null);
+                    setScanDetails(null);
+                  }}
                 />
               </Reveal>
             </div>
