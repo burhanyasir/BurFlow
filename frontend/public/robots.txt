@@ -1,3 +1,7 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /dashboard/
+Disallow: /admin/
+
+Sitemap: https://burflow.vercel.app/sitemap.xml

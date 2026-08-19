@@ -18,6 +18,8 @@ const ContactPage = lazy(() => import('./pages/contact/ContactPage'));
 const FAQPage = lazy(() => import('./pages/faq/FAQPage'));
 const BlogPage = lazy(() => import('./pages/blog/BlogPage'));
 const BlogArticlePage = lazy(() => import('./pages/blog/BlogArticlePage'));
+const ComparisonPage = lazy(() => import('./pages/comparison/ComparisonPage'));
+const ComparisonArticle = lazy(() => import('./pages/comparison/ComparisonArticle'));
 const DocsPage = lazy(() => import('./pages/docs/DocsPage'));
 const WidgetPage = lazy(() => import('./pages/docs/WidgetPage'));
 const ApiPage = lazy(() => import('./pages/docs/ApiPage'));
@@ -106,6 +108,8 @@ function RoutesWithAnimation() {
         <Route path="/faq" element={<PublicRoute><FAQPage /></PublicRoute>} />
         <Route path="/blog" element={<PublicRoute><BlogPage /></PublicRoute>} />
         <Route path="/blog/:slug" element={<PublicRoute><BlogArticlePage /></PublicRoute>} />
+        <Route path="/compare" element={<PublicRoute><ComparisonPage /></PublicRoute>} />
+        <Route path="/compare/:slug" element={<PublicRoute><ComparisonArticle /></PublicRoute>} />
         <Route path="/docs" element={<PublicRoute><DocsPage /></PublicRoute>} />
         <Route path="/docs/widget" element={<PublicRoute><WidgetPage /></PublicRoute>} />
         <Route path="/docs/api" element={<PublicRoute><ApiPage /></PublicRoute>} />

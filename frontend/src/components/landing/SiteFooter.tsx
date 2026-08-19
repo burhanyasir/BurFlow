@@ -24,6 +24,7 @@ const footerColumns = [
       { label: 'About', to: '/about' },
       { label: 'Contact sales', to: '/contact' },
       { label: 'Blog', to: '/blog' },
+      { label: 'Compare', to: '/compare' },
     ],
   },
   {
