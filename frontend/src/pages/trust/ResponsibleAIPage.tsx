@@ -4,15 +4,15 @@ import { Link } from 'react-router-dom';
 const sections = [
   {
     title: 'Deterministic, Template-Based Engine',
-    body: 'Conversation Engine does not rely on free-form large language model generation. Our core engine uses deterministic conversation flows built from expert-authored templates. Every response is constructed from predefined, reviewed, and tested templates — eliminating the risk of hallucination or fabricated information.',
+    body: 'BurFlow does not rely on free-form large language model generation. Our core engine uses deterministic conversation flows built from expert-authored templates. Every response is constructed from predefined, reviewed, and tested templates â€” eliminating the risk of hallucination or fabricated information.',
   },
   {
     title: 'Grounding in Verified Knowledge',
-    body: 'All answers are grounded exclusively in the customer\'s uploaded knowledge sources — PDFs, FAQs, help articles, and structured data. The retrieval system searches only within these approved documents. No external web content or unverified data is used to generate responses.',
+    body: 'All answers are grounded exclusively in the customer\'s uploaded knowledge sources â€” PDFs, FAQs, help articles, and structured data. The retrieval system searches only within these approved documents. No external web content or unverified data is used to generate responses.',
   },
   {
     title: 'Confidence Scoring and Guardrails',
-    body: 'Every generated response includes a confidence score based on the relevance of the source material and the match strength. Workspace owners configure a confidence threshold. Responses below this threshold are blocked and replaced with a clarifying question or a human handoff — never a guess.',
+    body: 'Every generated response includes a confidence score based on the relevance of the source material and the match strength. Workspace owners configure a confidence threshold. Responses below this threshold are blocked and replaced with a clarifying question or a human handoff â€” never a guess.',
   },
   {
     title: 'Human Oversight and Escalation',
@@ -20,7 +20,7 @@ const sections = [
   },
   {
     title: 'No Training on Customer Data',
-    body: 'Customer data — conversations, knowledge bases, and account information — is never used to train public AI models or improve models outside the customer\'s workspace. Each workspace operates as an isolated environment with its own knowledge base and configuration.',
+    body: 'Customer data â€” conversations, knowledge bases, and account information â€” is never used to train public AI models or improve models outside the customer\'s workspace. Each workspace operates as an isolated environment with its own knowledge base and configuration.',
   },
   {
     title: 'Transparency in AI Responses',
@@ -87,7 +87,7 @@ export default function ResponsibleAIPage() {
             Responsible AI
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed">
-            Safe, transparent, and trustworthy AI — built on principles of accountability and human oversight.
+            Safe, transparent, and trustworthy AI â€” built on principles of accountability and human oversight.
           </p>
         </motion.div>
 

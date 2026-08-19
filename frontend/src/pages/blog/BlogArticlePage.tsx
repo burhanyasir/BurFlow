@@ -31,18 +31,18 @@ const legacyArticles: BlogArticle[] = [
     slug: 'confidence-guarded-ai-responses',
     title: 'Introducing Confidence-Guarded AI Responses',
     category: 'Product',
-    excerpt: 'How we built token-by-token confidence scoring that prevents low-quality answers from reaching your customers — and what it means for your support team.',
-    content: `Every AI support platform claims to deliver accurate answers. But accuracy isn't binary — it's a spectrum. A response can start strong and veer into uncertainty mid-sentence. Traditional systems evaluate confidence at the response level, if at all. That leaves a dangerous blind spot.
+    excerpt: 'How we built token-by-token confidence scoring that prevents low-quality answers from reaching your customers â€” and what it means for your support team.',
+    content: `Every AI support platform claims to deliver accurate answers. But accuracy isn't binary â€” it's a spectrum. A response can start strong and veer into uncertainty mid-sentence. Traditional systems evaluate confidence at the response level, if at all. That leaves a dangerous blind spot.
 
-We built Confidence-Guarded AI Responses to solve this at the token level. Every token the model generates passes through a real-time confidence scorer that evaluates semantic alignment against grounded sources. If confidence drops below configurable thresholds, the system intervenes — surfacing a citation, requesting clarification, or escalating to a human.
+We built Confidence-Guarded AI Responses to solve this at the token level. Every token the model generates passes through a real-time confidence scorer that evaluates semantic alignment against grounded sources. If confidence drops below configurable thresholds, the system intervenes â€” surfacing a citation, requesting clarification, or escalating to a human.
 
-The architecture is straightforward: a lightweight scorer runs alongside the generation loop, consuming hidden-state embeddings and cross-attention weights. Within 8–12ms of overhead per response, we gain per-token confidence signals that drive guardrails without degrading latency.
+The architecture is straightforward: a lightweight scorer runs alongside the generation loop, consuming hidden-state embeddings and cross-attention weights. Within 8â€“12ms of overhead per response, we gain per-token confidence signals that drive guardrails without degrading latency.
 
-For support teams, this means no more "hallucinated" policy quotes, no more confident-sounding but wrong answers. Your customers get responses that are either correct or explicitly flagged as uncertain — with a clear path to resolution.
+For support teams, this means no more "hallucinated" policy quotes, no more confident-sounding but wrong answers. Your customers get responses that are either correct or explicitly flagged as uncertain â€” with a clear path to resolution.
 
 We open-sourced the scoring core at github.com/conversationengine/confidence-guard. The integration guide covers the three deployment modes: inline (same-process), sidecar (local network), and remote (API gateway).`,
     author: 'Product Team',
-    authorTitle: 'Product Team, Conversation Engine',
+    authorTitle: 'Product Team, BurFlow',
     date: 'July 15, 2026',
     readingTime: '6 min read',
   },
@@ -50,18 +50,18 @@ We open-sourced the scoring core at github.com/conversationengine/confidence-gua
     slug: 'grounding-eliminates-hallucinations',
     title: 'How Grounding Eliminates Hallucinations in AI Support',
     category: 'Engineering',
-    excerpt: 'A deep dive into the grounding architecture that ties every response to verifiable sources — eliminating hallucinations at the protocol level.',
-    content: `Hallucinations are the #1 barrier to production AI support. Models generate fluent text that sounds correct but isn't. Traditional retrieval-augmented generation (RAG) helps, but it doesn't guarantee fidelity — the model can still ignore retrieved context.
+    excerpt: 'A deep dive into the grounding architecture that ties every response to verifiable sources â€” eliminating hallucinations at the protocol level.',
+    content: `Hallucinations are the #1 barrier to production AI support. Models generate fluent text that sounds correct but isn't. Traditional retrieval-augmented generation (RAG) helps, but it doesn't guarantee fidelity â€” the model can still ignore retrieved context.
 
 Our grounding architecture takes a different approach. Instead of treating retrieved documents as hints, we encode them as hard constraints. The generation process is guided by a grounding verifier that cross-references each claim against source material in real time.
 
-The pipeline has three stages: retrieval, constraint encoding, and verified generation. Retrieval identifies the top-k relevant chunks from the knowledge base. Constraint encoding converts these into structured fact triples that the verifier understands. Verified generation runs the model with active constraint enforcement — if a generated token would produce a claim unsupported by the triples, the verifier suppresses it and the model must either cite a source or rephrase.
+The pipeline has three stages: retrieval, constraint encoding, and verified generation. Retrieval identifies the top-k relevant chunks from the knowledge base. Constraint encoding converts these into structured fact triples that the verifier understands. Verified generation runs the model with active constraint enforcement â€” if a generated token would produce a claim unsupported by the triples, the verifier suppresses it and the model must either cite a source or rephrase.
 
 Benchmarks show a 99.7% reduction in hallucinated claims across 10,000 test queries. False negatives (correct answers blocked) sit at 0.3%. We consider this production-ready for any support domain with a maintained knowledge base.
 
 The full grounding specification is available in our documentation. Implementation requires Python 3.11+ and integrates with any OpenAI-compatible chat endpoint.`,
     author: 'Engineering Team',
-    authorTitle: 'Engineering Team, Conversation Engine',
+    authorTitle: 'Engineering Team, BurFlow',
     date: 'July 10, 2026',
     readingTime: '8 min read',
   },
@@ -72,7 +72,7 @@ The full grounding specification is available in our documentation. Implementati
     excerpt: 'We completed our SOC 2 Type II audit. Here is what the certification covers, how it protects your data, and why it matters for AI-powered support.',
     body: 'A Data Processing Agreement (DPA) is a legally binding contract that defines how a data processor handles personal data on behalf of a data controller. Under GDPR Article 28, a DPA is required whenever a processor handles personal data of EU residents. Our DPA ensures that both parties understand their obligations regarding data protection, security, and confidentiality.',
     author: 'Security Team',
-    authorTitle: 'Security Team, Conversation Engine',
+    authorTitle: 'Security Team, BurFlow',
     date: 'July 5, 2026',
     readingTime: '5 min read',
   },
@@ -80,20 +80,20 @@ The full grounding specification is available in our documentation. Implementati
     slug: 'state-of-ai-support-2026',
     title: 'The State of AI Customer Support in 2026',
     category: 'Company',
-    excerpt: 'An analysis of where the AI support industry stands mid-year — adoption rates, emerging patterns, and the growing demand for grounded, verifiable answers.',
-    content: `Mid-2026 marks a pivotal moment for AI-powered customer support. Adoption has crossed 45% of mid-market companies, up from 22% in 2024. But the conversation has shifted — from "should we use AI?" to "how do we trust AI?"
+    excerpt: 'An analysis of where the AI support industry stands mid-year â€” adoption rates, emerging patterns, and the growing demand for grounded, verifiable answers.',
+    content: `Mid-2026 marks a pivotal moment for AI-powered customer support. Adoption has crossed 45% of mid-market companies, up from 22% in 2024. But the conversation has shifted â€” from "should we use AI?" to "how do we trust AI?"
 
 Three trends define the current landscape.
 
-First, the grounding imperative. Early adopters who deployed ungrounded chatbots in 2024 are now replacing them with grounded alternatives. The cost of hallucinated answers — lost customers, compliance risk, brand damage — has proven too high. Grounded AI support is no longer a differentiator; it is table stakes.
+First, the grounding imperative. Early adopters who deployed ungrounded chatbots in 2024 are now replacing them with grounded alternatives. The cost of hallucinated answers â€” lost customers, compliance risk, brand damage â€” has proven too high. Grounded AI support is no longer a differentiator; it is table stakes.
 
-Second, the human-AI hybrid model is winning. Pure automation (no human in the loop) peaked at 30% of deployments in 2025 and is declining. The most effective support teams use AI as a force multiplier — handling routine queries with grounded confidence scoring while escalating nuanced cases with full context to human agents.
+Second, the human-AI hybrid model is winning. Pure automation (no human in the loop) peaked at 30% of deployments in 2025 and is declining. The most effective support teams use AI as a force multiplier â€” handling routine queries with grounded confidence scoring while escalating nuanced cases with full context to human agents.
 
 Third, compliance is driving procurement. SOC 2, GDPR, and HIPAA compliance are now mandatory requirements in 70% of enterprise RFPs for AI support platforms. The market is consolidating around vendors who can prove audit readiness.
 
-At Conversation Engine, we built for this reality from day one. Every feature — from token-level confidence scoring to tenant-isolated encryption — is designed to make compliance a side effect of good engineering.`,
+At BurFlow, we built for this reality from day one. Every feature â€” from token-level confidence scoring to tenant-isolated encryption â€” is designed to make compliance a side effect of good engineering.`,
     author: 'CEO',
-    authorTitle: 'CEO, Conversation Engine',
+    authorTitle: 'CEO, BurFlow',
     date: 'June 28, 2026',
     readingTime: '10 min read',
   },
@@ -101,22 +101,22 @@ At Conversation Engine, we built for this reality from day one. Every feature �
     slug: 'knowledge-base-optimization',
     title: 'A Guide to Knowledge Base Optimization',
     category: 'Product',
-    excerpt: 'Best practices for structuring your knowledge base so your AI assistant surfaces the right answer every time — with less maintenance overhead.',
+    excerpt: 'Best practices for structuring your knowledge base so your AI assistant surfaces the right answer every time â€” with less maintenance overhead.',
     content: `Your knowledge base is the single largest determinant of AI support quality. A well-structured KB produces accurate, grounded responses. A neglected KB produces hallucinations, frustrated customers, and escalations.
 
 Here are the optimization principles we have developed working with 200+ production deployments.
 
 Principle 1: Atomicity. Each KB article should cover exactly one concept. An article about "refund policy" should not also cover "shipping times." Atomic articles improve retrieval precision and make confidence scoring more reliable.
 
-Principle 2: Structured metadata. Tag every article with intent categories (e.g., billing, troubleshooting, account), audience segments, and associated product versions. The grounding verifier uses metadata to weight sources — metadata-rich KBs show 34% higher first-response accuracy.
+Principle 2: Structured metadata. Tag every article with intent categories (e.g., billing, troubleshooting, account), audience segments, and associated product versions. The grounding verifier uses metadata to weight sources â€” metadata-rich KBs show 34% higher first-response accuracy.
 
 Principle 3: Regular freshness audits. Set up automated checks that flag articles older than 90 days for review. Stale content is the leading cause of grounded-but-wrong answers where the model correctly cites an outdated policy.
 
 Principle 4: Synonym enrichment. Add common alternative phrasings to article titles. If your official term is "termination," but customers say "cancellation" or "closing account," add those as aliases. This lifts retrieval recall by 22% on average.
 
-We built KB optimization tools directly into the Conversation Engine dashboard — freshness scoring, coverage maps, and synonym suggestions are available in the Knowledge section.`,
+We built KB optimization tools directly into the BurFlow dashboard â€” freshness scoring, coverage maps, and synonym suggestions are available in the Knowledge section.`,
     author: 'Product Team',
-    authorTitle: 'Product Team, Conversation Engine',
+    authorTitle: 'Product Team, BurFlow',
     date: 'June 20, 2026',
     readingTime: '7 min read',
   },
@@ -124,22 +124,22 @@ We built KB optimization tools directly into the Conversation Engine dashboard �
     slug: 'tenant-isolation',
     title: 'Tenant Isolation: How We Keep Your Data Private',
     category: 'Engineering',
-    excerpt: 'A look at the multi-tenant architecture powering Conversation Engine — row-level security, encrypted silos, and strict isolation boundaries.',
+    excerpt: 'A look at the multi-tenant architecture powering BurFlow â€” row-level security, encrypted silos, and strict isolation boundaries.',
     content: `Multi-tenant SaaS platforms face a fundamental challenge: how do you share infrastructure for efficiency while guaranteeing that tenant A never accesses tenant B's data?
 
 Our isolation architecture solves this with three layers.
 
-Layer 1 — Row-level security (RLS). Every database query includes a tenant ID filter enforced at the query planner level. Not in application code — in the database itself. Even a misconfigured application cannot leak cross-tenant data because the RLS policy is attached to the table schema.
+Layer 1 â€” Row-level security (RLS). Every database query includes a tenant ID filter enforced at the query planner level. Not in application code â€” in the database itself. Even a misconfigured application cannot leak cross-tenant data because the RLS policy is attached to the table schema.
 
-Layer 2 — Encrypted tenant silos. Each tenant's knowledge base is encrypted with a unique key stored in a hardware-backed key management system. Inference requests decrypt content in-memory only for the duration of generation, with strict memory fencing.
+Layer 2 â€” Encrypted tenant silos. Each tenant's knowledge base is encrypted with a unique key stored in a hardware-backed key management system. Inference requests decrypt content in-memory only for the duration of generation, with strict memory fencing.
 
-Layer 3 — Audit logging. Every data access — read, write, or inference — is logged with tenant ID, user ID, resource type, and operation timestamp. Logs are immutable and retained for 12 months. Automated anomaly detection alerts on patterns that suggest cross-tenant access attempts.
+Layer 3 â€” Audit logging. Every data access â€” read, write, or inference â€” is logged with tenant ID, user ID, resource type, and operation timestamp. Logs are immutable and retained for 12 months. Automated anomaly detection alerts on patterns that suggest cross-tenant access attempts.
 
 We also offer dedicated tenant isolation (physical infrastructure) for enterprise customers with regulatory requirements. This is managed via the same control plane but provisions separate compute clusters, databases, and key hierarchies.
 
 The isolation model is documented in our SOC 2 report and available for architecture review under NDA.`,
     author: 'Engineering Team',
-    authorTitle: 'Engineering Team, Conversation Engine',
+    authorTitle: 'Engineering Team, BurFlow',
     date: 'June 12, 2026',
     readingTime: '6 min read',
   },
@@ -290,17 +290,17 @@ export default function BlogArticlePage() {
           image: SITE_URL,
           author: {
             '@type': 'Organization',
-            name: 'Conversation Engine',
+            name: 'BurFlow',
           },
           datePublished: date,
           publisher: {
             '@type': 'Organization',
-            name: 'Conversation Engine',
+            name: 'BurFlow',
             url: SITE_URL,
           },
         })}
       />
-      {/* ── BACK LINK ─────────────────────────────────────── */}
+      {/* â”€â”€ BACK LINK â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="mx-auto px-4 md:px-8 pt-28 md:pt-36" style={{ maxWidth: 800 }}>
         <motion.div
           initial={{ opacity: 0, x: -12 }}
@@ -320,7 +320,7 @@ export default function BlogArticlePage() {
         </motion.div>
       </div>
 
-      {/* ── HERO ──────────────────────────────────────────── */}
+      {/* â”€â”€ HERO â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="mx-auto px-4 md:px-8 pt-8 pb-10" style={{ maxWidth: 800 }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -351,12 +351,12 @@ export default function BlogArticlePage() {
         </motion.div>
       </section>
 
-      {/* ── DIVIDER ───────────────────────────────────────── */}
+      {/* â”€â”€ DIVIDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="mx-auto px-4 md:px-8" style={{ maxWidth: 800 }}>
         <div className="border-t border-[rgba(255,255,255,0.06)]" />
       </div>
 
-      {/* ── CONTENT ───────────────────────────────────────── */}
+      {/* â”€â”€ CONTENT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <article className="mx-auto px-4 md:px-8 py-10" style={{ maxWidth: 800 }}>
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -379,7 +379,7 @@ export default function BlogArticlePage() {
                     <>
                       <p className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">{excerpt}</p>
                       <p className="mb-6 leading-[1.8] text-[15px] text-[#C4C4CF]">
-                        The full article is coming soon. Meanwhile, try our free tools — no signup
+                        The full article is coming soon. Meanwhile, try our free tools â€” no signup
                         required.
                       </p>
                     </>
@@ -388,7 +388,7 @@ export default function BlogArticlePage() {
           )}
         </motion.div>
 
-        {/* ── TOOL CTA BANNER ──────────────────────────────── */}
+        {/* â”€â”€ TOOL CTA BANNER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {cta && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -399,7 +399,7 @@ export default function BlogArticlePage() {
             <p className="text-xs font-semibold uppercase tracking-wider text-[#C94F72]">
               Free tool
             </p>
-            <h3 className="mt-2 text-xl font-bold text-[#F5F5F7]">Try the {cta.name} — free</h3>
+            <h3 className="mt-2 text-xl font-bold text-[#F5F5F7]">Try the {cta.name} â€” free</h3>
             <p className="mt-2 max-w-xl text-sm text-[#A1A1AA]">
               Run the numbers on your own funnel in under a minute. No signup required.
             </p>
@@ -425,7 +425,7 @@ export default function BlogArticlePage() {
             </div>
           </motion.div>
         )}
-        {/* ── SOCIAL SHARE ────────────────────────────────── */}
+        {/* â”€â”€ SOCIAL SHARE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -457,7 +457,7 @@ export default function BlogArticlePage() {
         </motion.div>
       </article>
 
-      {/* ── RELATED ARTICLES ──────────────────────────────── */}
+      {/* â”€â”€ RELATED ARTICLES â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <section className="mx-auto px-4 md:px-8 pb-24" style={{ maxWidth: 1200 }}>
         <motion.div
           initial={{ opacity: 0, y: 20 }}

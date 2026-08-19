@@ -91,13 +91,13 @@ const CONFIG_OPTIONS = [
   { key: 'primaryColor', type: 'string (hex)', description: 'Primary brand color for the widget.' },
   { key: 'greeting', type: 'string', description: 'Initial greeting message shown in the widget.' },
   { key: 'suggestions', type: 'string[]', description: 'Up to 4 suggested questions to start with.' },
-  { key: 'showBranding', type: 'boolean', description: 'Show or hide the Conversation Engine branding.' },
+  { key: 'showBranding', type: 'boolean', description: 'Show or hide the BurFlow branding.' },
 ];
 
 export default function WidgetPage() {
   return (
     <div className="relative min-h-screen bg-obsidian text-white">
-      <Seo title="Widget Integration" description="Embed the Conversation Engine widget on any website with a single snippet or package install." path="/docs/widget" />
+      <Seo title="Widget Integration" description="Embed the BurFlow widget on any website with a single snippet or package install." path="/docs/widget" />
       <div className="pt-20 px-4 max-w-4xl mx-auto">
         <nav className="flex items-center gap-2 text-sm text-white/50">
           <Link to="/docs" className="hover:text-white transition-colors">Docs Home</Link>
@@ -165,7 +165,7 @@ export default function WidgetPage() {
           <ol className="space-y-3 text-sm text-white/70 list-decimal list-inside">
             <li>Open your live site where you installed the widget.</li>
             <li>Look for the chat bubble in the bottom corner of the page.</li>
-            <li>Click the bubble to open the widget — you should see your custom greeting.</li>
+            <li>Click the bubble to open the widget â€” you should see your custom greeting.</li>
             <li>Type a test question that your knowledge base can answer.</li>
             <li>Check that the response includes citations and a confidence indicator.</li>
             <li>If the widget does not appear, check the browser console for errors and verify your API key.</li>
@@ -177,10 +177,10 @@ export default function WidgetPage() {
         <div className="border-t border-white/10 pt-12">
           <h3 className="text-sm font-semibold uppercase tracking-widest text-white/40 mb-4">Related documentation</h3>
           <div className="flex flex-wrap gap-3">
-            <Link to="/docs/quick-start" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Quick Start →</Link>
-            <Link to="/docs/knowledge" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Knowledge Management →</Link>
-            <Link to="/docs/api" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">API Reference →</Link>
-            <Link to="/docs/integrations" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Integrations →</Link>
+            <Link to="/docs/quick-start" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Quick Start â†’</Link>
+            <Link to="/docs/knowledge" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Knowledge Management â†’</Link>
+            <Link to="/docs/api" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">API Reference â†’</Link>
+            <Link to="/docs/integrations" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Integrations â†’</Link>
           </div>
         </div>
       </SectionContainer>

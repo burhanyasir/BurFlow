@@ -88,7 +88,7 @@ export const PRICING_FAQS = [
     answer: 'Yes. You can upgrade, downgrade, or cancel your subscription at any time directly from your account billing dashboard.',
   },
   {
-    question: 'Does Conversation Engine work with our existing helpdesk?',
+    question: 'Does BurFlow work with our existing helpdesk?',
     answer: 'Yes. It integrates with existing documentation, websites, Zendesk, Help Scout, Shopify, and custom REST APIs.',
   },
 ];

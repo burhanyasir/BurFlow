@@ -35,7 +35,7 @@ const SUBPROCESSORS: Subprocessor[] = [
   },
   {
     name: 'AWS (Amazon Web Services)',
-    purpose: 'Cloud infrastructure — compute, storage, database',
+    purpose: 'Cloud infrastructure â€” compute, storage, database',
     location: 'United States (us-east-1)',
     dataProcessed: 'All customer data at rest',
   },
@@ -104,7 +104,7 @@ export default function SubprocessorsPage() {
             Subprocessors
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed">
-            Third-party vendors engaged to deliver the Conversation Engine platform. We vet every subprocessor for security and compliance before engagement.
+            Third-party vendors engaged to deliver the BurFlow platform. We vet every subprocessor for security and compliance before engagement.
           </p>
         </motion.div>
 
@@ -130,7 +130,7 @@ export default function SubprocessorsPage() {
           >
             <h3 className="text-lg font-bold text-white mb-3">Subprocessor Vetting and Notification</h3>
             <p className="text-sm text-white/70 leading-relaxed">
-              All subprocessors undergo a security review before engagement, including review of their SOC 2 reports, penetration test results, and data protection agreements. Each subprocessor is contractually bound to process data only as instructed by Conversation Engine and to maintain equivalent security standards.
+              All subprocessors undergo a security review before engagement, including review of their SOC 2 reports, penetration test results, and data protection agreements. Each subprocessor is contractually bound to process data only as instructed by BurFlow and to maintain equivalent security standards.
               Customers will be notified via email at least 30 days before any new subprocessor is engaged. Customers who object to a new subprocessor may terminate their agreement without penalty.
             </p>
           </div>

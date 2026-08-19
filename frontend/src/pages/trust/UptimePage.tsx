@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const sections = [
   {
     title: 'Service Availability Commitment',
-    body: 'Conversation Engine is architected for high availability across multiple availability zones. Our Enterprise plan includes a 99.9% uptime SLA, calculated on a monthly basis. If we fail to meet this commitment, customers are eligible for service credits as outlined in their subscription agreement.',
+    body: 'BurFlow is architected for high availability across multiple availability zones. Our Enterprise plan includes a 99.9% uptime SLA, calculated on a monthly basis. If we fail to meet this commitment, customers are eligible for service credits as outlined in their subscription agreement.',
   },
   {
     title: 'Current Status',
@@ -21,7 +21,7 @@ const sections = [
   },
   {
     title: 'Incident History',
-    body: 'We maintain a publicly available incident history on our status page. Each incident includes the timeline, root cause analysis, and corrective actions taken. Our goal is full transparency — we publish post-mortems for all significant incidents.',
+    body: 'We maintain a publicly available incident history on our status page. Each incident includes the timeline, root cause analysis, and corrective actions taken. Our goal is full transparency â€” we publish post-mortems for all significant incidents.',
   },
   {
     title: 'Status Page',

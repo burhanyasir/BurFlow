@@ -30,7 +30,7 @@ export default function AboutPage() {
         >
           <div className="bg-[var(--color-neutral-0)] shadow-sm border border-[var(--color-neutral-200)] rounded-2xl p-8 md:p-12 mb-12 shadow-sm hover:shadow-md transition-shadow duration-300">
             <p className="text-lg md:text-xl text-[var(--color-neutral-500)] leading-relaxed">
-              Conversation Engine provides organizations with immediate, automated customer assistance powered exclusively by their proprietary knowledge. We believe customer service automation should be trustworthy, accurate, and completely aligned with your brand identity.
+              BurFlow provides organizations with immediate, automated customer assistance powered exclusively by their proprietary knowledge. We believe customer service automation should be trustworthy, accurate, and completely aligned with your brand identity.
             </p>
           </div>
 

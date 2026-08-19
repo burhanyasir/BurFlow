@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const sections = [
   {
     title: 'SOC 2 Type II',
-    body: 'Conversation Engine is audited annually against SOC 2 Type II criteria. This certification verifies that our controls for security, availability, and confidentiality are not only properly designed but also operating effectively over a sustained period. Type II certification goes beyond a point-in-time audit — it validates our operational discipline over months of continuous monitoring.',
+    body: 'BurFlow is audited annually against SOC 2 Type II criteria. This certification verifies that our controls for security, availability, and confidentiality are not only properly designed but also operating effectively over a sustained period. Type II certification goes beyond a point-in-time audit â€” it validates our operational discipline over months of continuous monitoring.',
   },
   {
     title: 'GDPR Compliance',

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 const sections = [
   {
     title: '1. Introduction and Acceptance',
-    body: 'These Terms of Service ("Terms") govern your use of the Conversation Engine platform and services operated by Conversation Engine Inc. ("Company," "we," "us," or "our"). By accessing or using the service, you agree to be bound by these Terms. If you do not agree, do not access or use the service. These Terms apply to all visitors, users, and customers.',
+    body: 'These Terms of Service ("Terms") govern your use of the BurFlow platform and services operated by BurFlow Inc. ("Company," "we," "us," or "our"). By accessing or using the service, you agree to be bound by these Terms. If you do not agree, do not access or use the service. These Terms apply to all visitors, users, and customers.',
   },
   {
     title: '2. Account Registration and Responsibilities',
@@ -15,11 +15,11 @@ const sections = [
   },
   {
     title: '4. Service Description and Limitations',
-    body: 'Conversation Engine provides grounded AI-powered support responses based on customer-uploaded knowledge sources. We strive for accuracy but the service depends on the quality and completeness of the knowledge base provided. We reserve the right to set reasonable usage limits and to suspend accounts that exceed fair use thresholds or that violate these Terms.',
+    body: 'BurFlow provides grounded AI-powered support responses based on customer-uploaded knowledge sources. We strive for accuracy but the service depends on the quality and completeness of the knowledge base provided. We reserve the right to set reasonable usage limits and to suspend accounts that exceed fair use thresholds or that violate these Terms.',
   },
   {
     title: '5. Intellectual Property Rights',
-    body: 'The Conversation Engine platform, including its software, templates, algorithms, and branding, is owned by the Company and protected by intellectual property laws. Customers retain all rights to their uploaded knowledge base content and conversation data. We do not claim ownership of customer data. These Terms do not grant any license to use our trademarks or branding without prior written consent.',
+    body: 'The BurFlow platform, including its software, templates, algorithms, and branding, is owned by the Company and protected by intellectual property laws. Customers retain all rights to their uploaded knowledge base content and conversation data. We do not claim ownership of customer data. These Terms do not grant any license to use our trademarks or branding without prior written consent.',
   },
   {
     title: '6. Data Privacy and Security',
@@ -39,7 +39,7 @@ const sections = [
   },
   {
     title: '10. Contact Information',
-    body: 'For questions about these Terms, contact us at legal@conversationengine.com or at: Conversation Engine Inc., 1000 N West Street, Suite 1200, Wilmington, DE 19801, United States.',
+    body: 'For questions about these Terms, contact us at legal@conversationengine.com or at: BurFlow Inc., 1000 N West Street, Suite 1200, Wilmington, DE 19801, United States.',
   },
 ];
 
@@ -81,7 +81,7 @@ export default function TermsPage() {
             Terms of Service
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed">
-            The terms governing your use of the Conversation Engine platform.
+            The terms governing your use of the BurFlow platform.
           </p>
           <p className="mt-2 text-sm text-white/50">Last updated: July 28, 2026</p>
         </motion.div>

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const sections = [
   {
     title: 'What Data We Collect',
-    body: 'We collect only the data necessary to provide and improve our service. This includes: (1) Account data — name, email address, company name, and billing information provided during registration. (2) Conversation data — messages, responses, and metadata exchanged through the widget, strictly within the customer\'s workspace. (3) Usage data — aggregated metrics about feature usage, response volumes, and performance benchmarks that do not identify individual users.',
+    body: 'We collect only the data necessary to provide and improve our service. This includes: (1) Account data â€” name, email address, company name, and billing information provided during registration. (2) Conversation data â€” messages, responses, and metadata exchanged through the widget, strictly within the customer\'s workspace. (3) Usage data â€” aggregated metrics about feature usage, response volumes, and performance benchmarks that do not identify individual users.',
   },
   {
     title: 'How Data Is Used',
@@ -20,7 +20,7 @@ const sections = [
   },
   {
     title: 'No Training on Customer Data',
-    body: 'Conversation Engine does not train large language models or any public AI models on customer data. Our platform uses deterministic template-based responses and retrieval-augmented generation grounded exclusively in each customer\'s uploaded knowledge base. Your data remains yours.',
+    body: 'BurFlow does not train large language models or any public AI models on customer data. Our platform uses deterministic template-based responses and retrieval-augmented generation grounded exclusively in each customer\'s uploaded knowledge base. Your data remains yours.',
   },
   {
     title: 'Cookie Usage',
@@ -87,7 +87,7 @@ export default function PrivacyPage() {
             Privacy Policy
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed">
-            How we handle, protect, and respect your data — and your customers' data.
+            How we handle, protect, and respect your data â€” and your customers' data.
           </p>
         </motion.div>
 

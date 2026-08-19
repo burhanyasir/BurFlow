@@ -12,7 +12,7 @@ const docLinks = [
 export default function DocsPage() {
   return (
     <>
-      <Seo title="Docs" description="Browse the widget integration guide and API reference for Conversation Engine." path="/docs" />
+      <Seo title="Docs" description="Browse the widget integration guide and API reference for BurFlow." path="/docs" />
       <PageSection className="pt-20 md:pt-28" containerClassName="max-w-2xl">
         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
           <EmptyState

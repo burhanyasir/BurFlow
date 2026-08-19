@@ -22,7 +22,7 @@ const TABS = [
 // The widget bundle is served from the app's own origin (/widget/widget.js) in
 // both dev (Vite) and the Docker deployment (nginx). A dedicated CDN can
 // override it via VITE_WIDGET_CDN_URL. The loader reaches the API at the same
-// origin through the /api proxy, so no expiring JWT is embedded — the widget
+// origin through the /api proxy, so no expiring JWT is embedded â€” the widget
 // exchanges the tenant id at runtime (tokenless bootstrap).
 const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || (typeof window !== 'undefined' ? `${window.location.origin}/widget/widget.js` : '/widget/widget.js');
 const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
@@ -32,7 +32,7 @@ function buildSnippet(tabId: string, agentId: string, token: string): string {
   const attr = `data-tenant-id="${agentId}" data-api-url="${WIDGET_API_URL}" data-primary-color="#A8244B" data-position="right"`;
   switch (tabId) {
     case 'vanilla':
-      return `<!-- Conversation Engine Chatbot -->\n<script src="${base}" ${attr}></script>`;
+      return `<!-- BurFlow Chatbot -->\n<script src="${base}" ${attr}></script>`;
     case 'react':
       return `// Install: npm install @conversationengine/react\nimport { ChatWidget } from '@conversationengine/react';\n\nfunction App() {\n  return <ChatWidget agentId="${agentId}" token="${token}"/>;\n}`;
     case 'wordpress':
@@ -40,9 +40,9 @@ function buildSnippet(tabId: string, agentId: string, token: string): string {
     case 'shopify':
       return `// In theme.liquid before </body>:\n<script src="${base}" ${attr}></script>`;
     case 'webflow':
-      return `// Project Settings → Custom Code → Footer Code:\n<script src="${base}" ${attr}></script>`;
+      return `// Project Settings â†’ Custom Code â†’ Footer Code:\n<script src="${base}" ${attr}></script>`;
     default:
-      return `<!-- Conversation Engine Chatbot -->\n<script src="${base}" ${attr}></script>`;
+      return `<!-- BurFlow Chatbot -->\n<script src="${base}" ${attr}></script>`;
   }
 }
 
@@ -79,7 +79,7 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
     try {
       await loadWidgetBundle();
       const Ctor = (window as any).ChatWidget as { new (config: Record<string, unknown>): { mount: () => void } };
-      if (!Ctor) throw new Error('Widget bundle failed to load — check that /widget/widget.js is reachable.');
+      if (!Ctor) throw new Error('Widget bundle failed to load â€” check that /widget/widget.js is reachable.');
       const token = widgetToken || (await onGenerateToken());
       const widget = new Ctor({
         widgetToken: token,
@@ -151,7 +151,7 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
         <div className="bg-[var(--color-accent-50)] border border-[var(--color-accent-100)] rounded-xl p-6 mb-6 text-center">
           <p className="text-sm text-[var(--color-accent-700)] mb-3">Generate your widget code to get started.</p>
           <Button onClick={handleSetup} disabled={generating}>
-            {generating ? 'Generating…' : 'Generate Widget Code'}
+            {generating ? 'Generatingâ€¦' : 'Generate Widget Code'}
           </Button>
         </div>
       )}
@@ -192,13 +192,13 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
                 <Button size="sm" variant="ghost" onClick={stopPreview}>Hide preview</Button>
               ) : (
                 <Button size="sm" variant="secondary" onClick={startPreview} disabled={previewLoading}>
-                  {previewLoading ? 'Loading…' : 'Show live preview'}
+                  {previewLoading ? 'Loadingâ€¦' : 'Show live preview'}
                 </Button>
               )}
             </div>
             {previewActive && (
               <p className="text-xs text-[var(--color-neutral-500)]">
-                The bubble at the bottom-right of this page is your live widget — it loads the real {agentId} tenant
+                The bubble at the bottom-right of this page is your live widget â€” it loads the real {agentId} tenant
                 config. Open it to test questions against your knowledge base before installing.
               </p>
             )}

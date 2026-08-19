@@ -9,10 +9,10 @@ interface CookieEntry {
 }
 
 const COOKIE_LIST: CookieEntry[] = [
-  { name: 'session_id', provider: 'Conversation Engine', purpose: 'Maintains login session and authentication state', duration: 'Session', type: 'Essential' },
-  { name: 'csrf_token', provider: 'Conversation Engine', purpose: 'Prevents cross-site request forgery attacks', duration: 'Session', type: 'Essential' },
-  { name: 'workspace_id', provider: 'Conversation Engine', purpose: 'Remembers active workspace selection', duration: '30 days', type: 'Functional' },
-  { name: 'preferences', provider: 'Conversation Engine', purpose: 'Stores user interface preferences and settings', duration: '1 year', type: 'Functional' },
+  { name: 'session_id', provider: 'BurFlow', purpose: 'Maintains login session and authentication state', duration: 'Session', type: 'Essential' },
+  { name: 'csrf_token', provider: 'BurFlow', purpose: 'Prevents cross-site request forgery attacks', duration: 'Session', type: 'Essential' },
+  { name: 'workspace_id', provider: 'BurFlow', purpose: 'Remembers active workspace selection', duration: '30 days', type: 'Functional' },
+  { name: 'preferences', provider: 'BurFlow', purpose: 'Stores user interface preferences and settings', duration: '1 year', type: 'Functional' },
   { name: '_ga', provider: 'Google Analytics', purpose: 'Distinguishes unique users for analytics', duration: '2 years', type: 'Analytics' },
   { name: '_gid', provider: 'Google Analytics', purpose: 'Tracks user interaction for analytics', duration: '24 hours', type: 'Analytics' },
   { name: '_ga_*', provider: 'Google Analytics', purpose: 'Maintains analytics session state', duration: '2 years', type: 'Analytics' },
@@ -27,7 +27,7 @@ const sections = [
   },
   {
     title: 'How We Use Cookies',
-    body: 'We use three categories of cookies: (1) Essential cookies are required for the platform to function — authentication, security, and session management. (2) Analytics cookies help us understand how users interact with the platform so we can improve performance and usability. (3) Functional cookies remember your preferences and settings. We do not use advertising or tracking cookies.',
+    body: 'We use three categories of cookies: (1) Essential cookies are required for the platform to function â€” authentication, security, and session management. (2) Analytics cookies help us understand how users interact with the platform so we can improve performance and usability. (3) Functional cookies remember your preferences and settings. We do not use advertising or tracking cookies.',
   },
   {
     title: 'Third-Party Cookies',
@@ -64,7 +64,7 @@ export default function CookiesPage() {
             Cookie Policy
           </h1>
           <p className="mt-4 text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed">
-            How Conversation Engine uses cookies and similar technologies.
+            How BurFlow uses cookies and similar technologies.
           </p>
           <p className="mt-2 text-sm text-white/50">Last updated: July 28, 2026</p>
         </motion.div>

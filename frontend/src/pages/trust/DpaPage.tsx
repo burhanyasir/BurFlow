@@ -12,7 +12,7 @@ const sections = [
   },
   {
     title: 'Data Processing Scope',
-    body: 'The DPA covers all personal data processed through the Conversation Engine platform, including customer support conversation data, account registration information, and knowledge base content. Processing purposes are limited to delivering AI-powered support responses, analytics, and platform operations as documented in the agreement.',
+    body: 'The DPA covers all personal data processed through the BurFlow platform, including customer support conversation data, account registration information, and knowledge base content. Processing purposes are limited to delivering AI-powered support responses, analytics, and platform operations as documented in the agreement.',
   },
   {
     title: 'Security Measures',
@@ -20,7 +20,7 @@ const sections = [
   },
   {
     title: 'Data Subject Rights',
-    body: 'Conversation Engine assists customers in fulfilling data subject access requests (DSARs), including rights to access, rectification, erasure, portability, and restriction of processing. We respond to data subject requests initiated through the customer within 30 days.',
+    body: 'BurFlow assists customers in fulfilling data subject access requests (DSARs), including rights to access, rectification, erasure, portability, and restriction of processing. We respond to data subject requests initiated through the customer within 30 days.',
   },
   {
     title: 'Subprocessor List',

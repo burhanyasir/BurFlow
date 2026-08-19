@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 const sections = [
   {
     title: 'SOC 2 Compliance',
-    body: 'Conversation Engine undergoes annual SOC 2 Type II audits conducted by an independent third-party auditor. Our SOC 2 report covers the Trust Services Criteria for security, availability, and confidentiality. Customers under NDA can request the latest report from their account team or by contacting security@conversationengine.com.',
+    body: 'BurFlow undergoes annual SOC 2 Type II audits conducted by an independent third-party auditor. Our SOC 2 report covers the Trust Services Criteria for security, availability, and confidentiality. Customers under NDA can request the latest report from their account team or by contacting security@conversationengine.com.',
   },
   {
     title: 'Encryption at Rest and in Transit',

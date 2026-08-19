@@ -47,7 +47,7 @@ const ENDPOINTS = [
 export default function ApiPage() {
   return (
     <div className="relative min-h-screen bg-obsidian text-white">
-      <Seo title="API Reference" description="Use the Conversation Engine REST API to send chat requests, upload knowledge, and manage widgets." path="/docs/api" />
+      <Seo title="API Reference" description="Use the BurFlow REST API to send chat requests, upload knowledge, and manage widgets." path="/docs/api" />
       <div className="pt-20 px-4 max-w-4xl mx-auto">
         <nav className="flex items-center gap-2 text-sm text-white/50">
           <Link to="/docs" className="hover:text-white transition-colors">Docs Home</Link>
@@ -59,17 +59,17 @@ export default function ApiPage() {
       <PageHeader
         badge="API REFERENCE"
         title="REST endpoints and SDKs."
-        description="Integrate directly with the Conversation Engine API for programmatic access to chat, knowledge, and configuration."
+        description="Integrate directly with the BurFlow API for programmatic access to chat, knowledge, and configuration."
       />
 
       <SectionContainer containerClassName="max-w-4xl">
         <h2 className="text-2xl font-bold text-white mb-4">Authentication</h2>
         <GlassPanel className="p-6 md:p-8 mb-8">
           <p className="text-sm text-white/70 leading-relaxed mb-4">
-            All API requests require a Bearer token in the <code className="text-[#E8A0B4] bg-[#16162a] px-1.5 py-0.5 rounded">Authorization</code> header. Generate your API key from the <strong className="text-white">Settings → API Keys</strong> page in the dashboard.
+            All API requests require a Bearer token in the <code className="text-[#E8A0B4] bg-[#16162a] px-1.5 py-0.5 rounded">Authorization</code> header. Generate your API key from the <strong className="text-white">Settings â†’ API Keys</strong> page in the dashboard.
           </p>
           <pre className="text-sm text-[#e4e4f0] bg-[#16162a] p-4 rounded-xl border border-[rgba(255,255,255,0.08)]">Authorization: Bearer sk_YOUR_API_KEY</pre>
-          <p className="mt-4 text-sm text-white/60">Keep your API keys secure. Do not expose them in client-side code — use the widget for frontend integration.</p>
+          <p className="mt-4 text-sm text-white/60">Keep your API keys secure. Do not expose them in client-side code â€” use the widget for frontend integration.</p>
         </GlassPanel>
 
         <h2 className="text-2xl font-bold text-white mb-4">Base URL</h2>
@@ -124,10 +124,10 @@ export default function ApiPage() {
         <div className="border-t border-white/10 pt-12">
           <h3 className="text-sm font-semibold uppercase tracking-widest text-white/40 mb-4">Related documentation</h3>
           <div className="flex flex-wrap gap-3">
-            <Link to="/docs/quick-start" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Quick Start →</Link>
-            <Link to="/docs/widget" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Widget Integration →</Link>
-            <Link to="/docs/knowledge" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Knowledge Management →</Link>
-            <Link to="/docs/integrations" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Integrations →</Link>
+            <Link to="/docs/quick-start" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Quick Start â†’</Link>
+            <Link to="/docs/widget" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Widget Integration â†’</Link>
+            <Link to="/docs/knowledge" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Knowledge Management â†’</Link>
+            <Link to="/docs/integrations" className="text-sm text-[#C94F72] hover:text-[#E8A0B4] transition-colors">Integrations â†’</Link>
           </div>
         </div>
       </SectionContainer>
