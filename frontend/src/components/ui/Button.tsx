@@ -34,8 +34,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         variantStyles[variant],
         sizeStyles[size],
         fullWidth && 'w-full',
-        glow && variant === 'primary' && 'shadow-[0_0_20px_-5px_rgba(122,32,56,0.35)] hover:shadow-[0_0_25px_-3px_rgba(122,32,56,0.5)]',
-        glow && variant === 'secondary' && 'shadow-[0_0_20px_-5px_rgba(122,32,56,0.15)] hover:shadow-[0_0_25px_-3px_rgba(122,32,56,0.25)]',
+        glow && variant === 'primary' && 'shadow-[0_0_20px_-5px_rgba(0,98,72,0.35)] hover:shadow-[0_0_25px_-3px_rgba(0,98,72,0.5)]',
+        glow && variant === 'secondary' && 'shadow-[0_0_20px_-5px_rgba(0,98,72,0.15)] hover:shadow-[0_0_25px_-3px_rgba(0,98,72,0.25)]',
         className
       )}
       {...props}

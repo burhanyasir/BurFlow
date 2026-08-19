@@ -171,7 +171,7 @@ export default function LandingPage() {
             <motion.div
               {...fadeUp}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-6 shadow-[0_4px_20px_-4px_rgba(122,32,56,0.1)] relative overflow-hidden"
+              className="rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-6 shadow-[0_4px_20px_-4px_rgba(0,98,72,0.1)] relative overflow-hidden"
             >
               <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[var(--color-accent-400)] via-[var(--color-accent-600)] to-[var(--color-accent-400)]" />
               <div className="flex items-center gap-2.5 mb-4">
@@ -427,7 +427,7 @@ export default function LandingPage() {
               </div>
 
               {/* Stage 2: Grounding Engine */}
-              <div className="flex-1 rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-5 text-center relative shadow-[0_2px_12px_-4px_rgba(122,32,56,0.08)]">
+              <div className="flex-1 rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-5 text-center relative shadow-[0_2px_12px_-4px_rgba(0,98,72,0.08)]">
                 <div className="w-10 h-10 rounded-xl bg-[var(--color-accent-200)]/40 flex items-center justify-center mx-auto mb-3">
                   <svg className="w-5 h-5 text-[var(--color-accent-600)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />

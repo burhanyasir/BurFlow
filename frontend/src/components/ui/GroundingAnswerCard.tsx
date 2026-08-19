@@ -14,7 +14,7 @@ export function GroundingAnswerCard({
   return (
     <div
       className={cn(
-        'rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-7 shadow-[0_4px_24px_-4px_rgba(122,32,56,0.12)] max-w-lg relative overflow-hidden',
+        'rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-neutral-0)] p-7 shadow-[0_4px_24px_-4px_rgba(0,98,72,0.12)] max-w-lg relative overflow-hidden',
         className
       )}
     >

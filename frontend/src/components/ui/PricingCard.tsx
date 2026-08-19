@@ -49,7 +49,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
         className={cn(
           'h-full flex flex-col',
           variantCardStyles[tier.variant || 'free'],
-          tier.popular && 'shadow-[0_0_30px_-5px_rgba(122,32,56,0.3)]'
+          tier.popular && 'shadow-[0_0_30px_-5px_rgba(0,98,72,0.3)]'
         )}
       >
         <CardContent className="flex-1 flex flex-col">
