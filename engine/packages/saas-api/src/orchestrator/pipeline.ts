@@ -7,6 +7,7 @@ import { TenantPolicy } from './types';
 import { TAKEOVER_ACKNOWLEDGEMENT } from '@conversation-engine/saas-core';
 import { KnowledgeBaseProvider, PayloadValidationError, UpstreamLLMError } from '@conversation-engine/conversation-orchestrator';
 import { maybeTrigger } from '../services/lead-alert-service';
+import type { LeadAlertConfig } from '../services/lead-alert-service';
 
 export interface PipelineInput {
   message: string;
@@ -24,6 +25,8 @@ export interface PipelineInput {
    * protects any direct pipeline caller from burning LLM budget mid-handoff.
    */
   isHumanTookOver?: boolean;
+  /** Per-tenant lead alert config resolver (used by the lead alert service). */
+  getLeadAlertConfig?: (tenantId: string) => LeadAlertConfig | null | undefined;
 }
 
 export interface PipelineResult {

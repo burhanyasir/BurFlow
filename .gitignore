@@ -45,3 +45,9 @@ server-out.txt
 vitest-err.txt
 vitest-out.txt
 regression-report.txt
+
+# Playwright E2E artifacts
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e-widget-proof.png
+frontend/e2e-chat-open-proof.png

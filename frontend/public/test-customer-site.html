@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acme SaaS — Sales Automation Platform</title>
+  <meta name="description" content="Acme SaaS helps revenue teams close more deals with AI-powered sales automation." />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a2333; background: #f7f8fa; }
+    header { background: #0f6e56; color: #fff; padding: 16px 32px; display: flex; justify-content: space-between; align-items: center; }
+    header .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    header nav a { color: #fff; margin-left: 24px; text-decoration: none; font-size: 14px; opacity: 0.9; }
+    header nav a:hover { opacity: 1; text-decoration: underline; }
+    main { max-width: 1080px; margin: 0 auto; padding: 56px 24px; }
+    h1 { font-size: 44px; line-height: 1.1; letter-spacing: -0.03em; }
+    h1 span { color: #0f6e56; }
+    .sub { font-size: 18px; color: #5b6472; margin-top: 16px; max-width: 560px; line-height: 1.6; }
+    .cta-row { margin-top: 28px; display: flex; gap: 12px; }
+    .btn { display: inline-block; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; }
+    .btn-primary { background: #0f6e56; color: #fff; }
+    .btn-ghost { border: 1px solid #d5d9e0; color: #1a2333; }
+    .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 48px; }
+    .plan { background: #fff; border: 1px solid #e5e8ee; border-radius: 14px; padding: 24px; }
+    .plan.popular { border-color: #0f6e56; box-shadow: 0 8px 28px rgba(15, 110, 86, 0.18); }
+    .plan h3 { font-size: 16px; }
+    .plan .price { font-size: 28px; font-weight: 800; margin-top: 8px; }
+    .plan .price small { font-size: 13px; font-weight: 500; color: #5b6472; }
+    .plan ul { margin-top: 14px; list-style: none; }
+    .plan li { font-size: 14px; padding: 5px 0; color: #3b4453; }
+    .faq { margin-top: 48px; }
+    .faq h2 { font-size: 24px; }
+    .faq details { background: #fff; border: 1px solid #e5e8ee; border-radius: 10px; padding: 14px 18px; margin-top: 10px; }
+    .faq summary { font-weight: 600; cursor: pointer; }
+    .faq p { margin-top: 8px; font-size: 14px; color: #5b6472; line-height: 1.6; }
+    footer { border-top: 1px solid #e5e8ee; padding: 24px 32px; text-align: center; font-size: 13px; color: #8a92a0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">Acme SaaS</div>
+    <nav>
+      <a href="#plans">Pricing</a>
+      <a href="#faq">FAQ</a>
+      <a href="mailto:hello@acme-customer-website.com">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <h1>Sales automation that <span>closes deals</span> while you sleep.</h1>
+    <p class="sub">
+      Acme SaaS helps revenue teams capture, qualify, and book meetings automatically —
+      right from their website. Start free, no credit card required.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#plans">Start free trial</a>
+      <a class="btn btn-ghost" href="#faq">Talk to an expert</a>
+    </div>
+
+    <section class="plans" id="plans">
+      <div class="plan">
+        <h3>Starter</h3>
+        <div class="price">$29<small> / mo</small></div>
+        <ul>
+          <li>1 website</li>
+          <li>500 AI conversations / mo</li>
+          <li>Email support</li>
+        </ul>
+      </div>
+      <div class="plan popular">
+        <h3>Growth</h3>
+        <div class="price">$79<small> / mo</small></div>
+        <ul>
+          <li>3 websites</li>
+          <li>2,000 AI conversations / mo</li>
+          <li>Priority support</li>
+          <li>CRM integrations</li>
+        </ul>
+      </div>
+      <div class="plan">
+        <h3>Enterprise</h3>
+        <div class="price">Custom</div>
+        <ul>
+          <li>Unlimited websites</li>
+          <li>Unlimited conversations</li>
+          <li>Dedicated success manager</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <h2>Frequently asked questions</h2>
+      <details open>
+        <summary>What plans does Acme SaaS offer?</summary>
+        <p>We offer three plans: Starter at $29/mo, Growth at $79/mo, and Enterprise with custom pricing. Every plan starts with a 14-day free trial and no credit card.</p>
+      </details>
+      <details>
+        <summary>How long does setup take?</summary>
+        <p>Most customers go live in under 10 minutes — paste one line of code and the AI agent starts learning your site.</p>
+      </details>
+      <details>
+        <summary>Do you offer a free trial?</summary>
+        <p>Yes, every plan includes a 14-day free trial. No credit card required.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer>&copy; 2026 Acme SaaS. All rights reserved.</footer>
+
+  <!--
+    BurFlow chat widget.
+    For manual testing: replace YOUR_TENANT_ID with the tenant slug from
+    Dashboard -> Widget settings (Embed tab). The E2E suite rewrites this tag
+    automatically with a freshly-signed-up tenant.
+  -->
+  <script src="/widget/widget.js" data-tenant-id="YOUR_TENANT_ID" data-primary-color="#006248" data-position="right"></script>
+</body>
+</html>
