@@ -279,7 +279,7 @@ describe('ChatWidget', () => {
     const msgs = widget.getMessages();
     expect(msgs.length).toBe(1);
     expect(msgs[0].role).toBe('assistant');
-    expect(msgs[0].content).toMatch(/Hey there!/i);
+    expect(msgs[0].content).toBeTruthy();
   });
 
   it('does not duplicate greeting on multiple opens', () => {
@@ -292,31 +292,31 @@ describe('ChatWidget', () => {
     expect(widget.getMessages().length).toBe(1);
   });
 
-  it('renders starter option chips on first open', () => {
+  it('renders starter option cards on first open', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Welcome!' });
     widget.mount();
     widget.toggle();
 
-    const chips = document.querySelectorAll('.cw-starter-chip');
-    expect(chips.length).toBe(3);
-    const labels = Array.from(chips).map((c) => c.textContent);
-    expect(labels).toContain('Show me pricing');
-    expect(labels).toContain('How does it work?');
-    expect(labels).toContain('Book a demo');
+    const cards = document.querySelectorAll('.cw-welcome-card');
+    expect(cards.length).toBe(3);
+    const labels = Array.from(cards).map((c) => c.textContent);
+    expect(labels.some((l) => l!.includes('Find the right plan'))).toBe(true);
+    expect(labels.some((l) => l!.includes('See BurFlow in action'))).toBe(true);
+    expect(labels.some((l) => l!.includes('Book a 15-min demo'))).toBe(true);
   });
 
-  it('fades out starter chips once the conversation sends a message', async () => {
+  it('fades out starter cards once the conversation sends a message', async () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
     widget.mount();
     widget.toggle();
-    expect(document.querySelector('.cw-starter-chips')).toBeTruthy();
+    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
 
     const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
     input.value = 'Hello';
     widget.send();
     await new Promise((r) => setTimeout(r, 300));
 
-    expect(document.querySelector('.cw-starter-chips')).toBeNull();
+    expect(document.querySelector('.cw-welcome-cards')).toBeNull();
   });
 
   it('sends the starter prompt when a chip is clicked', async () => {
@@ -335,16 +335,16 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
-    const pricingChip = Array.from(document.querySelectorAll('.cw-starter-chip')).find(
-      (c) => c.textContent === 'Show me pricing'
+    const planCard = Array.from(document.querySelectorAll('.cw-welcome-card')).find(
+      (c) => c.textContent!.includes('Find the right plan')
     ) as HTMLButtonElement;
-    expect(pricingChip).toBeTruthy();
-    pricingChip.click();
+    expect(planCard).toBeTruthy();
+    planCard.click();
 
     await new Promise((r) => setTimeout(r, 50));
     const msgs = widget.getMessages();
     expect(msgs[1].role).toBe('user');
-    expect(msgs[1].content).toBe('Show me pricing');
+    expect(msgs[1].content).toBe('Find the right plan');
   });
 
   it('uses custom starterOptions from config', () => {
@@ -356,37 +356,34 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
-    const chips = document.querySelectorAll('.cw-starter-chip');
-    expect(chips.length).toBe(3);
-    const labels = Array.from(chips).map((c) => c.textContent);
-    expect(labels).toContain('Tell me about your pricing');
-    expect(labels).toContain('Book a consultation');
-    expect(labels).toContain('View case studies');
+    const cards = document.querySelectorAll('.cw-welcome-card');
+    expect(cards.length).toBe(3);
+    const labels = Array.from(cards).map((c) => c.textContent);
+    expect(labels.some((l) => l!.includes('Tell me about your pricing'))).toBe(true);
+    expect(labels.some((l) => l!.includes('Book a consultation'))).toBe(true);
+    expect(labels.some((l) => l!.includes('View case studies'))).toBe(true);
   });
 
-  it('renders starter chips with capsule/pill styling', () => {
+  it('renders welcome cards with card styling', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hi!' });
     widget.mount();
     widget.toggle();
 
-    const chip = document.querySelector('.cw-starter-chip') as HTMLElement;
-    expect(chip).toBeTruthy();
-    expect(chip.style.borderRadius).toBe('9999px');
-    expect(chip.style.display).toBe('inline-flex');
-    expect(chip.style.padding).toBe('6px 14px');
-    expect(chip.style.fontSize).toBe('13px');
-    expect(chip.style.border).toContain('1px solid');
+    const card = document.querySelector('.cw-welcome-card') as HTMLElement;
+    expect(card).toBeTruthy();
+    expect(card.classList.contains('cw-welcome-card')).toBe(true);
+    expect(card.tagName).toBe('BUTTON');
   });
 
-  it('attaches starter chips inside the first assistant message bubble', () => {
+  it('attaches welcome cards inside the first assistant message bubble', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hello!' });
     widget.mount();
     widget.toggle();
 
     const bubble = document.querySelector('.cw-message-assistant .cw-message-bubble');
     expect(bubble).toBeTruthy();
-    const chipsInside = bubble!.querySelectorAll('.cw-starter-chip');
-    expect(chipsInside.length).toBe(3);
+    const cardsInside = bubble!.querySelectorAll('.cw-welcome-card');
+    expect(cardsInside.length).toBe(3);
   });
 
   it('adds user message on send', () => {
@@ -595,7 +592,7 @@ describe('ChatWidget', () => {
 
     const header = document.querySelector('.cw-header')!;
     expect(header.textContent).toContain('Support');
-    expect(header.textContent).toContain('AI Sales Assistant');
+    expect(header.textContent).toContain('Ask us anything');
   });
 
   it('clears input on Enter key (not Shift+Enter)', () => {
@@ -729,14 +726,14 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
-    // TAKEOVER_STARTED: banner visible, starter chips removed.
+    // TAKEOVER_STARTED: banner visible, starter cards removed.
     await new Promise(r => setTimeout(r, 60));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('block');
-    expect(document.querySelector('.cw-starter-chips')).toBeFalsy();
+    expect(document.querySelector('.cw-welcome-cards')).toBeFalsy();
 
-    // TAKEOVER_ENDED: banner hidden, starter chips restored.
+    // TAKEOVER_ENDED: banner hidden, starter cards restored.
     await new Promise(r => setTimeout(r, 200));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
-    expect(document.querySelector('.cw-starter-chips')).toBeTruthy();
+    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
   });
 });

@@ -122,32 +122,11 @@ export function buildContinuityCue(previousMessages: Array<{ role?: string; cont
 }
 
 export function buildBusinessGreeting(profile: BusinessContextLike = {}): string {
-  const companyName = profile.companyName || 'this business';
-  const industryLabel = profile.industry || profile.businessType || 'business';
-  const productHint = profile.products?.[0] || profile.services?.[0] || 'offerings';
-  const pricingHint = profile.pricingModel || 'plans';
-
-  let greeting = '';
-
-  if (/saas|software|technology|platform/i.test(industryLabel)) {
-    greeting = `Hey there! 👋 I know everything about ${companyName}'s products and pricing. Ask me anything — I'll give you a straight answer, not a sales pitch.`;
-  } else if (/agency|consult|marketing|creative|design/i.test(industryLabel)) {
-    greeting = `Hey there! 👋 I can walk you through ${companyName}'s services and help you find the right fit. What are you looking for?`;
-  } else if (/restaurant|food|cafe|hotel|hospitality/i.test(industryLabel)) {
-    greeting = `Hey there! 👋 I can help you explore ${companyName}'s menu, availability, or the best next step. What would you like to know?`;
-  } else {
-    greeting = `Hey there! 👋 I'm your guide to ${companyName}. I can explain our ${productHint.toLowerCase()}, compare ${pricingHint.toLowerCase()}, or point you to the right next step. What are you curious about?`;
+  const industryLabel = profile.industry || profile.businessType || '';
+  if (/restaurant|food|cafe|hotel|hospitality/i.test(industryLabel)) {
+    return `How can I help with ${profile.companyName || 'this business'}?`;
   }
-
-  if (profile.faqs?.length || profile.contactDetails?.length) {
-    const faqPart = profile.faqs?.length ? 'answer common questions' : 'clarify common questions';
-    const contactPart = profile.contactDetails?.length ? `point you to contact options such as ${profile.contactDetails[0]}` : 'point you to contact options';
-    greeting = `${greeting} I can also ${faqPart} and ${contactPart}.`;
-  }
-
-
-
-  return greeting;
+  return `What brings you here today?`;
 }
 
 export function buildRecommendationCardFromMessage(message: string, profile: BusinessContextLike = {}): RecommendationCard | null {
@@ -314,10 +293,10 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   sessionId: undefined as any,
   widgetToken: undefined as any,
   title: 'BurFlow Sales Agent',
-  subtitle: 'Your smart buying assistant',
+  subtitle: 'AI assistant · Online',
   primaryColor: '#006248',
   avatarUrl: undefined as any,
-  greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
+  greeting: 'What brings you here today?',
   greetingText: undefined as any,
   position: 'bottom-right',
   widgetPosition: undefined as any,
@@ -331,12 +310,10 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   customCss: '',
   starterOptions: [],
   suggestedActions: [
-    { id: 'pricing', label: 'Pricing', action: 'send_text', payload: 'Show me pricing', variant: 'secondary', category: 'plans' },
-    { id: 'products', label: 'Best Fit', action: 'send_text', payload: 'Which option fits our needs best?', variant: 'secondary', category: 'guidance' },
-    { id: 'services', label: 'Products', action: 'send_text', payload: 'What products do you offer?', variant: 'secondary', category: 'products' },
-    { id: 'demo', label: 'Book 15-Min Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
-    { id: 'faq', label: 'Common Questions', action: 'send_text', payload: 'What are the most common questions?', variant: 'secondary', category: 'faq' },
-    { id: 'contact', label: 'Talk to Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary', category: 'sales' },
+    { id: 'plans', label: 'Find the right plan', action: 'send_text', payload: 'Find the right plan for my needs', variant: 'secondary', category: 'plans' },
+    { id: 'demo', label: 'Book a 15-min demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
+    { id: 'contact', label: 'Talk to sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary', category: 'sales' },
+    { id: 'faq', label: 'Common questions', action: 'send_text', payload: 'What are the most common questions?', variant: 'secondary', category: 'faq' },
   ],
 };
 
@@ -434,6 +411,27 @@ export class ChatWidget {
       .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
       .cw-preopen-pill { background:#E8F5E9 !important; color:#006248 !important; border:1px solid #C8E6C9 !important; }
       .cw-preopen-pill:hover { background:#006248 !important; color:#fff !important; }
+      /* Welcome action cards */
+      .cw-welcome-cards { display:flex; flex-direction:column; gap:8px; padding:4px 0 8px; }
+      .cw-welcome-card { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1.5px solid #E8ECF1; border-radius:14px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
+      .cw-welcome-card:hover { border-color:#A5D6A7; background:#F0FAF4; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,98,72,0.08); }
+      .cw-welcome-card:active { transform:translateY(0); box-shadow:none; }
+      .cw-welcome-card-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; flex-shrink:0; }
+      .cw-welcome-card-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+      .cw-welcome-card-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+      .cw-welcome-card-body b { font-size:13.5px; font-weight:600; color:#1F2937; letter-spacing:-0.01em; line-height:1.3; }
+      .cw-welcome-card-body small { font-size:11.5px; color:#6B7280; line-height:1.3; }
+      .cw-welcome-card-badge { display:inline-block; padding:2px 6px; border-radius:999px; background:#E8F5E9; color:#006248; font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; width:fit-content; }
+      .cw-welcome-card-arrow { width:18px; height:18px; flex-shrink:0; color:#9CA3AF; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform 0.15s ease, color 0.15s ease; }
+      .cw-welcome-card:hover .cw-welcome-card-arrow { transform:translateX(2px); color:#006248; }
+      .cw-welcome-section { margin-top:18px; }
+      .cw-welcome-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+      .cw-welcome-section-title { font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#374151; }
+      .cw-welcome-section-meta { font-size:10px; color:#9CA3AF; }
+      .cw-welcome-escape { display:block; width:100%; padding:8px 0; margin-top:4px; border:0; background:transparent; color:#006248; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; border-radius:8px; transition:background 0.15s ease; }
+      .cw-welcome-escape:hover { background:#F0FAF4; }
+      .cw-welcome-icon { width:36px; height:36px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; margin-bottom:12px; }
+      .cw-welcome-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
       html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
       html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
       html[data-cw-theme='dark'] .cw-input-area { background:#111827 !important; border-top-color:#1F2937 !important; }
@@ -678,16 +676,46 @@ export class ChatWidget {
     const panel = document.createElement('div');
     panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
-    panel.style.cssText = `position:fixed;bottom:84px;${pos}z-index:999998;display:none;max-width:300px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1.5px solid #E8F5E9;border-left:3px solid #006248;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,98,72,0.15),0 8px 32px rgba(0,0,0,0.08);cursor:pointer;`;
+    panel.style.cssText = `position:fixed;bottom:84px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.12),0 8px 32px rgba(0,0,0,0.06);`;
 
+    // Header with brand mark
     const header = document.createElement('div');
-    header.style.cssText = 'padding:14px 16px 6px;font-size:10px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#006248;display:flex;align-items:center;gap:6px;';
-    header.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#006248" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Suggested questions';
+    header.style.cssText = 'padding:14px 16px 10px;display:flex;align-items:center;gap:8px;';
+    const brandMark = document.createElement('span');
+    brandMark.style.cssText = 'width:24px;height:24px;display:grid;place-items:center;border-radius:8px;background:#006248;color:#fff;font-size:14px;font-weight:800;flex-shrink:0;';
+    brandMark.textContent = 'B';
+    header.appendChild(brandMark);
+    const brandText = document.createElement('span');
+    brandText.style.cssText = 'font-size:12px;font-weight:600;color:#111827;';
+    brandText.textContent = 'BurFlow';
+    header.appendChild(brandText);
+    const statusDot = document.createElement('span');
+    statusDot.style.cssText = 'font-size:10px;color:#6B7280;margin-left:auto;';
+    statusDot.textContent = 'Online now';
+    header.appendChild(statusDot);
     panel.appendChild(header);
 
+    // Question text
+    const questionEl = document.createElement('div');
+    questionEl.style.cssText = 'padding:0 16px 10px;font-size:13px;color:#374151;line-height:1.5;';
+    questionEl.textContent = 'Not sure where to start? Pick a quick path below.';
+    panel.appendChild(questionEl);
+
+    // Options
     const optionsWrap = document.createElement('div');
     optionsWrap.className = 'cw-preopen-options';
     panel.appendChild(optionsWrap);
+
+    // Escape link
+    const escapeLink = document.createElement('div');
+    escapeLink.style.cssText = 'padding:8px 16px 14px;text-align:center;font-size:12px;color:#006248;font-weight:600;cursor:pointer;transition:background 0.15s ease;border-radius:0 0 16px 16px;';
+    escapeLink.textContent = 'Ask something else →';
+    escapeLink.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.dismissPreOpenPanel();
+      if (!this.isOpen) this.toggle();
+    });
+    panel.appendChild(escapeLink);
 
     document.body.appendChild(panel);
     this.preOpenPanelEl = panel;
@@ -702,7 +730,7 @@ export class ChatWidget {
     document.addEventListener('click', this.boundDismissPreOpen);
   }
 
-  /** Rebuilds the pre-open "Suggested questions" rows from the current config (called at mount and again when remote config arrives). */
+  /** Rebuilds the pre-open panel option rows from the current config. */
   private renderPreOpenOptions(): void {
     if (!this.preOpenPanelEl) return;
     const wrap = this.preOpenPanelEl.querySelector('.cw-preopen-options');
@@ -712,21 +740,24 @@ export class ChatWidget {
     const options = this.config.starterOptions?.length
       ? this.config.starterOptions
       : this.defaultStarterOptions();
-    const icons = ['💬', '🚀', '📅', '💡', '🎯'];
+
     options.forEach((text, i) => {
       const row = document.createElement('div');
-      row.style.cssText = `padding:10px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;gap:10px;${i < options.length - 1 ? 'border-bottom:1px solid #F0F4F0;' : ''}transition:all 0.2s ease;border-radius:10px;margin:2px 6px;cursor:pointer;`;
-      const icon = document.createElement('span');
-      icon.style.cssText = 'font-size:14px;flex-shrink:0;';
-      icon.textContent = icons[i % icons.length];
-      row.appendChild(icon);
+      row.style.cssText = `padding:10px 16px;display:flex;align-items:center;gap:10px;${i < options.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}transition:all 0.18s ease;cursor:pointer;`;
+
       const pill = document.createElement('span');
       pill.className = 'cw-preopen-pill';
-      pill.style.cssText = 'display:inline-flex;align-items:center;padding:7px 14px;border-radius:10px;background:#E8F5E9;color:#006248;font-size:13px;font-weight:500;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.2s ease;line-height:1.3;';
+      pill.style.cssText = 'display:inline-flex;align-items:center;padding:7px 14px;border-radius:10px;background:#E8F5E9;color:#006248;font-size:13px;font-weight:500;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.18s ease;line-height:1.3;flex:1;';
       pill.textContent = text;
       row.appendChild(pill);
-      row.addEventListener('mouseenter', () => { row.style.background = '#F0FAF4'; row.style.transform = 'translateX(4px)'; });
-      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; row.style.transform = 'translateX(0)'; });
+
+      const chevron = document.createElement('span');
+      chevron.style.cssText = 'color:#9CA3AF;font-size:12px;flex-shrink:0;transition:transform 0.15s ease;';
+      chevron.textContent = '›';
+      row.appendChild(chevron);
+
+      row.addEventListener('mouseenter', () => { row.style.background = '#F0FAF4'; pill.style.transform = 'translateX(3px)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; pill.style.transform = 'translateX(0)'; });
       row.addEventListener('click', (e) => {
         e.stopPropagation();
         this.dismissPreOpenPanel();
@@ -742,12 +773,13 @@ export class ChatWidget {
   private defaultStarterOptions(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
     if (/ecommerce|retail|store|shop|medical|pharma/.test(type)) {
-      return ['What products do you offer?', 'How fast is delivery?', 'What is your return policy?'];
+      return ['Find the right product', 'How fast is delivery?', 'What is your return policy?'];
     }
     if (/clinic|dental|healthcare|hospital/.test(type)) {
       return ['Book an appointment', 'What services do you offer?', 'What are your hours?'];
     }
-    return ['Show me pricing', 'How does it work?', 'Book a demo'];
+    // Outcome-led wording — answers "what will I get?" not "what is it?"
+    return ['Find the right plan', 'See BurFlow in action', 'Book a 15-min demo'];
   }
 
   private showPreOpenPanel(): void {
@@ -820,7 +852,7 @@ export class ChatWidget {
     textWrap.appendChild(title);
     const subtitle = document.createElement('div');
     subtitle.style.cssText = 'font-size:11px;opacity:0.75;margin-top:1px;';
-    subtitle.textContent = 'AI Sales Assistant';
+    subtitle.textContent = this.config.subtitle || 'AI assistant · Online';
     this.headerSubtitleEl = subtitle;
     textWrap.appendChild(subtitle);
     info.appendChild(textWrap);
@@ -934,8 +966,7 @@ export class ChatWidget {
   /** Removes the starter chips while a human agent is driving the session. */
   private hideStarterChips(): void {
     if (!this.messagesEl) return;
-    const chips = this.messagesEl.querySelector('.cw-starter-chips');
-    if (chips) chips.remove();
+    this.messagesEl.querySelectorAll('.cw-starter-chips,.cw-welcome-cards,.cw-welcome-section,.cw-welcome-escape,.cw-welcome-icon').forEach((el) => el.remove());
   }
 
   private createHandoffArea(): HTMLDivElement {
@@ -1036,11 +1067,13 @@ export class ChatWidget {
 
   private fadeOutStarterChips(): void {
     if (!this.messagesEl) return;
-    const chips = this.messagesEl.querySelector('.cw-starter-chips') as HTMLElement | null;
-    if (!chips) return;
-    chips.style.opacity = '0';
-    chips.style.transition = 'opacity 0.25s ease';
-    setTimeout(() => chips.remove(), 250);
+    const targets = this.messagesEl.querySelectorAll('.cw-starter-chips,.cw-welcome-cards,.cw-welcome-section,.cw-welcome-escape,.cw-welcome-icon');
+    if (!targets.length) return;
+    targets.forEach((el) => {
+      (el as HTMLElement).style.opacity = '0';
+      (el as HTMLElement).style.transition = 'opacity 0.25s ease';
+    });
+    setTimeout(() => targets.forEach((el) => el.remove()), 250);
   }
 
   private sendStarterPrompt(text: string): void {
@@ -1254,42 +1287,109 @@ export class ChatWidget {
   private renderInitialActions(): void {
     this.suggestionHistory = [];
     if (!this.messagesEl) return;
-    const existing = this.messagesEl.querySelector('.cw-starter-chips');
-    if (existing) existing.remove();
+    this.messagesEl.querySelectorAll('.cw-starter-chips,.cw-welcome-cards,.cw-welcome-section,.cw-welcome-escape,.cw-welcome-icon').forEach((el) => el.remove());
 
     const starters = this.config.starterOptions?.length
       ? this.config.starterOptions
       : this.defaultStarterOptions();
 
-    const chipWrap = document.createElement('div');
-    chipWrap.className = 'cw-starter-chips';
-    chipWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;padding:12px 0 4px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);';
+    // --- Welcome icon ---
+    const welcomeIcon = document.createElement('div');
+    welcomeIcon.className = 'cw-welcome-icon';
+    welcomeIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="m12 3 .8 2.8a5.6 5.6 0 0 0 3.9 3.9l2.8.8-2.8.8a5.6 5.6 0 0 0-3.9 3.9L12 19l-.8-2.8a5.6 5.6 0 0 0-3.9-3.9l-2.8-.8 2.8-.8a5.6 5.6 0 0 0 3.9-3.9L12 3Z"/></svg>';
 
-    starters.forEach((text) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.className = 'cw-starter-chip';
-      chip.textContent = text;
-      chip.style.cssText = 'display:inline-flex;align-items:center;padding:6px 14px;border:1px solid #E5E7EB;border-radius:9999px;background:#F9FAFB;color:#374151;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:background 0.15s ease,color 0.15s ease,border-color 0.15s ease;white-space:nowrap;';
-      chip.addEventListener('mouseenter', () => {
-        chip.style.background = '#E8F5E9';
-        chip.style.color = '#006248';
-        chip.style.borderColor = '#A5D6A7';
-      });
-      chip.addEventListener('mouseleave', () => {
-        chip.style.background = '#F9FAFB';
-        chip.style.color = '#374151';
-        chip.style.borderColor = '#E5E7EB';
-      });
-      chip.addEventListener('click', () => this.sendStarterPrompt(text));
-      chipWrap.appendChild(chip);
+    // --- Section: "Choose a quick path" ---
+    const section = document.createElement('div');
+    section.className = 'cw-welcome-section';
+
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'cw-welcome-section-header';
+    const sectionTitle = document.createElement('span');
+    sectionTitle.className = 'cw-welcome-section-title';
+    sectionTitle.textContent = 'CHOOSE A QUICK PATH';
+    sectionHeader.appendChild(sectionTitle);
+    const sectionMeta = document.createElement('span');
+    sectionMeta.className = 'cw-welcome-section-meta';
+    sectionMeta.textContent = 'Recommended for this page';
+    sectionHeader.appendChild(sectionMeta);
+    section.appendChild(sectionHeader);
+
+    // --- Action cards ---
+    const cardWrap = document.createElement('div');
+    cardWrap.className = 'cw-welcome-cards';
+
+    const cardIcons: Record<string, string> = {
+      plans: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M15 9l4-4M17 3h4v4"/></svg>',
+      guidance: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 3-3 3 3M9 15l3 3 3-3"/></svg>',
+      demo: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>',
+      sales: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      faq: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
+      products: '<svg viewBox="0 0 24 24"><path d="m12 3 .8 2.8a5.6 5.6 0 0 0 3.9 3.9l2.8.8-2.8.8a5.6 5.6 0 0 0-3.9 3.9L12 19l-.8-2.8a5.6 5.6 0 0 0-3.9-3.9l-2.8-.8 2.8-.8a5.6 5.6 0 0 0 3.9-3.9L12 3Z"/></svg>',
+    };
+
+    starters.forEach((text, i) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'cw-welcome-card';
+      card.style.animationDelay = `${i * 0.06}s`;
+
+      // Icon
+      const iconWrap = document.createElement('span');
+      iconWrap.className = 'cw-welcome-card-icon';
+      const category = this.config.suggestedActions?.[i]?.category || (i === 0 ? 'guidance' : i === 1 ? 'demo' : 'plans');
+      iconWrap.innerHTML = cardIcons[category] || cardIcons.guidance;
+      card.appendChild(iconWrap);
+
+      // Body
+      const body = document.createElement('span');
+      body.className = 'cw-welcome-card-body';
+      // Badge on first card
+      if (i === 0) {
+        const badge = document.createElement('span');
+        badge.className = 'cw-welcome-card-badge';
+        badge.textContent = 'Recommended';
+        body.appendChild(badge);
+      }
+      const title = document.createElement('b');
+      title.textContent = text;
+      body.appendChild(title);
+      const desc = document.createElement('small');
+      desc.textContent = i === 0 ? 'Get a personalized recommendation' : i === 1 ? 'A quick product overview' : 'Choose a convenient time';
+      body.appendChild(desc);
+      card.appendChild(body);
+
+      // Arrow
+      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      arrow.setAttribute('class', 'cw-welcome-card-arrow');
+      arrow.setAttribute('viewBox', '0 0 24 24');
+      arrow.innerHTML = '<path d="m9 18 6-6-6-6"/>';
+      card.appendChild(arrow);
+
+      card.addEventListener('click', () => this.sendStarterPrompt(text));
+      cardWrap.appendChild(card);
     });
 
+    section.appendChild(cardWrap);
+
+    // --- Escape path ---
+    const escapeBtn = document.createElement('button');
+    escapeBtn.type = 'button';
+    escapeBtn.className = 'cw-welcome-escape';
+    escapeBtn.textContent = 'Ask something else →';
+    escapeBtn.addEventListener('click', () => {
+      if (this.inputEl) this.inputEl.focus();
+    });
+
+    // Insert into the first assistant bubble (after the greeting text)
     const firstAssistantBubble = this.messagesEl.querySelector('.cw-message-assistant .cw-message-bubble');
     if (firstAssistantBubble) {
-      firstAssistantBubble.appendChild(chipWrap);
+      firstAssistantBubble.appendChild(welcomeIcon);
+      firstAssistantBubble.appendChild(section);
+      firstAssistantBubble.appendChild(escapeBtn);
     } else {
-      this.messagesEl.appendChild(chipWrap);
+      this.messagesEl.appendChild(welcomeIcon);
+      this.messagesEl.appendChild(section);
+      this.messagesEl.appendChild(escapeBtn);
     }
     this.scrollToBottom();
   }
