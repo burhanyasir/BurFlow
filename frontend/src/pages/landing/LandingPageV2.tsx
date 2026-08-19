@@ -216,7 +216,7 @@ export default function LandingPage() {
   const [scanStage, setScanStage] = useState('');
   const [scanProgress, setScanProgress] = useState(0);
   const [scanSummary, setScanSummary] = useState({ pages: 0, products: 0, services: 0, pricing: 0, faqs: 0, intents: 0, readyIn: '4 min' });
-  const [scanDetails, setScanDetails] = useState<{ name: string; description: string; pages: string[]; products: string[]; services: string[] } | null>(null);
+  const [scanDetails, setScanDetails] = useState<{ name: string; description: string; pages: string[]; products: string[]; services: string[]; headings: string[] } | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (scanTimerRef.current) clearInterval(scanTimerRef.current); }, []);
@@ -230,7 +230,7 @@ export default function LandingPage() {
   }
 
   /** Extract structured info from HTML. */
-  function parsePage(html: string, baseUrl: string): { title: string; description: string; links: string[]; headings: string[] } {
+  function parsePage(html: string, baseUrl: string): { title: string; description: string; links: string[]; headings: string[]; paragraphs: string[]; lists: string[] } {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const title = doc.querySelector('title')?.textContent?.trim() || '';
     const description = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
@@ -243,20 +243,40 @@ export default function LandingPage() {
     const headings = Array.from(doc.querySelectorAll('h1,h2,h3'))
       .map((h) => h.textContent?.trim() || '')
       .filter(Boolean);
-    return { title, description, links: [...new Set(links)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20) };
+    // Extract paragraph text for content analysis
+    const paragraphs = Array.from(doc.querySelectorAll('p'))
+      .map((p) => p.textContent?.trim() || '')
+      .filter((t) => t.length > 20 && t.length < 300)
+      .slice(0, 30);
+    // Extract list items for product/service discovery
+    const lists = Array.from(doc.querySelectorAll('li'))
+      .map((li) => li.textContent?.trim() || '')
+      .filter((t) => t.length > 5 && t.length < 200)
+      .slice(0, 30);
+    return { title, description, links: [...new Set(links)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20), paragraphs, lists };
   }
 
-  /** Classify pages and extract products/services from headings. */
-  function classifyContent(pages: string[], headings: string[]): { products: string[]; services: string[]; pricing: number; faqs: number } {
-    const productKeywords = /product|feature|solution|tool|platform|software|app/i;
-    const serviceKeywords = /service|support|consulting|help|setup|onboard/i;
-    const pricingKeywords = /pric|plan|cost|tier|subscription/i;
-    const faqKeywords = /faq|question|answer|help|support/i;
+  /** Classify pages and extract products/services from headings and content. */
+  function classifyContent(pages: string[], headings: string[], paragraphs: string[], lists: string[]): { products: string[]; services: string[]; pricing: number; faqs: number } {
+    const productKeywords = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
+    const serviceKeywords = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
+    const pricingKeywords = /pric|plan|cost|tier|subscription|fee|rate|package/i;
+    const faqKeywords = /faq|question|answer|help|support|contact/i;
+    const allText = [...headings, ...paragraphs, ...lists];
+    // Extract product names from headings that match product keywords
     const products = headings.filter((h) => productKeywords.test(h)).slice(0, 8);
+    // Also look for product-like patterns in paragraphs (e.g., "Our X product...", "introducing Y")
+    const productPatterns = paragraphs.filter((p) => /(?:our|the|introducing|new|popular|best| flagship)\s+(?:product|feature|tool|platform|solution|app|software)/i.test(p)).slice(0, 4);
+    products.push(...productPatterns.map((p) => p.slice(0, 60)));
+    // Extract service names
     const services = headings.filter((h) => serviceKeywords.test(h)).slice(0, 8);
-    const pricing = pages.filter((p) => pricingKeywords.test(p)).length || headings.filter((h) => pricingKeywords.test(h)).length;
+    const servicePatterns = paragraphs.filter((p) => /(?:our|the|offering|providing|delivering)\s+(?:service|support|consulting|help|training)/i.test(p)).slice(0, 4);
+    services.push(...servicePatterns.map((p) => p.slice(0, 60)));
+    // Count pricing pages
+    const pricing = pages.filter((p) => pricingKeywords.test(p)).length || headings.filter((h) => pricingKeywords.test(h)).length || paragraphs.filter((p) => /pricing|plan|tier|subscription/i.test(p)).length > 0 ? 1 : 0;
+    // Count FAQ pages
     const faqs = pages.filter((p) => faqKeywords.test(p)).length + headings.filter((h) => faqKeywords.test(h)).length;
-    return { products, services, pricing, faqs };
+    return { products: [...new Set(products)].slice(0, 8), services: [...new Set(services)].slice(0, 8), pricing, faqs };
   }
 
   const SCAN_STAGES: [number, string][] = [
@@ -331,6 +351,8 @@ export default function LandingPage() {
       setScanStage('Analyzing products & services…');
       setScanProgress(70);
       const extraHeadings: string[] = [...parsed.headings];
+      const extraParagraphs: string[] = [...parsed.paragraphs];
+      const extraLists: string[] = [...parsed.lists];
       const pagesToFetch = subPages.filter((p) => /product|service|pricing|about|feature/i.test(p)).slice(0, 3);
       for (const page of pagesToFetch) {
         try {
@@ -338,12 +360,14 @@ export default function LandingPage() {
           const pageHtml = await fetchPage(pageUrl);
           const pageParsed = parsePage(pageHtml, pageUrl);
           extraHeadings.push(...pageParsed.headings);
+          extraParagraphs.push(...pageParsed.paragraphs);
+          extraLists.push(...pageParsed.lists);
         } catch { /* skip failed pages */ }
       }
 
       setScanStage('Classifying content…');
       setScanProgress(88);
-      const classified = classifyContent(parsed.links, extraHeadings);
+      const classified = classifyContent(parsed.links, extraHeadings, extraParagraphs, extraLists);
       const intents = Math.max(5, classified.products.length * 3 + classified.services.length * 2 + classified.pricing * 2);
 
       setScanStage('Building knowledge graph…');
@@ -368,6 +392,7 @@ export default function LandingPage() {
         pages: discoveredPages.slice(0, 8),
         products: classified.products,
         services: classified.services,
+        headings: [...new Set(extraHeadings)].slice(0, 12),
       });
       setScanStage('Scan complete');
       setScanState('done');
@@ -378,7 +403,7 @@ export default function LandingPage() {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       setScanProgress(100);
       setScanSummary({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5, readyIn: '4 min' });
-      setScanDetails({ name: domain, description: 'Could not fully fetch the website. The agent will learn more during setup.', pages: [url], products: [], services: [] });
+      setScanDetails({ name: domain, description: 'Could not fully fetch the website. The agent will learn more during setup.', pages: [url], products: [], services: [], headings: [] });
       setScanStage('Scan complete — limited data');
       setScanState('done');
     }
@@ -439,7 +464,7 @@ export default function LandingPage() {
                     className="h-12 flex-1 rounded-2xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-50)] px-4 text-sm text-[var(--color-neutral-800)] outline-none focus:border-[var(--color-accent-400)] focus:ring-2 focus:ring-[var(--color-accent-200)]"
                     placeholder="https://yourcompany.com"
                   />
-                  <button type="submit" disabled={scanState === 'scanning'} className="h-12 rounded-2xl bg-[var(--color-accent-600)] px-5 text-sm font-semibold text-white shadow-lg shadow-[rgba(99,102,241,0.18)] transition hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed">
+                  <button type="submit" disabled={scanState === 'scanning'} className="h-12 rounded-2xl bg-[var(--color-accent-600)] px-5 text-sm font-semibold text-white shadow-lg shadow-[rgba(0,98,72,0.18)] transition hover:bg-[var(--color-accent-700)] disabled:opacity-60 disabled:cursor-not-allowed">
                     {scanState === 'scanning' ? 'Scanning…' : scanState === 'done' ? 'Rescan' : 'Scan My Website'}
                   </button>
                 </div>
@@ -514,9 +539,9 @@ export default function LandingPage() {
                       <div className="mt-3 grid gap-2 sm:grid-cols-2">
                         {scanDetails.products.length > 0 && (
                           <div>
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Products found</p>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Products & features</p>
                             <ul className="mt-1 space-y-0.5">
-                              {scanDetails.products.map((p) => <li key={p} className="text-xs text-[var(--color-neutral-700)]">• {p}</li>)}
+                              {scanDetails.products.map((p) => <li key={p} className="text-xs text-[var(--color-neutral-700)] line-clamp-1">• {p}</li>)}
                             </ul>
                           </div>
                         )}
@@ -524,10 +549,20 @@ export default function LandingPage() {
                           <div>
                             <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Services found</p>
                             <ul className="mt-1 space-y-0.5">
-                              {scanDetails.services.map((s) => <li key={s} className="text-xs text-[var(--color-neutral-700)]">• {s}</li>)}
+                              {scanDetails.services.map((s) => <li key={s} className="text-xs text-[var(--color-neutral-700)] line-clamp-1">• {s}</li>)}
                             </ul>
                           </div>
                         )}
+                      </div>
+                    )}
+                    {scanDetails.headings.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Key pages & sections</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {scanDetails.headings.slice(0, 8).map((h, i) => (
+                            <span key={i} className="inline-block rounded-md bg-[var(--color-accent-50)] px-2 py-0.5 text-[11px] text-[var(--color-accent-700)] border border-[var(--color-accent-200)]">{h.slice(0, 40)}</span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
