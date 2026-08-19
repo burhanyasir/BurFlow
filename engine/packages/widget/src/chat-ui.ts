@@ -126,7 +126,7 @@ export function buildBusinessGreeting(profile: BusinessContextLike = {}): string
   if (/restaurant|food|cafe|hotel|hospitality/i.test(industryLabel)) {
     return `How can I help with ${profile.companyName || 'this business'}?`;
   }
-  return `What brings you here today?`;
+  return `Hi! What brings you here today?`;
 }
 
 export function buildRecommendationCardFromMessage(message: string, profile: BusinessContextLike = {}): RecommendationCard | null {
@@ -292,11 +292,11 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   apiKey: undefined as any,
   sessionId: undefined as any,
   widgetToken: undefined as any,
-  title: 'BurFlow Sales Agent',
+  title: 'BurFlow Assistant',
   subtitle: 'AI assistant · Online',
   primaryColor: '#006248',
   avatarUrl: undefined as any,
-  greeting: 'What brings you here today?',
+  greeting: 'Hi! What brings you here today?',
   greetingText: undefined as any,
   position: 'bottom-right',
   widgetPosition: undefined as any,
@@ -930,7 +930,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:6px 0 10px;text-align:center;';
-    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Powered by <b style="color:#006248;">BurFlow</b></span>';
+    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:#006248;">BurFlow</b></span>';
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -1355,7 +1355,7 @@ export class ChatWidget {
       title.textContent = text;
       body.appendChild(title);
       const desc = document.createElement('small');
-      desc.textContent = i === 0 ? 'Get a personalized recommendation' : i === 1 ? 'A quick product overview' : 'Choose a convenient time';
+      desc.textContent = i === 0 ? '3 quick questions' : i === 1 ? 'A 60-second product tour' : 'Choose a convenient time';
       body.appendChild(desc);
       card.appendChild(body);
 
@@ -1376,7 +1376,7 @@ export class ChatWidget {
     const escapeBtn = document.createElement('button');
     escapeBtn.type = 'button';
     escapeBtn.className = 'cw-welcome-escape';
-    escapeBtn.textContent = 'Ask something else →';
+    escapeBtn.textContent = 'Already a customer? Get support →';
     escapeBtn.addEventListener('click', () => {
       if (this.inputEl) this.inputEl.focus();
     });
@@ -1651,9 +1651,10 @@ export class ChatWidget {
 
   private getWelcomeMessage(): string {
     const baseGreeting = buildBusinessGreeting(this.businessProfile);
+    const subtitle = this.messages.length === 0 ? '\n\nChoose a quick path, or ask anything below.' : '';
     const continuityCue = this.messages.length > 0 ? ` ${buildContinuityCue(this.messages, this.messages[this.messages.length - 1]?.content || '')}` : '';
     const contextHint = this.messages.length > 0 ? ' Based on what you asked earlier, I can continue from there.' : '';
-    return `${baseGreeting}${contextHint}${continuityCue}`;
+    return `${baseGreeting}${subtitle}${contextHint}${continuityCue}`;
   }
 
   private updateHeaderText(): void {

@@ -52,9 +52,9 @@ function buildSnippet(tabId: string, tenantId: string, color: string, position: 
 export default function WidgetDashboard() {
   const navigate = useNavigate(); const { user, tenant, logout } = useAuth(); const { addToast } = useToast();
   const workspaceName = tenant?.name || 'Conversation Engine';
-  const [primaryColor, setPrimaryColor] = useState('#6366f1');
+  const [primaryColor, setPrimaryColor] = useState('#006248');
   const [position, setPosition] = useState<'right' | 'left'>('right');
-  const [welcomeMessage, setWelcomeMessage] = useState('Hi there! How can I help you today?');
+  const [welcomeMessage, setWelcomeMessage] = useState('Hi! What brings you here today?');
   const [placeholder, setPlaceholder] = useState('Type your message here\u2026');
   const [suggestedQuestions, setSuggestedQuestions] = useState<string[]>([]);
   const [questionInput, setQuestionInput] = useState('');

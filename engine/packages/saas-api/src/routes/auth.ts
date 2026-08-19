@@ -75,10 +75,10 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
       // widget itself) never 404 on first visit.
       widgetConfigRepo?.upsert(tenant.id, {
         companyName: tenant.name,
-        primaryColor: '#6366f1',
-        position: 'right',
-        greeting: 'Hi there! How can I help you today?',
-        launcherText: 'Type your message here…',
+        primaryColor: '#006248',
+        position: 'bottom-right',
+        greeting: 'Hi! What brings you here today?',
+        launcherText: 'Chat with us',
         starterOptions: [],
         autoOpen: false,
         autoOpenDelay: 3,

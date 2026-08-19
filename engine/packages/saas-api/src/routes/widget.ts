@@ -262,7 +262,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     return {
       theme: 'light',
       position: 'bottom-right',
-      primaryColor: '#6366f1',
+      primaryColor: '#006248',
       logoUrl: undefined,
       companyName: 'BurFlow',
       greeting: 'Hi! I’m BurFlow. How can I help you today?',
