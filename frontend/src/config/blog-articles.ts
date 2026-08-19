@@ -92,6 +92,52 @@ export const blogArticles: BlogArticle[] = [
       author: { '@type': 'Organization', name: 'BurFlow' },
     },
   },
+  // ── Long-tail buyer keywords ────────────────────────────────────────────
+  {
+    slug: 'how-to-qualify-leads-with-ai-chatbot',
+    title: 'How to Qualify Leads With an AI Chatbot (Step-by-Step)',
+    excerpt:
+      'Stop wasting sales time on unqualified traffic. Learn how AI chatbots can score buying intent, collect key info, and route only warm leads to your team.',
+    category: 'Guide',
+    readTime: '10 min',
+    publishDate: '2026-08-16',
+  },
+  {
+    slug: 'best-chatbot-for-saas-pricing-page',
+    title: 'Best Chatbot for SaaS Pricing Pages: Qualify Visitors Automatically',
+    excerpt:
+      'Your pricing page gets traffic but no conversions. Here\'s how the right AI chatbot qualifies visitors, answers pricing questions, and books demos from your pricing page.',
+    category: 'Guide',
+    readTime: '7 min',
+    publishDate: '2026-08-14',
+  },
+  {
+    slug: 'reduce-customer-support-costs-with-ai',
+    title: 'How to Reduce Customer Support Costs by 40% With AI',
+    excerpt:
+      'Support teams are drowning in repetitive tickets. AI sales agents can handle Tier-1 questions, qualify leads, and reduce support costs — here\'s the playbook.',
+    category: 'Guide',
+    readTime: '8 min',
+    publishDate: '2026-08-11',
+  },
+  {
+    slug: 'automate-demo-bookings-from-website',
+    title: 'Automate Demo Bookings From Your Website (No Forms Required)',
+    excerpt:
+      'Forms convert at 2-5%. AI-guided conversations convert at 15-30%. Here\'s how to replace your demo form with an intelligent booking flow.',
+    category: 'Guide',
+    readTime: '6 min',
+    publishDate: '2026-08-07',
+  },
+  {
+    slug: 'ai-sales-agent-vs-traditional-chatbot',
+    title: 'AI Sales Agent vs Traditional Chatbot: What\'s the Difference?',
+    excerpt:
+      'Not all chatbots are equal. Learn the key differences between basic chatbots and AI sales agents that actually convert visitors into customers.',
+    category: 'Education',
+    readTime: '5 min',
+    publishDate: '2026-08-04',
+  },
   // ── Product deep-dives ─────────────────────────────────────────────────
   {
     slug: 'confidence-guarded-ai-responses',

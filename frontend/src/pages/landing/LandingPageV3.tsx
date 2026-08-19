@@ -8,6 +8,7 @@ import { Reveal } from '../../components/landing/reveal';
 import { SiteHeader } from '../../components/landing/SiteHeader';
 import { SiteFooter } from '../../components/landing/SiteFooter';
 import { WidgetLauncher } from '../../components/landing/WidgetLauncher';
+import { ExitIntentPopup } from '../../components/landing/ExitIntentPopup';
 import { LiveActivity, RatingProof, TrustMarquee } from '../../components/landing/social';
 import { StickyCta } from '../../components/landing/sticky-cta';
 import { initAnalytics, track, trackOnce } from '../../lib/analytics';
@@ -143,6 +144,53 @@ const softwareApplicationSchema = {
   ],
 };
 
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How does BurFlow qualify visitors?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'BurFlow scans your website, learns your products and pricing, and uses buying-intent detection to recommend the right plan and flag visitor intent in real time.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What pricing plans does BurFlow offer?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'BurFlow offers a Free tier ($0, 100 messages/mo), Starter ($49/mo), Professional ($99/mo), and Enterprise (custom pricing).',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How long does it take to set up BurFlow?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'BurFlow can be live in under 10 minutes — just paste the widget snippet into your website and it immediately starts scanning and qualifying visitors.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Does BurFlow use my data for training?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'No. BurFlow answers are grounded in your own website content only. Your data is never used to train the model.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I humanly hand off conversations?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. BurFlow supports seamless handover to human reps when visitors request escalation or when the conversation is escalated by the team.',
+      },
+    },
+  ],
+};
+
 export default function LandingPageV3() {
   const sectionsRef = useRef<HTMLElement | null>(null);
   const [scan, setScan] = useState<{ status: ScanStatus; stage: string; progress: number; url: string }>({
@@ -223,9 +271,10 @@ export default function LandingPageV3() {
         title="BurFlow — Autonomous AI Sales Agents That Turn Traffic Into Demos"
         description="BurFlow scans your website, learns your offer, and helps visitors compare options, qualify themselves, and book a demo — automatically, without friction or dead-end chat."
         canonicalPath="/"
+        schema={JSON.stringify(softwareApplicationSchema)}
       />
       <Helmet>
-        <script type="application/ld+json">{JSON.stringify(softwareApplicationSchema)}</script>
+        <script type="application/ld+json">{JSON.stringify(faqSchema)}</script>
       </Helmet>
       <SiteHeader />
 
@@ -617,6 +666,7 @@ export default function LandingPageV3() {
       <LiveActivity />
       <StickyCta />
       <WidgetLauncher />
+      <ExitIntentPopup />
     </main>
   );
 }

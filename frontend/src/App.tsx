@@ -20,6 +20,8 @@ const BlogPage = lazy(() => import('./pages/blog/BlogPage'));
 const BlogArticlePage = lazy(() => import('./pages/blog/BlogArticlePage'));
 const ComparisonPage = lazy(() => import('./pages/comparison/ComparisonPage'));
 const ComparisonArticle = lazy(() => import('./pages/comparison/ComparisonArticle'));
+const IntegrationsHub = lazy(() => import('./pages/integrations/IntegrationsHub'));
+const IntegrationArticle = lazy(() => import('./pages/integrations/IntegrationArticle'));
 const DocsPage = lazy(() => import('./pages/docs/DocsPage'));
 const WidgetPage = lazy(() => import('./pages/docs/WidgetPage'));
 const ApiPage = lazy(() => import('./pages/docs/ApiPage'));
@@ -28,6 +30,12 @@ const KnowledgePage = lazy(() => import('./pages/docs/KnowledgePage'));
 const IntegrationsPage = lazy(() => import('./pages/docs/IntegrationsPage'));
 const TrustCenterPage = lazy(() => import('./pages/trust/TrustCenterPage'));
 const DemoPage = lazy(() => import('./pages/demo/DemoPage'));
+const ToolsPage = lazy(() => import('./pages/tools/ToolsPage'));
+const LeadLeakCalculatorPage = lazy(() => import('./pages/tools/LeadLeakCalculatorPage'));
+const ChatbotRoiCalculatorPage = lazy(() => import('./pages/tools/ChatbotRoiCalculatorPage'));
+const FaqGeneratorPage = lazy(() => import('./pages/tools/FaqGeneratorPage'));
+const WebpageToMarkdownPage = lazy(() => import('./pages/tools/WebpageToMarkdownPage'));
+const SitemapValidatorPage = lazy(() => import('./pages/tools/SitemapValidatorPage'));
 const DesignSystemPage = lazy(() => import('./pages/dev/DesignSystemPage'));
 const PrivacyPage = lazy(() => import('./pages/trust/PrivacyPage'));
 const ChangelogPage = lazy(() => import('./pages/trust/ChangelogPage'));
@@ -110,6 +118,8 @@ function RoutesWithAnimation() {
         <Route path="/blog/:slug" element={<PublicRoute><BlogArticlePage /></PublicRoute>} />
         <Route path="/compare" element={<PublicRoute><ComparisonPage /></PublicRoute>} />
         <Route path="/compare/:slug" element={<PublicRoute><ComparisonArticle /></PublicRoute>} />
+        <Route path="/integrations" element={<PublicRoute><IntegrationsHub /></PublicRoute>} />
+        <Route path="/integrations/:slug" element={<PublicRoute><IntegrationArticle /></PublicRoute>} />
         <Route path="/docs" element={<PublicRoute><DocsPage /></PublicRoute>} />
         <Route path="/docs/widget" element={<PublicRoute><WidgetPage /></PublicRoute>} />
         <Route path="/docs/api" element={<PublicRoute><ApiPage /></PublicRoute>} />
@@ -132,6 +142,12 @@ function RoutesWithAnimation() {
         <Route path="/terms" element={<PublicRoute><TermsPage /></PublicRoute>} />
         <Route path="/cookies" element={<PublicRoute><CookiesPage /></PublicRoute>} />
         <Route path="/demo" element={<PublicRoute><DemoPage /></PublicRoute>} />
+        <Route path="/tools" element={<PublicRoute><ToolsPage /></PublicRoute>} />
+        <Route path="/tools/lead-leak-calculator" element={<PublicRoute><LeadLeakCalculatorPage /></PublicRoute>} />
+        <Route path="/tools/chatbot-roi-calculator" element={<PublicRoute><ChatbotRoiCalculatorPage /></PublicRoute>} />
+        <Route path="/tools/faq-generator" element={<PublicRoute><FaqGeneratorPage /></PublicRoute>} />
+        <Route path="/tools/webpage-to-markdown" element={<PublicRoute><WebpageToMarkdownPage /></PublicRoute>} />
+        <Route path="/tools/sitemap-validator" element={<PublicRoute><SitemapValidatorPage /></PublicRoute>} />
         <Route path="/design-system" element={<PublicRoute><DesignSystemPage /></PublicRoute>} />
 
         {/* Auth Routes */}
