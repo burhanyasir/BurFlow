@@ -7,11 +7,50 @@
  * widget configuration.
  */
 :root {
-  --cw-primary-color: #3b82f6;
+  --cw-primary-color: #006248;
 }
 
 .cw-bubble,
 .cw-send {
-  background: linear-gradient(135deg, var(--cw-primary-color, #6366f1) 0%, var(--cw-primary-color, #8b5cf6) 100%);
+  background: linear-gradient(135deg, var(--cw-primary-color, #006248) 0%, var(--cw-primary-color, #004d38) 100%);
   color: #fff;
+}
+
+/* Pre-open suggested questions panel */
+.cw-preopen-panel {
+  border: 1.5px solid #E8F5E9;
+  box-shadow: 0 20px 60px rgba(0,98,72,0.12), 0 4px 20px rgba(0,0,0,0.06);
+}
+
+.cw-preopen-pill {
+  background: #E8F5E9;
+  color: #006248;
+  border: 1px solid #C8E6C9;
+  transition: all 0.2s ease;
+}
+
+.cw-preopen-pill:hover {
+  background: #006248;
+  color: #fff;
+}
+
+/* Mobile responsive */
+@media (max-width: 640px) {
+  .cw-container {
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+  }
+  .cw-bubble {
+    bottom: 16px !important;
+  }
+  .cw-preopen-panel {
+    bottom: 80px !important;
+    left: 16px !important;
+    right: 16px !important;
+    max-width: none !important;
+  }
 }

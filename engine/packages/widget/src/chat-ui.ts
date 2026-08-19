@@ -315,7 +315,7 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   widgetToken: undefined as any,
   title: 'BurFlow Sales Agent',
   subtitle: 'Your smart buying assistant',
-  primaryColor: '#3B82F6',
+  primaryColor: '#006248',
   avatarUrl: undefined as any,
   greeting: '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!',
   greetingText: undefined as any,
@@ -424,24 +424,32 @@ export class ChatWidget {
       @keyframes cw-pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
       @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
       @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
-      @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(99,102,241,0.6),0 2px 12px rgba(0,0,0,0.15)} }
-      .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#6366f1) 0%,var(--cw-primary-color,#8b5cf6) 100%) !important; }
-      .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#6366f1) 0%,var(--cw-primary-color,#8b5cf6) 100%) !important; }
-      .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(99,102,241,0.55) !important; }
-      .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(99,102,241,0.4) !important; }
+      @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
+      .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
+      .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
+      .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(0,98,72,0.55) !important; }
+      .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(0,98,72,0.4) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
-      .cw-input:focus { border-color:var(--cw-primary-color,#818CF8) !important; box-shadow:0 0 0 3px rgba(99,102,241,0.1) !important; background:#fff !important; }
+      .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px rgba(0,98,72,0.12) !important; background:#fff !important; }
+      .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
+      .cw-preopen-pill { background:#E8F5E9 !important; color:#006248 !important; border:1px solid #C8E6C9 !important; }
+      .cw-preopen-pill:hover { background:#006248 !important; color:#fff !important; }
       html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
       html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
       html[data-cw-theme='dark'] .cw-input-area { background:#111827 !important; border-top-color:#1F2937 !important; }
       html[data-cw-theme='dark'] .cw-action-panel { background:#0F172A !important; border-top-color:#1F2937 !important; }
       html[data-cw-theme='dark'] .cw-input { background:#1F2937 !important; border-color:#374151 !important; color:#F3F4F6 !important; }
       html[data-cw-theme='dark'] .cw-card { background:#1F2937 !important; border-color:#374151 !important; color:#E5E7EB !important; }
-      html[data-cw-theme='dark'] .cw-msg-user { background:var(--cw-primary-color,#6366f1) !important; color:#fff !important; }
+      html[data-cw-theme='dark'] .cw-msg-user { background:var(--cw-primary-color,#006248) !important; color:#fff !important; }
       html[data-cw-theme='dark'] .cw-bubble-label { color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-preopen-panel { background:#1F2937 !important; border-color:#374151 !important; }
       html[data-cw-theme='dark'] .cw-preopen-panel div { color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-highlight { background: rgba(255,255,255,0.1) !important; }
+      @media (max-width:640px) {
+        .cw-container { bottom:0 !important; left:0 !important; right:0 !important; width:100vw !important; height:100vh !important; border-radius:0 !important; }
+        .cw-bubble { bottom:16px !important; }
+        .cw-preopen-panel { bottom:80px !important; left:16px !important; right:16px !important; max-width:none !important; }
+      }
     `;
     document.head.appendChild(style);
   }
@@ -669,10 +677,10 @@ export class ChatWidget {
     const panel = document.createElement('div');
     panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:92px;' : 'right:92px;';
-    panel.style.cssText = `position:fixed;bottom:24px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.15);cursor:pointer;`;
+    panel.style.cssText = `position:fixed;bottom:84px;${pos}z-index:999998;display:none;max-width:280px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1.5px solid #E8F5E9;border-radius:16px;overflow:hidden;box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06);cursor:pointer;`;
 
     const header = document.createElement('div');
-    header.style.cssText = 'padding:12px 16px 6px;font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#6B7280;';
+    header.style.cssText = 'padding:14px 16px 8px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#006248;';
     header.textContent = 'Suggested questions';
     panel.appendChild(header);
 
@@ -705,9 +713,10 @@ export class ChatWidget {
       : this.defaultStarterOptions();
     options.forEach((text, i) => {
       const row = document.createElement('div');
-      row.style.cssText = `padding:8px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;${i < options.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}transition:background 0.15s ease;`;
+      row.style.cssText = `padding:10px 16px;font-size:13px;color:#374151;font-weight:500;line-height:1.4;display:flex;align-items:center;gap:8px;${i < options.length - 1 ? 'border-bottom:1px solid #F0F4F0;' : ''}transition:background 0.15s ease;border-radius:8px;margin:2px 4px;`;
       const pill = document.createElement('span');
-      pill.style.cssText = 'display:inline-flex;align-items:center;padding:4px 12px;border-radius:9999px;background:#EEF2FF;color:#4338CA;font-size:12px;font-weight:500;white-space:nowrap;';
+      pill.className = 'cw-preopen-pill';
+      pill.style.cssText = 'display:inline-flex;align-items:center;padding:6px 14px;border-radius:9999px;background:#E8F5E9;color:#006248;font-size:12px;font-weight:600;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.2s ease;';
       pill.textContent = text;
       row.appendChild(pill);
       row.addEventListener('mouseenter', () => { row.style.background = '#F9FAFB'; });
@@ -780,7 +789,7 @@ export class ChatWidget {
   private createHeader(): HTMLDivElement {
     const header = document.createElement('div');
     header.className = 'cw-header';
-    header.style.cssText = `background:linear-gradient(135deg,#1e1b4b 0%,#312e81 60%,#4338ca 100%);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:20px 20px 0 0;`;
+    header.style.cssText = `background:linear-gradient(135deg,#003d2d 0%,#006248 60%,#00855e 100%);color:#fff;padding:18px 20px;display:flex;align-items:center;justify-content:space-between;border-radius:20px 20px 0 0;`;
 
     const info = document.createElement('div');
     info.style.cssText = 'display:flex;align-items:center;gap:10px;';
@@ -872,7 +881,7 @@ export class ChatWidget {
     const sendBtn = document.createElement('button');
     sendBtn.className = 'cw-send';
     sendBtn.setAttribute('aria-label', 'Send message');
-    sendBtn.style.cssText = `background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:14px;width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px rgba(99,102,241,0.3);transition:transform 0.15s ease,box-shadow 0.15s ease;`;
+    sendBtn.style.cssText = `background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border:none;border-radius:14px;width:44px;height:44px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px rgba(0,98,72,0.3);transition:transform 0.15s ease,box-shadow 0.15s ease;`;
     sendBtn.innerHTML = this.getSendIconSvg();
     sendBtn.addEventListener('click', () => this.send());
     this.sendBtnEl = sendBtn;
@@ -883,7 +892,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:6px 0 10px;text-align:center;';
-    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Powered by <b style="color:#6366f1;">BurFlow</b></span>';
+    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Powered by <b style="color:#006248;">BurFlow</b></span>';
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -892,7 +901,7 @@ export class ChatWidget {
   private createTakeoverArea(): HTMLDivElement {
     const el = document.createElement('div');
     el.className = 'cw-takeover';
-    el.style.cssText = 'display:none;padding:0 16px 12px;background:#EEF2FF;border-top:1px solid #E0E7FF;';
+    el.style.cssText = 'display:none;padding:0 16px 12px;background:#E8F5E9;border-top:1px solid #C8E6C9;';
     return el;
   }
 
@@ -904,7 +913,7 @@ export class ChatWidget {
       <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
         <span style="font-size:14px;flex-shrink:0;">👤</span>
         <div>
-          <p style="margin:0;font-size:12px;font-weight:600;color:#312E81;">Human agent joined</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:#003d2d;">Human agent joined</p>
           <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">A real person is now assisting this conversation. Replies will come from them shortly.</p>
         </div>
       </div>`;
@@ -936,7 +945,7 @@ export class ChatWidget {
     if (userMessages >= 3) {
       this.handoffEl.style.display = 'block';
       this.handoffEl.innerHTML = `
-        <button class="cw-handoff-link" style="background:none;border:none;color:#6366f1;font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
+        <button class="cw-handoff-link" style="background:none;border:none;color:#006248;font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
           Talk to a human
         </button>`;
       this.handoffEl.querySelector('.cw-handoff-link')?.addEventListener('click', () => this.showHandoffForm());
@@ -951,7 +960,7 @@ export class ChatWidget {
         <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">Leave your email and we'll reach out shortly.</p>
         <div style="display:flex;gap:8px;">
           <input type="email" class="cw-handoff-email" placeholder="you@company.com" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
-          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
+          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
         </div>
       </div>`;
     this.handoffEl.querySelector('.cw-handoff-submit')?.addEventListener('click', () => this.submitHandoff());
@@ -1127,9 +1136,9 @@ export class ChatWidget {
     const isUser = msg.role === 'user';
     const isAgent = msg.sender === 'agent';
     const bubbleStyle = isUser
-      ? 'background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;'
+      ? 'background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;'
       : isAgent
-        ? 'background:#EEF2FF;color:#1F2937;border:1px solid #C7D2FE;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
+        ? 'background:#E8F5E9;color:#1F2937;border:1px solid #C8E6C9;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
         : 'background:#F3F4F6;color:#1F2937;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);';
     bubble.style.cssText = `max-width:82%;padding:12px 16px;border-radius:18px;font-size:14px;line-height:1.6;word-wrap:break-word;${bubbleStyle}`;
 
@@ -1144,7 +1153,7 @@ export class ChatWidget {
       const label = document.createElement('div');
       label.className = 'cw-agent-label';
       label.textContent = 'Agent';
-      label.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#6366f1;margin-bottom:4px;';
+      label.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#006248;margin-bottom:4px;';
       bubble.appendChild(label);
     }
 
@@ -1257,9 +1266,9 @@ export class ChatWidget {
       chip.textContent = text;
       chip.style.cssText = 'display:inline-flex;align-items:center;padding:6px 14px;border:1px solid #E5E7EB;border-radius:9999px;background:#F9FAFB;color:#374151;font-size:13px;font-weight:500;font-family:inherit;cursor:pointer;transition:background 0.15s ease,color 0.15s ease,border-color 0.15s ease;white-space:nowrap;';
       chip.addEventListener('mouseenter', () => {
-        chip.style.background = '#EEF2FF';
-        chip.style.color = '#4338CA';
-        chip.style.borderColor = '#C7D2FE';
+        chip.style.background = '#E8F5E9';
+        chip.style.color = '#006248';
+        chip.style.borderColor = '#A5D6A7';
       });
       chip.addEventListener('mouseleave', () => {
         chip.style.background = '#F9FAFB';
@@ -1308,7 +1317,7 @@ export class ChatWidget {
     title.appendChild(titleText);
     const badge = document.createElement('span');
     badge.textContent = 'Recommended';
-    badge.style.cssText = 'font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;background:#E0E7FF;color:#4338CA;';
+    badge.style.cssText = 'font-size:11px;font-weight:600;padding:4px 8px;border-radius:999px;background:#E8F5E9;color:#006248;';
     title.appendChild(badge);
     el.appendChild(title);
 
@@ -1389,7 +1398,7 @@ export class ChatWidget {
     btn.type = 'button';
     btn.className = 'cw-action-button';
     btn.textContent = button.label;
-    btn.style.cssText = `padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-size:13px;transition:transform 0.15s ease, box-shadow 0.15s ease;${button.variant === 'primary' ? `background:${this.config.primaryColor};color:#fff;box-shadow:0 10px 20px rgba(59,130,246,0.16);` : 'background:#fff;color:#1F2937;border:1px solid #D1D5DB;'}`;
+    btn.style.cssText = `padding:10px 14px;border-radius:999px;border:none;cursor:pointer;font-size:13px;transition:transform 0.15s ease, box-shadow 0.15s ease;${button.variant === 'primary' ? `background:${this.config.primaryColor};color:#fff;box-shadow:0 10px 20px rgba(0,98,72,0.16);` : 'background:#fff;color:#1F2937;border:1px solid #D1D5DB;'}`;
     if (button.category) {
       const iconMap: Record<string, string> = { demo: '🎯', plans: '💰', guidance: '🧠', sales: '🤝', faq: '❓', products: '📦' };
       btn.textContent = `${iconMap[button.category] || '•'} ${button.label}`;
@@ -1482,15 +1491,15 @@ export class ChatWidget {
 
   private getBubbleStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:20px;${pos}height:52px;padding:0 22px;border-radius:26px;background:linear-gradient(135deg,#6366f1 0%,#8b5cf6 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(99,102,241,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
+    return `position:fixed;bottom:20px;${pos}height:52px;padding:0 22px;border-radius:26px;background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:10px;box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
   }
 
   private getContainerStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
-      return `position:fixed;top:0;left:0;width:100vw;height:100vh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+      return `position:fixed;top:0;left:0;width:100vw;height:100dvh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
     }
-    return `position:fixed;bottom:88px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(650px, 85vh);background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    return `position:fixed;bottom:20px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(650px, calc(100vh - 120px));background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {
