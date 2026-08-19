@@ -413,25 +413,25 @@ export class ChatWidget {
       .cw-preopen-pill:hover { background:#006248 !important; color:#fff !important; }
       /* Welcome action cards */
       .cw-welcome-cards { display:flex; flex-direction:column; gap:8px; padding:4px 0 8px; }
-      .cw-welcome-card { display:flex; align-items:center; gap:12px; padding:12px 14px; border:1.5px solid #E8ECF1; border-radius:14px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
+      .cw-welcome-card { display:flex; align-items:center; gap:12px; padding:14px 16px; border:1.5px solid #E8ECF1; border-radius:14px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
       .cw-welcome-card:hover { border-color:#A5D6A7; background:#F0FAF4; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,98,72,0.08); }
       .cw-welcome-card:active { transform:translateY(0); box-shadow:none; }
-      .cw-welcome-card-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; flex-shrink:0; }
-      .cw-welcome-card-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-      .cw-welcome-card-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
-      .cw-welcome-card-body b { font-size:13.5px; font-weight:600; color:#1F2937; letter-spacing:-0.01em; line-height:1.3; }
-      .cw-welcome-card-body small { font-size:11.5px; color:#6B7280; line-height:1.3; }
-      .cw-welcome-card-badge { display:inline-block; padding:2px 6px; border-radius:999px; background:#E8F5E9; color:#006248; font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; width:fit-content; }
-      .cw-welcome-card-arrow { width:18px; height:18px; flex-shrink:0; color:#9CA3AF; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform 0.15s ease, color 0.15s ease; }
+      .cw-welcome-card-icon { width:40px; height:40px; display:grid; place-items:center; border-radius:12px; background:#E8F5E9; color:#006248; flex-shrink:0; }
+      .cw-welcome-card-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+      .cw-welcome-card-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+      .cw-welcome-card-body b { font-size:14px; font-weight:600; color:#1F2937; letter-spacing:-0.01em; line-height:1.35; }
+      .cw-welcome-card-body small { font-size:12px; color:#6B7280; line-height:1.35; white-space:normal; overflow:visible; }
+      .cw-welcome-card-badge { display:inline-block; padding:3px 8px; border-radius:999px; background:#E8F5E9; color:#006248; font-size:10px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; width:fit-content; }
+      .cw-welcome-card-arrow { width:20px; height:20px; flex-shrink:0; color:#9CA3AF; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform 0.15s ease, color 0.15s ease; }
       .cw-welcome-card:hover .cw-welcome-card-arrow { transform:translateX(2px); color:#006248; }
-      .cw-welcome-section { margin-top:18px; }
-      .cw-welcome-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
-      .cw-welcome-section-title { font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#374151; }
-      .cw-welcome-section-meta { font-size:10px; color:#9CA3AF; }
-      .cw-welcome-escape { display:block; width:100%; padding:8px 0; margin-top:4px; border:0; background:transparent; color:#006248; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; border-radius:8px; transition:background 0.15s ease; }
+      .cw-welcome-section { margin-top:20px; }
+      .cw-welcome-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+      .cw-welcome-section-title { font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#374151; }
+      .cw-welcome-section-meta { font-size:11px; color:#9CA3AF; }
+      .cw-welcome-escape { display:block; width:100%; padding:10px 0; margin-top:6px; border:0; background:transparent; color:#006248; font-size:13px; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; border-radius:8px; transition:background 0.15s ease; }
       .cw-welcome-escape:hover { background:#F0FAF4; }
-      .cw-welcome-icon { width:36px; height:36px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; margin-bottom:12px; }
-      .cw-welcome-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+      .cw-welcome-icon { width:38px; height:38px; display:grid; place-items:center; border-radius:12px; background:#E8F5E9; color:#006248; margin-bottom:14px; }
+      .cw-welcome-icon svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
       html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
       html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
       html[data-cw-theme='dark'] .cw-input-area { background:#111827 !important; border-top-color:#1F2937 !important; }
@@ -872,7 +872,7 @@ export class ChatWidget {
   private createMessagesArea(): HTMLDivElement {
     const el = document.createElement('div');
     el.className = 'cw-messages';
-    el.style.cssText = 'flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:14px;background:#F8F9FB;overscroll-behavior:contain;';
+    el.style.cssText = 'flex:1;overflow-y:auto;padding:24px 20px;display:flex;flex-direction:column;gap:16px;background:#F8F9FB;overscroll-behavior:contain;';
     return el;
   }
 
@@ -886,10 +886,10 @@ export class ChatWidget {
   private createInputArea(): HTMLDivElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'cw-input-area';
-    wrapper.style.cssText = 'padding:0 16px 0;border-top:1px solid #E8ECF1;background:#fff;border-radius:0 0 20px 20px;';
+    wrapper.style.cssText = 'padding:0 20px 0;border-top:1px solid #E8ECF1;background:#fff;border-radius:0 0 20px 20px;';
 
     const inputRow = document.createElement('div');
-    inputRow.style.cssText = 'display:flex;gap:10px;align-items:flex-end;padding:14px 0 0;';
+    inputRow.style.cssText = 'display:flex;gap:12px;align-items:flex-end;padding:16px 0 0;';
 
     const textarea = document.createElement('textarea');
     textarea.className = 'cw-input';
@@ -1606,7 +1606,7 @@ export class ChatWidget {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
       return `position:fixed;top:0;left:0;width:100vw;height:100dvh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
     }
-    return `position:fixed;bottom:20px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(720px, calc(100vh - 80px));background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    return `position:fixed;bottom:20px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(760px, calc(100vh - 80px));background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {

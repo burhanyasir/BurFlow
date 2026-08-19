@@ -711,7 +711,7 @@ describe('ChatWidget', () => {
 
   it('hides starter chips on TAKEOVER_STARTED and restores them on TAKEOVER_ENDED via the event stream', async () => {
     const encoder = new TextEncoder();
-    const stream = new ReadableStream({
+    const eventStream = new ReadableStream({
       start(controller) {
         controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } })}\n\n`));
         setTimeout(() => {
@@ -720,7 +720,13 @@ describe('ChatWidget', () => {
         }, 150);
       },
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.includes('/chat/events')) {
+        return Promise.resolve({ ok: true, body: eventStream });
+      }
+      // Return valid JSON for history polling and other endpoints
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ messages: [] }) });
+    }));
 
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: '', sessionId: 's1', starterOptions: ['Option A', 'Option B'] });
     widget.mount();
