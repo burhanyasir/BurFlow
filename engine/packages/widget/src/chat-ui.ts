@@ -1606,7 +1606,7 @@ export class ChatWidget {
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
       return `position:fixed;top:0;left:0;width:100vw;height:100dvh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
     }
-    return `position:fixed;bottom:20px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(650px, calc(100vh - 120px));background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+    return `position:fixed;bottom:20px;${pos}width:420px;max-width:min(calc(100vw - 24px), 420px);height:min(720px, calc(100vh - 80px));background:#FAFBFC;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }
 
   private getChatIconSvg(): string {

@@ -182,7 +182,7 @@ function WidgetEmbedLoader() {
     script.setAttribute('data-tenant-id', WIDGET_TENANT_ID);
     if (WIDGET_API_URL) script.setAttribute('data-api-url', WIDGET_API_URL);
     script.setAttribute('data-position', 'bottom-right');
-    script.setAttribute('data-primary-color', '#6366f1');
+    script.setAttribute('data-primary-color', '#006248');
     script.setAttribute('data-greeting', '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!');
     script.setAttribute('data-launcher-text', 'Try for free');
 
@@ -216,9 +216,48 @@ export default function LandingPage() {
   const [scanStage, setScanStage] = useState('');
   const [scanProgress, setScanProgress] = useState(0);
   const [scanSummary, setScanSummary] = useState({ pages: 0, products: 0, services: 0, pricing: 0, faqs: 0, intents: 0, readyIn: '4 min' });
+  const [scanDetails, setScanDetails] = useState<{ name: string; description: string; pages: string[]; products: string[]; services: string[] } | null>(null);
   const scanTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => () => { if (scanTimerRef.current) clearInterval(scanTimerRef.current); }, []);
+
+  /** Fetch a page through a CORS proxy and parse its content. */
+  async function fetchPage(url: string): Promise<string> {
+    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+    return res.text();
+  }
+
+  /** Extract structured info from HTML. */
+  function parsePage(html: string, baseUrl: string): { title: string; description: string; links: string[]; headings: string[] } {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const title = doc.querySelector('title')?.textContent?.trim() || '';
+    const description = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
+    const origin = new URL(baseUrl).origin;
+    const links = Array.from(doc.querySelectorAll('a[href]'))
+      .map((a) => a.getAttribute('href') || '')
+      .filter((href) => href.startsWith('/') || href.startsWith(origin))
+      .map((href) => { try { return new URL(href, origin).pathname; } catch { return href; } })
+      .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
+    const headings = Array.from(doc.querySelectorAll('h1,h2,h3'))
+      .map((h) => h.textContent?.trim() || '')
+      .filter(Boolean);
+    return { title, description, links: [...new Set(links)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20) };
+  }
+
+  /** Classify pages and extract products/services from headings. */
+  function classifyContent(pages: string[], headings: string[]): { products: string[]; services: string[]; pricing: number; faqs: number } {
+    const productKeywords = /product|feature|solution|tool|platform|software|app/i;
+    const serviceKeywords = /service|support|consulting|help|setup|onboard/i;
+    const pricingKeywords = /pric|plan|cost|tier|subscription/i;
+    const faqKeywords = /faq|question|answer|help|support/i;
+    const products = headings.filter((h) => productKeywords.test(h)).slice(0, 8);
+    const services = headings.filter((h) => serviceKeywords.test(h)).slice(0, 8);
+    const pricing = pages.filter((p) => pricingKeywords.test(p)).length || headings.filter((h) => pricingKeywords.test(h)).length;
+    const faqs = pages.filter((p) => faqKeywords.test(p)).length + headings.filter((h) => faqKeywords.test(h)).length;
+    return { products, services, pricing, faqs };
+  }
 
   const SCAN_STAGES: [number, string][] = [
     [0, 'Connecting to site…'],
@@ -251,37 +290,98 @@ export default function LandingPage() {
     ];
   }, [scanState, scanSummary]);
 
-  const handleScanDemo = (e?: React.FormEvent) => {
+  const handleScanDemo = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!siteUrl || siteUrl === 'https://') return;
+    let url = siteUrl.trim();
+    if (!url.startsWith('http')) url = 'https://' + url;
     setScanState('scanning');
     setScanProgress(0);
     setScanStage(SCAN_STAGES[0]![1]);
-
-    // Derive realistic-looking counts from the domain length (deterministic per URL)
-    const domain = siteUrl.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-    const seed = domain.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
-    const pages = 40 + (seed % 160);
-    const products = 2 + (seed % 8);
-    const services = 1 + (seed % 5);
-    const pricing = 1 + (seed % 3);
-    const faqs = 3 + (seed % 12);
-    const intents = 8 + (seed % 15);
+    setScanDetails(null);
 
     let p = 0;
     if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+
+    // Start progress animation
     scanTimerRef.current = window.setInterval(() => {
-      p = Math.min(p + 2 + Math.random() * 4, 100);
+      p = Math.min(p + 1.5 + Math.random() * 2.5, 85);
       const stage = [...SCAN_STAGES].reverse().find(([at]) => p >= at)?.[1] ?? SCAN_STAGES[0]![1];
       setScanProgress(p);
       setScanStage(stage);
-      if (p >= 100) {
-        if (scanTimerRef.current) clearInterval(scanTimerRef.current);
-        scanTimerRef.current = null;
-        setScanSummary({ pages, products, services, pricing, faqs, intents, readyIn: '4 min' });
-        setScanState('done');
+    }, 150);
+
+    try {
+      // Fetch the actual website
+      setScanStage('Connecting to site…');
+      setScanProgress(5);
+      const html = await fetchPage(url);
+
+      setScanStage('Parsing content…');
+      setScanProgress(35);
+      const parsed = parsePage(html, url);
+
+      // Try to discover sub-pages from links
+      setScanStage('Discovering pages…');
+      setScanProgress(55);
+      const subPages = parsed.links.slice(0, 12);
+      const discoveredPages: string[] = [url, ...subPages.map((p) => { try { return new URL(p, url).toString(); } catch { return p; } })];
+
+      // Fetch a few key sub-pages for deeper analysis
+      setScanStage('Analyzing products & services…');
+      setScanProgress(70);
+      const extraHeadings: string[] = [...parsed.headings];
+      const pagesToFetch = subPages.filter((p) => /product|service|pricing|about|feature/i.test(p)).slice(0, 3);
+      for (const page of pagesToFetch) {
+        try {
+          const pageUrl = new URL(page, url).toString();
+          const pageHtml = await fetchPage(pageUrl);
+          const pageParsed = parsePage(pageHtml, pageUrl);
+          extraHeadings.push(...pageParsed.headings);
+        } catch { /* skip failed pages */ }
       }
-    }, 120);
+
+      setScanStage('Classifying content…');
+      setScanProgress(88);
+      const classified = classifyContent(parsed.links, extraHeadings);
+      const intents = Math.max(5, classified.products.length * 3 + classified.services.length * 2 + classified.pricing * 2);
+
+      setScanStage('Building knowledge graph…');
+      setScanProgress(98);
+
+      // Complete
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+      setScanProgress(100);
+      setScanSummary({
+        pages: discoveredPages.length,
+        products: classified.products.length || 1,
+        services: classified.services.length || 1,
+        pricing: classified.pricing || 1,
+        faqs: classified.faqs || 1,
+        intents,
+        readyIn: '4 min',
+      });
+      setScanDetails({
+        name: parsed.title || new URL(url).hostname,
+        description: parsed.description || 'No meta description found.',
+        pages: discoveredPages.slice(0, 8),
+        products: classified.products,
+        services: classified.services,
+      });
+      setScanStage('Scan complete');
+      setScanState('done');
+    } catch (err) {
+      // Fallback: show what we can from the homepage alone
+      if (scanTimerRef.current) clearInterval(scanTimerRef.current);
+      scanTimerRef.current = null;
+      const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+      setScanProgress(100);
+      setScanSummary({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5, readyIn: '4 min' });
+      setScanDetails({ name: domain, description: 'Could not fully fetch the website. The agent will learn more during setup.', pages: [url], products: [], services: [] });
+      setScanStage('Scan complete — limited data');
+      setScanState('done');
+    }
   };
 
   return (
@@ -394,6 +494,44 @@ export default function LandingPage() {
                     ))}
                   </div>
                 </div>
+
+                {scanState === 'done' && scanDetails && (
+                  <div className="mt-4 rounded-2xl border border-[var(--color-neutral-200)] bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--color-accent-600)]">What we found</p>
+                    <p className="mt-1 text-sm font-semibold text-[var(--color-neutral-900)]">{scanDetails.name}</p>
+                    <p className="mt-1 text-xs text-[var(--color-neutral-500)] line-clamp-2">{scanDetails.description}</p>
+                    {scanDetails.pages.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Pages discovered</p>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {scanDetails.pages.map((p) => (
+                            <span key={p} className="inline-block max-w-[140px] truncate rounded-md bg-[var(--color-neutral-100)] px-2 py-0.5 text-[11px] text-[var(--color-neutral-600)]" title={p}>{p.replace(/^https?:\/\/[^/]+/, '').split('/').filter(Boolean).slice(-2).join('/') || '/'}</span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {(scanDetails.products.length > 0 || scanDetails.services.length > 0) && (
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {scanDetails.products.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Products found</p>
+                            <ul className="mt-1 space-y-0.5">
+                              {scanDetails.products.map((p) => <li key={p} className="text-xs text-[var(--color-neutral-700)]">• {p}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                        {scanDetails.services.length > 0 && (
+                          <div>
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--color-neutral-400)]">Services found</p>
+                            <ul className="mt-1 space-y-0.5">
+                              {scanDetails.services.map((s) => <li key={s} className="text-xs text-[var(--color-neutral-700)]">• {s}</li>)}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="mt-4 rounded-2xl border border-[var(--color-accent-200)] bg-[var(--color-accent-50)] p-4 text-sm text-[var(--color-neutral-700)]">
                   <p className="font-semibold text-[var(--color-neutral-900)]">What your visitors will experience</p>
