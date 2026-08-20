@@ -162,9 +162,9 @@ export function LandingChatWidget() {
           isOpen ? 'scale-100 opacity-100 pointer-events-auto' : 'scale-90 opacity-0 pointer-events-none'
         }`}
         style={{
-          width: 'clamp(360px, calc(100vw - 2rem), 420px)',
-          height: isOpen ? 'clamp(540px, 75vh, 660px)' : '0px',
-          borderRadius: '24px',
+          width: 'clamp(320px, calc(100vw - 2rem), 380px)',
+          height: isOpen ? 'clamp(480px, 70vh, 560px)' : '0px',
+          borderRadius: '20px',
         }}
       >
         <div className="glass-strong flex h-full flex-col overflow-hidden" style={{ boxShadow: 'var(--shadow-glass), var(--shadow-wine)' }}>
@@ -241,7 +241,7 @@ export function LandingChatWidget() {
                     key={qr.id}
                     type="button"
                     onClick={() => sendMessage(qr.payload)}
-                    className="glass inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-[12px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-all duration-200 border border-hairline"
+                    className="glass inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11.5px] font-medium text-muted-foreground hover:text-foreground hover:bg-white/[0.08] transition-all duration-200 border border-hairline"
                   >
                     <Sparkles className="h-3 w-3 text-gold" /> {qr.label}
                   </button>
@@ -319,7 +319,7 @@ export function LandingChatWidget() {
       {/* Floating button */}
       <button
         onClick={() => isOpen ? setIsOpen(false) : handleOpen()}
-        className="group relative flex h-14 w-14 items-center justify-center rounded-full transition duration-300 hover:scale-105 active:scale-95 wine-gradient"
+        className="group relative flex h-12 w-12 items-center justify-center rounded-full transition duration-300 hover:scale-105 active:scale-95 wine-gradient"
         style={{ boxShadow: 'var(--shadow-wine)' }}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >
