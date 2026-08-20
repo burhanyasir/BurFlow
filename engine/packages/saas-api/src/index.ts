@@ -369,7 +369,7 @@ app.use('/api/auth', createPasswordResetRoutes(userRepo));
 app.use('/api/auth', createVerifyRoutes(userRepo, JWT_SECRET));
 
 // Widget public routes
-app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET, tenantRepo));
+app.use('/api/widget', createWidgetRoutes(widgetConfigRepo, JWT_SECRET, tenantRepo, db));
 
 // Protected routes
 const auth = authMiddleware(JWT_SECRET);

@@ -120,7 +120,9 @@ export type {
   PaddleTierConfig, PaddlePriceConfig, PaddleCountryPriceOverride,
 } from './config/paddle-plans';
 // Plan/quota catalog only. StripeClient and the Stripe checkout types are
-// quarantined — Paddle is the sole billing provider and no production code
+// quarantined �?" Paddle is the sole billing provider and no production code
 // may reach Stripe anymore.
 export { getPlanConfig, isUnlimited, UNLIMITED_THRESHOLD } from './stripe';
 export type { PlanConfig, StripePlanConfig } from './stripe';
+export { deriveWidgetDefaults } from './widget-defaults/derive';
+export type { WidgetDerivedDefaults, DerivedStarterButton, DerivedBusinessType } from './widget-defaults/derive';

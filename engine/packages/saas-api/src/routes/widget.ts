@@ -1,5 +1,8 @@
 import { Router, Request, Response } from 'express';
-import { WidgetConfigRepository, TenantRepository } from '@conversation-engine/saas-core';
+import { WidgetConfigRepository, TenantRepository, deriveWidgetDefaults } from '@conversation-engine/saas-core';
+import type { WidgetDerivedDefaults } from '@conversation-engine/saas-core';
+import type { SqlDatabase } from '@conversation-engine/saas-core';
+import { isPostgresDatabase } from '@conversation-engine/saas-core';
 import jwt from 'jsonwebtoken';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { requireJsonObject, validateRequiredString, validationError, LABEL_MAX } from '../middleware/validate';
@@ -265,9 +268,30 @@ function signWidgetToken(encoded: string, secret: string): string {
   return createHmac('sha256', secret).update(encoded).digest('hex');
 }
 
-export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string, tenantRepo?: TenantRepository): Router {
+export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwtSecret?: string, tenantRepo?: TenantRepository, knowledgeDb?: SqlDatabase): Router {
   const router = Router();
   const widgetAuth = jwtSecret ? authMiddleware(jwtSecret) : undefined;
+
+  /**
+   * Best-effort loader of the tenant's published knowledge chunks. The
+   * knowledge pipeline keeps snapshots on the primary SQLite db (or a
+   * dedicated SQLite file for Postgres deployments); derivation is skipped
+   * when the chunks are unreachable.
+   */
+  function loadKnowledgeChunks(tenantId: string): Array<{ content?: string; metadata?: Record<string, unknown> }> {
+    if (!knowledgeDb || isPostgresDatabase(knowledgeDb)) return [];
+    try {
+      const rows = knowledgeDb.prepare(
+        `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
+      ).all(tenantId) as Array<{ chunk_data: string }>;
+      const chunks = rows.flatMap((row) => {
+        try { return JSON.parse(row.chunk_data || '[]'); } catch { return []; }
+      });
+      return chunks.filter((c: any) => c && typeof c.content === 'string');
+    } catch {
+      return [];
+    }
+  }
 
   function generateWidgetToken(tenantId: string): string {
     const secret = getWidgetSecret();
@@ -425,6 +449,33 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         }
         return res.status(404).json({ error: 'Widget not configured' });
       }
+      // Site-adaptive defaults: whenever the tenant has not configured explicit
+      // options, derive them from their published knowledge base so the widget
+      // always speaks their business instead of generic SaaS prompts.
+      let derived: WidgetDerivedDefaults | undefined;
+      try {
+        const chunks = loadKnowledgeChunks(tenantId);
+        if (chunks.length) derived = deriveWidgetDefaults(chunks);
+      } catch {
+        // derivation is best-effort — fall through to configured/default values
+      }
+      const businessProfile = config.businessProfile
+        ? { ...config.businessProfile }
+        : {};
+      if (derived?.businessType && !businessProfile.businessType && !businessProfile.business_type) {
+        businessProfile.businessType = derived.businessType;
+        businessProfile.business_type = derived.businessType;
+      }
+      const starterOptions = config.starterOptions?.length
+        ? config.starterOptions
+        : derived?.starterOptions?.length
+          ? derived.starterOptions
+          : undefined;
+      const suggestedActions = config.suggestedActions?.length
+        ? config.suggestedActions
+        : derived?.suggestedActions?.length
+          ? derived.suggestedActions
+          : undefined;
       const origin = req.get('Origin') || req.get('Referer') || '';
       if (config.allowedDomains.length > 0 && origin) {
         try {
@@ -449,9 +500,9 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         companyName: config.companyName,
         greeting: config.greeting,
         launcherText: config.launcherText,
-        businessProfile: config.businessProfile,
-        starterOptions: config.starterOptions,
-        suggestedActions: config.suggestedActions,
+        businessProfile,
+        starterOptions,
+        suggestedActions,
         customCss: config.customCss,
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
