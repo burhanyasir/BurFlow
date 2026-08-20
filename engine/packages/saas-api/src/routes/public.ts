@@ -123,5 +123,126 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
     }
   });
 
+  // POST /preview-scan — Server-side website fetch + parse for the landing page scanner.
+  // No auth needed. Rate-limited at mount point. Returns parsed HTML content
+  // so the client never has to deal with CORS proxies.
+  router.post('/preview-scan', requireJsonObject, async (req: Request, res: Response) => {
+    try {
+      const { url } = req.body || {};
+      if (!url || typeof url !== 'string' || url.trim().length === 0) {
+        return res.status(400).json({ error: 'url is required' });
+      }
+      let parsedUrl: URL;
+      try {
+        parsedUrl = new URL(url.startsWith('http') ? url : `https://${url}`);
+      } catch {
+        return res.status(400).json({ error: 'Invalid URL' });
+      }
+
+      // Block private/internal networks
+      const hostname = parsedUrl.hostname.toLowerCase();
+      if (/^(localhost|127\.|10\.|192\.168|172\.(1[6-9]|2|3[01])\.|0\.|::1)/.test(hostname)) {
+        return res.status(400).json({ error: 'Private network URLs are not allowed' });
+      }
+
+      const fetchPage = async (pageUrl: string): Promise<string> => {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 8000);
+        try {
+          const res = await fetch(pageUrl, {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'BurFlow-Scanner/1.0 (compatible; bot)' },
+            redirect: 'follow',
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          return await res.text();
+        } finally {
+          clearTimeout(timer);
+        }
+      };
+
+      /** Regex-based HTML extraction — no jsdom needed. */
+      const extractBetween = (html: string, tag: string): string[] => {
+        const re = new RegExp(`<${tag}[^>]*>([\s\S]*?)<\/${tag}>`, 'gi');
+        const results: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(html))) results.push(m[1].replace(/<[^>]+>/g, '').trim());
+        return results;
+      };
+      const extractAttr = (html: string, tag: string, attr: string): string[] => {
+        const re = new RegExp(`<${tag}[^>]*\s${attr}=["']([^"']*)["'][^>]*>`, 'gi');
+        const results: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(html))) results.push(m[1].trim());
+        return results;
+      };
+
+      const parseHtml = (rawHtml: string, baseUrl: string) => {
+        const origin = new URL(baseUrl).origin;
+        const titleMatch = rawHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+        const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+        const descMatch = rawHtml.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
+          || rawHtml.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+        const description = descMatch ? descMatch[1].trim() : '';
+        const rawLinks = extractAttr(rawHtml, 'a', 'href')
+          .filter((href) => href.startsWith('/') || href.startsWith(origin))
+          .map((href) => { try { return new URL(href, origin).pathname; } catch { return href; } })
+          .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
+        const headings = [...extractBetween(rawHtml, 'h1'), ...extractBetween(rawHtml, 'h2'), ...extractBetween(rawHtml, 'h3')];
+        const paragraphs = extractBetween(rawHtml, 'p').filter((t) => t.length > 20 && t.length < 300).slice(0, 30);
+        const lists = extractBetween(rawHtml, 'li').filter((t) => t.length > 5 && t.length < 200).slice(0, 30);
+        return { title, description, links: [...new Set(rawLinks)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20), paragraphs, lists };
+      };
+
+      // Fetch main page
+      const mainHtml = await fetchPage(parsedUrl.href);
+      const mainParsed = parseHtml(mainHtml, parsedUrl.href);
+
+      // Discover sub-pages (product, service, pricing, about)
+      const subPatterns = /product|service|pric|plan|about|feature|solution|offer|contact|team/i;
+      const subPaths = mainParsed.links.filter((p) => subPatterns.test(p)).slice(0, 3);
+      const subPages: Array<{ path: string; headings: string[]; paragraphs: string[]; lists: string[] }> = [];
+      for (const subPath of subPaths) {
+        try {
+          const subUrl = new URL(subPath, parsedUrl.origin).href;
+          const subHtml = await fetchPage(subUrl);
+          const subParsed = parseHtml(subHtml, subUrl);
+          subPages.push({ path: subPath, headings: subParsed.headings, paragraphs: subParsed.paragraphs, lists: subParsed.lists });
+        } catch { /* skip failed sub-pages */ }
+      }
+
+      // Classify content
+      const allHeadings = [...mainParsed.headings, ...subPages.flatMap((s) => s.headings)];
+      const allParagraphs = [...mainParsed.paragraphs, ...subPages.flatMap((s) => s.paragraphs)];
+      const allLists = [...mainParsed.lists, ...subPages.flatMap((s) => s.lists)];
+      const allText = [...allHeadings, ...allParagraphs, ...allLists].join(' ');
+
+      const productKw = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
+      const serviceKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
+      const products = allHeadings.filter((h) => productKw.test(h)).slice(0, 8);
+      const services = allHeadings.filter((h) => serviceKw.test(h)).slice(0, 8);
+
+      // Extract specific product/service names from text
+      const namePatterns = allParagraphs
+        .filter((p) => /we offer|our .{0,20}(product|service|solution|tool|platform)/i.test(p))
+        .map((p) => p.slice(0, 150))
+        .slice(0, 3);
+
+      res.json({
+        title: mainParsed.title,
+        description: mainParsed.description,
+        headings: allHeadings.slice(0, 12),
+        products,
+        services,
+        paragraphs: namePatterns,
+        links: mainParsed.links.slice(0, 10),
+        subPages: subPages.map((s) => s.path),
+      });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Preview scan failed');
+      res.status(500).json({ error: 'Failed to scan website' });
+    }
+  });
+
   return router;
 }

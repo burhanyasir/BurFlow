@@ -211,44 +211,6 @@ export default function LandingPageV3() {
   const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
   const scanTimer = useRef<number | null>(null);
 
-  /** Fetch a page through CORS proxies with fallbacks. */
-  const fetchPage = useCallback(async (pageUrl: string): Promise<string> => {
-    const proxies = [
-      `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`,
-      `https://corsproxy.io/?${encodeURIComponent(pageUrl)}`,
-      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pageUrl)}`,
-    ];
-    for (const proxy of proxies) {
-      try {
-        const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
-        if (res.ok) return await res.text();
-      } catch { /* try next proxy */ }
-    }
-    throw new Error('All CORS proxies failed');
-  }, []);
-
-  /** Extract structured info from HTML. */
-  const parsePage = useCallback((html: string, baseUrl: string) => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    const title = doc.querySelector('title')?.textContent?.trim() || '';
-    const description = doc.querySelector('meta[name="description"]')?.getAttribute('content') || '';
-    const origin = new URL(baseUrl).origin;
-    const links = Array.from(doc.querySelectorAll('a[href]'))
-      .map((a) => a.getAttribute('href') || '')
-      .filter((href) => href.startsWith('/') || href.startsWith(origin))
-      .map((href) => { try { return new URL(href, origin).pathname; } catch { return href; } })
-      .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
-    const headings = Array.from(doc.querySelectorAll('h1,h2,h3'))
-      .map((h) => h.textContent?.trim() || '').filter(Boolean);
-    const paragraphs = Array.from(doc.querySelectorAll('p'))
-      .map((p) => p.textContent?.trim() || '')
-      .filter((t) => t.length > 20 && t.length < 300).slice(0, 30);
-    const lists = Array.from(doc.querySelectorAll('li'))
-      .map((li) => li.textContent?.trim() || '')
-      .filter((t) => t.length > 5 && t.length < 200).slice(0, 30);
-    return { title, description, links: [...new Set(links)].slice(0, 50), headings: [...new Set(headings)].slice(0, 20), paragraphs, lists };
-  }, []);
-
   /** Classify pages and extract products/services. */
   const classifyContent = useCallback((pages: string[], headings: string[], paragraphs: string[], lists: string[]) => {
     const productKeywords = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
@@ -283,50 +245,35 @@ export default function LandingPageV3() {
     document.getElementById('scan-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
     try {
-      setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 5 }));
-      const html = await fetchPage(url);
-      setScan((prev) => ({ ...prev, stage: 'Parsing content…', progress: 25 }));
-      const parsed = parsePage(html, url);
+      setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
+      // Use server-side endpoint — no CORS issues.
+      const scanRes = await apiClient.post('/public/preview-scan', { url });
+      const data = scanRes.data as { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] };
 
-      setScan((prev) => ({ ...prev, stage: 'Discovering pages…', progress: 45 }));
-      const subPages = parsed.links.slice(0, 12);
-      const discoveredPages = [url, ...subPages.map((p) => { try { return new URL(p, url).toString(); } catch { return p; } })];
+      setScan((prev) => ({ ...prev, stage: 'Analyzing content…', progress: 70 }));
 
-      setScan((prev) => ({ ...prev, stage: 'Analyzing products & services…', progress: 65 }));
-      const extraHeadings = [...parsed.headings];
-      const extraParagraphs = [...parsed.paragraphs];
-      const extraLists = [...parsed.lists];
-      const pagesToFetch = subPages.filter((p) => /product|service|pricing|about|feature/i.test(p)).slice(0, 3);
-      for (const page of pagesToFetch) {
-        try {
-          const pageUrl = new URL(page, url).toString();
-          const pageHtml = await fetchPage(pageUrl);
-          const pageParsed = parsePage(pageHtml, pageUrl);
-          extraHeadings.push(...pageParsed.headings);
-          extraParagraphs.push(...pageParsed.paragraphs);
-          extraLists.push(...pageParsed.lists);
-        } catch { /* skip failed pages */ }
-      }
+      const discoveredPages = [url, ...(data.subPages || []).map((p: string) => { try { return new URL(p, url).toString(); } catch { return p; } })];
 
-      setScan((prev) => ({ ...prev, stage: 'Classifying content…', progress: 85 }));
-      const classified = classifyContent(parsed.links, extraHeadings, extraParagraphs, extraLists);
-      const intents = Math.max(5, classified.products.length * 3 + classified.services.length * 2 + classified.pricing * 2);
+      setScan((prev) => ({ ...prev, stage: 'Classifying products & services…', progress: 85 }));
+      const products = data.products || [];
+      const services = data.services || [];
+      const intents = Math.max(5, products.length * 3 + services.length * 2 + 4);
 
       setScanResult({
         pages: discoveredPages.length,
-        products: classified.products.length || 1,
-        services: classified.services.length || 1,
-        pricing: classified.pricing || 1,
-        faqs: classified.faqs || 1,
+        products: products.length || 1,
+        services: services.length || 1,
+        pricing: 1,
+        faqs: 1,
         intents,
       });
       setScanDetails({
-        name: parsed.title || new URL(url).hostname,
-        description: parsed.description || 'No meta description found.',
+        name: data.title || new URL(url).hostname,
+        description: data.description || 'Website scanned successfully.',
         pages: discoveredPages.slice(0, 8),
-        products: classified.products,
-        services: classified.services,
-        headings: [...new Set(extraHeadings)].slice(0, 12),
+        products,
+        services,
+        headings: (data.headings || []).slice(0, 12),
       });
 
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
@@ -334,7 +281,7 @@ export default function LandingPageV3() {
     } catch {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
-      setScanDetails({ name: domain, description: `Scanned ${domain} — some content was blocked by CORS. BurFlow can still learn from it once connected.`, pages: [url], products: [], services: [], headings: [] });
+      setScanDetails({ name: domain, description: `Could not fetch ${domain} — it may block automated requests. BurFlow can still learn from it once connected.`, pages: [url], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
   }, [fetchPage, parsePage, classifyContent]);
