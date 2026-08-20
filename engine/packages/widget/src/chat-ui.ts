@@ -447,17 +447,22 @@ export class ChatWidget {
       html[data-cw-theme='dark'] .cw-preopen-panel div { color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-highlight { background: rgba(255,255,255,0.1) !important; }
       @media (max-width:640px) {
-        .cw-container { bottom:0 !important; left:0 !important; right:0 !important; width:100vw !important; height:100dvh !important; border-radius:0 !important; }
+        .cw-container { left:10px !important; right:10px !important; bottom:10px !important; width:auto !important; height:min(70dvh, 600px) !important; border-radius:20px !important; }
+        .cw-container .cw-header { border-radius:20px 20px 0 0 !important; }
         .cw-bubble { bottom:16px !important; }
-        .cw-preopen-panel { bottom:72px !important; left:16px !important; right:16px !important; max-width:none !important; border-radius:16px !important; }
-        .cw-preopen-pill { padding:8px 14px !important; font-size:12.5px !important; }
-        .cw-header { padding:12px 14px !important; }
-        .cw-header .cw-logo { width:30px !important; height:30px !important; }
-        .cw-messages { padding:16px 14px !important; gap:12px !important; }
-        .cw-input-area { padding:0 14px !important; }
-        .cw-input { padding:9px 11px !important; font-size:13.5px !important; min-height:38px !important; border-radius:12px !important; }
-        .cw-send { width:38px !important; height:38px !important; border-radius:12px !important; }
-        .cw-action-panel { padding:8px 14px 6px !important; gap:8px !important; }
+        .cw-preopen-panel { bottom:72px !important; left:auto !important; right:16px !important; max-width:264px !important; border-radius:14px !important; }
+        .cw-preopen-pill { padding:8px 12px !important; font-size:12.5px !important; }
+        .cw-header { padding:10px 12px !important; }
+        .cw-header .cw-logo { width:28px !important; height:28px !important; }
+        .cw-messages { padding:12px 12px !important; gap:10px !important; }
+        .cw-input-area { padding:0 12px !important; }
+        .cw-input { padding:8px 10px !important; font-size:13px !important; min-height:36px !important; border-radius:12px !important; }
+        .cw-send { width:36px !important; height:36px !important; border-radius:12px !important; }
+        .cw-action-panel { padding:8px 12px 6px !important; gap:8px !important; }
+        .cw-welcome-card { padding:8px 10px !important; gap:8px !important; }
+        .cw-welcome-card-icon { width:28px !important; height:28px !important; border-radius:9px !important; }
+        .cw-welcome-card-body b { font-size:12.5px !important; }
+        .cw-welcome-card-body small { font-size:11px !important; }
       }
     `;
     document.head.appendChild(style);
@@ -1614,7 +1619,7 @@ export class ChatWidget {
   private getContainerStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
-      return `position:fixed;top:0;left:0;width:100vw;height:100dvh;background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+      return `position:fixed;left:10px;right:10px;bottom:10px;width:auto;height:min(70dvh, 600px);background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.25),0 0 0 1px rgba(0,0,0,0.04);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
     }
     return `position:fixed;bottom:20px;${pos}width:380px;max-width:min(calc(100vw - 24px), 380px);height:min(640px, calc(100vh - 80px));background:#FAFBFC;border-radius:18px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
   }

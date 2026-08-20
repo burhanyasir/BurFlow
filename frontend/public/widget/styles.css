@@ -105,18 +105,33 @@
 
 /* Mobile responsive */
 @media (max-width: 640px) {
+  .cw-container {
+    left: 10px !important;
+    right: 10px !important;
+    bottom: 10px !important;
+    width: auto !important;
+    height: min(70dvh, 600px) !important;
+    border-radius: 20px !important;
+  }
   .cw-bubble {
     bottom: 16px !important;
   }
   .cw-preopen-panel {
     bottom: 72px !important;
-    left: 16px !important;
+    left: auto !important;
     right: 16px !important;
-    max-width: none !important;
-    border-radius: 16px !important;
+    max-width: 264px !important;
+    border-radius: 14px !important;
   }
   .cw-preopen-pill {
-    padding: 8px 14px !important;
+    padding: 8px 12px !important;
     font-size: 12.5px !important;
+  }
+  .cw-messages {
+    padding: 12px 12px !important;
+    gap: 10px !important;
+  }
+  .cw-welcome-card {
+    padding: 8px 10px !important;
   }
 }
