@@ -278,14 +278,18 @@ export default function LandingPageV3() {
     try {
       setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
 
-      // 1) Try server-side endpoint first (no CORS needed)
+      // 1) Try server-side endpoint first (no CORS needed). Retry once —
+      //    a cold start or momentary deployment blip shouldn't send the
+      //    visitor straight to flaky CORS proxies.
       type ScanError = { code: string; message: string };
       type ScanData = { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[]; error?: ScanError };
       let data: ScanData | null = null;
-      try {
-        const scanRes = await apiClient.post<{ data?: ScanData } & Record<string, unknown>>('/public/preview-scan', { url });
-        data = scanRes.data ?? null;
-      } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
+      for (let attempt = 0; attempt < 2 && !data; attempt++) {
+        try {
+          const scanRes = await apiClient.post<{ data?: ScanData } & Record<string, unknown>>('/public/preview-scan', { url });
+          data = scanRes.data ?? null;
+        } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
+      }
 
       // The site itself refused the scan — proxies would be blocked too,
       // so explain instead of falling back.
