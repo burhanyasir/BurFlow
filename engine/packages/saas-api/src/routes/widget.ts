@@ -76,7 +76,7 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
     'launcherText', 'starterOptions', 'allowedDomains', 'autoOpen',
     'autoOpenDelay', 'customCss', 'notificationEmail', 'slackWebhookUrl',
     'customWebhookUrl', 'alertEmails',
-    'notifyThreshold', 'businessProfile',
+    'notifyThreshold', 'businessProfile', 'suggestedActions',
   ]);
   for (const key of Object.keys(raw)) {
     if (!KNOWN_KEYS.has(key)) return { ok: false, error: `Unknown field: ${key}` };
@@ -150,6 +150,33 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
       if (clean && !options.includes(clean)) options.push(clean);
     }
     data.starterOptions = options;
+  }
+
+  if (raw.suggestedActions !== undefined) {
+    if (!Array.isArray(raw.suggestedActions) || raw.suggestedActions.length > MAX_STARTER_OPTIONS) {
+      return { ok: false, error: `suggestedActions must be an array of at most ${MAX_STARTER_OPTIONS} buttons` };
+    }
+    const buttons: Array<Record<string, unknown>> = [];
+    for (const item of raw.suggestedActions) {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) {
+        return { ok: false, error: 'suggestedActions items must be button objects' };
+      }
+      const btn = item as Record<string, unknown>;
+      if (typeof btn.label !== 'string' || btn.label.trim().length === 0 || btn.label.trim().length > 60) {
+        return { ok: false, error: 'suggestedActions items must have a label of 1-60 characters' };
+      }
+      const clean: Record<string, unknown> = {
+        id: typeof btn.id === 'string' && btn.id ? btn.id : `suggest-${buttons.length}`,
+        label: btn.label.trim(),
+        action: typeof btn.action === 'string' ? btn.action : 'send_text',
+        payload: typeof btn.payload === 'string' && btn.payload ? btn.payload : btn.label.trim(),
+      };
+      if (typeof btn.variant === 'string') clean.variant = btn.variant;
+      if (typeof btn.category === 'string') clean.category = btn.category;
+      if (typeof btn.icon === 'string') clean.icon = btn.icon;
+      buttons.push(clean);
+    }
+    data.suggestedActions = buttons;
   }
 
   if (raw.allowedDomains !== undefined) {
@@ -424,6 +451,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         launcherText: config.launcherText,
         businessProfile: config.businessProfile,
         starterOptions: config.starterOptions,
+        suggestedActions: config.suggestedActions,
         customCss: config.customCss,
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,

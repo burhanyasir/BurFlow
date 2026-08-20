@@ -855,6 +855,7 @@ export class WidgetConfigRepository {
     if (data.autoOpenDelay) { cols.push('auto_open_delay'); vals.push(data.autoOpenDelay); }
     if (data.businessProfile !== undefined) { cols.push('business_profile'); vals.push(JSON.stringify(data.businessProfile)); }
     if (data.starterOptions !== undefined) { cols.push('starter_options'); vals.push(JSON.stringify(data.starterOptions)); }
+    if (data.suggestedActions !== undefined) { cols.push('suggested_actions'); vals.push(JSON.stringify(data.suggestedActions)); }
     if (data.customCss) { cols.push('custom_css'); vals.push(data.customCss); }
     if (data.notificationEmail) { cols.push('notification_email'); vals.push(data.notificationEmail); }
     if (data.slackWebhookUrl) { cols.push('slack_webhook_url'); vals.push(data.slackWebhookUrl); }
@@ -877,6 +878,7 @@ export class WidgetConfigRepository {
       autoOpen: !!row.auto_open, autoOpenDelay: row.auto_open_delay,
       businessProfile: row.business_profile ? JSON.parse(row.business_profile) : undefined,
       starterOptions: row.starter_options ? JSON.parse(row.starter_options) : undefined,
+      suggestedActions: row.suggested_actions ? JSON.parse(row.suggested_actions) : undefined,
       customCss: row.custom_css,
       notificationEmail: row.notification_email || undefined,
       slackWebhookUrl: row.slack_webhook_url || undefined,

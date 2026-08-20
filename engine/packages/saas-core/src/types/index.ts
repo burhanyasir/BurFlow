@@ -262,6 +262,8 @@ export interface WidgetConfig {
   autoOpenDelay: number;
   businessProfile?: Record<string, unknown>;
   starterOptions?: string[];
+  /** Tenant-defined quick-action buttons shown by default in the widget action panel. */
+  suggestedActions?: Array<{ id: string; label: string; action: string; payload: string; variant?: string; category?: string }>;
   customCss?: string;
   notificationEmail?: string;
   slackWebhookUrl?: string;

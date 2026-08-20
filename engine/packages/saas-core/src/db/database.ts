@@ -483,6 +483,7 @@ function migrate(db: Database.Database): void {
 
   // Starter options column (additive, safe to re-run)
   try { db.exec(`ALTER TABLE widget_configs ADD COLUMN starter_options TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN suggested_actions TEXT;`); } catch {}
 
   // Lead notification columns (additive, safe to re-run)
   try { db.exec(`ALTER TABLE widget_configs ADD COLUMN notification_email TEXT;`); } catch {}
