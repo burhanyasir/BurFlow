@@ -244,14 +244,106 @@ export default function LandingPageV3() {
     apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {});
     document.getElementById('scan-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
+    /** Try fetching a URL through multiple CORS proxies. Returns HTML or throws. */
+    const fetchViaProxy = async (target: string, timeout = 12000): Promise<string> => {
+      const proxies = [
+        { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}` },
+        { url: `https://corsproxy.io/?url=${encodeURIComponent(target)}` },
+        { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}` },
+      ];
+      for (const proxy of proxies) {
+        try {
+          const ctrl = new AbortController();
+          const timer = setTimeout(() => ctrl.abort(), timeout);
+          const resp = await fetch(proxy.url, { signal: ctrl.signal });
+          clearTimeout(timer);
+          if (!resp.ok) continue;
+          const text = await resp.text();
+          if (text.includes('<') && text.length > 200) return text;
+        } catch { /* try next proxy */ }
+      }
+      throw new Error('All CORS proxies failed');
+    };
+
+    /** Regex-based HTML parser. */
+    const parseHtml = (raw: string, base: string) => {
+      const origin = new URL(base).origin;
+      const get = (tag: string) => {
+        const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
+        const r: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(raw))) r.push(m[1].replace(/<[^>]+>/g, '').trim());
+        return r;
+      };
+      const tm = raw.match(/<title[^>]*>([\\s\\S]*?)<\/title>/i);
+      const dm = raw.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
+        || raw.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+      const attrRe = (tag: string, a: string) => {
+        const re = new RegExp(`<${tag}[^\\>]*\\s${a}=["']([^"']*)["'][^>]*>`, 'gi');
+        const r: string[] = [];
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(raw))) r.push(m[1].trim());
+        return r;
+      };
+      const links = attrRe('a', 'href')
+        .filter((h) => h.startsWith('/') || h.startsWith(origin))
+        .map((h) => { try { return new URL(h, origin).pathname; } catch { return h; } })
+        .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
+      return {
+        title: tm ? tm[1].replace(/<[^>]+>/g, '').trim() : '',
+        description: dm ? dm[1].trim() : '',
+        links: [...new Set(links)].slice(0, 50),
+        headings: [...new Set([...get('h1'), ...get('h2'), ...get('h3')])].slice(0, 20),
+        paragraphs: get('p').filter((t) => t.length > 20 && t.length < 300).slice(0, 30),
+        lists: get('li').filter((t) => t.length > 5 && t.length < 200).slice(0, 30),
+      };
+    };
+
     try {
       setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
-      // Use server-side endpoint — no CORS issues.
-      const scanRes = await apiClient.post('/public/preview-scan', { url });
-      const data = scanRes.data as { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] };
+
+      // 1) Try server-side endpoint first (no CORS needed)
+      let data: { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] } | null = null;
+      try {
+        const scanRes = await apiClient.post('/public/preview-scan', { url });
+        data = scanRes.data;
+      } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
+
+      // 2) If server failed, fetch directly via CORS proxies
+      if (!data || (!data.title && !data.headings?.length)) {
+        setScan((prev) => ({ ...prev, stage: 'Fetching website via proxy…', progress: 25 }));
+        const mainHtml = await fetchViaProxy(url);
+        const mainParsed = parseHtml(mainHtml, url);
+
+        const subPat = /product|service|pric|plan|about|feature|solution|offer|contact|team/i;
+        const subPaths = mainParsed.links.filter((p) => subPat.test(p)).slice(0, 3);
+        const subPages: Array<{ path: string; headings: string[]; paragraphs: string[]; lists: string[] }> = [];
+        for (const sp of subPaths) {
+          try {
+            const subUrl = new URL(sp, url).href;
+            const subHtml = await fetchViaProxy(subUrl, 8000);
+            const subParsed = parseHtml(subHtml, subUrl);
+            subPages.push({ path: sp, headings: subParsed.headings, paragraphs: subParsed.paragraphs, lists: subParsed.lists });
+          } catch { /* skip */ }
+        }
+
+        const allHeadings = [...mainParsed.headings, ...subPages.flatMap((s) => s.headings)];
+        const allParagraphs = [...mainParsed.paragraphs, ...subPages.flatMap((s) => s.paragraphs)];
+        const pKw = /product|feature|solution|tool|platform|software|app|offer|plan|package/i;
+        const sKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
+        data = {
+          title: mainParsed.title,
+          description: mainParsed.description,
+          headings: allHeadings.slice(0, 12),
+          products: allHeadings.filter((h) => pKw.test(h)).slice(0, 8),
+          services: allHeadings.filter((h) => sKw.test(h)).slice(0, 8),
+          paragraphs: allParagraphs.filter((p) => /we offer|our .{0,20}(product|service|solution)/i.test(p)).map((p) => p.slice(0, 150)).slice(0, 3),
+          links: mainParsed.links.slice(0, 10),
+          subPages: subPages.map((s) => s.path),
+        };
+      }
 
       setScan((prev) => ({ ...prev, stage: 'Analyzing content…', progress: 70 }));
-
       const discoveredPages = [url, ...(data.subPages || []).map((p: string) => { try { return new URL(p, url).toString(); } catch { return p; } })];
 
       setScan((prev) => ({ ...prev, stage: 'Classifying products & services…', progress: 85 }));
@@ -259,32 +351,18 @@ export default function LandingPageV3() {
       const services = data.services || [];
       const intents = Math.max(5, products.length * 3 + services.length * 2 + 4);
 
-      setScanResult({
-        pages: discoveredPages.length,
-        products: products.length || 1,
-        services: services.length || 1,
-        pricing: 1,
-        faqs: 1,
-        intents,
-      });
-      setScanDetails({
-        name: data.title || new URL(url).hostname,
-        description: data.description || 'Website scanned successfully.',
-        pages: discoveredPages.slice(0, 8),
-        products,
-        services,
-        headings: (data.headings || []).slice(0, 12),
-      });
+      setScanResult({ pages: discoveredPages.length, products: products.length || 1, services: services.length || 1, pricing: 1, faqs: 1, intents });
+      setScanDetails({ name: data.title || new URL(url).hostname, description: data.description || 'Website scanned successfully.', pages: discoveredPages.slice(0, 8), products, services, headings: (data.headings || []).slice(0, 12) });
 
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
       trackOnce('scan_complete');
     } catch {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
-      setScanDetails({ name: domain, description: `Could not fetch ${domain} — it may block automated requests. BurFlow can still learn from it once connected.`, pages: [url], products: [], services: [], headings: [] });
+      setScanDetails({ name: domain, description: `Could not fully fetch ${domain}. The agent will learn more during setup.`, pages: [url], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
-  }, [fetchPage, parsePage, classifyContent]);
+  }, [classifyContent]);
 
   useEffect(() => {
     initAnalytics();
