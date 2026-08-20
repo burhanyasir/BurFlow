@@ -1,7 +1,11 @@
 {
   "rewrites": [
     {
-      "source": "/api/:match*",
+      "source": "/api/public/preview-scan",
+      "destination": "/api/public/preview-scan"
+    },
+    {
+      "source": "/api/(?!(public/preview-scan)).*",
       "destination": "https://burflow.onrender.com/api/:match*"
     },
     {
