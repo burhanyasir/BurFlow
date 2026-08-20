@@ -134,13 +134,27 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
     const allHeadings = [...mainParsed.headings, ...subPages.flatMap((s) => s.headings)];
     const allParagraphs = [...mainParsed.paragraphs, ...subPages.flatMap((s) => s.paragraphs)];
 
-    const productKw = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
-    const serviceKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
-    const products = allHeadings.filter((h) => productKw.test(h)).slice(0, 8);
-    const services = allHeadings.filter((h) => serviceKw.test(h)).slice(0, 8);
+    // Broader keyword matching for products/services across industries
+    const productKw = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module|shoe|bag|fragrance|clothing|apparel|watch|jewelry|gadget|device|equipment|collection|menu|item|gear|wear|store|shop/i;
+    const serviceKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed|delivery|repair|cleaning|install|booking|rental|salon|clinic|spa|gym|fitness|wellness|education|course|class/i;
+    let products = allHeadings.filter((h) => productKw.test(h) && h.trim().length > 2).slice(0, 8);
+    let services = allHeadings.filter((h) => serviceKw.test(h) && h.trim().length > 2).slice(0, 8);
+
+    // If no products found from keywords, use collection/category links and meaningful headings
+    if (products.length === 0) {
+      const collectionLinks = mainParsed.links
+        .filter((l) => /collection|category|product|shop|store|menu|item/i.test(l))
+        .map((l) => l.replace(/^\//, '').replace(/\//g, ' > '))
+        .slice(0, 8);
+      if (collectionLinks.length > 0) products = collectionLinks;
+    }
+    if (products.length === 0) {
+      // Fall back to meaningful non-boilerplate headings
+      products = allHeadings.filter((h) => h.trim().length > 3 && !/^(home|menu|close|search|cart|login|sign|menu|toggle|location|nav|skip|cookie|copyright)/i.test(h.trim())).slice(0, 8);
+    }
 
     const namePatterns = allParagraphs
-      .filter((p) => /we offer|our .{0,20}(product|service|solution|tool|platform)/i.test(p))
+      .filter((p) => /we offer|our .{0,30}(product|service|solution|tool|platform|collection|range|line|brand)/i.test(p))
       .map((p) => p.slice(0, 150))
       .slice(0, 3);
 
