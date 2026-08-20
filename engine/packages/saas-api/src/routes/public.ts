@@ -145,13 +145,17 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         return res.status(400).json({ error: 'Private network URLs are not allowed' });
       }
 
-      const fetchPage = async (pageUrl: string): Promise<string> => {
+      const fetchPage = async (pageUrl: string, timeoutMs = 6000): Promise<string> => {
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 8000);
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
         try {
           const res = await fetch(pageUrl, {
             signal: controller.signal,
-            headers: { 'User-Agent': 'BurFlow-Scanner/1.0 (compatible; bot)' },
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+              Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+            },
             redirect: 'follow',
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -159,6 +163,21 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         } finally {
           clearTimeout(timer);
         }
+      };
+
+      /** Classify a fetch failure so the client can show a helpful message
+       *  instead of a generic error. */
+      const fetchErrorCode = (err: any): { code: string; message: string } => {
+        const msg = String(err?.message || '');
+        if (msg.includes('AbortError') || err?.name === 'AbortError') return { code: 'timeout', message: 'The site took too long to respond.' };
+        const m = msg.match(/HTTP (\d+)/);
+        if (m) {
+          const s = Number(m[1]);
+          if (s === 403 || s === 401 || s === 429) return { code: 'blocked', message: 'The site blocked automated scanning (HTTP ' + s + ').' };
+          if (s === 404) return { code: 'not_found', message: 'The page was not found (HTTP 404).' };
+          if (s >= 500) return { code: 'server_error', message: 'The site returned a server error (HTTP ' + s + ').' };
+        }
+        return { code: 'network', message: 'Could not reach the site.' };
       };
 
       /** Regex-based HTML extraction — no jsdom needed.
@@ -244,8 +263,25 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         };
       };
 
-      // Fetch main page
-      const mainHtml = await fetchPage(parsedUrl.href);
+      // Fetch main page — a block/timeout must NOT fail the whole scan;
+      // return a structured error the client can explain to the visitor.
+      let mainHtml: string;
+      try {
+        mainHtml = await fetchPage(parsedUrl.href);
+      } catch (err: any) {
+        const reason = fetchErrorCode(err);
+        return res.json({
+          error: reason,
+          title: parsedUrl.hostname,
+          description: '',
+          headings: [],
+          products: [],
+          services: [],
+          paragraphs: [],
+          links: [],
+          subPages: [],
+        });
+      }
       const mainParsed = parseHtml(mainHtml, parsedUrl.href);
 
       // Discover sub-pages (product, service, pricing, about)
@@ -255,7 +291,7 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
       await Promise.all(subPaths.map(async (subPath) => {
         try {
           const subUrl = new URL(subPath, parsedUrl.origin).href;
-          const subHtml = await fetchPage(subUrl);
+          const subHtml = await fetchPage(subUrl, 5000);
           const subParsed = parseHtml(subHtml, subUrl);
           subPages.push({ path: subPath, headings: subParsed.headings, paragraphs: subParsed.paragraphs, lists: subParsed.lists, jsonLd: subParsed.jsonLd });
         } catch { /* skip failed sub-pages */ }

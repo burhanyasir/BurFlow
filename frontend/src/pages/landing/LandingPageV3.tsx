@@ -279,12 +279,23 @@ export default function LandingPageV3() {
       setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
 
       // 1) Try server-side endpoint first (no CORS needed)
-      type ScanData = { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] };
+      type ScanError = { code: string; message: string };
+      type ScanData = { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[]; error?: ScanError };
       let data: ScanData | null = null;
       try {
         const scanRes = await apiClient.post<{ data?: ScanData } & Record<string, unknown>>('/public/preview-scan', { url });
         data = scanRes.data ?? null;
       } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
+
+      // The site itself refused the scan — proxies would be blocked too,
+      // so explain instead of falling back.
+      if (data?.error && (data.error.code === 'blocked' || data.error.code === 'not_found' || data.error.code === 'server_error')) {
+        const host = new URL(url).hostname;
+        setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
+        setScanDetails({ name: host, description: `${data.error.message} The agent will learn about your business during setup instead.`, pages: [], products: [], services: [], headings: [] });
+        setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
+        return;
+      }
 
       // 2) If server failed, fetch directly via CORS proxies
       if (!data || (!data.title && !data.headings?.length)) {
@@ -336,7 +347,7 @@ export default function LandingPageV3() {
     } catch {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
-      setScanDetails({ name: domain, description: `Could not fully fetch ${domain}. The agent will learn more during setup.`, pages: [url], products: [], services: [], headings: [] });
+      setScanDetails({ name: domain, description: `Could not fully fetch ${domain} — it may block automated scanning or require JavaScript. The agent will learn about your business during setup instead.`, pages: [], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
   }, []);
