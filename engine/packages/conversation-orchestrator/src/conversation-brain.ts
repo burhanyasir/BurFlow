@@ -1462,8 +1462,8 @@ function scoreButtonCandidate(
   if (completedTopics.includes('features') && button.category === 'features') score -= 10;
 
   if (messageTags.has(button.category)) score += 25;
-  if (button.tags.some(tag => messageTags.has(tag))) score += 20;
-  if (button.tags.some(tag => lowerLabel.includes(tag))) score += 10;
+  if (button.tags?.some(tag => messageTags.has(tag))) score += 20;
+  if (button.tags?.some(tag => lowerLabel.includes(tag))) score += 10;
 
   const recentSeen = memory.buttonsShown.some(b => b.buttonId === button.id || b.label.toLowerCase() === lowerLabel);
   if (recentSeen) score -= 1000;
@@ -2781,7 +2781,8 @@ export async function processConversationBrain(input: BrainInput): Promise<Brain
     // Anything else (e.g. the 5s ceiling timeout) gets a graceful fallback so the
     // visitor still receives a response and the process never terminates.
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(`[brain] ${message} — returning graceful fallback response`);
+    const stack = error instanceof Error && error.stack ? `\n${error.stack}` : '';
+    console.warn(`[brain] ${message} — returning graceful fallback response${stack}`);
     return buildTimeoutFallback(input);
   } finally {
     if (timer) clearTimeout(timer);

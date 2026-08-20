@@ -51,3 +51,4 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/e2e-widget-proof.png
 frontend/e2e-chat-open-proof.png
+frontend/public/demo-*.html
