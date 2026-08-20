@@ -24,7 +24,6 @@ export const REPLY_GENERATOR: GeneratorTemplate = {
   ],
   build: (v) => {
     const context = v.context?.trim() || 'your latest message';
-    const channel = v.channel || 'Email';
     const tone = (v.tone || 'Professional').toLowerCase();
     return [
       `Thank you for reaching out about this. ${capitalize(context)} — I appreciate the context.\n\n${tone === 'concise' ? 'Here is the quick answer:' : 'Here is how I would suggest we move forward:'}\n1. Confirm the key point from your note.\n2. Offer the next concrete step.\n3. Set an expectation for timing.\n\nLooking forward to hearing from you.`,

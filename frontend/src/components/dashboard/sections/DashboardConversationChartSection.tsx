@@ -1,5 +1,4 @@
 import { type HTMLAttributes, useMemo } from 'react';
-import { cn } from '../../../utils/cn';
 import { DashboardChartCard } from '../DashboardChartCard';
 
 export interface DailySeries {

@@ -339,7 +339,7 @@ export function useOnboardingState() {
         error: err.message || 'Upload failed',
       });
     }
-  }, [addFile, updateFileStatus, setData, persist]);
+  }, [addFile, updateFileStatus, setData]);
 
   const submitFaqs = useCallback(async (): Promise<void> => {
     if (!data.knowledge.faqs.trim()) return;
@@ -428,7 +428,7 @@ export function useOnboardingState() {
       return next;
     });
     return token;
-  }, [data.embed.agentId, persist]);
+  }, [persist]);
 
   const updateWidgetConfig = useCallback(async (): Promise<void> => {
     await apiClient.put('/widget/config', {
@@ -472,7 +472,7 @@ export function useOnboardingState() {
     const reply: ChatMessage = { role: 'assistant', content: result.response || "I'm not sure how to respond to that. Could you try asking something else?" };
     addTestMessage(reply);
     return reply;
-  }, [addTestMessage, data.embed.agentId]);
+  }, [addTestMessage]);
 
   const seedDemoData = useCallback(async (): Promise<void> => {
     await apiClient.post('/onboarding/seed-demo-data');

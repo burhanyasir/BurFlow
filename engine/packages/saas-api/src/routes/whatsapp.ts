@@ -234,9 +234,6 @@ export function createWhatsAppRoutes(options: WhatsAppRouteOptions): Router {
         smallTalk: DEFAULT_TENANT_POLICY.smallTalk,
         trustBuilding: DEFAULT_TENANT_POLICY.trustBuilding,
       },
-      getLeadAlertConfig: leadOptions?.getNotificationConfig
-        ? (tid) => leadOptions.getNotificationConfig!(tid)
-        : undefined,
     });
 
     const {

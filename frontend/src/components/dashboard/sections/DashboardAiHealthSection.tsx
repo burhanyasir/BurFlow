@@ -1,7 +1,6 @@
 import { type HTMLAttributes } from 'react';
 import { cn } from '../../../utils/cn';
 import { DashboardChartCard } from '../DashboardChartCard';
-import { Activity, Brain, TrendingUp, BarChart3 } from 'lucide-react';
 
 export interface AiHealthMetric {
   label: string;

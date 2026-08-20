@@ -1,7 +1,7 @@
 import { type HTMLAttributes } from 'react';
 import { cn } from '../../../utils/cn';
 import { DashboardChartCard } from '../DashboardChartCard';
-import { CreditCard, Zap, BarChart3, CalendarDays } from 'lucide-react';
+import { Zap, BarChart3, CalendarDays } from 'lucide-react';
 
 export interface PlanInfo {
   name: string;

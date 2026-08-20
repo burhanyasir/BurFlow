@@ -64,10 +64,10 @@ describe('migration runner — initial schema', () => {
     expect(res.pending).toEqual([]);
   });
 
-  it('verification passes: 40 tables, 443 columns, 66 explicit indexes', async () => {
+  it('verification passes: 40 tables, 449 columns, 66 explicit indexes', async () => {
     const check = await verifySchema(adapter);
     expect(check.errors).toEqual([]);
-    expect(check.summary).toEqual({ tables: 40, columns: 443, indexes: 66 });
+    expect(check.summary).toEqual({ tables: 40, columns: 449, indexes: 66 });
   });
 });
 

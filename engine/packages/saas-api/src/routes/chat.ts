@@ -312,9 +312,11 @@ export function createChatRoutes(
         // Defense-in-depth: if an agent took over between the route-level
         // guard above and pipeline execution, the pipeline skips the LLM.
         isHumanTookOver: handoff ? !handoff.isAiManaged(tenantId!, convSessionId) : false,
-        getLeadAlertConfig: leadOptions?.getNotificationConfig
-          ? (tid) => leadOptions.getNotificationConfig!(tid)
-          : undefined,
+        // NOTE: lead notifications are dispatched ONLY here in captureLeadFromTurn
+        // (dispatchLeadNotifications / notifyLeadCaptured) — gated on isNew /
+        // qualificationChanged and honoring notifyThreshold. Do NOT plumb the
+        // tenant config into the pipeline's maybeTrigger, or leads get alerted
+        // twice and the sales_qualified_only threshold is bypassed.
         policy: {
           qualification: DEFAULT_TENANT_POLICY.qualification,
           cta: DEFAULT_TENANT_POLICY.cta,

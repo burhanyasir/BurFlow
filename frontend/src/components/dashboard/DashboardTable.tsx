@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type ReactNode, useCallback } from 'react';
+import { type HTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../utils/cn';
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
 

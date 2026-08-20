@@ -1,5 +1,4 @@
 import { type HTMLAttributes, useMemo } from 'react';
-import { cn } from '../../../utils/cn';
 import { DashboardActivityPanel, type ActivityItem } from '../DashboardActivityPanel';
 import { MessageSquare, AlertCircle, TrendingUp, UserCheck } from 'lucide-react';
 

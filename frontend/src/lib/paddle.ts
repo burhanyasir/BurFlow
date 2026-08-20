@@ -1,5 +1,5 @@
 import { initializePaddle } from '@paddle/paddle-js';
-import type { Paddle, PricePreviewParams, CheckoutOpenOptions, PaddleEventData } from '@paddle/paddle-js';
+import type { Paddle, PricePreviewParams, PaddleEventData } from '@paddle/paddle-js';
 
 /**
  * Thin wrapper around @paddle/paddle-js for the sandbox subscription flow.

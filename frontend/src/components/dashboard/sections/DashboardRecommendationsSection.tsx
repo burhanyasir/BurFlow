@@ -1,4 +1,4 @@
-import { type HTMLAttributes, type ReactNode } from 'react';
+import { type HTMLAttributes } from 'react';
 import { cn } from '../../../utils/cn';
 import { DashboardChartCard } from '../DashboardChartCard';
 import { AlertCircle, Lightbulb, ArrowRight } from 'lucide-react';
@@ -34,7 +34,6 @@ export function DashboardRecommendationsSection({ recommendations, loading, empt
         <div className="space-y-2">
           {recommendations.map((r) => {
             const meta = severityMeta[r.severity];
-            const Icon = meta.icon;
             return (
               <div
                 key={r.id}

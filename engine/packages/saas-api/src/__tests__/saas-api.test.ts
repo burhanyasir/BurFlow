@@ -110,8 +110,8 @@ describe('Auth', () => {
     const config = widgetConfigRepo.get(res.body.tenant.id);
     expect(config).not.toBeNull();
     expect(config!.companyName).toBe('Widget Co');
-    expect(config!.position).toBe('right');
-    expect(config!.primaryColor).toBe('#6366f1');
+    expect(config!.position).toBe('bottom-right');
+    expect(config!.primaryColor).toBe('#006248');
   });
 
   it('signup rejects duplicate email', async () => {

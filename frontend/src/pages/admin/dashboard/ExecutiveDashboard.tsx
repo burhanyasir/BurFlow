@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   DashboardLayout,
@@ -11,15 +11,14 @@ import {
   DashboardActivityTimelineSection,
   DashboardRecommendationsSection,
   DashboardUsageBillingSection,
-  DashboardLoadingState,
   DashboardErrorState,
 } from '../../../components/dashboard';
-import { useSessions, useAnalytics, useDashboard } from '../../../hooks/useConversationIntelligence';
+import { useSessions, useAnalytics } from '../../../hooks/useConversationIntelligence';
 import { useOnboarding } from '../../../hooks/useOnboarding';
 import type { NavItem, MetricCardData } from '../../../components/dashboard';
 import { useAuth } from '../../../lib/auth-context';
 import { fetchWithAuth } from '../../../lib/api-client';
-import { scoreToVariant, scoreToMetricVariant } from '../../../types/conversation-intelligence';
+import { scoreToMetricVariant } from '../../../types/conversation-intelligence';
 import { MessageSquare, Target, BookOpen, RefreshCw, Activity, Zap, Shield } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
@@ -152,15 +151,6 @@ export default function ExecutiveDashboard() {
     if (failedDocs > 0) sources.push({ name: `${failedDocs} failed documents`, citationCount: 0, status: 'failed' });
     return sources;
   }, [monitoring, indexedDocs, sessions, failedDocs]);
-
-  const topTopics = useMemo(() => {
-    const map = new Map<string, number>();
-    for (const s of sessions) {
-      const stage = s.funnelStage || 'Unknown';
-      map.set(stage, (map.get(stage) || 0) + 1);
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  }, [sessions]);
 
   const recommendations = useMemo(() => {
     const items: Array<{ id: string; message: string; href?: string; onClick?: () => void; severity: 'info' | 'warning' | 'error' }> = [];

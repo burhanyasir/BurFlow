@@ -16,15 +16,6 @@ export interface BusinessIntelligenceSnapshot {
   suggestedQuestions: string[];
 }
 
-interface KnowledgeSignals {
-  hasFiles?: boolean;
-  hasWebsites?: boolean;
-  hasFaqs?: boolean;
-  hasDocuments?: boolean;
-  hasWidget?: boolean;
-  hasConversations?: boolean;
-}
-
 function normalizeIndustry(value?: string): string {
   if (!value) return 'your market';
   const cleaned = value.trim();

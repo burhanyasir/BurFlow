@@ -1,8 +1,8 @@
-import { type HTMLAttributes, type ReactNode } from 'react';
+import { type HTMLAttributes } from 'react';
 import { cn } from '../../../utils/cn';
 import { DashboardChartCard } from '../DashboardChartCard';
 import { DashboardEmptyState } from '../DashboardEmptyState';
-import { Book, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Book, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export interface KnowledgeSource {
   name: string;

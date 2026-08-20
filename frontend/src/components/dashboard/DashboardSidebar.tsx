@@ -24,7 +24,6 @@ export interface DashboardSidebarProps {
   onUpgrade?: () => void;
   onLogout?: () => void;
   onSettings?: () => void;
-  onProfile?: () => void;
   className?: string;
 }
 
@@ -62,7 +61,7 @@ function SidebarUserMenu({ userName, userEmail, onLogout, onSettings }: {
 }
 
 export function DashboardSidebar({
-  items, onNavigate, workspaceName, planName, userName, userEmail, usageLabel, usagePercent = 0, onUpgrade, onLogout, onSettings, onProfile, className,
+  items, onNavigate, workspaceName, planName, userName, userEmail, usageLabel, usagePercent = 0, onUpgrade, onLogout, onSettings, className,
 }: DashboardSidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();

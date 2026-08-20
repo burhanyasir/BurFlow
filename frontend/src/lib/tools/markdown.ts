@@ -39,7 +39,7 @@ function collectTextNodes(node: Node): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-function tableToMarkdown(table: Element, depth: number): string {
+function tableToMarkdown(table: Element, _depth: number): string {
   const rows: string[][] = [];
   table.querySelectorAll('tr').forEach((tr) => {
     const cells: string[] = [];
@@ -194,7 +194,7 @@ function stringifyValue(value: unknown, depth: number): string {
   }
   if (Array.isArray(value)) {
     if (value.length === 0) return '[]';
-    return value.map((v, i) => `${indent}- ${stringifyValue(v, depth + 1)}`).join('\n');
+    return value.map((v, _i) => `${indent}- ${stringifyValue(v, depth + 1)}`).join('\n');
   }
   return String(value);
 }

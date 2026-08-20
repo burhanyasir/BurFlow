@@ -27,7 +27,7 @@ const sections = [
   },
   {
     title: 'How We Use Cookies',
-    body: 'We use three categories of cookies: (1) Essential cookies are required for the platform to function â€” authentication, security, and session management. (2) Analytics cookies help us understand how users interact with the platform so we can improve performance and usability. (3) Functional cookies remember your preferences and settings. We do not use advertising or tracking cookies.',
+    body: 'We use three categories of cookies: (1) Essential cookies are required for the platform to function — authentication, security, and session management. (2) Analytics cookies help us understand how users interact with the platform so we can improve performance and usability. (3) Functional cookies remember your preferences and settings. We do not use advertising or tracking cookies.',
   },
   {
     title: 'Third-Party Cookies',

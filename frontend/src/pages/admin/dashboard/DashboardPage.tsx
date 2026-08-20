@@ -205,9 +205,6 @@ export default function DashboardPage() {
   const totalDocs = monitoring?.totalDocuments || 0;
   const knowledgeCoverage = totalDocs > 0 ? Math.round((indexedDocs / totalDocs) * 100) : indexedDocs > 0 ? 100 : 0;
 
-  const handoffRate = analyticsData ? Math.round((analyticsData.handoffRate || 0) * 100) : 0;
-  const csat = analyticsData ? Math.round((analyticsData.avgConversationScore || 0) * 100) : null;
-
   const healthScore = useMemo(() => {
     if (totalSessions === 0 && totalDocs === 0) return 0;
     const coverageWeight = totalDocs > 0 ? Math.min(knowledgeCoverage / 100, 1) * 40 : 20;
@@ -222,7 +219,6 @@ export default function DashboardPage() {
   const workspaceName = subscription?.companyName || subscription?.workspaceName || tenant?.name || 'Workspace';
   const planName = subscription?.planName || 'Free';
   const planTrial = subscription?.onTrial || false;
-  const usagePercent = usageLimit > 0 ? Math.round((usageThisMonth / usageLimit) * 100) : 0;
 
   const last7Days = useMemo(() => getLast7Days(), []);
   const dailyCounts = useMemo(() => countByDay(sessions, last7Days), [sessions, last7Days]);

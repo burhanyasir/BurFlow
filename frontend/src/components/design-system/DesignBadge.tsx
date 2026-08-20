@@ -30,7 +30,7 @@ export function DesignBadge({ icon, label, tone = 'default', className }: Design
       className={cn(
         'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium',
         toneStyles[tone],
-        toneBg[tone] && toneBg[tone],
+        toneBg[tone],
         className,
       )}
     >

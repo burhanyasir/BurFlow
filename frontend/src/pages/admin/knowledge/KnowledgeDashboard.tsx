@@ -190,7 +190,7 @@ export default function KnowledgeDashboard() {
   };
 
   const toggleSelectAll = () => { setSelectedDocs(prev => prev.size === docs.length ? new Set() : new Set(docs.map(d => d.documentId))); };
-  const toggleSelectDoc = (id: string) => { setSelectedDocs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); };
+  const toggleSelectDoc = (id: string) => { setSelectedDocs(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; }); };
 
   const handleBulkDelete = async () => {
     const ids = Array.from(selectedDocs);

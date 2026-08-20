@@ -6,7 +6,7 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
+import { PageHead, DashButton, Panel, EmptyState } from '../../../components/dash/ui';
 import { Palette, Code, Copy, Check, Send, Trash2 } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [

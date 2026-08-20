@@ -23,8 +23,6 @@ export interface DashboardFilterBarProps {
 }
 
 function FilterChip({ label, current, options, onSelect }: { label: string; current?: string; options: FilterOption[]; onSelect: (val: string | undefined) => void }) {
-  const activeLabel = options.find((o) => o.value === current)?.label;
-
   return (
     <div className="relative group">
       <select

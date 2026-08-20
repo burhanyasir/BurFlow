@@ -10,7 +10,7 @@ export default function ROICalculator() {
   const [currentConversion, setCurrentConversion] = useState(2);
   const [avgDealValue, setAvgDealValue] = useState(500);
   const [supportHours, setSupportHours] = useState(40);
-  const [supportRate, setSupportRate] = useState(50);
+  const [supportRate] = useState(50);
 
   const burflowConversion = Math.min(currentConversion * 2.5, 25);
   const additionalConversions = Math.round((monthlyVisitors * (burflowConversion - currentConversion)) / 100);

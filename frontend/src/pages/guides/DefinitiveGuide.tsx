@@ -215,7 +215,7 @@ export default function DefinitiveGuide() {
 
           {/* Guide content */}
           <div className="mt-12 space-y-16">
-            {sections.map((section, i) => (
+            {sections.map((section) => (
               <section key={section.id} id={section.id}>
                 <h2 className="text-3xl font-bold text-[var(--color-neutral-900)]">{section.title}</h2>
                 <div className="mt-6 space-y-4 text-[var(--color-neutral-700)] leading-relaxed">

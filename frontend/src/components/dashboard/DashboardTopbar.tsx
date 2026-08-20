@@ -16,7 +16,7 @@ export interface DashboardTopbarProps {
 export function DashboardTopbar({
   breadcrumb, searchPlaceholder = 'Search conversations, documents...', onSearch, notificationCount, onNotificationsClick, className, workspaceSwitcher,
 }: DashboardTopbarProps) {
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
 
   return (

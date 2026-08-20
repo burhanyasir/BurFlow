@@ -9,10 +9,6 @@ const tool = getToolBySlug('document-to-markdown')!;
 
 /* ── Converters ───────────────────────────────────────────── */
 
-function escapeHtml(value: string): string {
-  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-}
-
 function collectText(node: Node): string {
   if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? '';
   const el = node as HTMLElement;
@@ -54,7 +50,7 @@ function collectTextNodes(node: Node): string {
   return out.replace(/\s+/g, ' ').trim();
 }
 
-function tableToMarkdown(table: Element, depth: number): string {
+function tableToMarkdown(table: Element, _depth: number): string {
   const rows: string[][] = [];
   table.querySelectorAll('tr').forEach((tr) => {
     const cells: string[] = [];

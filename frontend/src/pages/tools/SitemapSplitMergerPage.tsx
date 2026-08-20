@@ -40,8 +40,6 @@ export default function SitemapSplitMergerPage() {
     }
   };
 
-  const inputCls = 'w-full rounded-xl border border-[var(--color-neutral-200)] bg-[var(--color-neutral-0)] px-4 py-3 text-sm text-[var(--color-neutral-900)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent-600)]/30 focus:border-[var(--color-accent-600)] transition';
-
   return (
     <GenericToolWrapper
       tool={tool}

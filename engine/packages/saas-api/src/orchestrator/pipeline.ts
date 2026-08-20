@@ -7,7 +7,6 @@ import { TenantPolicy } from './types';
 import { TAKEOVER_ACKNOWLEDGEMENT } from '@conversation-engine/saas-core';
 import { KnowledgeBaseProvider, PayloadValidationError, UpstreamLLMError } from '@conversation-engine/conversation-orchestrator';
 import { maybeTrigger } from '../services/lead-alert-service';
-import type { LeadAlertConfig } from '../services/lead-alert-service';
 
 export interface PipelineInput {
   message: string;
@@ -25,8 +24,6 @@ export interface PipelineInput {
    * protects any direct pipeline caller from burning LLM budget mid-handoff.
    */
   isHumanTookOver?: boolean;
-  /** Per-tenant lead alert config resolver (used by the lead alert service). */
-  getLeadAlertConfig?: (tenantId: string) => LeadAlertConfig | null | undefined;
 }
 
 export interface PipelineResult {
@@ -272,6 +269,11 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
 
   // Non-blocking lead qualification alert
   // Fires when funnelStage transitions to 'qualify'/'booking' or when contact details are provided.
+  // NOTE: only the legacy LEAD_ALERT_WEBHOOK_URL path is used here. Tenant
+  // configured channels (widget config) are dispatched by the chat/whatsapp
+  // routes via captureLeadFromTurn (dispatchLeadNotifications / notifyLeadCaptured),
+  // which gates on isNew / qualificationChanged and honors notifyThreshold.
+  // Plumb the tenant config into this call and every turn double-alerts.
   try {
     await maybeTrigger(
       state.tenantId ?? input.tenantId,
@@ -280,8 +282,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
         ? { email: brainOutput.extractedLead.email ?? undefined, phone: brainOutput.extractedLead.phone ?? undefined }
         : null,
       state.knownFacts.useCase || state.knownFacts.industry || '',
-      [...state.ledger.topicsCovered, ...state.ledger.topicsPending],
-      { config: input.getLeadAlertConfig ? input.getLeadAlertConfig(state.tenantId ?? input.tenantId) ?? null : null }
+      [...state.ledger.topicsCovered, ...state.ledger.topicsPending]
     );
   } catch {}
 

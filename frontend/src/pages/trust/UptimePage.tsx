@@ -21,7 +21,7 @@ const sections = [
   },
   {
     title: 'Incident History',
-    body: 'We maintain a publicly available incident history on our status page. Each incident includes the timeline, root cause analysis, and corrective actions taken. Our goal is full transparency â€” we publish post-mortems for all significant incidents.',
+    body: 'We maintain a publicly available incident history on our status page. Each incident includes the timeline, root cause analysis, and corrective actions taken. Our goal is full transparency — we publish post-mortems for all significant incidents.',
   },
   {
     title: 'Status Page',

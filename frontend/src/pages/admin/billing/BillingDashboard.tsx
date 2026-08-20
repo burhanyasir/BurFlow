@@ -10,7 +10,7 @@ import { cn } from '../../../utils/cn';
 import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, ExternalLink, Sparkles } from 'lucide-react';
 import {
   isPaddleConfigured, getPaddlePricePreview, openPaddleCheckout,
-  onPaddleCheckoutEvent, setPaddleClientCountry,
+  onPaddleCheckoutEvent,
 } from '../../../lib/paddle';
 
 const NAV_ITEMS: NavItem[] = [

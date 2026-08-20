@@ -35,7 +35,7 @@ const SUBPROCESSORS: Subprocessor[] = [
   },
   {
     name: 'AWS (Amazon Web Services)',
-    purpose: 'Cloud infrastructure â€” compute, storage, database',
+    purpose: 'Cloud infrastructure — compute, storage, database',
     location: 'United States (us-east-1)',
     dataProcessed: 'All customer data at rest',
   },

@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Button } from '../../components/ui/Button';
 import { Container } from '../../layouts/Container';
-import { TrustSection } from './TrustSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
 
@@ -257,12 +255,11 @@ export default function LandingPage() {
   }
 
   /** Classify pages and extract products/services from headings and content. */
-  function classifyContent(pages: string[], headings: string[], paragraphs: string[], lists: string[]): { products: string[]; services: string[]; pricing: number; faqs: number } {
+  function classifyContent(pages: string[], headings: string[], paragraphs: string[], _lists: string[]): { products: string[]; services: string[]; pricing: number; faqs: number } {
     const productKeywords = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
     const serviceKeywords = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
     const pricingKeywords = /pric|plan|cost|tier|subscription|fee|rate|package/i;
     const faqKeywords = /faq|question|answer|help|support|contact/i;
-    const allText = [...headings, ...paragraphs, ...lists];
     // Extract product names from headings that match product keywords
     const products = headings.filter((h) => productKeywords.test(h)).slice(0, 8);
     // Also look for product-like patterns in paragraphs (e.g., "Our X product...", "introducing Y")
@@ -396,7 +393,7 @@ export default function LandingPage() {
       });
       setScanStage('Scan complete');
       setScanState('done');
-    } catch (err) {
+    } catch {
       // Fallback: show what we can from the homepage alone
       if (scanTimerRef.current) clearInterval(scanTimerRef.current);
       scanTimerRef.current = null;

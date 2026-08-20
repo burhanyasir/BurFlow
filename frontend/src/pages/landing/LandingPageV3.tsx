@@ -209,30 +209,6 @@ export default function LandingPageV3() {
   });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
-  const scanTimer = useRef<number | null>(null);
-
-  /** Classify pages and extract products/services. */
-  const classifyContent = useCallback((pages: string[], headings: string[], paragraphs: string[], lists: string[]) => {
-    const productKeywords = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module/i;
-    const serviceKeywords = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
-    const pricingKeywords = /pric|plan|cost|tier|subscription|fee|rate|package/i;
-    const faqKeywords = /faq|question|answer|help|support|contact/i;
-    const products = headings.filter((h) => productKeywords.test(h)).slice(0, 8);
-    const productPatterns = paragraphs.filter((p) => /(?:our|the|introducing|new|popular|best|flagship)\s+(?:product|feature|tool|platform|solution|app|software)/i.test(p)).slice(0, 4);
-    products.push(...productPatterns.map((p) => p.slice(0, 60)));
-    const services = headings.filter((h) => serviceKeywords.test(h)).slice(0, 8);
-    const servicePatterns = paragraphs.filter((p) => /(?:our|the|offering|providing|delivering)\s+(?:service|support|consulting|help|training)/i.test(p)).slice(0, 4);
-    services.push(...servicePatterns.map((p) => p.slice(0, 60)));
-    const pricing = pages.filter((p) => pricingKeywords.test(p)).length || headings.filter((h) => pricingKeywords.test(h)).length || (paragraphs.filter((p) => /pricing|plan|tier|subscription/i.test(p)).length > 0 ? 1 : 0);
-    const faqs = pages.filter((p) => faqKeywords.test(p)).length + headings.filter((h) => faqKeywords.test(h)).length;
-    return { products: [...new Set(products)].slice(0, 8), services: [...new Set(services)].slice(0, 8), pricing, faqs };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (scanTimer.current) window.clearInterval(scanTimer.current);
-    };
-  }, []);
 
   const startScan = useCallback(async (raw: string) => {
     let url = raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
@@ -303,10 +279,11 @@ export default function LandingPageV3() {
       setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
 
       // 1) Try server-side endpoint first (no CORS needed)
-      let data: { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] } | null = null;
+      type ScanData = { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[] };
+      let data: ScanData | null = null;
       try {
-        const scanRes = await apiClient.post('/public/preview-scan', { url });
-        data = scanRes.data;
+        const scanRes = await apiClient.post<{ data?: ScanData } & Record<string, unknown>>('/public/preview-scan', { url });
+        data = scanRes.data ?? null;
       } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
 
       // 2) If server failed, fetch directly via CORS proxies
@@ -362,7 +339,7 @@ export default function LandingPageV3() {
       setScanDetails({ name: domain, description: `Could not fully fetch ${domain}. The agent will learn more during setup.`, pages: [url], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
-  }, [classifyContent]);
+  }, []);
 
   useEffect(() => {
     initAnalytics();

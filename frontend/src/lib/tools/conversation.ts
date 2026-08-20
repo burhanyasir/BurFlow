@@ -3,8 +3,6 @@ export interface ConversationTurn {
   text: string;
 }
 
-const AGENT_PATTERNS = [/^(agent|bot|assistant|ai|support|help desk)\s*:/i, /^(support|agent)\s*\(?\d{1,3}\)?\s*:/i, /^agent\s*#?\d*:/i];
-
 export function parseConversationLog(text: string): ConversationTurn[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   const turns: ConversationTurn[] = [];

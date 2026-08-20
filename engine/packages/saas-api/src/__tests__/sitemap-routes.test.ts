@@ -81,7 +81,7 @@ describe('sitemap routes', () => {
     const res = await request(startApp(), '/sitemap.xml');
     const today = new Date().toISOString().slice(0, 10);
     const urlBlocks = res.body.split('<url>').slice(1);
-    expect(urlBlocks).toHaveLength(4);
+    expect(urlBlocks).toHaveLength(10);
     for (const block of urlBlocks) {
       expect(block).toContain(`<lastmod>${today}</lastmod>`);
     }
@@ -91,8 +91,8 @@ describe('sitemap routes', () => {
     const res = await request(startApp(), '/sitemap.xml');
     const openTags = (res.body.match(/<url>/g) || []).length;
     const closeTags = (res.body.match(/<\/url>/g) || []).length;
-    expect(openTags).toBe(4);
-    expect(closeTags).toBe(4);
+    expect(openTags).toBe(10);
+    expect(closeTags).toBe(10);
     expect(res.body.trimEnd().endsWith('</urlset>')).toBe(true);
   });
 });
