@@ -63,7 +63,10 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
     const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
     const results: string[] = [];
     let m: RegExpExecArray | null;
-    while ((m = re.exec(html))) results.push(m[1].replace(/<[^>]+>/g, '').trim());
+    while ((m = re.exec(html))) {
+      const text = m[1].replace(/<[^>]+>/g, '').trim();
+      if (text) results.push(text);
+    }
     return results;
   };
 
@@ -75,13 +78,40 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
     return results;
   };
 
+  const extractJsonLd = (html: string): string[] => {
+    const names: string[] = [];
+    const blocks = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi) || [];
+    for (const block of blocks) {
+      const raw = block.replace(/^<script[^>]*>/, '').replace(/<\/script>$/, '');
+      try {
+        const parsed = JSON.parse(raw);
+        const walk = (node: unknown): void => {
+          if (!node || typeof node !== 'object') return;
+          if (Array.isArray(node)) { node.forEach(walk); return; }
+          const obj = node as Record<string, unknown>;
+          if (typeof obj['@type'] === 'string') {
+            const types = obj['@type'].toLowerCase();
+            if (/(product|service|menu|item|offer|course|class|treatment)/.test(types) && typeof obj.name === 'string' && obj.name.trim().length > 1) {
+              names.push(obj.name.trim());
+            }
+          }
+          Object.values(obj).forEach(walk);
+        };
+        walk(parsed);
+      } catch { /* malformed JSON-LD — skip */ }
+    }
+    return [...new Set(names)];
+  };
+
   const parseHtml = (rawHtml: string, baseUrl: string) => {
     const origin = new URL(baseUrl).origin;
     const titleMatch = rawHtml.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : '';
+    const ogTitleMatch = rawHtml.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']*)["']/i);
+    const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '').trim() : (ogTitleMatch ? ogTitleMatch[1].trim() : '');
     const descMatch =
       rawHtml.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i) ||
-      rawHtml.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
+      rawHtml.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i) ||
+      rawHtml.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']*)["']/i);
     const description = descMatch ? descMatch[1].trim() : '';
     const rawLinks = extractAttr(rawHtml, 'a', 'href')
       .filter((href) => href.startsWith('/') || href.startsWith(origin))
@@ -93,8 +123,15 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
       ...extractBetween(rawHtml, 'h1'),
       ...extractBetween(rawHtml, 'h2'),
       ...extractBetween(rawHtml, 'h3'),
-    ];
-    const paragraphs = extractBetween(rawHtml, 'p')
+    ].filter((h) => h.length > 1 && !/^(home|menu|close|search|cart|login|sign|toggle|location|nav|skip|cookie|copyright|privacy|main menu|secondary|site footer|homepage|skip to)/i.test(h));
+    const noscript = (rawHtml.match(/<noscript[^>]*>([\s\S]*?)<\/noscript>/i) || [])[1] || '';
+    const noscriptSentences = noscript
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 20 && s.length < 300);
+    const paragraphs = [...extractBetween(rawHtml, 'p'), ...noscriptSentences]
       .filter((t) => t.length > 20 && t.length < 300)
       .slice(0, 30);
     const lists = extractBetween(rawHtml, 'li')
@@ -104,9 +141,10 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
       title,
       description,
       links: [...new Set(rawLinks)].slice(0, 50),
-      headings: [...new Set(headings)].slice(0, 20),
+      headings: [...new Set(headings.filter((h) => title.toLowerCase().length > 3 && h.toLowerCase() !== title.toLowerCase()))].slice(0, 20),
       paragraphs,
       lists,
+      jsonLd: extractJsonLd(rawHtml),
     };
   };
 
@@ -114,10 +152,10 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
     const mainHtml = await fetchPage(parsedUrl.href);
     const mainParsed = parseHtml(mainHtml, parsedUrl.href);
 
-    const subPatterns = /product|service|pric|plan|about|feature|solution|offer|contact|team/i;
-    const subPaths = mainParsed.links.filter((p) => subPatterns.test(p)).slice(0, 3);
-    const subPages: Array<{ path: string; headings: string[]; paragraphs: string[]; lists: string[] }> = [];
-    for (const subPath of subPaths) {
+    const subPatterns = /product|service|pric|plan|about|feature|solution|offer|contact|team|shop|store|collection|category|menu|treatment|gallery|work|portfolio|booking|book|appointment|pricing|careers|faq/i;
+    const subPaths = [...new Set(mainParsed.links.filter((p) => subPatterns.test(p)))].slice(0, 4);
+    const subPages: Array<{ path: string; headings: string[]; paragraphs: string[]; lists: string[]; jsonLd: string[] }> = [];
+    await Promise.all(subPaths.map(async (subPath) => {
       try {
         const subUrl = new URL(subPath, parsedUrl.origin).href;
         const subHtml = await fetchPage(subUrl);
@@ -127,18 +165,59 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
           headings: subParsed.headings,
           paragraphs: subParsed.paragraphs,
           lists: subParsed.lists,
+          jsonLd: subParsed.jsonLd,
         });
       } catch { /* skip failed sub-pages */ }
-    }
+    }));
 
     const allHeadings = [...mainParsed.headings, ...subPages.flatMap((s) => s.headings)];
     const allParagraphs = [...mainParsed.paragraphs, ...subPages.flatMap((s) => s.paragraphs)];
+    const allLists = [...mainParsed.lists, ...subPages.flatMap((s) => s.lists)];
+    const jsonLdNames = [...mainParsed.jsonLd, ...subPages.flatMap((s) => s.jsonLd)];
 
     // Broader keyword matching for products/services across industries
-    const productKw = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module|shoe|bag|fragrance|clothing|apparel|watch|jewelry|gadget|device|equipment|collection|menu|item|gear|wear|store|shop/i;
-    const serviceKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed|delivery|repair|cleaning|install|booking|rental|salon|clinic|spa|gym|fitness|wellness|education|course|class/i;
-    let products = allHeadings.filter((h) => productKw.test(h) && h.trim().length > 2).slice(0, 8);
-    let services = allHeadings.filter((h) => serviceKw.test(h) && h.trim().length > 2).slice(0, 8);
+    const productKw = /product|feature|solution|tool|platform|software|app|offer|plan|package|suite|module|collection|category|menu|item|gear|device|equipment|shop|store|series|bundle/i;
+    const serviceKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed|delivery|repair|cleaning|install|booking|rental|salon|clinic|spa|gym|fitness|wellness|education|course|class|treatment/i;
+
+    // Products: JSON-LD names first (most reliable), then price-bearing
+    // sentences ("…Headphones — $129"), then headings containing product words.
+    const priceStop = /^(with|and|for|the|a|an|of|from|to|or|at|by|in|on|your|our|all|new|more|plus|using|through|including|starting|per|each|now|up|save)$/i;
+    const pricedItems = allParagraphs
+      .filter((p) => /\$\s?\d+/.test(p) && p.length < 220)
+      .map((p) => {
+        const before = p.split(/\$\s?\d+/)[0].replace(/[—–,;:|()[\]{}"]+\s*$/g, '').trim();
+        const kept = before.split(/\s+/).filter((t) => t.length > 1 && !priceStop.test(t));
+        const name = kept.slice(-3).join(' ');
+        return name.length > 2 && name.length < 70 && /^[A-Z0-9]/.test(name.split(' ').pop() || '') ? name : '';
+      })
+      .filter(Boolean);
+    // Reject sentence-like headings (news headlines, long CTA copy) as
+    // product/service names: names are short and mostly Title Case.
+    const isNameLike = (h: string): boolean => {
+      const words = h.split(/\s+/).filter(Boolean);
+      if (words.length === 0) return false;
+      if (words.length <= 3) return true;
+      return words.filter((w) => /^[A-Z0-9]/.test(w)).length / words.length >= 0.6;
+    };
+    let products = jsonLdNames.slice(0, 8);
+    if (products.length < 8) {
+      for (const name of pricedItems) {
+        if (name.length > 2 && name.length < 70 && !productKw.test(name)) products.push(name);
+        if (products.length >= 8) break;
+      }
+    }
+    if (products.length < 8) {
+      products = [...products, ...allHeadings.filter((h) => productKw.test(h) && isNameLike(h) && h.trim().length > 2).slice(0, 8 - products.length)];
+    }
+    let services = allHeadings.filter((h) => serviceKw.test(h) && isNameLike(h) && h.trim().length > 2).slice(0, 8);
+    if (services.length < 8) {
+      for (const item of allLists.map((l) => l.replace(/\s+/g, ' ').trim()).filter((l) => serviceKw.test(l) && isNameLike(l) && l.length < 120)) {
+        if (!services.includes(item)) services.push(item);
+        if (services.length >= 8) break;
+      }
+    }
+    products = [...new Set(products)].slice(0, 8);
+    services = [...new Set(services)].slice(0, 8);
 
     // If no products found from keywords, use collection/category links and meaningful headings
     if (products.length === 0) {
@@ -150,7 +229,7 @@ export default async function handler(req: ScanRequest, res: ScanResponse) {
     }
     if (products.length === 0) {
       // Fall back to meaningful non-boilerplate headings
-      products = allHeadings.filter((h) => h.trim().length > 3 && !/^(home|menu|close|search|cart|login|sign|menu|toggle|location|nav|skip|cookie|copyright)/i.test(h.trim())).slice(0, 8);
+      products = allHeadings.filter((h) => h.trim().length > 3 && isNameLike(h) && !/^(home|menu|close|search|cart|login|sign|menu|toggle|location|nav|skip|cookie|copyright)/i.test(h.trim())).slice(0, 8);
     }
 
     const namePatterns = allParagraphs
