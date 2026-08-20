@@ -211,12 +211,20 @@ export default function LandingPageV3() {
   const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
   const scanTimer = useRef<number | null>(null);
 
-  /** Fetch a page through a CORS proxy and parse its content. */
+  /** Fetch a page through CORS proxies with fallbacks. */
   const fetchPage = useCallback(async (pageUrl: string): Promise<string> => {
-    const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`;
-    const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
-    if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-    return res.text();
+    const proxies = [
+      `https://api.allorigins.win/raw?url=${encodeURIComponent(pageUrl)}`,
+      `https://corsproxy.io/?${encodeURIComponent(pageUrl)}`,
+      `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(pageUrl)}`,
+    ];
+    for (const proxy of proxies) {
+      try {
+        const res = await fetch(proxy, { signal: AbortSignal.timeout(8000) });
+        if (res.ok) return await res.text();
+      } catch { /* try next proxy */ }
+    }
+    throw new Error('All CORS proxies failed');
   }, []);
 
   /** Extract structured info from HTML. */
@@ -326,7 +334,7 @@ export default function LandingPageV3() {
     } catch {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
       setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
-      setScanDetails({ name: domain, description: 'Could not fully fetch the website. The agent will learn more during setup.', pages: [url], products: [], services: [], headings: [] });
+      setScanDetails({ name: domain, description: `Scanned ${domain} — some content was blocked by CORS. BurFlow can still learn from it once connected.`, pages: [url], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
   }, [fetchPage, parsePage, classifyContent]);

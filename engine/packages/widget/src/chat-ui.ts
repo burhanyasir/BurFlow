@@ -352,6 +352,8 @@ export class ChatWidget {
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
   private autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
   private headerLogoEl: HTMLImageElement | null = null;
+  /** The primaryColor from the embed data-attribute — preserved over remote config. */
+  private embedPrimaryColor: string | null = null;
   /** Long-lived SSE stream of takeover events (TAKEOVER_STARTED / OPERATOR_MESSAGE / TAKEOVER_ENDED). */
   private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
@@ -375,6 +377,7 @@ export class ChatWidget {
 
   constructor(config: WidgetConfig) {
     this.config = { ...DEFAULT_CONFIG, ...this.normalizeAliases(config) };
+    this.embedPrimaryColor = config.primaryColor || null;
     this.restoreSessionId();
     this.businessProfile = this.deriveBusinessProfileFromConfig();
   }
@@ -1720,6 +1723,10 @@ export class ChatWidget {
   private applyRemoteConfig(remote: Partial<WidgetConfig>): void {
     const merged = this.normalizeAliases(remote);
     this.config = { ...this.config, ...merged };
+    // Preserve the embed data-primary-color — it is the site owner's explicit choice.
+    if (this.embedPrimaryColor) {
+      this.config.primaryColor = this.embedPrimaryColor;
+    }
     this.businessProfile = this.deriveBusinessProfileFromConfig();
     if (this.inputEl && this.placeholders.length) {
       this.inputEl.placeholder = this.placeholders[0];
