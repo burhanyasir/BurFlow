@@ -1,8 +1,60 @@
 {
   "rewrites": [
     {
-      "source": "/api/(?!public/preview-scan(?:/|$)).*",
-      "destination": "https://burflow.onrender.com/api/:match*"
+      "source": "/api/admin/:match*",
+      "destination": "https://burflow.onrender.com/api/admin/:match*"
+    },
+    {
+      "source": "/api/billing/:match*",
+      "destination": "https://burflow.onrender.com/api/billing/:match*"
+    },
+    {
+      "source": "/api/chat/:match*",
+      "destination": "https://burflow.onrender.com/api/chat/:match*"
+    },
+    {
+      "source": "/api/conversations/:match*",
+      "destination": "https://burflow.onrender.com/api/conversations/:match*"
+    },
+    {
+      "source": "/api/knowledge/:match*",
+      "destination": "https://burflow.onrender.com/api/knowledge/:match*"
+    },
+    {
+      "source": "/api/public/leads",
+      "destination": "https://burflow.onrender.com/api/public/leads"
+    },
+    {
+      "source": "/api/widget/:match*",
+      "destination": "https://burflow.onrender.com/api/widget/:match*"
+    },
+    {
+      "source": "/api/onboarding/:match*",
+      "destination": "https://burflow.onrender.com/api/onboarding/:match*"
+    },
+    {
+      "source": "/api/team/:match*",
+      "destination": "https://burflow.onrender.com/api/team/:match*"
+    },
+    {
+      "source": "/api/api-keys/:match*",
+      "destination": "https://burflow.onrender.com/api/api-keys/:match*"
+    },
+    {
+      "source": "/api/webhooks/:match*",
+      "destination": "https://burflow.onrender.com/api/webhooks/:match*"
+    },
+    {
+      "source": "/api/tenants/:match*",
+      "destination": "https://burflow.onrender.com/api/tenants/:match*"
+    },
+    {
+      "source": "/api/insights/:match*",
+      "destination": "https://burflow.onrender.com/api/insights/:match*"
+    },
+    {
+      "source": "/api/auth/:match*",
+      "destination": "https://burflow.onrender.com/api/auth/:match*"
     },
     {
       "source": "/((?!api/).*)",
