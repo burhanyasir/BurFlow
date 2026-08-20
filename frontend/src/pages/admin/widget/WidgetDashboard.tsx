@@ -273,7 +273,23 @@ export default function WidgetDashboard() {
                 <span className="truncate font-mono text-xs text-muted-foreground">{TABS.find(t => t.id === activeTab)?.label || 'HTML'}</span>
                 <DashButton
                   variant="ghost"
-                  onClick={async () => { if (snippet) { await navigator.clipboard.writeText(snippet); setCopied(true); setTimeout(() => setCopied(false), 2000); } }}
+                  onClick={async () => {
+                    if (!snippet) return;
+                    try {
+                      await navigator.clipboard.writeText(snippet);
+                    } catch {
+                      const ta = document.createElement('textarea');
+                      ta.value = snippet;
+                      ta.style.position = 'fixed';
+                      ta.style.opacity = '0';
+                      document.body.appendChild(ta);
+                      ta.select();
+                      try { document.execCommand('copy'); } catch { /* clipboard unavailable */ }
+                      document.body.removeChild(ta);
+                    }
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
                   className="h-9 shrink-0 px-4 text-xs"
                 >
                   {copied ? <><Check className="size-3.5" /> Copied!</> : <><Copy className="size-3.5" /> Copy</>}

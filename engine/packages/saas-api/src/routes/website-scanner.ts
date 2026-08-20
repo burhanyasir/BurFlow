@@ -68,8 +68,15 @@ export function createWebsiteScannerRoutes(deps: WebsiteScannerRouteDeps): Route
       const scan = scanId
         ? deps.scanRepo.findById(scanId)
         : deps.scanRepo.findLatestByTenant(tenantId);
-      if (!scan || scan.tenantId !== tenantId) {
-        return res.status(404).json({ error: 'Scan not found' });
+      if (scanId) {
+        if (!scan || scan.tenantId !== tenantId) {
+          return res.status(404).json({ error: 'Scan not found' });
+        }
+      } else if (!scan) {
+        // Polling without an explicit scan id — a tenant that has never run a
+        // scan is a valid state, not an error (avoids 404 noise on the
+        // knowledge dashboard).
+        return res.json({ scan: null, pages: [] });
       }
       const pages = deps.pageRepo.listByScan(scan.id);
       res.json({ scan, pages });
