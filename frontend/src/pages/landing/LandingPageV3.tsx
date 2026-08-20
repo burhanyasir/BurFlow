@@ -286,8 +286,11 @@ export default function LandingPageV3() {
       let data: ScanData | null = null;
       for (let attempt = 0; attempt < 2 && !data; attempt++) {
         try {
-          const scanRes = await apiClient.post<{ data?: ScanData } & Record<string, unknown>>('/public/preview-scan', { url });
-          data = scanRes.data ?? null;
+          const scanRes = await apiClient.post<ScanData & { data?: ScanData }>('/public/preview-scan', { url });
+          const body = scanRes ?? null;
+          // The endpoint returns a flat body ({title, headings, …}); the
+          // {data: …} wrapper only exists in older responses.
+          data = body && (body.title || body.headings?.length || body.products?.length || body.error) ? body : (body?.data ?? null);
         } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
       }
 
