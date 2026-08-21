@@ -1,21 +1,21 @@
 {
-  "environment": "sandbox",
-  "generatedAt": "2026-08-16T16:41:03.810Z",
+  "environment": "production",
+  "generatedAt": "2026-08-20T16:10:39.442Z",
   "catalog": {
     "starter": {
-      "productId": "pro_01m05q4qh0m76ejj48498ndngx",
-      "monthlyPriceId": "pri_01m05q57jmqwh52skjcrc9wz9b",
-      "yearlyPriceId": "pri_01m05q59km3mep9jwk2hrq41v1"
+      "productId": "pro_01m0fz0hm09b5rwxfnj937zdvj",
+      "monthlyPriceId": "pri_01m0fz0j7x081g0cxhxc7xp0n0",
+      "yearlyPriceId": "pri_01m0fz0jyytjt709tw2xa7q1w9"
     },
     "pro": {
-      "productId": "pro_01m05q5ajnczy33vy2k3jvce6m",
-      "monthlyPriceId": "pri_01m05q5bft466c6s12acwpb9vw",
-      "yearlyPriceId": "pri_01m05q5cdh05fk99g19wp5mdhw"
+      "productId": "pro_01m0fz0kq3709wvfv2aeekd73k",
+      "monthlyPriceId": "pri_01m0fz0m8vw3vsza835x2a7z88",
+      "yearlyPriceId": "pri_01m0fz0mv1e7tvpv3mrs1qzpyg"
     },
     "advanced": {
-      "productId": "pro_01m05q5dbgpwct5yy4n7mnv940",
-      "monthlyPriceId": "pri_01m05q5e7js84jnjydqcne1991",
-      "yearlyPriceId": "pri_01m05q5f9hkcy2n9e8qrqab17h"
+      "productId": "pro_01m0fz0ngx0rsdbkpkz7461xv3",
+      "monthlyPriceId": "pri_01m0fz0p5zbnwzy04jfpqd4cxc",
+      "yearlyPriceId": "pri_01m0fz0psygf805hwwe4tb4hxg"
     }
   }
 }

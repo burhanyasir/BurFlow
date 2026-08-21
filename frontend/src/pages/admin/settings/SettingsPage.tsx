@@ -791,9 +791,12 @@ function BillingSection() {
               </div>
 
               <div className="pt-2">
-                <Button variant="secondary" size="sm" onClick={() => addToast('Manage subscription portal', 'info')}>
+                <Button variant="secondary" size="sm" onClick={() => window.open('/billing/manage', '_blank')}>
                   Manage Subscription
                 </Button>
+              </div>
+              <div className="pt-2">
+                <p className="text-sm text-[rgba(255,255,255,0.5)] text-center">No payment method saved — you'll be asked at checkout.</p>
               </div>
             </div>
           ) : (

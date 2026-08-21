@@ -7,16 +7,16 @@ import { cn } from '../../utils/cn';
 import { SITE_URL } from '../../lib/site';
 
 const monthlyTiers: PricingTier[] = [
-  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
-  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 Knowledge Bases', '100 Documents', 'Email Support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
-  { name: 'Professional', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 messages / mo', '10 Knowledge Bases', '500 Documents', 'Priority Support + Analytics'], cta: 'Start Free Trial', ctaVariant: 'primary' },
-  { name: 'Enterprise', price: 'Custom', variant: 'enterprise', features: ['Unlimited messages', 'Unlimited Knowledge Bases', 'Unlimited Documents', 'Dedicated SLA & SSO'], cta: 'Contact Sales', ctaVariant: 'primary' }
+  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
+  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
+  { name: 'Pro', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['5,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], cta: 'Start Free Trial', ctaVariant: 'primary' },
+  { name: 'Advanced', price: '$120', period: '/ mo', variant: 'enterprise', features: ['50,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], cta: 'Contact Sales', ctaVariant: 'primary' }
 ];
 
 const annualTiers: PricingTier[] = monthlyTiers.map(t => {
   if (t.price === 'Custom' || t.price === '$0') return t;
   const monthly = parseInt(t.price.replace('$', ''));
-  const annual = Math.round(monthly * 12 * 0.8);
+  const annual = Math.round(monthly * 12 * 0.83); // 17% reduction for yearly
   return { ...t, price: `$${annual}`, period: '/ yr' };
 });
 
@@ -56,7 +56,7 @@ export default function PricingPage() {
           </button>
           <span id="billing-label-annual" className={cn('text-sm font-medium transition-colors select-none', annual ? 'text-[var(--color-neutral-900)]' : 'text-[var(--color-neutral-500)]')}>
             Annual Billing <span className="text-[var(--color-accent-600)] font-semibold relative">
-              (Save 20%)
+              (Save 17%)
               <span className="absolute -inset-0.5 rounded bg-[var(--color-accent-200)]/60 -z-10" aria-hidden="true" />
             </span>
           </span>
