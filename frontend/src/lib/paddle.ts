@@ -25,7 +25,7 @@ export function getPaddleEnv(): PaddleEnvConfig {
   if (environment !== 'sandbox' && environment !== 'production') {
     throw new Error(`Invalid VITE_PADDLE_ENV "${environment}" — must be "sandbox" or "production".`);
   }
-  const cfg = { token: token.trim(), environment };
+  const cfg: PaddleEnvConfig = { token: token.trim(), environment };
   if (!cfg.token && cfg.environment === 'production') {
     return PRODUCTION_DEFAULTS;
   }
