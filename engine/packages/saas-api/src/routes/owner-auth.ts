@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRepository, TenantRepository } from '@conversation-engine/saas-core';
+import { UserRepository, TenantRepository, comparePassword } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 
 const logger = createLogger('saas-api:owner-auth');
@@ -22,23 +22,26 @@ export function createOwnerAuthRoutes(
         return res.status(400).json({ error: 'Email and password required' });
       }
 
-      // Owner panel accepts two auth methods:
-      // 1. Any valid user account with role='owner' + correct password
-      // 2. Any email + the OWNER_PASSWORD env var (owner can always get in)
       const user = userRepo.findByEmail(email);
-      const isOwnerPassword = password === OWNER_PASSWORD;
-
       if (!user) {
         createContextLogger(logger).info({ email }, 'Owner login failed - unknown email');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      if (user.role !== 'owner' && !isOwnerPassword) {
-        createContextLogger(logger).info({ email, role: user.role }, 'Owner login failed - not owner');
+      const isOwnerPassword = password === OWNER_PASSWORD;
+      const isUserPassword = comparePassword(password, user.passwordHash);
+
+      if (!isOwnerPassword && !isUserPassword) {
+        createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
       const tenants = tenantRepo.findByOwner(user.id);
+      if (tenants.length === 0 && !isOwnerPassword) {
+        createContextLogger(logger).info({ email }, 'Owner login failed - not a tenant owner');
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
       const primaryTenant = tenants[0];
 
       const token = jwt.sign(
@@ -58,7 +61,7 @@ export function createOwnerAuthRoutes(
 
       res.json({
         token,
-        user: { id: user.id, email: user.email, name: user.name, role: user.role },
+        user: { id: user.id, email: user.email, name: user.name },
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Owner login failed');
@@ -78,7 +81,7 @@ export function createOwnerAuthRoutes(
       }
       const user = userRepo.findById(payload.sub);
       if (!user) return res.status(401).json({ error: 'User not found' });
-      res.json({ user: { id: user.id, email: user.email, name: user.name, role: user.role } });
+      res.json({ user: { id: user.id, email: user.email, name: user.name } });
     } catch {
       res.status(401).json({ error: 'Invalid token' });
     }
