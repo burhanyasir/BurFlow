@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, type SqlDatabase } from '@conversation-engine/saas-core';
+import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, SubscriptionRepository, type SqlDatabase } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { randomBytes } from 'crypto';
 
@@ -12,6 +12,7 @@ export function createSupportRoutes(
   tenantRepo: TenantRepository,
   conversationRepo: ConversationRepository,
   messageRepo: MessageRepository,
+  subRepo: SubscriptionRepository,
   db: SqlDatabase,
   jwtSecret: string,
 ): Router {
@@ -229,14 +230,20 @@ export function createSupportRoutes(
       const now = new Date().toISOString();
       const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Activate plan on tenant
-      db.prepare(
-        'UPDATE subscriptions SET plan = ?, status = ?, current_period_start = ?, current_period_end = ? WHERE tenant_id = ?'
-      ).run(row.requested_plan, 'active', now, periodEnd, row.tenant_id);
+      // Activate plan on tenant — ensure subscription row exists first
+      subRepo.init(row.tenant_id, row.requested_plan);
+      subRepo.update(row.tenant_id, {
+        plan: row.requested_plan,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+        trialEnd: undefined,
+        cancelledAt: undefined,
+      });
 
       db.prepare(
-        'UPDATE tenants SET plan = ?, subscription_status = ?, subscription_period_end = ? WHERE id = ?'
-      ).run(row.requested_plan, 'active', periodEnd, row.tenant_id);
+        'UPDATE tenants SET plan = ?, subscription_status = ?, subscription_period_end = ?, updated_at = ? WHERE id = ?'
+      ).run(row.requested_plan, 'active', periodEnd, now, row.tenant_id);
 
       // Also approve the subscription request if one exists
       db.prepare(

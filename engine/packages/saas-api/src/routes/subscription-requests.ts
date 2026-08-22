@@ -70,6 +70,28 @@ export function createSubscriptionRequestRoutes(
     }
   });
 
+  // ─── USER: Check own pending request ─────────────────────────────────
+  router.get('/pending', (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization;
+      if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+
+      let tenantId: string;
+      try {
+        const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
+        tenantId = payload.tenantId;
+      } catch { return res.status(401).json({ error: 'Invalid token' }); }
+
+      const row = db.prepare(
+        'SELECT id, requested_plan as "plan", billing_period as "billingPeriod", status, created_at as "createdAt" FROM subscription_requests WHERE tenant_id = ? AND status = ? ORDER BY created_at DESC LIMIT 1'
+      ).get(tenantId, 'pending') as any;
+
+      res.json({ request: row || null });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to check pending request' });
+    }
+  });
+
   // ─── OWNER: List all requests ────────────────────────────────────────
   const ownerOnly = (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
@@ -115,12 +137,14 @@ export function createSubscriptionRequestRoutes(
       const now = new Date().toISOString();
       const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      // Activate the plan on the tenant
+      // Activate the plan on the tenant — ensure subscription row exists first
+      subRepo.init(row.tenant_id, row.requested_plan as any);
       subRepo.update(row.tenant_id, {
         plan: row.requested_plan,
         status: 'active',
         currentPeriodStart: now,
         currentPeriodEnd: periodEnd,
+        trialEnd: undefined,
         cancelledAt: undefined,
       });
       tenantRepo.update(row.tenant_id, {

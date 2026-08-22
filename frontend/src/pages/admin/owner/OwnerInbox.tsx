@@ -129,9 +129,9 @@ export default function OwnerInbox() {
   const pendingPayments = payments.filter(p => p.status === 'pending').length;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02]">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden rounded-2xl border border-hairline bg-surface">
       {/* Sidebar */}
-      <div className="w-72 shrink-0 border-r border-white/5 overflow-y-auto">
+      <div className="w-72 shrink-0 border-r border-hairline overflow-y-auto">
         <div className="p-4">
           <h2 className="font-display text-sm font-bold tracking-tight mb-3 flex items-center gap-2">
             <Inbox className="size-4 text-warning-300" /> Inbox
@@ -147,7 +147,7 @@ export default function OwnerInbox() {
                 onClick={() => { setTab(item.key); setSelectedTicket(null); setSelectedConv(null); }}
                 className={cn(
                   'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition',
-                  tab === item.key ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground',
+                   tab === item.key ? 'bg-surface-2 text-foreground' : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
                 )}
               >
                 {item.icon}
@@ -161,16 +161,16 @@ export default function OwnerInbox() {
         </div>
 
         {/* List */}
-        <div className="border-t border-white/5">
+        <div className="border-t border-hairline">
           {loading ? (
             <div className="flex items-center justify-center py-8"><Loader2 className="size-4 animate-spin text-muted-foreground" /></div>
           ) : tab === 'tickets' ? (
             tickets.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">No tickets</p> :
             tickets.map(t => (
-              <button key={t.id} onClick={() => openTicket(t)} className={cn('w-full border-b border-white/5 px-4 py-3 text-left transition hover:bg-white/5', selectedTicket?.id === t.id && 'bg-white/5')}>
+              <button key={t.id} onClick={() => openTicket(t)} className={cn('w-full border-b border-hairline px-4 py-3 text-left transition hover:bg-surface-2', selectedTicket?.id === t.id && 'bg-surface-2')}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium truncate max-w-[140px]">{t.user_email}</span>
-                  <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', t.status === 'open' ? 'bg-warning-300/20 text-warning-300' : t.status === 'replied' ? 'bg-info-300/20 text-info-300' : 'bg-white/10 text-muted-foreground')}>{t.status}</span>
+                  <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', t.status === 'open' ? 'bg-warning-300/20 text-warning-300' : t.status === 'replied' ? 'bg-info-300/20 text-info-300' : 'bg-surface-2 text-muted-foreground')}>{t.status}</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{t.subject}</p>
                 <p className="text-[9px] text-muted-foreground/60 mt-0.5">{fmtDate(t.updated_at)}</p>
@@ -179,7 +179,7 @@ export default function OwnerInbox() {
           ) : tab === 'chatbot' ? (
             chatConvs.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">No conversations</p> :
             chatConvs.map(c => (
-              <button key={c.id} onClick={() => openConversation(c)} className={cn('w-full border-b border-white/5 px-4 py-3 text-left transition hover:bg-white/5', selectedConv?.id === c.id && 'bg-white/5')}>
+              <button key={c.id} onClick={() => openConversation(c)} className={cn('w-full border-b border-hairline px-4 py-3 text-left transition hover:bg-surface-2', selectedConv?.id === c.id && 'bg-surface-2')}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium truncate max-w-[140px]">{c.tenant_name || c.session_id.slice(0, 8)}</span>
                   <span className="text-[9px] text-muted-foreground">{c.message_count} msgs</span>
@@ -191,7 +191,7 @@ export default function OwnerInbox() {
           ) : (
             payments.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">No payments</p> :
             payments.map(p => (
-              <div key={p.id} className="border-b border-white/5 px-4 py-3">
+              <div key={p.id} className="border-b border-hairline px-4 py-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium truncate max-w-[140px]">{p.user_email}</span>
                   <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', p.status === 'pending' ? 'bg-warning-300/20 text-warning-300' : p.status === 'approved' ? 'bg-success-300/20 text-success-300' : 'bg-error-300/20 text-error-300')}>{p.status}</span>
@@ -227,17 +227,17 @@ export default function OwnerInbox() {
           </div>
         ) : selectedTicket ? (
           <div className="flex h-full flex-col">
-            <div className="border-b border-white/5 px-6 py-4">
+            <div className="border-b border-hairline px-6 py-4">
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold">{selectedTicket.subject}</h3>
                   <p className="text-xs text-muted-foreground">{selectedTicket.user_email} &middot; {fmtDate(selectedTicket.created_at)}</p>
                 </div>
                 <div className="flex gap-2">
-                  <a href={`mailto:${selectedTicket.user_email}`} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/10 transition">
+                  <a href={`mailto:${selectedTicket.user_email}`} className="flex items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface transition">
                     <Mail className="size-3" /> Email
                   </a>
-                  <button onClick={() => closeTicket(selectedTicket.id)} className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs text-muted-foreground hover:bg-white/10 transition">
+                  <button onClick={() => closeTicket(selectedTicket.id)} className="flex items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-3 py-1.5 text-xs text-muted-foreground hover:bg-surface transition">
                     <XCircle className="size-3" /> Close
                   </button>
                 </div>
@@ -245,21 +245,21 @@ export default function OwnerInbox() {
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {ticketMessages.map(m => (
-                <div key={m.id} className={cn('max-w-[80%] rounded-2xl px-4 py-3', m.sender_type === 'owner' ? 'ml-auto bg-primary/10 border border-primary/20' : 'bg-white/5 border border-white/5')}>
+                <div key={m.id} className={cn('max-w-[80%] rounded-2xl px-4 py-3', m.sender_type === 'owner' ? 'ml-auto bg-primary/10 border border-primary/20' : 'bg-surface-2 border border-hairline')}>
                   <p className="text-xs font-medium mb-1">{m.sender_type === 'owner' ? 'You' : m.sender_email}</p>
                   <p className="text-sm whitespace-pre-wrap">{m.content}</p>
                   <p className="text-[9px] text-muted-foreground/60 mt-1">{fmtDate(m.created_at)}</p>
                 </div>
               ))}
             </div>
-            <div className="border-t border-white/5 px-6 py-3">
+            <div className="border-t border-hairline px-6 py-3">
               <div className="flex gap-2">
                 <input
                   value={newMessage}
                   onChange={e => setNewMessage(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && sendMessage()}
                   placeholder="Type a reply..."
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  className="flex-1 rounded-xl border border-hairline bg-surface-2 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                 />
                 <button onClick={sendMessage} disabled={sending || !newMessage.trim()} className="flex items-center gap-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition disabled:opacity-50">
                   {sending ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Send
@@ -269,13 +269,13 @@ export default function OwnerInbox() {
           </div>
         ) : selectedConv ? (
           <div className="flex h-full flex-col">
-            <div className="border-b border-white/5 px-6 py-4">
+            <div className="border-b border-hairline px-6 py-4">
               <h3 className="text-sm font-bold">{selectedConv.tenant_name || 'Chatbot'}</h3>
               <p className="text-xs text-muted-foreground">Session: {selectedConv.session_id.slice(0, 12)}... &middot; {selectedConv.message_count} messages</p>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
               {convMessages.map(m => (
-                <div key={m.id} className={cn('max-w-[80%] rounded-2xl px-4 py-3', m.role === 'user' ? 'bg-white/5 border border-white/5' : m.sender === 'agent' ? 'ml-auto bg-warning-300/10 border border-warning-300/20' : 'ml-auto bg-primary/10 border border-primary/20')}>
+                <div key={m.id} className={cn('max-w-[80%] rounded-2xl px-4 py-3', m.role === 'user' ? 'bg-surface-2 border border-hairline' : m.sender === 'agent' ? 'ml-auto bg-warning-300/10 border border-warning-300/20' : 'ml-auto bg-primary/10 border border-primary/20')}>
                   <p className="text-xs font-medium mb-1">{m.role === 'user' ? 'Visitor' : m.sender === 'agent' ? 'Agent (Human)' : 'AI Bot'}</p>
                   <p className="text-sm whitespace-pre-wrap">{m.content}</p>
                   <p className="text-[9px] text-muted-foreground/60 mt-1">{fmtDate(m.created_at)}</p>

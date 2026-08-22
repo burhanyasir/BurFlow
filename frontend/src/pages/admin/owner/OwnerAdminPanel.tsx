@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '../../../utils/cn';
+import { useTheme } from '../../../theme/ThemeProvider';
 import OwnerInbox from './OwnerInbox';
 import {
   Crown,
@@ -31,6 +32,8 @@ import {
   Eye,
   Loader2,
   Inbox,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 type PlanId = 'free' | 'starter' | 'pro' | 'advanced';
@@ -182,7 +185,7 @@ function planBadgeClasses(plan: string): string {
     case 'starter': return 'bg-info-300/20 text-info-300 border-info-300/30';
     case 'pro': return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
     case 'advanced': return 'bg-warning-300/20 text-warning-300 border-warning-300/30';
-    default: return 'bg-white/10 text-muted-foreground border-white/10';
+    default: return 'bg-surface-2 text-muted-foreground border-hairline';
   }
 }
 
@@ -193,8 +196,8 @@ function statusBadgeClasses(status: string): string {
     case 'past_due': return 'bg-warning-300/20 text-warning-300 border-warning-300/30';
     case 'cancelled': return 'bg-error-300/20 text-error-300 border-error-300/30';
     case 'expired': return 'bg-error-300/20 text-error-300 border-error-300/30';
-    case 'paused': return 'bg-white/10 text-muted-foreground border-white/10';
-    default: return 'bg-white/10 text-muted-foreground border-white/10';
+    case 'paused': return 'bg-surface-2 text-muted-foreground border-hairline';
+    default: return 'bg-surface-2 text-muted-foreground border-hairline';
   }
 }
 
@@ -298,7 +301,7 @@ function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f] px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center">
           <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl border border-warning-300/30 bg-warning-300/10">
@@ -325,7 +328,7 @@ function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="owner@example.com"
               autoFocus
-              className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
+              className="h-12 w-full rounded-xl border border-hairline bg-surface-2 px-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
             />
           </div>
 
@@ -338,7 +341,7 @@ function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password"
-                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
+                className="h-12 w-full rounded-xl border border-hairline bg-surface-2 px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
               />
               <button
                 type="button"
@@ -376,6 +379,7 @@ function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
 // ─── Admin Panel View ─────────────────────────────────────────────────
 function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => void }) {
   const { toasts, addToast, removeToast } = useToast();
+  const { theme, toggleTheme } = useTheme();
   const [view, setView] = useState<'tenants' | 'inbox'>('tenants');
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
@@ -620,11 +624,11 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
   const isBusy = (key: string) => actionLoading === key;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-foreground">
+    <div className="min-h-screen bg-background text-foreground">
       <ToastContainer toasts={toasts} onRemove={removeToast} />
 
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-40 border-b border-hairline bg-background/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <div className="flex size-9 items-center justify-center rounded-xl border border-warning-300/30 bg-warning-300/10">
@@ -638,19 +642,27 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
           <div className="flex items-center gap-2">
             <button
               onClick={() => setView('tenants')}
-              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'tenants' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground')}
+              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'tenants' ? 'bg-surface-2 text-foreground' : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground')}
             >
               <Building2 className="size-3.5" /> Tenants
             </button>
             <button
               onClick={() => setView('inbox')}
-              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'inbox' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground')}
+              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'inbox' ? 'bg-surface-2 text-foreground' : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground')}
             >
               <Inbox className="size-3.5" /> Inbox
             </button>
             <button
+              onClick={toggleTheme}
+              className="flex items-center gap-1.5 rounded-xl border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </button>
+            <button
               onClick={onLogout}
-              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+              className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-2 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
             >
               <LogOut className="size-4" />
               Logout
@@ -669,13 +681,13 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
           <div className="animate-pulse space-y-6">
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {[0, 1, 2, 3].map((i) => (
-                <div key={i} className="h-28 rounded-2xl border border-white/5 bg-white/5" />
+                <div key={i} className="h-28 rounded-2xl border border-hairline bg-surface" />
               ))}
             </div>
-            <div className="h-12 rounded-xl border border-white/5 bg-white/5" />
+            <div className="h-12 rounded-xl border border-hairline bg-surface" />
             <div className="space-y-3">
               {[0, 1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-28 rounded-2xl border border-white/5 bg-white/5" />
+                <div key={i} className="h-28 rounded-2xl border border-hairline bg-surface" />
               ))}
             </div>
           </div>
@@ -703,7 +715,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
 
         {/* Subscription Requests */}
         {!loading && (
-          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
+          <div className="rounded-2xl border border-hairline bg-surface p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-warning-300/10">
@@ -716,7 +728,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setRequestTab('pending'); }} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${requestTab === 'pending' ? 'bg-warning-300/20 text-warning-300' : 'text-muted-foreground hover:text-foreground'}`}>Pending</button>
-                <button onClick={() => { setRequestTab('all'); }} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${requestTab === 'all' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>All</button>
+                <button onClick={() => { setRequestTab('all'); }} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${requestTab === 'all' ? 'bg-surface-2 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>All</button>
               </div>
             </div>
             {requestsLoading ? (
@@ -726,7 +738,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
             ) : (
               <div className="space-y-3">
                 {(requestTab === 'pending' ? subRequests : allSubRequests).map((req: any) => (
-                  <div key={req.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+                  <div key={req.id} className="flex items-center justify-between rounded-xl border border-hairline bg-surface px-4 py-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium truncate">{req.user_email}</p>
@@ -758,7 +770,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search tenants by name, email, or ID..."
-                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                className="h-12 w-full rounded-xl border border-hairline bg-surface-2 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -834,7 +846,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
               <button
                 type="button"
                 onClick={() => setShowAddTenant(false)}
-                className="h-10 rounded-xl border border-white/10 px-5 text-sm text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+                className="h-10 rounded-xl border border-hairline px-5 text-sm text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
               >
                 Cancel
               </button>
@@ -843,7 +855,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
         )}
         {/* Tenant List */}
         {!loading && filteredTenants.length === 0 && (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02] py-16">
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-hairline bg-surface py-16">
             <Building2 className="mb-3 size-8 text-muted-foreground" />
             <p className="text-sm font-medium text-muted-foreground">{search ? "No tenants match your search." : "No tenants found."}</p>
           </div>
@@ -897,7 +909,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                           <button
                             onClick={() => { setShowPlanDropdown(showPlanDropdown === t.id ? null : t.id); setShowStatusDropdown(null); }}
                             disabled={isBusy("plan-" + t.id)}
-                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                           >
                             <Zap className="size-3" /> Plan <ChevronDown className="size-3" />
                           </button>
@@ -924,7 +936,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                           <button
                             onClick={() => { setShowStatusDropdown(showStatusDropdown === t.id ? null : t.id); setShowPlanDropdown(null); }}
                             disabled={isBusy("status-" + t.id)}
-                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                           >
                             Status <ChevronDown className="size-3" />
                           </button>
@@ -950,7 +962,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                         <button
                           onClick={() => (isExpanded ? closeDetail() : loadDetail(t.id))}
                           disabled={detailLoading && selectedTenantId !== t.id}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                         >
                           {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
                           {detailLoading && selectedTenantId === t.id ? "Loading..." : "Details"}
@@ -970,7 +982,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                         <button
                           onClick={() => handleExtend(t.id)}
                           disabled={isBusy("extend-" + t.id)}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                         >
                           <Timer className="size-3" /> Extend
                         </button>
@@ -990,17 +1002,17 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                           <button
                             onClick={() => handleRename(t.id)}
                             disabled={isBusy("rename-" + t.id)}
-                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                           >Save</button>
                           <button
                             onClick={() => setShowRename(null)}
-                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2"
                           ><X className="size-3" /></button>
                         </div>
                       ) : (
                         <button
                           onClick={() => { setShowRename(t.id); setRenameValue((prev) => ({ ...prev, [t.id]: t.name })); }}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2"
                         >
                           <PenLine className="size-3" /> Rename
                         </button>
@@ -1010,7 +1022,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                         <button
                           onClick={() => handleReactivate(t.id)}
                           disabled={isBusy("reactivate-" + t.id)}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2 disabled:opacity-50"
                         >
                           <RotateCcw className="size-3" /> Reactivate
                         </button>
@@ -1026,13 +1038,13 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                           </button>
                           <button
                             onClick={() => setConfirmCancel(null)}
-                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2"
                           ><X className="size-3" /></button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setConfirmCancel(t.id)}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2"
                         >
                           <Pause className="size-3" /> Cancel
                         </button>
@@ -1050,13 +1062,13 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
                           </button>
                           <button
                             onClick={() => setShowDeleteConfirm(null)}
-                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-surface-2"
                           ><X className="size-3" /></button>
                         </div>
                       ) : (
                         <button
                           onClick={() => setShowDeleteConfirm(t.id)}
-                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs text-error-300 transition hover:bg-white/10 hover:text-error-300"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs text-error-300 transition hover:bg-surface-2 hover:text-error-300"
                         >
                           <Trash2 className="size-3" /> Delete
                         </button>
@@ -1195,7 +1207,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                       <span className="text-muted-foreground">{label}</span>
                       <span className="tabular-nums">{used.toLocaleString()} / {limit.toLocaleString()}</span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
                       <div
                         className={cn(
                           "h-full rounded-full transition-all",
@@ -1243,7 +1255,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                 {detail.teamMembers.map((m) => (
                   <div key={m.id} className="flex items-center justify-between rounded-xl border border-hairline bg-surface p-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-primary">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-surface-2 text-xs font-bold text-primary">
                         {m.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -1255,7 +1267,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                       "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
                       m.role === "owner" ? "bg-warning-300/20 text-warning-300 border-warning-300/30" :
                       m.role === "admin" ? "bg-info-300/20 text-info-300 border-info-300/30" :
-                      "bg-white/10 text-muted-foreground border-white/10"
+                      "bg-surface-2 text-muted-foreground border-hairline"
                     )}>
                       {m.role}
                     </span>
@@ -1301,7 +1313,7 @@ export default function OwnerAdminPanel() {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
         <div className="text-center">
-          <div className="mx-auto mb-4 size-8 animate-spin rounded-full border-2 border-white/10 border-t-warning-300" />
+          <div className="mx-auto mb-4 size-8 animate-spin rounded-full border-2 border-hairline border-t-warning-300" />
           <p className="text-sm text-muted-foreground">Verifying access...</p>
         </div>
       </div>
