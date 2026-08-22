@@ -7,7 +7,7 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, Clock, Upload } from 'lucide-react';
+import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, Clock, Upload, Send, Inbox } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -61,18 +61,25 @@ export default function BillingDashboard() {
   const [uploadingSS, setUploadingSS] = useState(false);
   const [ssSubmitted, setSsSubmitted] = useState(false);
 
+  const [supportSubject, setSupportSubject] = useState('');
+  const [supportMessage, setSupportMessage] = useState('');
+  const [sendingSupport, setSendingSupport] = useState(false);
+  const [supportTickets, setSupportTickets] = useState<{ id: string; subject: string; status: string; created_at: string; updated_at: string }[]>([]);
+
   const loadData = useCallback(async () => {
     setLoading(true); setError(null); try {
-      const [currentRes, plansRes, usageRes, pendingRes] = await Promise.allSettled([
+      const [currentRes, plansRes, usageRes, pendingRes, ticketsRes] = await Promise.allSettled([
         apiClient.get<CurrentSubscription>('/billing/current'),
         apiClient.get<{ plans: Plan[] }>('/billing/plans'),
         apiClient.get<{ usage: UsageRecord[] }>('/billing/usage'),
         apiClient.get<{ request: PendingRequest | null }>('/billing/requests/pending'),
+        apiClient.get<{ tickets: any[] }>('/support/tickets?status=all'),
       ]);
       if (currentRes.status === 'fulfilled') setCurrentSub(currentRes.value);
       if (plansRes.status === 'fulfilled') setPlans(plansRes.value.plans || []);
       if (usageRes.status === 'fulfilled') setUsage(usageRes.value.usage || []);
       if (pendingRes.status === 'fulfilled') setPendingRequest(pendingRes.value.request);
+      if (ticketsRes.status === 'fulfilled') setSupportTickets(ticketsRes.value.tickets || []);
     } catch (err: any) { setError(err.message || 'Failed to load billing data'); } finally { setLoading(false); }
   }, []);
 
@@ -113,6 +120,20 @@ export default function BillingDashboard() {
     } catch (err: any) {
       addToast(err.message || 'Failed to upload screenshot', 'error');
     } finally { setUploadingSS(false); }
+  };
+
+  const handleSendSupport = async () => {
+    if (!supportSubject.trim() || !supportMessage.trim()) { addToast('Please enter a subject and message.', 'error'); return; }
+    setSendingSupport(true);
+    try {
+      await apiClient.post('/support/tickets', { subject: supportSubject.trim(), message: supportMessage.trim(), source: 'dashboard' });
+      addToast('Support message sent! The owner will get back to you.', 'success');
+      setSupportSubject('');
+      setSupportMessage('');
+      await loadData();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to send message', 'error');
+    } finally { setSendingSupport(false); }
   };
 
   const statusLabel = (sub: CurrentSubscription): string => {
@@ -347,6 +368,51 @@ export default function BillingDashboard() {
                 </div>
               </Panel>
             )}
+
+            <Panel>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10"><Inbox className="size-4 text-primary" /></div>
+                <div>
+                  <h2 className="text-lg font-bold tracking-tight">Contact Support</h2>
+                  <p className="text-sm text-muted-foreground">Need help? Send us a message and we'll get back to you.</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <input
+                  value={supportSubject}
+                  onChange={e => setSupportSubject(e.target.value)}
+                  placeholder="Subject (e.g. billing issue, feature request)"
+                  className="w-full rounded-xl border border-hairline bg-surface-2 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <textarea
+                  value={supportMessage}
+                  onChange={e => setSupportMessage(e.target.value)}
+                  placeholder="Describe your issue or question…"
+                  rows={4}
+                  className="w-full rounded-xl border border-hairline bg-surface-2 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                />
+                <DashButton variant="primary" onClick={handleSendSupport} disabled={sendingSupport || !supportSubject.trim() || !supportMessage.trim()}>
+                  {sendingSupport ? 'Sending…' : <><Send className="size-3.5" /> Send Message</>}
+                </DashButton>
+              </div>
+
+              {supportTickets.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-sm font-semibold text-muted-foreground mb-3">Your messages</h3>
+                  <div className="space-y-2">
+                    {supportTickets.map(t => (
+                      <div key={t.id} className="flex items-center justify-between rounded-xl border border-hairline bg-surface-2 px-4 py-3">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{t.subject}</p>
+                          <p className="text-xs text-muted-foreground">{new Date(t.created_at).toLocaleString()}</p>
+                        </div>
+                        <span className={cn('ml-3 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase', t.status === 'open' ? 'bg-warning-300/20 text-warning-300' : t.status === 'replied' ? 'bg-info-300/20 text-info-300' : 'bg-surface text-muted-foreground')}>{t.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Panel>
           </>
         )}
       </div>
