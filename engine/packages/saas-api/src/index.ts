@@ -52,6 +52,7 @@ import { createPublicRoutes } from './routes/public';
 import { createBillingRoutes } from './routes/billing';
 import { createAdminRoutes } from './routes/admin';
 import { createOwnerAdminRoutes } from './routes/owner-admin';
+import { createOwnerAuthRoutes } from './routes/owner-auth';
 import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
 import { createAuditRoutes } from './routes/audit';
@@ -515,7 +516,8 @@ app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo,
 
 // Owner-only admin panel — full control over tenants, plans, subscriptions
 app.use('/api/owner', createRateLimit({ windowMs: 60_000, max: 300 }));
-app.use('/api/owner', auth, tenantGuard, createOwnerAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo, teamMemberRepo));
+app.use('/api/owner/auth', createOwnerAuthRoutes(userRepo, tenantRepo, JWT_SECRET));
+app.use('/api/owner', createOwnerAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo, teamMemberRepo, JWT_SECRET));
 
 // Customer Activation routes
 app.use('/api/admin', auth, tenantGuard, createActivationRoutes(

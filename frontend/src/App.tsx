@@ -270,7 +270,7 @@ function RoutesWithAnimation() {
         <Route path="/dashboard/insights" element={<ProtectedRoute><AdminRoute><InsightsDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/billing" element={<ProtectedRoute><BillingDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/billing/manual" element={<ProtectedRoute><AdminManualBilling /></ProtectedRoute>} />
-        <Route path="/dashboard/owner" element={<ProtectedRoute><AdminRoute><OwnerAdminPanel /></AdminRoute></ProtectedRoute>} />
+        <Route path="/owner" element={<OwnerAdminPanel />} />
         <Route path="/dashboard/widget" element={<ProtectedRoute><WidgetDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/unanswered" element={<ProtectedRoute><AdminRoute><UnansweredDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/citations" element={<ProtectedRoute><AdminRoute><CitationDashboard /></AdminRoute></ProtectedRoute>} />

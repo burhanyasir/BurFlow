@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import {
   UserRepository, TenantRepository, ConversationRepository,
   UsageRepository, KnowledgeBaseRepository, KbDocumentRepository,
@@ -27,14 +28,26 @@ export function createOwnerAdminRoutes(
   leadRepo: LeadRepository,
   handoffReqRepo: HandoffRequestRepository,
   teamMemberRepo: TeamMemberRepository,
+  jwtSecret: string,
 ): Router {
   const router = Router();
 
   const ownerOnly = (req: Request, res: Response, next: Function) => {
-    if (req.user?.role !== 'owner') {
-      return res.status(403).json({ error: 'Owner access required' });
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
     }
-    next();
+    try {
+      const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
+      if (payload.role !== 'owner' || payload.panel !== 'owner') {
+        return res.status(403).json({ error: 'Owner panel access required' });
+      }
+      req.user = payload;
+      req.tenantId = payload.tenantId;
+      next();
+    } catch {
+      return res.status(401).json({ error: 'Invalid or expired token' });
+    }
   };
 
   // ─── TENANT LIST with full details ───────────────────────────────────
@@ -308,6 +321,53 @@ export function createOwnerAdminRoutes(
       res.json({ ok: true, name: name.trim() });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to rename tenant' });
+    }
+  });
+
+  // ─── CREATE TENANT ──────────────────────────────────────────────────
+  router.post('/tenants', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { name, email, password, plan } = req.body;
+
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: 'Workspace name must be at least 2 characters' });
+      }
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: 'Valid email is required' });
+      }
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters' });
+      }
+
+      const existing = userRepo.findByEmail(email);
+      if (existing) {
+        return res.status(409).json({ error: 'Email already registered' });
+      }
+
+      const user = userRepo.create({ email, password, name: name.trim() });
+      const tenant = tenantRepo.create({ name: name.trim(), ownerId: user.id });
+
+      const normalizedPlan = plan && VALID_PLANS.includes(plan) ? (plan === 'professional' ? 'pro' : plan) : 'free';
+      const now = new Date().toISOString();
+      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      subRepo.init(tenant.id, normalizedPlan);
+      if (normalizedPlan !== 'free') {
+        subRepo.update(tenant.id, { plan: normalizedPlan, status: 'active', currentPeriodStart: now, currentPeriodEnd: periodEnd });
+        tenantRepo.update(tenant.id, { plan: normalizedPlan, subscriptionStatus: 'active', subscriptionPeriodEnd: periodEnd });
+      }
+
+      createContextLogger(logger).info({ tenantId: tenant.id, email, plan: normalizedPlan }, 'Owner created tenant');
+      res.json({
+        ok: true,
+        tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+        user: { id: user.id, email: user.email, name: user.name },
+        plan: normalizedPlan,
+        tempPassword: password,
+      });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner create tenant failed');
+      res.status(500).json({ error: 'Failed to create tenant' });
     }
   });
 

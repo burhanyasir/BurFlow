@@ -1,25 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { DashboardLayout } from '../../../components/dashboard';
-import type { NavItem } from '../../../components/dashboard';
-import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
-import { Badge } from '../../../components/dashboard/Badge';
-import { useAuth } from '../../../lib/auth-context';
-import { apiClient } from '../../../lib/api-client';
-import { useToast } from '../../../components/ui/Toast';
+﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '../../../utils/cn';
 import {
+  Crown,
   Building2,
   Users,
   CreditCard,
-  RefreshCw,
   Search,
   ChevronDown,
   ChevronUp,
   Mail,
   CheckCircle,
   XCircle,
-  Clock,
   AlertTriangle,
   Trash2,
   PenLine,
@@ -30,27 +21,15 @@ import {
   Shield,
   Zap,
   Pause,
-  Play,
   RotateCcw,
   TrendingUp,
-  Crown,
   Hash,
-  ArrowRight,
   X,
   Timer,
-  BarChart3,
+  LogOut,
+  Eye,
+  Loader2,
 } from 'lucide-react';
-
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard' },
-  { label: 'Conversations', href: '/dashboard/conversations' },
-  { label: 'Analytics', href: '/dashboard/analytics' },
-  { label: 'Knowledge', href: '/dashboard/knowledge' },
-  { label: 'Widget', href: '/dashboard/widget' },
-  { label: 'Billing', href: '/dashboard/billing' },
-  { label: 'Onboarding', href: '/dashboard/onboarding' },
-  { label: 'Owner Admin', href: '/dashboard/admin', active: true },
-];
 
 type PlanId = 'free' | 'starter' | 'pro' | 'advanced';
 type SubStatus = 'active' | 'trialing' | 'past_due' | 'cancelled' | 'expired' | 'paused';
@@ -70,6 +49,13 @@ const STATUS_OPTIONS: { id: SubStatus; label: string }[] = [
   { id: 'expired', label: 'Expired' },
   { id: 'paused', label: 'Paused' },
 ];
+
+interface OwnerUser {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
 
 interface TenantSummary {
   id: string;
@@ -160,28 +146,46 @@ interface TenantDetail {
   }[];
 }
 
+function ownerFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('owner_token');
+  return fetch(`/api/owner${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
+  }).then(async (res) => {
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || body.message || `Request failed (${res.status})`);
+    }
+    return res.json();
+  });
+}
+
 function usagePercent(used: number, limit: number) {
   return Math.round((used / Math.max(limit, 1)) * 100);
 }
 
-function planBadgeVariant(plan: string): 'neutral' | 'info' | 'premium' | 'warning' {
+function planBadgeClasses(plan: string): string {
   switch (plan) {
-    case 'starter': return 'info';
-    case 'pro': return 'premium';
-    case 'advanced': return 'warning';
-    default: return 'neutral';
+    case 'starter': return 'bg-info-300/20 text-info-300 border-info-300/30';
+    case 'pro': return 'bg-purple-500/20 text-purple-300 border-purple-500/30';
+    case 'advanced': return 'bg-warning-300/20 text-warning-300 border-warning-300/30';
+    default: return 'bg-white/10 text-muted-foreground border-white/10';
   }
 }
 
-function statusBadgeVariant(status: string): 'success' | 'info' | 'error' | 'warning' | 'neutral' {
+function statusBadgeClasses(status: string): string {
   switch (status) {
-    case 'active': return 'success';
-    case 'trialing': return 'info';
-    case 'past_due': return 'warning';
-    case 'cancelled': return 'error';
-    case 'expired': return 'error';
-    case 'paused': return 'neutral';
-    default: return 'neutral';
+    case 'active': return 'bg-success/20 text-success-300 border-success/30';
+    case 'trialing': return 'bg-info-300/20 text-info-300 border-info-300/30';
+    case 'past_due': return 'bg-warning-300/20 text-warning-300 border-warning-300/30';
+    case 'cancelled': return 'bg-error-300/20 text-error-300 border-error-300/30';
+    case 'expired': return 'bg-error-300/20 text-error-300 border-error-300/30';
+    case 'paused': return 'bg-white/10 text-muted-foreground border-white/10';
+    default: return 'bg-white/10 text-muted-foreground border-white/10';
   }
 }
 
@@ -198,12 +202,171 @@ function formatCurrency(amount: number): string {
   return `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export default function OwnerAdminPanel() {
-  const navigate = useNavigate();
-  const { user, tenant, logout } = useAuth();
-  const { addToast } = useToast();
-  const workspaceName = tenant?.name || 'Owner Admin';
+function useToast() {
+  const [toasts, setToasts] = useState<{ id: number; message: string; type: 'success' | 'error' }[]>([]);
+  const nextId = useRef(0);
 
+  const addToast = useCallback((message: string, type: 'success' | 'error') => {
+    const id = nextId.current++;
+    setToasts((prev) => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  }, []);
+
+  const removeToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  return { toasts, addToast, removeToast };
+}
+
+function ToastContainer({ toasts, onRemove }: { toasts: { id: number; message: string; type: string }[]; onRemove: (id: number) => void }) {
+  return (
+    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+      {toasts.map((t) => (
+        <div
+          key={t.id}
+          className={cn(
+            'flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium shadow-lift backdrop-blur-sm transition-all',
+            t.type === 'success' ? 'border-success/30 bg-success/10 text-success-300' : 'border-error-300/30 bg-error-300/10 text-error-300',
+          )}
+        >
+          {t.type === 'success' ? <CheckCircle className="size-4 shrink-0" /> : <AlertTriangle className="size-4 shrink-0" />}
+          <span className="flex-1">{t.message}</span>
+          <button onClick={() => onRemove(t.id)} className="shrink-0 text-muted-foreground hover:text-foreground">
+            <X className="size-3.5" />
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function StatTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl border border-hairline bg-surface p-5">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icon}</div>
+      <div>
+        <p className="font-display text-xl font-bold tabular-nums">{value}</p>
+        <p className="text-xs text-muted-foreground">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Login View ───────────────────────────────────────────────────────
+function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!email.trim() || !password.trim()) {
+      setError('Please enter email and password');
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch('/api/owner/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || data.message || 'Login failed');
+      localStorage.setItem('owner_token', data.token);
+      onLogin(data.user);
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f] px-4">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl border border-warning-300/30 bg-warning-300/10">
+            <Crown className="size-8 text-warning-300" />
+          </div>
+          <h1 className="font-display text-3xl font-bold tracking-tight text-foreground">Owner Login</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Platform administration access</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          {error && (
+            <div className="flex items-center gap-3 rounded-xl border border-error-300/30 bg-error-300/10 px-4 py-3 text-sm text-error-300">
+              <AlertTriangle className="size-4 shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label htmlFor="email" className="text-sm font-medium text-muted-foreground">Email</label>
+            <input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="owner@example.com"
+              autoFocus
+              className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="password" className="text-sm font-medium text-muted-foreground">Password</label>
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-warning-300/50 focus:outline-none focus:ring-1 focus:ring-warning-300/50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                {showPassword ? <XCircle className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-warning-300/20 border border-warning-300/30 text-warning-300 font-semibold text-sm transition hover:bg-warning-300/30 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="size-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              <>
+                <Crown className="size-4" />
+                Sign In
+              </>
+            )}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Admin Panel View ─────────────────────────────────────────────────
+function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => void }) {
+  const { toasts, addToast, removeToast } = useToast();
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -212,8 +375,8 @@ export default function OwnerAdminPanel() {
   const [selectedTenantId, setSelectedTenantId] = useState<string | null>(null);
   const [tenantDetail, setTenantDetail] = useState<TenantDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
   const [extendDays, setExtendDays] = useState<Record<string, string>>({});
   const [renameValue, setRenameValue] = useState<Record<string, string>>({});
   const [showRename, setShowRename] = useState<string | null>(null);
@@ -222,13 +385,20 @@ export default function OwnerAdminPanel() {
   const [showStatusDropdown, setShowStatusDropdown] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState<string | null>(null);
 
+  const [showAddTenant, setShowAddTenant] = useState(false);
+  const [addTenantName, setAddTenantName] = useState('');
+  const [addTenantEmail, setAddTenantEmail] = useState('');
+  const [addTenantPassword, setAddTenantPassword] = useState('');
+  const [addTenantPlan, setAddTenantPlan] = useState<PlanId>('free');
+  const [addTenantLoading, setAddTenantLoading] = useState(false);
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const [tenantsRes, statsRes] = await Promise.allSettled([
-        apiClient.get<{ tenants: TenantSummary[]; total: number }>('/owner/tenants'),
-        apiClient.get<PlatformStats>('/owner/stats'),
+        ownerFetch<{ tenants: TenantSummary[]; total: number }>('/tenants'),
+        ownerFetch<PlatformStats>('/stats'),
       ]);
       if (tenantsRes.status === 'fulfilled') setTenants(tenantsRes.value.tenants || []);
       if (statsRes.status === 'fulfilled') setPlatformStats(statsRes.value);
@@ -244,7 +414,7 @@ export default function OwnerAdminPanel() {
   const loadDetail = useCallback(async (tenantId: string) => {
     setDetailLoading(true);
     try {
-      const detail = await apiClient.get<TenantDetail>(`/owner/tenants/${tenantId}`);
+      const detail = await ownerFetch<TenantDetail>(`/tenants/${tenantId}`);
       setTenantDetail(detail);
       setSelectedTenantId(tenantId);
     } catch (err: any) {
@@ -281,7 +451,7 @@ export default function OwnerAdminPanel() {
   const handlePlanChange = (tenantId: string, plan: PlanId) => {
     setShowPlanDropdown(null);
     runAction(tenantId, `plan-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/plan`, { plan }),
+      ownerFetch(`/tenants/${tenantId}/plan`, { method: 'POST', body: JSON.stringify({ plan }) }),
       `Plan changed to ${plan}`,
     );
   };
@@ -289,7 +459,7 @@ export default function OwnerAdminPanel() {
   const handleStatusChange = (tenantId: string, status: SubStatus) => {
     setShowStatusDropdown(null);
     runAction(tenantId, `status-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/status`, { status }),
+      ownerFetch(`/tenants/${tenantId}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
       `Status changed to ${status}`,
     );
   };
@@ -301,23 +471,23 @@ export default function OwnerAdminPanel() {
       return;
     }
     runAction(tenantId, `extend-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/extend`, { days }),
+      ownerFetch(`/tenants/${tenantId}/extend`, { method: 'POST', body: JSON.stringify({ days }) }),
       `Extended by ${days} days`,
     );
-    setExtendDays(prev => ({ ...prev, [tenantId]: '' }));
+    setExtendDays((prev) => ({ ...prev, [tenantId]: '' }));
   };
 
   const handleCancel = (tenantId: string) => {
     setConfirmCancel(null);
     runAction(tenantId, `cancel-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/cancel`),
+      ownerFetch(`/tenants/${tenantId}/cancel`, { method: 'POST' }),
       'Subscription cancelled',
     );
   };
 
   const handleReactivate = (tenantId: string) => {
     runAction(tenantId, `reactivate-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/reactivate`),
+      ownerFetch(`/tenants/${tenantId}/reactivate`, { method: 'POST' }),
       'Subscription reactivated',
     );
   };
@@ -330,7 +500,7 @@ export default function OwnerAdminPanel() {
     }
     setShowRename(null);
     runAction(tenantId, `rename-${tenantId}`, () =>
-      apiClient.post(`/owner/tenants/${tenantId}/rename`, { name }),
+      ownerFetch(`/tenants/${tenantId}/rename`, { method: 'POST', body: JSON.stringify({ name }) }),
       'Tenant renamed',
     );
   };
@@ -338,12 +508,43 @@ export default function OwnerAdminPanel() {
   const handleDelete = (tenantId: string) => {
     setShowDeleteConfirm(null);
     runAction(tenantId, `delete-${tenantId}`, () =>
-      apiClient.delete(`/owner/tenants/${tenantId}`),
+      ownerFetch(`/tenants/${tenantId}`, { method: 'DELETE' }),
       'Tenant deleted',
     );
   };
 
-  const filteredTenants = tenants.filter(t => {
+  const handleAddTenant = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addTenantName.trim() || !addTenantEmail.trim() || !addTenantPassword.trim()) {
+      addToast('Please fill in all fields', 'error');
+      return;
+    }
+    setAddTenantLoading(true);
+    try {
+      await ownerFetch('/tenants', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: addTenantName.trim(),
+          email: addTenantEmail.trim(),
+          password: addTenantPassword,
+          plan: addTenantPlan,
+        }),
+      });
+      addToast('Tenant created successfully', 'success');
+      setShowAddTenant(false);
+      setAddTenantName('');
+      setAddTenantEmail('');
+      setAddTenantPassword('');
+      setAddTenantPlan('free');
+      await loadData();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to create tenant', 'error');
+    } finally {
+      setAddTenantLoading(false);
+    }
+  };
+
+  const filteredTenants = tenants.filter((t) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
@@ -357,161 +558,172 @@ export default function OwnerAdminPanel() {
 
   const isBusy = (key: string) => actionLoading === key;
 
-
-  if (user?.role !== 'owner') {
-    return (
-      <DashboardLayout
-        sidebarItems={NAV_ITEMS}
-        onNavigate={(item) => item.href && navigate(item.href)}
-        workspaceName={workspaceName}
-        userName={user?.name}
-        userEmail={user?.email}
-        onLogout={logout}
-        onSettings={() => navigate('/dashboard/settings')}
-      >
-        <EmptyState
-          icon={<Shield className="size-6" />}
-          title="Access denied"
-          body="Only the owner can access this panel."
-          actions={<DashButton onClick={() => navigate('/dashboard')}>Back to dashboard</DashButton>}
-        />
-      </DashboardLayout>
-    );
-  }
-
-  if (loading) {
-    return (
-      <DashboardLayout
-        sidebarItems={NAV_ITEMS}
-        onNavigate={(item) => item.href && navigate(item.href)}
-        workspaceName={workspaceName}
-        userName={user?.name}
-        userEmail={user?.email}
-        onLogout={logout}
-        onSettings={() => navigate('/dashboard/settings')}
-      >
-        <div className="animate-pulse space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {[0, 1, 2, 3].map(i => (
-              <div key={i} className="h-36 rounded-2xl border border-hairline bg-surface" />
-            ))}
-          </div>
-          <div className="h-12 rounded-xl border border-hairline bg-surface" />
-          <div className="space-y-3">
-            {[0, 1, 2, 3, 4].map(i => (
-              <div key={i} className="h-28 rounded-2xl border border-hairline bg-surface" />
-            ))}
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (error && tenants.length === 0) {
-    return (
-      <DashboardLayout
-        sidebarItems={NAV_ITEMS}
-        onNavigate={(item) => item.href && navigate(item.href)}
-        workspaceName={workspaceName}
-        userName={user?.name}
-        userEmail={user?.email}
-        onLogout={logout}
-        onSettings={() => navigate('/dashboard/settings')}
-      >
-        <EmptyState
-          icon={<AlertTriangle className="size-6" />}
-          title="Couldn't load owner data"
-          body={error}
-          actions={<DashButton onClick={loadData}><RefreshCw className="size-4" /> Retry</DashButton>}
-        />
-      </DashboardLayout>
-    );
-  }
-
   return (
-    <DashboardLayout
-      sidebarItems={NAV_ITEMS}
-      onNavigate={(item) => item.href && navigate(item.href)}
-      workspaceName={workspaceName}
-      userName={user?.name}
-      userEmail={user?.email}
-      onLogout={logout}
-      onSettings={() => navigate('/dashboard/settings')}
-    >
-      <div className="space-y-6">
-        <PageHead
-          title="Owner Admin"
-          sub="Manage all tenants, subscriptions, and platform settings"
-          actions={
-            <>
-              <DashButton variant="ghost" onClick={loadData}><RefreshCw className="size-4" /> Refresh</DashButton>
-            </>
-          }
-        />
+    <div className="min-h-screen bg-[#0a0a0f] text-foreground">
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
 
-        {error && (
-          <div className="flex items-center gap-3 rounded-2xl border border-error-500/20 bg-error-300/25 px-4 py-3">
-            <AlertTriangle className="size-5 shrink-0 text-error-500" />
-            <p className="flex-1 text-sm">{error}</p>
-            <button onClick={() => setError(null)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
+      {/* Header */}
+      <header className="sticky top-0 z-40 border-b border-white/5 bg-[#0a0a0f]/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex size-9 items-center justify-center rounded-xl border border-warning-300/30 bg-warning-300/10">
+              <Crown className="size-5 text-warning-300" />
+            </div>
+            <div>
+              <h1 className="font-display text-lg font-bold tracking-tight">Owner Control Panel</h1>
+              <p className="text-xs text-muted-foreground">Welcome back, {user.name}</p>
+            </div>
           </div>
-        )}
-
-        {platformStats && (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              icon={<Building2 className="size-4" />}
-              label="Total Tenants"
-              value={platformStats.totalTenants.toLocaleString()}
-              hint="All registered workspaces"
-            />
-            <StatCard
-              icon={<CreditCard className="size-4" />}
-              label="MRR"
-              value={formatCurrency(platformStats.mrr)}
-              hint="Monthly recurring revenue"
-            />
-            <StatCard
-              icon={<CheckCircle className="size-4" />}
-              label="Active Subscriptions"
-              value={platformStats.activeSubscriptions.toLocaleString()}
-              hint="Paying customers"
-            />
-            <StatCard
-              icon={<Timer className="size-4" />}
-              label="Trial Subscriptions"
-              value={platformStats.trialSubscriptions.toLocaleString()}
-              hint="Currently in trial period"
-            />
-          </div>
-        )}
-
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search tenants by name, email, or ID..."
-            className="h-12 w-full rounded-2xl border border-hairline bg-surface pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="size-4" />
-            </button>
-          )}
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+          >
+            <LogOut className="size-4" />
+            Logout
+          </button>
         </div>
+      </header>
 
-        {filteredTenants.length === 0 ? (
-          <EmptyState
-            icon={<Building2 className="size-6" />}
-            title="No tenants found"
-            body={search ? 'Try a different search term.' : 'No tenants have registered yet.'}
-          />
-        ) : (
+      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+        {/* Loading */}
+        {loading && (
+          <div className="animate-pulse space-y-6">
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="h-28 rounded-2xl border border-white/5 bg-white/5" />
+              ))}
+            </div>
+            <div className="h-12 rounded-xl border border-white/5 bg-white/5" />
+            <div className="space-y-3">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-28 rounded-2xl border border-white/5 bg-white/5" />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && tenants.length === 0 && !loading && (
+          <div className="flex items-center gap-3 rounded-2xl border border-error-300/20 bg-error-300/10 px-5 py-4">
+            <AlertTriangle className="size-5 shrink-0 text-error-300" />
+            <p className="flex-1 text-sm">{error}</p>
+            <button onClick={loadData} className="text-xs font-medium text-muted-foreground hover:text-foreground">
+              Retry
+            </button>
+          </div>
+        )}
+        {/* Platform Stats */}
+        {platformStats && !loading && (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <StatTile icon={<Building2 className="size-4" />} label="Total Tenants" value={platformStats.totalTenants.toLocaleString()} />
+            <StatTile icon={<CreditCard className="size-4" />} label="MRR" value={formatCurrency(platformStats.mrr)} />
+            <StatTile icon={<CheckCircle className="size-4" />} label="Active Subs" value={platformStats.activeSubscriptions.toLocaleString()} />
+            <StatTile icon={<Timer className="size-4" />} label="Trial Subs" value={platformStats.trialSubscriptions.toLocaleString()} />
+          </div>
+        )}
+
+        {/* Search + Add Tenant */}
+        {!loading && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search tenants by name, email, or ID..."
+                className="h-12 w-full rounded-xl border border-white/10 bg-white/5 pl-11 pr-4 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              {search && (
+                <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+            <button
+              onClick={() => setShowAddTenant(!showAddTenant)}
+              className="flex h-12 items-center justify-center gap-2 rounded-xl border border-primary/30 bg-primary/10 px-5 text-sm font-semibold text-primary transition hover:bg-primary/20"
+            >
+              <Building2 className="size-4" />
+              Add Tenant
+            </button>
+          </div>
+        )}
+        {/* Add Tenant Form */}
+        {showAddTenant && (
+          <form onSubmit={handleAddTenant} className="rounded-2xl border border-primary/30 bg-surface p-6">
+            <h3 className="mb-4 font-display text-lg font-bold tracking-tight">Create New Tenant</h3>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Tenant Name</label>
+                <input
+                  type="text"
+                  value={addTenantName}
+                  onChange={(e) => setAddTenantName(e.target.value)}
+                  placeholder="Acme Corp"
+                  className="h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Owner Email</label>
+                <input
+                  type="email"
+                  value={addTenantEmail}
+                  onChange={(e) => setAddTenantEmail(e.target.value)}
+                  placeholder="admin@acme.com"
+                  className="h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Password</label>
+                <input
+                  type="password"
+                  value={addTenantPassword}
+                  onChange={(e) => setAddTenantPassword(e.target.value)}
+                  placeholder="Strong password"
+                  className="h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-sm text-foreground placeholder:text-muted-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Plan</label>
+                <select
+                  value={addTenantPlan}
+                  onChange={(e) => setAddTenantPlan(e.target.value as PlanId)}
+                  className="h-10 w-full rounded-xl border border-hairline bg-surface-2 px-3 text-sm text-foreground transition focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                >
+                  {PLAN_OPTIONS.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="submit"
+                disabled={addTenantLoading}
+                className="flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-semibold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+              >
+                {addTenantLoading ? "Creating..." : "Create Tenant"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowAddTenant(false)}
+                className="h-10 rounded-xl border border-white/10 px-5 text-sm text-muted-foreground transition hover:bg-white/5 hover:text-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
+        {/* Tenant List */}
+        {!loading && filteredTenants.length === 0 && (
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-white/5 bg-white/[0.02] py-16">
+            <Building2 className="mb-3 size-8 text-muted-foreground" />
+            <p className="text-sm font-medium text-muted-foreground">{search ? "No tenants match your search." : "No tenants found."}</p>
+          </div>
+        )}
+
+        {!loading && filteredTenants.length > 0 && (
           <div className="space-y-3">
             {filteredTenants.map((t) => {
               const isExpanded = selectedTenantId === t.id;
@@ -519,25 +731,30 @@ export default function OwnerAdminPanel() {
                 <div key={t.id} className="space-y-3">
                   <div
                     className={cn(
-                      'rounded-2xl border bg-surface p-5 shadow-soft transition',
-                      isExpanded ? 'border-primary' : 'border-hairline hover:border-foreground/20',
+                      "rounded-2xl border bg-surface p-5 transition",
+                      isExpanded ? "border-primary" : "border-hairline hover:border-foreground/20",
                     )}
                   >
                     <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <button
-                            onClick={() => isExpanded ? closeDetail() : loadDetail(t.id)}
-                            className="text-left font-display text-base font-bold tracking-tight hover:text-primary transition-colors"
+                            onClick={() => (isExpanded ? closeDetail() : loadDetail(t.id))}
+                            className="text-left font-display text-base font-bold tracking-tight transition-colors hover:text-primary"
                           >
                             {t.name}
                           </button>
-                          <Badge variant={planBadgeVariant(t.plan)} size="sm">{t.plan}</Badge>
-                          <Badge variant={statusBadgeVariant(t.subscriptionStatus)} size="sm" dot>{t.subscriptionStatus}</Badge>
+                          <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-medium", planBadgeClasses(t.plan))}>
+                            {t.plan}
+                          </span>
+                          <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium", statusBadgeClasses(t.subscriptionStatus))}>
+                            <span className="size-1 rounded-full bg-current" />
+                            {t.subscriptionStatus}
+                          </span>
                         </div>
                         <div className="mt-1.5 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Mail className="size-3" /> {t.ownerEmail}</span>
-                          <span className="flex items-center gap-1"><Hash className="size-3" /> {t.id.slice(0, 8)}</span>
+                          <span className="flex items-center gap-1"><Hash className="size-3" /> {t.slug}</span>
                           {t.currentPeriodEnd && (
                             <span className="flex items-center gap-1"><Calendar className="size-3" /> Ends {formatDate(t.currentPeriodEnd)}</span>
                           )}
@@ -551,23 +768,22 @@ export default function OwnerAdminPanel() {
 
                       <div className="flex items-center gap-2">
                         <div className="relative">
-                          <DashButton
-                            variant="ghost"
+                          <button
                             onClick={() => { setShowPlanDropdown(showPlanDropdown === t.id ? null : t.id); setShowStatusDropdown(null); }}
-                            disabled={isBusy(`plan-${t.id}`)}
-                            className="text-xs"
+                            disabled={isBusy("plan-" + t.id)}
+                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
                           >
                             <Zap className="size-3" /> Plan <ChevronDown className="size-3" />
-                          </DashButton>
+                          </button>
                           {showPlanDropdown === t.id && (
                             <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-hairline bg-surface shadow-lift">
-                              {PLAN_OPTIONS.map(p => (
+                              {PLAN_OPTIONS.map((p) => (
                                 <button
                                   key={p.id}
                                   onClick={() => handlePlanChange(t.id, p.id)}
                                   className={cn(
-                                    'flex w-full items-center gap-2 px-3 py-2 text-sm transition hover:bg-surface-2',
-                                    t.plan === p.id && 'font-semibold text-primary',
+                                    "flex w-full items-center gap-2 px-3 py-2 text-sm transition hover:bg-surface-2",
+                                    t.plan === p.id && "font-semibold text-primary",
                                   )}
                                 >
                                   {t.plan === p.id && <CheckCircle className="size-3" />}
@@ -579,23 +795,22 @@ export default function OwnerAdminPanel() {
                         </div>
 
                         <div className="relative">
-                          <DashButton
-                            variant="ghost"
+                          <button
                             onClick={() => { setShowStatusDropdown(showStatusDropdown === t.id ? null : t.id); setShowPlanDropdown(null); }}
-                            disabled={isBusy(`status-${t.id}`)}
-                            className="text-xs"
+                            disabled={isBusy("status-" + t.id)}
+                            className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
                           >
                             Status <ChevronDown className="size-3" />
-                          </DashButton>
+                          </button>
                           {showStatusDropdown === t.id && (
                             <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-xl border border-hairline bg-surface shadow-lift">
-                              {STATUS_OPTIONS.map(s => (
+                              {STATUS_OPTIONS.map((s) => (
                                 <button
                                   key={s.id}
                                   onClick={() => handleStatusChange(t.id, s.id)}
                                   className={cn(
-                                    'flex w-full items-center gap-2 px-3 py-2 text-sm transition hover:bg-surface-2',
-                                    t.subscriptionStatus === s.id && 'font-semibold text-primary',
+                                    "flex w-full items-center gap-2 px-3 py-2 text-sm transition hover:bg-surface-2",
+                                    t.subscriptionStatus === s.id && "font-semibold text-primary",
                                   )}
                                 >
                                   {t.subscriptionStatus === s.id && <CheckCircle className="size-3" />}
@@ -606,104 +821,119 @@ export default function OwnerAdminPanel() {
                           )}
                         </div>
 
-                        <DashButton
-                          variant="ghost"
-                          onClick={() => isExpanded ? closeDetail() : loadDetail(t.id)}
+                        <button
+                          onClick={() => (isExpanded ? closeDetail() : loadDetail(t.id))}
                           disabled={detailLoading && selectedTenantId !== t.id}
-                          className="text-xs"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
                         >
                           {isExpanded ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-                          {detailLoading && selectedTenantId === t.id ? 'Loading...' : 'Details'}
-                        </DashButton>
+                          {detailLoading && selectedTenantId === t.id ? "Loading..." : "Details"}
+                        </button>
                       </div>
                     </div>
-
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-hairline pt-3">
                       <div className="flex items-center gap-1.5">
                         <input
                           type="number"
-                          value={extendDays[t.id] || ''}
-                          onChange={(e) => setExtendDays(prev => ({ ...prev, [t.id]: e.target.value }))}
+                          value={extendDays[t.id] || ""}
+                          onChange={(e) => setExtendDays((prev) => ({ ...prev, [t.id]: e.target.value }))}
                           placeholder="Days"
                           className="h-8 w-20 rounded-lg border border-hairline bg-surface-2 px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                           min="1"
                         />
-                        <DashButton variant="ghost" onClick={() => handleExtend(t.id)} disabled={isBusy(`extend-${t.id}`)} className="h-8 text-xs">
+                        <button
+                          onClick={() => handleExtend(t.id)}
+                          disabled={isBusy("extend-" + t.id)}
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                        >
                           <Timer className="size-3" /> Extend
-                        </DashButton>
+                        </button>
                       </div>
 
                       {showRename === t.id ? (
                         <div className="flex items-center gap-1.5">
                           <input
                             type="text"
-                            value={renameValue[t.id] || ''}
-                            onChange={(e) => setRenameValue(prev => ({ ...prev, [t.id]: e.target.value }))}
+                            value={renameValue[t.id] || ""}
+                            onChange={(e) => setRenameValue((prev) => ({ ...prev, [t.id]: e.target.value }))}
                             placeholder="New name"
                             className="h-8 w-36 rounded-lg border border-hairline bg-surface-2 px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
                             autoFocus
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleRename(t.id); if (e.key === 'Escape') setShowRename(null); }}
+                            onKeyDown={(e) => { if (e.key === "Enter") handleRename(t.id); if (e.key === "Escape") setShowRename(null); }}
                           />
-                          <DashButton variant="ghost" onClick={() => handleRename(t.id)} disabled={isBusy(`rename-${t.id}`)} className="h-8 text-xs">Save</DashButton>
-                          <DashButton variant="ghost" onClick={() => setShowRename(null)} className="h-8 text-xs"><X className="size-3" /></DashButton>
+                          <button
+                            onClick={() => handleRename(t.id)}
+                            disabled={isBusy("rename-" + t.id)}
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
+                          >Save</button>
+                          <button
+                            onClick={() => setShowRename(null)}
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                          ><X className="size-3" /></button>
                         </div>
                       ) : (
-                        <DashButton
-                          variant="ghost"
-                          onClick={() => { setShowRename(t.id); setRenameValue(prev => ({ ...prev, [t.id]: t.name })); }}
-                          className="h-8 text-xs"
+                        <button
+                          onClick={() => { setShowRename(t.id); setRenameValue((prev) => ({ ...prev, [t.id]: t.name })); }}
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
                         >
                           <PenLine className="size-3" /> Rename
-                        </DashButton>
+                        </button>
                       )}
 
-                      {t.subscriptionStatus === 'cancelled' || t.subscriptionStatus === 'expired' ? (
-                        <DashButton
-                          variant="ghost"
+                      {t.subscriptionStatus === "cancelled" || t.subscriptionStatus === "expired" ? (
+                        <button
                           onClick={() => handleReactivate(t.id)}
-                          disabled={isBusy(`reactivate-${t.id}`)}
-                          className="h-8 text-xs"
+                          disabled={isBusy("reactivate-" + t.id)}
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10 disabled:opacity-50"
                         >
                           <RotateCcw className="size-3" /> Reactivate
-                        </DashButton>
+                        </button>
                       ) : confirmCancel === t.id ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-error-500">Confirm?</span>
-                          <DashButton variant="ghost" onClick={() => handleCancel(t.id)} disabled={isBusy(`cancel-${t.id}`)} className="h-8 text-xs border border-error-500/30 text-error-500">
+                          <span className="text-xs text-error-300">Confirm?</span>
+                          <button
+                            onClick={() => handleCancel(t.id)}
+                            disabled={isBusy("cancel-" + t.id)}
+                            className="flex h-8 items-center rounded-lg border border-error-300/30 bg-error-300/10 px-2.5 text-xs text-error-300 transition hover:bg-error-300/20 disabled:opacity-50"
+                          >
                             Yes, cancel
-                          </DashButton>
-                          <DashButton variant="ghost" onClick={() => setConfirmCancel(null)} className="h-8 text-xs">
-                            <X className="size-3" />
-                          </DashButton>
+                          </button>
+                          <button
+                            onClick={() => setConfirmCancel(null)}
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                          ><X className="size-3" /></button>
                         </div>
                       ) : (
-                        <DashButton
-                          variant="ghost"
+                        <button
                           onClick={() => setConfirmCancel(t.id)}
-                          className="h-8 text-xs"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
                         >
                           <Pause className="size-3" /> Cancel
-                        </DashButton>
+                        </button>
                       )}
 
                       {showDeleteConfirm === t.id ? (
                         <div className="flex items-center gap-1.5">
-                          <span className="text-xs text-error-500">Delete forever?</span>
-                          <DashButton variant="ghost" onClick={() => handleDelete(t.id)} disabled={isBusy(`delete-${t.id}`)} className="h-8 text-xs border border-error-500/30 text-error-500">
+                          <span className="text-xs text-error-300">Delete forever?</span>
+                          <button
+                            onClick={() => handleDelete(t.id)}
+                            disabled={isBusy("delete-" + t.id)}
+                            className="flex h-8 items-center gap-1 rounded-lg border border-error-300/30 bg-error-300/10 px-2.5 text-xs text-error-300 transition hover:bg-error-300/20 disabled:opacity-50"
+                          >
                             <Trash2 className="size-3" /> Delete
-                          </DashButton>
-                          <DashButton variant="ghost" onClick={() => setShowDeleteConfirm(null)} className="h-8 text-xs">
-                            <X className="size-3" />
-                          </DashButton>
+                          </button>
+                          <button
+                            onClick={() => setShowDeleteConfirm(null)}
+                            className="flex h-8 items-center rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs transition hover:bg-white/10"
+                          ><X className="size-3" /></button>
                         </div>
                       ) : (
-                        <DashButton
-                          variant="ghost"
+                        <button
                           onClick={() => setShowDeleteConfirm(t.id)}
-                          className="h-8 text-xs text-error-500 hover:text-error-500"
+                          className="flex h-8 items-center gap-1 rounded-lg border border-hairline bg-surface-2 px-2.5 text-xs text-error-300 transition hover:bg-white/10 hover:text-error-300"
                         >
                           <Trash2 className="size-3" /> Delete
-                        </DashButton>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -716,23 +946,22 @@ export default function OwnerAdminPanel() {
             })}
           </div>
         )}
-      </div>
-    </DashboardLayout>
+      </main>
+    </div>
   );
 }
 
-
-
+// ─── Tenant Detail Panel ──────────────────────────────────────────────
 function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; loading: boolean }) {
   if (loading && !detail) {
     return (
-      <Panel className="animate-pulse">
+      <div className="rounded-2xl border border-primary/30 bg-surface p-6 animate-pulse">
         <div className="space-y-4">
-          {[0, 1, 2].map(i => (
+          {[0, 1, 2].map((i) => (
             <div key={i} className="h-20 rounded-xl bg-surface-2" />
           ))}
         </div>
-      </Panel>
+      </div>
     );
   }
 
@@ -743,8 +972,8 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
   const stats = detail.stats;
 
   return (
-    <Panel className="border-primary/30">
-      <div className="flex items-center justify-between mb-6">
+    <div className="rounded-2xl border border-primary/30 bg-surface p-6">
+      <div className="mb-6 flex items-center justify-between">
         <h3 className="font-display text-lg font-bold tracking-tight">{detail.name}</h3>
         <span className="text-xs text-muted-foreground">ID: {detail.id}</span>
       </div>
@@ -752,7 +981,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-4">
           <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <Shield className="size-4 text-primary" /> Owner Info
             </h4>
             <div className="space-y-2 text-sm">
@@ -767,7 +996,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Verified</span>
                 {detail.owner.emailVerified ? (
-                  <span className="flex items-center gap-1 text-success-500"><CheckCircle className="size-3" /> Yes</span>
+                  <span className="flex items-center gap-1 text-success-300"><CheckCircle className="size-3" /> Yes</span>
                 ) : (
                   <span className="flex items-center gap-1 text-muted-foreground"><XCircle className="size-3" /> No</span>
                 )}
@@ -781,17 +1010,22 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
 
           {sub && (
             <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <CreditCard className="size-4 text-primary" /> Subscription
               </h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Plan</span>
-                  <Badge variant={planBadgeVariant(sub.planId)}>{sub.planName}</Badge>
+                  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", planBadgeClasses(sub.planId))}>
+                    {sub.planName}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Status</span>
-                  <Badge variant={statusBadgeVariant(sub.status)} dot>{sub.status}</Badge>
+                  <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", statusBadgeClasses(sub.status))}>
+                    <span className="size-1.5 rounded-full bg-current" />
+                    {sub.status}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Period Start</span>
@@ -810,7 +1044,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                 {sub.cancelledAt && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cancelled At</span>
-                    <span className="font-medium text-error-500">{formatDate(sub.cancelledAt)}</span>
+                    <span className="font-medium text-error-300">{formatDate(sub.cancelledAt)}</span>
                   </div>
                 )}
                 {sub.paddleSubscriptionId && (
@@ -822,31 +1056,30 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               </div>
             </div>
           )}
-
           {limits && (
             <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <Zap className="size-4 text-primary" /> Plan Limits
               </h4>
               <div className="space-y-3">
                 {[
-                  { label: 'Conversations', used: sub!.conversationsUsed, limit: limits.conversations },
-                  { label: 'Documents', used: sub!.documentsUsed, limit: limits.documents },
-                  { label: 'Knowledge Bases', used: 0, limit: limits.knowledgeBases },
-                  { label: 'Team Members', used: detail.teamMembers.length, limit: limits.teamMembers },
+                  { label: "Conversations", used: sub!.conversationsUsed, limit: limits.conversations },
+                  { label: "Documents", used: sub!.documentsUsed, limit: limits.documents },
+                  { label: "Knowledge Bases", used: 0, limit: limits.knowledgeBases },
+                  { label: "Team Members", used: detail.teamMembers.length, limit: limits.teamMembers },
                 ].map(({ label, used, limit }) => (
                   <div key={label}>
-                    <div className="flex justify-between text-xs mb-1">
+                    <div className="mb-1 flex justify-between text-xs">
                       <span className="text-muted-foreground">{label}</span>
                       <span className="tabular-nums">{used.toLocaleString()} / {limit.toLocaleString()}</span>
                     </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-surface">
+                    <div className="h-1.5 overflow-hidden rounded-full bg-white/5">
                       <div
                         className={cn(
-                          'h-full rounded-full transition-all',
-                          usagePercent(used, limit) > 90 ? 'bg-error-500' : usagePercent(used, limit) > 70 ? 'bg-warning-500' : 'bg-primary',
+                          "h-full rounded-full transition-all",
+                          usagePercent(used, limit) > 90 ? "bg-error-300" : usagePercent(used, limit) > 70 ? "bg-warning-300" : "bg-primary",
                         )}
-                        style={{ width: `${Math.min(usagePercent(used, limit), 100)}%` }}
+                        style={{ width: Math.min(usagePercent(used, limit), 100) + "%" }}
                       />
                     </div>
                   </div>
@@ -855,7 +1088,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                   <span>API Calls: {limits.apiCalls.toLocaleString()}/mo</span>
                   <span>Storage: {limits.storageMb.toLocaleString()} MB</span>
                   <span>Widgets: {limits.widgets}</span>
-                  <span>Custom Branding: {limits.customBranding ? 'Yes' : 'No'}</span>
+                  <span>Custom Branding: {limits.customBranding ? "Yes" : "No"}</span>
                 </div>
               </div>
             </div>
@@ -864,75 +1097,52 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
 
         <div className="space-y-4">
           <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-            <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+            <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
               <TrendingUp className="size-4 text-primary" /> Stats
             </h4>
             <div className="grid grid-cols-3 gap-3">
               {[
-                { icon: <MessageSquare className="size-4" />, label: 'Total Convos', value: stats.totalConversations },
-                { icon: <MessageSquare className="size-4" />, label: 'Active Convos', value: stats.activeConversations },
-                { icon: <Users className="size-4" />, label: 'Leads', value: stats.leads },
-                { icon: <FileText className="size-4" />, label: 'Documents', value: stats.documents },
-                { icon: <Users className="size-4" />, label: 'Team Members', value: stats.teamMembers },
-                { icon: <Key className="size-4" />, label: 'API Keys', value: stats.apiKeys },
+                { icon: <MessageSquare className="size-4" />, label: "Total Convos", value: stats.totalConversations },
+                { icon: <MessageSquare className="size-4" />, label: "Active Convos", value: stats.activeConversations },
+                { icon: <Users className="size-4" />, label: "Leads", value: stats.leads },
+                { icon: <FileText className="size-4" />, label: "Documents", value: stats.documents },
+                { icon: <Users className="size-4" />, label: "Team Members", value: stats.teamMembers },
+                { icon: <Key className="size-4" />, label: "API Keys", value: stats.apiKeys },
               ].map(({ icon, label, value }) => (
                 <div key={label} className="rounded-xl border border-hairline bg-surface p-3 text-center">
-                  <span className="flex justify-center text-muted-foreground mb-1">{icon}</span>
+                  <span className="mb-1 flex justify-center text-muted-foreground">{icon}</span>
                   <p className="font-display text-lg font-bold tabular-nums">{value.toLocaleString()}</p>
-                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{label}</p>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {detail.usageHistory.length > 0 && (
-            <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                <BarChart3 className="size-4 text-primary" /> Usage History
-              </h4>
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-hairline">
-                      <th className="px-2 py-1.5 text-left font-semibold uppercase tracking-wider text-muted-foreground">Date</th>
-                      <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-wider text-muted-foreground">Convos</th>
-                      <th className="px-2 py-1.5 text-right font-semibold uppercase tracking-wider text-muted-foreground">Messages</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.usageHistory.slice(0, 10).map((r, i) => (
-                      <tr key={`${r.date}-${i}`} className="border-b border-hairline last:border-0">
-                        <td className="px-2 py-1.5">{formatDate(r.date)}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{r.conversations.toLocaleString()}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums">{r.messages.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
           {detail.teamMembers.length > 0 && (
             <div className="rounded-2xl border border-hairline bg-surface-2 p-4">
-              <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+              <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                 <Users className="size-4 text-primary" /> Team Members
               </h4>
               <div className="space-y-2">
-                {detail.teamMembers.map(m => (
+                {detail.teamMembers.map((m) => (
                   <div key={m.id} className="flex items-center justify-between rounded-xl border border-hairline bg-surface p-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ember-soft text-primary text-xs font-bold">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-primary">
                         {m.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{m.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                        <p className="truncate text-sm font-medium">{m.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{m.email}</p>
                       </div>
                     </div>
-                    <Badge variant={m.role === 'owner' ? 'premium' : m.role === 'admin' ? 'info' : 'neutral'} size="sm">
+                    <span className={cn(
+                      "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+                      m.role === "owner" ? "bg-warning-300/20 text-warning-300 border-warning-300/30" :
+                      m.role === "admin" ? "bg-info-300/20 text-info-300 border-info-300/30" :
+                      "bg-white/10 text-muted-foreground border-white/10"
+                    )}>
                       {m.role}
-                    </Badge>
+                    </span>
                   </div>
                 ))}
               </div>
@@ -940,6 +1150,51 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
           )}
         </div>
       </div>
-    </Panel>
+    </div>
   );
+}
+
+export default function OwnerAdminPanel() {
+  const [ownerUser, setOwnerUser] = useState<OwnerUser | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const token = localStorage.getItem("owner_token");
+    if (!token) {
+      setChecking(false);
+      return;
+    }
+    ownerFetch<OwnerUser>("/auth/me")
+      .then((user) => setOwnerUser(user))
+      .catch(() => {
+        localStorage.removeItem("owner_token");
+      })
+      .finally(() => setChecking(false));
+  }, []);
+
+  const handleLogin = (user: OwnerUser) => {
+    setOwnerUser(user);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("owner_token");
+    setOwnerUser(null);
+  };
+
+  if (checking) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0a0a0f]">
+        <div className="text-center">
+          <div className="mx-auto mb-4 size-8 animate-spin rounded-full border-2 border-white/10 border-t-warning-300" />
+          <p className="text-sm text-muted-foreground">Verifying access...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ownerUser) {
+    return <LoginView onLogin={handleLogin} />;
+  }
+
+  return <AdminPanelView user={ownerUser} onLogout={handleLogout} />;
 }
