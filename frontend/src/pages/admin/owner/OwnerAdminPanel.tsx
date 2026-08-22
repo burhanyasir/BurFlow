@@ -392,6 +392,12 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
   const [addTenantPlan, setAddTenantPlan] = useState<PlanId>('free');
   const [addTenantLoading, setAddTenantLoading] = useState(false);
 
+  const [subRequests, setSubRequests] = useState<any[]>([]);
+  const [allSubRequests, setAllSubRequests] = useState<any[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestAction, setRequestAction] = useState<string | null>(null);
+  const [requestTab, setRequestTab] = useState<'pending' | 'all'>('pending');
+
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -401,7 +407,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
         ownerFetch<PlatformStats>('/stats'),
       ]);
       if (tenantsRes.status === 'fulfilled') setTenants(tenantsRes.value.tenants || []);
-      if (statsRes.status === 'fulfilled') setPlatformStats(statsRes.value);
+      if (statsRes.status === 'fulfilled') setPlatformStats(tenantsRes.value);
     } catch (err: any) {
       setError(err.message || 'Failed to load owner data');
     } finally {
@@ -409,7 +415,25 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
     }
   }, []);
 
+  const loadRequests = useCallback(async (status?: string) => {
+    setRequestsLoading(true);
+    try {
+      if (requestTab === 'all') {
+        const res = await ownerFetch<{ requests: any[] }>('/requests/all');
+        setAllSubRequests(res.requests || []);
+      } else {
+        const res = await ownerFetch<{ requests: any[] }>(`/requests/list?status=${status || 'pending'}`);
+        setSubRequests(res.requests || []);
+      }
+    } catch (err: any) {
+      addToast(err.message || 'Failed to load requests', 'error');
+    } finally {
+      setRequestsLoading(false);
+    }
+  }, [requestTab, addToast]);
+
   useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => { loadRequests(); }, [loadRequests]);
 
   const loadDetail = useCallback(async (tenantId: string) => {
     setDetailLoading(true);
@@ -544,6 +568,33 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
     }
   };
 
+  const handleApproveRequest = async (requestId: string) => {
+    setRequestAction(requestId);
+    try {
+      await ownerFetch(`/requests/${requestId}/approve`, { method: 'POST' });
+      addToast('Plan activated!', 'success');
+      await loadRequests();
+      await loadData();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to approve', 'error');
+    } finally {
+      setRequestAction(null);
+    }
+  };
+
+  const handleRejectRequest = async (requestId: string) => {
+    setRequestAction(requestId);
+    try {
+      await ownerFetch(`/requests/${requestId}/reject`, { method: 'POST', body: JSON.stringify({ reason: 'Rejected by owner' }) });
+      addToast('Request rejected', 'success');
+      await loadRequests();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to reject', 'error');
+    } finally {
+      setRequestAction(null);
+    }
+  };
+
   const filteredTenants = tenants.filter((t) => {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -619,6 +670,53 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
             <StatTile icon={<CreditCard className="size-4" />} label="MRR" value={formatCurrency(platformStats.mrr)} />
             <StatTile icon={<CheckCircle className="size-4" />} label="Active Subs" value={platformStats.activeSubscriptions.toLocaleString()} />
             <StatTile icon={<Timer className="size-4" />} label="Trial Subs" value={platformStats.trialSubscriptions.toLocaleString()} />
+          </div>
+        )}
+
+        {/* Subscription Requests */}
+        {!loading && (
+          <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="flex size-8 items-center justify-center rounded-lg bg-warning-300/10">
+                  <CreditCard className="size-4 text-warning-300" />
+                </div>
+                <h2 className="font-display text-sm font-bold tracking-tight">Plan Requests</h2>
+                {subRequests.length > 0 && requestTab === 'pending' && (
+                  <span className="rounded-full bg-warning-300/20 px-2 py-0.5 text-xs font-bold text-warning-300">{subRequests.length}</span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setRequestTab('pending'); }} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${requestTab === 'pending' ? 'bg-warning-300/20 text-warning-300' : 'text-muted-foreground hover:text-foreground'}`}>Pending</button>
+                <button onClick={() => { setRequestTab('all'); }} className={`rounded-lg px-3 py-1.5 text-xs font-medium transition ${requestTab === 'all' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>All</button>
+              </div>
+            </div>
+            {requestsLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+            ) : (requestTab === 'pending' ? subRequests : allSubRequests).length === 0 ? (
+              <p className="text-center text-sm text-muted-foreground py-6">No {requestTab === 'pending' ? 'pending ' : ''}requests yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {(requestTab === 'pending' ? subRequests : allSubRequests).map((req: any) => (
+                  <div key={req.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/[0.02] px-4 py-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-medium truncate">{req.user_email}</p>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${req.status === 'pending' ? 'bg-warning-300/20 text-warning-300' : req.status === 'approved' ? 'bg-success-300/20 text-success-300' : 'bg-error-300/20 text-error-300'}`}>{req.status}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">Requesting <strong className="text-foreground">{req.requested_plan}</strong> plan {req.user_name ? `· ${req.user_name}` : ''} {req.billing_period ? `· ${req.billing_period}` : ''}</p>
+                      <p className="text-[10px] text-muted-foreground/60 mt-0.5">{req.created_at ? new Date(req.created_at).toLocaleString() : ''}</p>
+                    </div>
+                    {req.status === 'pending' && (
+                      <div className="flex gap-2 ml-4">
+                        <button disabled={requestAction === req.id} onClick={() => handleApproveRequest(req.id)} className="rounded-lg bg-success-300/20 px-3 py-1.5 text-xs font-medium text-success-300 hover:bg-success-300/30 transition disabled:opacity-50">{requestAction === req.id ? <Loader2 className="size-3 animate-spin inline" /> : 'Approve'}</button>
+                        <button disabled={requestAction === req.id} onClick={() => handleRejectRequest(req.id)} className="rounded-lg bg-error-300/20 px-3 py-1.5 text-xs font-medium text-error-300 hover:bg-error-300/30 transition disabled:opacity-50">Reject</button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

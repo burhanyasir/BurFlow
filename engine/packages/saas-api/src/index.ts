@@ -52,6 +52,7 @@ import { createPublicRoutes } from './routes/public';
 import { createBillingRoutes } from './routes/billing';
 import { createAdminRoutes } from './routes/admin';
 import { createOwnerAdminRoutes } from './routes/owner-admin';
+import { createSubscriptionRequestRoutes } from './routes/subscription-requests';
 import { createOwnerAuthRoutes } from './routes/owner-auth';
 import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
@@ -518,6 +519,10 @@ app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo,
 app.use('/api/owner', createRateLimit({ windowMs: 60_000, max: 300 }));
 app.use('/api/owner/auth', createOwnerAuthRoutes(userRepo, tenantRepo, JWT_SECRET));
 app.use('/api/owner', createOwnerAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo, teamMemberRepo, JWT_SECRET));
+
+// Subscription request routes — users request plans, owner approves
+app.use('/api/billing/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));
+app.use('/api/owner/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));
 
 // Customer Activation routes
 app.use('/api/admin', auth, tenantGuard, createActivationRoutes(

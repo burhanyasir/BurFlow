@@ -18,6 +18,7 @@ export interface PricingTier {
 export interface PricingCardProps {
   tier: PricingTier;
   className?: string;
+  onCtaClick?: (plan: string) => void;
 }
 
 const variantCardStyles: Record<string, string> = {
@@ -34,7 +35,7 @@ const variantTextStyles: Record<string, string> = {
   enterprise: 'text-white'
 };
 
-export function PricingCard({ tier, className }: PricingCardProps) {
+export function PricingCard({ tier, className, onCtaClick }: PricingCardProps) {
   const isEnterprise = tier.variant === 'enterprise';
   return (
     <div className={cn('relative', className)}>
@@ -91,6 +92,7 @@ export function PricingCard({ tier, className }: PricingCardProps) {
             fullWidth
             size="lg"
             className={isEnterprise ? 'bg-[var(--color-accent-600)] hover:bg-[var(--color-accent-700)] text-white border-none' : undefined}
+            onClick={onCtaClick ? () => onCtaClick(tier.variant === 'free' ? 'free' : tier.name.toLowerCase()) : undefined}
           >
             {tier.cta}
           </Button>

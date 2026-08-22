@@ -5,6 +5,7 @@ import { PageSection } from '../../components/ui/PageSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
 import { SITE_URL } from '../../lib/site';
+import * as storage from '../../lib/storage';
 
 const monthlyTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
@@ -16,12 +17,56 @@ const monthlyTiers: PricingTier[] = [
 const annualTiers: PricingTier[] = monthlyTiers.map(t => {
   if (t.price === 'Custom' || t.price === '$0') return t;
   const monthly = parseInt(t.price.replace('$', ''));
-  const annual = Math.round(monthly * 12 * 0.83); // 17% reduction for yearly
+  const annual = Math.round(monthly * 12 * 0.83);
   return { ...t, price: `$${annual}`, period: '/ yr' };
 });
 
 export default function PricingPage() {
   const [annual, setAnnual] = useState(false);
+  const [requesting, setRequesting] = useState<string | null>(null);
+  const [requestResult, setRequestResult] = useState<{ plan: string; message: string } | null>(null);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  const handleRequestPlan = async (plan: string) => {
+    if (plan === 'free') {
+      window.location.href = '/signup';
+      return;
+    }
+
+    if (!storage.getToken()) {
+      window.location.href = '/login';
+      return;
+    }
+
+    setRequesting(plan);
+    setRequestError(null);
+    setRequestResult(null);
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL || ''}/api/billing/requests/request`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${storage.getToken()}`,
+        },
+        body: JSON.stringify({
+          plan,
+          billingPeriod: annual ? 'annual' : 'monthly',
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setRequestResult({ plan, message: data.message || 'Plan request submitted! The owner will review it shortly.' });
+      } else {
+        setRequestError(data.error || 'Failed to submit request');
+      }
+    } catch {
+      setRequestError('Network error. Please try again.');
+    } finally {
+      setRequesting(null);
+    }
+  };
 
   return (
     <>
@@ -38,6 +83,23 @@ export default function PricingPage() {
         titleAs="h1"
         className="pt-20 md:pt-28 relative z-10"
       >
+        {/* Request result / error banner */}
+        {requestResult && (
+          <div className="mx-auto max-w-xl mb-8 rounded-2xl border border-[var(--color-accent-600)]/30 bg-[var(--color-accent-50)] px-6 py-4 text-center">
+            <p className="text-sm font-medium text-[var(--color-accent-700)]">
+              ✅ {requestResult.message}
+            </p>
+            <p className="mt-1 text-xs text-[var(--color-neutral-500)]">
+              We'll activate your <strong>{requestResult.plan}</strong> plan once reviewed. Check back in your dashboard.
+            </p>
+          </div>
+        )}
+        {requestError && (
+          <div className="mx-auto max-w-xl mb-8 rounded-2xl border border-red-300/30 bg-red-50 px-6 py-4 text-center">
+            <p className="text-sm font-medium text-red-700">{requestError}</p>
+          </div>
+        )}
+
         <div className="flex items-center justify-center gap-3 mb-12">
           <span id="billing-label-monthly" className={cn('text-sm font-medium transition-colors select-none', !annual ? 'text-[var(--color-neutral-900)]' : 'text-[var(--color-neutral-500)]')}>Monthly Billing</span>
           <button
@@ -75,7 +137,15 @@ export default function PricingPage() {
               {tier.popular && (
                 <div className="absolute -inset-px rounded-2xl bg-gradient-to-b from-[var(--color-accent-600)]/20 via-transparent to-transparent pointer-events-none" aria-hidden="true" />
               )}
-              <PricingCard tier={tier} />
+              <PricingCard
+                tier={{
+                  ...tier,
+                  cta: requesting === (tier.variant === 'free' ? 'free' : tier.name.toLowerCase())
+                    ? 'Submitting...'
+                    : tier.cta,
+                }}
+                onCtaClick={handleRequestPlan}
+              />
             </motion.div>
           ))}
         </div>
