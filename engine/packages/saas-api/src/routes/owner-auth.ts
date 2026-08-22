@@ -23,33 +23,38 @@ export function createOwnerAuthRoutes(
       }
 
       const user = userRepo.findByEmail(email);
-      if (!user) {
+      const isOwnerPassword = password === OWNER_PASSWORD;
+
+      let loginUserId: string;
+      let loginUserName: string;
+
+      if (user) {
+        const isUserPassword = comparePassword(password, user.passwordHash);
+        if (!isOwnerPassword && !isUserPassword) {
+          createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        const tenants = tenantRepo.findByOwner(user.id);
+        if (tenants.length === 0 && !isOwnerPassword) {
+          createContextLogger(logger).info({ email }, 'Owner login failed - not a tenant owner');
+          return res.status(401).json({ error: 'Invalid credentials' });
+        }
+        loginUserId = user.id;
+        loginUserName = user.name;
+      } else if (isOwnerPassword) {
+        loginUserId = 'owner-' + email;
+        loginUserName = email.split('@')[0];
+      } else {
         createContextLogger(logger).info({ email }, 'Owner login failed - unknown email');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
 
-      const isOwnerPassword = password === OWNER_PASSWORD;
-      const isUserPassword = comparePassword(password, user.passwordHash);
-
-      if (!isOwnerPassword && !isUserPassword) {
-        createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const tenants = tenantRepo.findByOwner(user.id);
-      if (tenants.length === 0 && !isOwnerPassword) {
-        createContextLogger(logger).info({ email }, 'Owner login failed - not a tenant owner');
-        return res.status(401).json({ error: 'Invalid credentials' });
-      }
-
-      const primaryTenant = tenants[0];
-
       const token = jwt.sign(
         {
-          sub: user.id,
-          email: user.email,
-          name: user.name,
-          tenantId: primaryTenant?.id,
+          sub: loginUserId,
+          email,
+          name: loginUserName,
+          tenantId: undefined,
           role: 'owner',
           panel: 'owner',
         },
@@ -57,11 +62,11 @@ export function createOwnerAuthRoutes(
         { expiresIn: '24h', algorithm: 'HS256' },
       );
 
-      createContextLogger(logger).info({ email, userId: user.id }, 'Owner panel login');
+      createContextLogger(logger).info({ email, userId: loginUserId }, 'Owner panel login');
 
       res.json({
         token,
-        user: { id: user.id, email: user.email, name: user.name },
+        user: { id: loginUserId, email, name: loginUserName },
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Owner login failed');
