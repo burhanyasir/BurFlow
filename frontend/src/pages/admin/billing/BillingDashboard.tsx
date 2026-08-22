@@ -7,7 +7,7 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, Clock } from 'lucide-react';
+import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, Clock, Upload } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -58,6 +58,8 @@ export default function BillingDashboard() {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('month');
   const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
   const [requestingPlan, setRequestingPlan] = useState<string | null>(null);
+  const [uploadingSS, setUploadingSS] = useState(false);
+  const [ssSubmitted, setSsSubmitted] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null); try {
@@ -86,6 +88,31 @@ export default function BillingDashboard() {
     } catch (err: any) {
       addToast(err.message || 'Failed to submit plan request', 'error');
     } finally { setRequestingPlan(null); }
+  };
+
+  const handleScreenshotUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !pendingRequest) return;
+    setUploadingSS(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      await apiClient.post('/support/payment-confirm', {
+        requestedPlan: pendingRequest.plan,
+        amount: pendingRequest.plan === 'starter' ? '49' : pendingRequest.plan === 'pro' ? '99' : '120',
+        billingPeriod: pendingRequest.billingPeriod,
+        walletAccount: 'PK58SADA0000003007645484',
+        screenshotUrl: dataUrl,
+      });
+      setSsSubmitted(true);
+      addToast('Screenshot uploaded! The owner will review it shortly.', 'success');
+    } catch (err: any) {
+      addToast(err.message || 'Failed to upload screenshot', 'error');
+    } finally { setUploadingSS(false); }
   };
 
   const statusLabel = (sub: CurrentSubscription): string => {
@@ -161,20 +188,28 @@ export default function BillingDashboard() {
                 <span className="font-semibold">Pending plan request</span> — your request for the <span className="font-semibold">{pendingRequest.plan}</span> plan ({pendingRequest.billingPeriod}) is being reviewed.
               </div>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+            <div className="rounded-xl border border-hairline bg-surface-2 p-4 space-y-3">
               <h4 className="text-sm font-bold">Payment Instructions</h4>
-              <p className="text-xs text-muted-foreground">Send payment to the following account to activate your plan:</p>
+              <p className="text-xs text-muted-foreground">Send payment to the following bank account to activate your plan:</p>
               <div className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3">
                 <CreditCard className="size-5 text-amber-500" />
                 <div>
-                  <p className="text-xs text-muted-foreground">JazzCash / EasyPaisa Account</p>
+                  <p className="text-xs text-muted-foreground">Bank Account</p>
                   <p className="text-lg font-bold font-mono tracking-wider text-foreground">PK58SADA0000003007645484</p>
                 </div>
               </div>
               <p className="text-xs text-muted-foreground">
-                After sending payment, you can optionally upload a screenshot or message us at{' '}
+                After sending payment, upload a screenshot below or email us at{' '}
                 <a href="mailto:burflow2026@gmail.com" className="text-primary hover:underline">burflow2026@gmail.com</a>
               </p>
+              <div className="flex items-center gap-3">
+                <label className={cn('flex cursor-pointer items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-2.5 text-sm font-medium text-muted-foreground transition hover:bg-surface-2 hover:text-foreground', ssSubmitted && 'opacity-60 pointer-events-none')}>
+                  <Upload className="size-4" />
+                  {ssSubmitted ? 'Screenshot uploaded' : uploadingSS ? 'Uploading…' : 'Upload screenshot'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleScreenshotUpload} disabled={uploadingSS || ssSubmitted} />
+                </label>
+                {ssSubmitted && <span className="text-xs text-success-300 font-medium">Sent to owner for review</span>}
+              </div>
             </div>
             <button onClick={() => setPendingRequest(null)} className="mt-3 text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
           </div>
