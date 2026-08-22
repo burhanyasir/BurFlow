@@ -7,11 +7,7 @@ import { useAuth } from '../../../lib/auth-context';
 import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { cn } from '../../../utils/cn';
-import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, ExternalLink, Sparkles } from 'lucide-react';
-import {
-  isPaddleConfigured, getPaddlePricePreview, openPaddleCheckout,
-  onPaddleCheckoutEvent,
-} from '../../../lib/paddle';
+import { Check, CreditCard, FileText, MessageSquare, RefreshCw, Zap, AlertTriangle, Clock } from 'lucide-react';
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -31,23 +27,20 @@ interface PlanLimits {
 
 interface Plan {
   id: string; name: string; price: number; priceYearly: number; currency: string;
-  interval: string;
-  paddlePriceIds: { monthly: string; yearly: string };
-  paddleProductId?: string; trialDays?: number;
+  interval: string; trialDays?: number;
   features: string[]; limits: PlanLimits;
 }
-// Paddle-only: stripeSubscriptionId was replaced by paddleSubscriptionId when
-// Stripe was removed as a billing provider.
-interface CurrentSubscription { planId: string; planName: string; status: string; paddleSubscriptionId?: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
+interface CurrentSubscription { planId: string; planName: string; status: string; currentPeriodStart: string; currentPeriodEnd: string; trialEnd: string | null; cancelledAt: string | null; onTrial: boolean; daysLeftInTrial: number | null; conversationsLimit: number; conversationsUsed: number; documentsLimit: number; documentsUsed: number; teamMembers: number; features: string[]; }
 interface UsageRecord { date: string; conversations: number; messages: number; documentsUploaded: number; }
+interface PendingRequest { id: string; plan: string; billingPeriod: string; status: string; createdAt: string; }
 
 type BillingPeriod = 'month' | 'year';
 
 const DEFAULT_PLANS: Plan[] = [
-  { id: 'free', name: 'Free', price: 0, priceYearly: 0, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, features: ['100 conversations per month'], limits: { conversations: 100, documents: 3, knowledgeBases: 1, teamMembers: 1, apiCalls: 0, storageMb: 100, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
-  { id: 'starter', name: 'Starter', price: 49, priceYearly: 470, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['1,000 conversations per month', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], limits: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5, apiCalls: 5000, storageMb: 500, widgets: 3, analytics: true, customBranding: false, prioritySupport: false } },
-  { id: 'pro', name: 'Pro', price: 99, priceYearly: 950, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['5,000 conversations per month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10, analytics: true, customBranding: true, prioritySupport: true } },
-  { id: 'advanced', name: 'Advanced', price: 120, priceYearly: 1200, currency: 'usd', interval: 'mo', paddlePriceIds: { monthly: '', yearly: '' }, trialDays: 7, features: ['50,000 conversations per month', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50, analytics: true, customBranding: true, prioritySupport: true } },
+  { id: 'free', name: 'Free', price: 0, priceYearly: 0, currency: 'usd', interval: 'mo', features: ['100 conversations per month'], limits: { conversations: 100, documents: 3, knowledgeBases: 1, teamMembers: 1, apiCalls: 0, storageMb: 100, widgets: 1, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'starter', name: 'Starter', price: 49, priceYearly: 470, currency: 'usd', interval: 'mo', trialDays: 7, features: ['1,000 conversations per month', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], limits: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5, apiCalls: 5000, storageMb: 500, widgets: 3, analytics: true, customBranding: false, prioritySupport: false } },
+  { id: 'pro', name: 'Pro', price: 99, priceYearly: 950, currency: 'usd', interval: 'mo', trialDays: 7, features: ['5,000 conversations per month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10, analytics: true, customBranding: true, prioritySupport: true } },
+  { id: 'advanced', name: 'Advanced', price: 120, priceYearly: 1200, currency: 'usd', interval: 'mo', trialDays: 7, features: ['50,000 conversations per month', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50, analytics: true, customBranding: true, prioritySupport: true } },
 ];
 
 function usagePercent(used: number, limit: number) {
@@ -61,87 +54,38 @@ export default function BillingDashboard() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [usage, setUsage] = useState<UsageRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [changePlanLoading, setChangePlanLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>('month');
-  const [pricePreview, setPricePreview] = useState<Record<string, { formattedGrandTotal: string; currencyCode: string } | null>>({});
-  const [checkoutOpening, setCheckoutOpening] = useState<string | null>(null);
-
-  const paddleConfigured = isPaddleConfigured();
+  const [pendingRequest, setPendingRequest] = useState<PendingRequest | null>(null);
+  const [requestingPlan, setRequestingPlan] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     setLoading(true); setError(null); try {
-      const [currentRes, plansRes, usageRes] = await Promise.allSettled([
+      const [currentRes, plansRes, usageRes, pendingRes] = await Promise.allSettled([
         apiClient.get<CurrentSubscription>('/billing/current'),
         apiClient.get<{ plans: Plan[] }>('/billing/plans'),
         apiClient.get<{ usage: UsageRecord[] }>('/billing/usage'),
+        apiClient.get<{ request: PendingRequest | null }>('/billing/requests/pending'),
       ]);
       if (currentRes.status === 'fulfilled') setCurrentSub(currentRes.value);
       if (plansRes.status === 'fulfilled') setPlans(plansRes.value.plans || []);
       if (usageRes.status === 'fulfilled') setUsage(usageRes.value.usage || []);
+      if (pendingRes.status === 'fulfilled') setPendingRequest(pendingRes.value.request);
     } catch (err: any) { setError(err.message || 'Failed to load billing data'); } finally { setLoading(false); }
   }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Paddle: localized price previews for the active billing period. Only real
-  // price IDs are queried; when Paddle isn't configured we fall back to static
-  // catalog prices. Country stays unset so Paddle auto-detects from IP.
-  useEffect(() => {
-    if (!paddleConfigured || plans.length === 0) return;
-    let cancelled = false;
-    (async () => {
-      const next: Record<string, { formattedGrandTotal: string; currencyCode: string } | null> = {};
-      for (const plan of plans) {
-        const priceId = billingPeriod === 'year' ? plan.paddlePriceIds?.yearly : plan.paddlePriceIds?.monthly;
-        if (!priceId || plan.price === 0) continue;
-        try {
-          const preview = await getPaddlePricePreview(priceId);
-          if (preview) {
-            next[plan.id] = { formattedGrandTotal: preview.formattedGrandTotal, currencyCode: preview.currencyCode };
-          }
-        } catch { /* keep static fallback */ }
-      }
-      if (!cancelled) setPricePreview(next);
-    })();
-    return () => { cancelled = true; };
-  }, [plans, billingPeriod, paddleConfigured]);
-
-  // Redirect to the dashboard with a success flag once the overlay completes.
-  useEffect(() => {
-    const off = onPaddleCheckoutEvent('checkout.completed', () => {
-      addToast('Subscription activated — welcome aboard!', 'success');
-      navigate('/dashboard?checkout=success');
-    });
-    return off;
-  }, [navigate, addToast]);
-
-  const handleChangePlan = async (planId: string) => {
-    setChangePlanLoading(true); try { await apiClient.post('/billing/change-plan', { plan: planId }); await loadData(); }
-    catch (err: any) { setError(err.message || 'Failed to change plan'); } finally { setChangePlanLoading(false); }
-  };
-
-  const handleSubscribe = async (plan: Plan) => {
-    if (plan.price === 0) { await handleChangePlan(plan.id); return; }
-
-    const priceId = billingPeriod === 'year' ? plan.paddlePriceIds?.yearly : plan.paddlePriceIds?.monthly;
-    if (paddleConfigured && priceId) {
-      setCheckoutOpening(plan.id);
-      openPaddleCheckout({ priceId, email: user?.email });
-      return;
-    }
-    if (!priceId) {
-      addToast('Live checkout is not configured yet — set VITE_PADDLE_CLIENT_TOKEN and the Paddle price IDs to enable subscriptions.', 'warning');
-      return;
-    }
-    // Paddle is the only billing provider — there is no server-side checkout
-    // fallback anymore (the legacy Stripe /billing/checkout route was removed).
-    addToast('Paddle checkout is not configured (set VITE_PADDLE_CLIENT_TOKEN and the price IDs).', 'warning');
-  };
-
-  const handleManageBilling = async () => {
-    try { const res = await apiClient.post<{ url: string }>('/billing/manage'); if (res.url) window.open(res.url, '_blank'); else addToast('No billing portal URL returned', 'warning'); }
-    catch { addToast('Failed to open billing portal', 'error'); }
+  const handleRequestPlan = async (plan: Plan) => {
+    if (plan.price === 0) { addToast('You are already on the free plan.', 'info'); return; }
+    setRequestingPlan(plan.id);
+    try {
+      await apiClient.post('/billing/requests/request', { plan: plan.id, billingPeriod });
+      addToast(`Request submitted for the ${plan.name} plan — the owner will review it shortly.`, 'success');
+      await loadData();
+    } catch (err: any) {
+      addToast(err.message || 'Failed to submit plan request', 'error');
+    } finally { setRequestingPlan(null); }
   };
 
   const statusLabel = (sub: CurrentSubscription): string => {
@@ -155,8 +99,6 @@ export default function BillingDashboard() {
 
   const planPriceLabel = (plan: Plan): string => {
     if (plan.price === 0) return '$0';
-    const preview = pricePreview[plan.id];
-    if (preview?.formattedGrandTotal) return preview.formattedGrandTotal;
     const amount = billingPeriod === 'year' ? plan.priceYearly : plan.price;
     return `$${amount}`;
   };
@@ -199,7 +141,6 @@ export default function BillingDashboard() {
           actions={
             <>
               <DashButton variant="ghost" onClick={loadData}><RefreshCw className="size-4" /> Refresh</DashButton>
-              {currentSub && currentSub.status === 'active' && <DashButton onClick={handleManageBilling}><ExternalLink className="size-4" /> Manage subscription</DashButton>}
             </>
           }
         />
@@ -209,6 +150,16 @@ export default function BillingDashboard() {
             <AlertTriangle className="size-5 shrink-0 text-error-500" />
             <p className="flex-1 text-sm">{error}</p>
             <button onClick={() => setError(null)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
+          </div>
+        )}
+
+        {pendingRequest && (
+          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-300/25 px-4 py-3">
+            <Clock className="size-5 shrink-0 text-amber-500" />
+            <div className="flex-1 text-sm">
+              <span className="font-semibold">Pending plan request</span> — your request for the <span className="font-semibold">{pendingRequest.plan}</span> plan ({pendingRequest.billingPeriod}) is being reviewed. Submitted {new Date(pendingRequest.createdAt).toLocaleDateString()}.
+            </div>
+            <button onClick={() => setPendingRequest(null)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
           </div>
         )}
 
@@ -247,7 +198,7 @@ export default function BillingDashboard() {
                 <div>
                   <h2 className="text-lg font-bold tracking-tight">Plans</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {paddleConfigured ? 'Secure checkout powered by Paddle. 7-day free trial on every paid plan.' : 'Static pricing — configure VITE_PADDLE_CLIENT_TOKEN to enable live checkout.'}
+                    Select a plan — request is reviewed by the owner.
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface-2 p-1">
@@ -270,16 +221,17 @@ export default function BillingDashboard() {
               <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                 {displayPlans.map(plan => {
                   const isCurrent = plan.id === currentSub.planId;
-                  const canChange = !isCurrent && currentSub.status !== 'cancelled' && currentSub.status !== 'expired';
-                  const isUpgrade = plan.price > 0 && currentSub.planId === 'free';
+                  const isRequested = pendingRequest?.plan === plan.id && pendingRequest?.billingPeriod === billingPeriod;
                   return (
                     <div key={plan.id} className={cn('flex flex-col rounded-3xl border p-6 transition', isCurrent ? 'border-primary shadow-glow' : 'border-hairline')}>
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-display text-base font-bold">{plan.name}</h3>
                         {isCurrent ? (
                           <span className="inline-flex items-center rounded-full bg-ember-soft px-2.5 py-0.5 text-[11px] font-semibold">Current</span>
+                        ) : isRequested ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-amber-600"><Clock className="size-3" /> Pending</span>
                         ) : plan.trialDays && plan.price > 0 ? (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600"><Sparkles className="size-3" /> {plan.trialDays}-day trial</span>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-600"><Check className="size-3" /> {plan.trialDays}-day trial</span>
                         ) : null}
                       </div>
                       <p className="mt-4 font-display text-3xl font-bold tracking-tight">
@@ -294,16 +246,20 @@ export default function BillingDashboard() {
                       <div className="mt-6">
                         {isCurrent ? (
                           <DashButton variant="primary" className="pointer-events-none w-full opacity-60">Current plan</DashButton>
-                        ) : canChange ? (
+                        ) : isRequested ? (
+                          <DashButton variant="ghost" className="pointer-events-none w-full opacity-60">Request pending</DashButton>
+                        ) : plan.price === 0 ? (
+                          <DashButton variant="ghost" className="w-full" disabled>Free plan</DashButton>
+                        ) : (
                           <DashButton
-                            variant={isUpgrade ? 'primary' : 'ghost'}
+                            variant="primary"
                             className="w-full"
-                            onClick={() => handleSubscribe(plan)}
-                            disabled={checkoutOpening === plan.id}
+                            onClick={() => handleRequestPlan(plan)}
+                            disabled={requestingPlan === plan.id}
                           >
-                            {checkoutOpening === plan.id ? 'Opening checkout…' : isUpgrade ? 'Start free trial' : `Switch to ${plan.name}`}
+                            {requestingPlan === plan.id ? 'Sending request…' : 'Request Plan'}
                           </DashButton>
-                        ) : null}
+                        )}
                       </div>
                     </div>
                   );
