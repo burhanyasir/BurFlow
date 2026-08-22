@@ -685,12 +685,12 @@ CREATE INDEX idx_scanned_pages_url ON scanned_pages(tenant_id, url);
 
 CREATE TABLE subscription_requests (
   id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   user_email TEXT NOT NULL,
   user_name TEXT,
   requested_plan TEXT NOT NULL,
   billing_period TEXT DEFAULT 'monthly',
-  status TEXT DEFAULT 'pending',
+  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
   owner_notes TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL

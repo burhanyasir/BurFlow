@@ -407,7 +407,7 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
         ownerFetch<PlatformStats>('/stats'),
       ]);
       if (tenantsRes.status === 'fulfilled') setTenants(tenantsRes.value.tenants || []);
-      if (statsRes.status === 'fulfilled') setPlatformStats(tenantsRes.value);
+      if (statsRes.status === 'fulfilled') setPlatformStats(statsRes.value);
     } catch (err: any) {
       setError(err.message || 'Failed to load owner data');
     } finally {

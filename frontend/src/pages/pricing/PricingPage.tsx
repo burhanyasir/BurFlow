@@ -5,7 +5,7 @@ import { PageSection } from '../../components/ui/PageSection';
 import { PricingCard, type PricingTier } from '../../components/ui/PricingCard';
 import { cn } from '../../utils/cn';
 import { SITE_URL } from '../../lib/site';
-import * as storage from '../../lib/storage';
+import { storage } from '../../lib/storage';
 
 const monthlyTiers: PricingTier[] = [
   { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
