@@ -696,5 +696,5 @@ CREATE TABLE subscription_requests (
   updated_at TEXT NOT NULL
 );
 
-CREATE INDEX idx_sr_status ON subscription_requests(status);
-CREATE INDEX idx_sr_tenant ON subscription_requests(tenant_id);
+CREATE INDEX idx_subscription_requests_status ON subscription_requests(status);
+CREATE INDEX idx_subscription_requests_tenant ON subscription_requests(tenant_id);
