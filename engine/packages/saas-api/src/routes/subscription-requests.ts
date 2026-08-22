@@ -19,28 +19,6 @@ export function createSubscriptionRequestRoutes(
 ): Router {
   const router = Router();
 
-  // Ensure subscription_requests table exists (PostgreSQL needs explicit creation)
-  try {
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS subscription_requests (
-        id TEXT PRIMARY KEY,
-        tenant_id TEXT NOT NULL,
-        user_email TEXT NOT NULL,
-        user_name TEXT,
-        requested_plan TEXT NOT NULL,
-        billing_period TEXT DEFAULT 'monthly',
-        status TEXT DEFAULT 'pending',
-        owner_notes TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      )
-    `);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_sr_status ON subscription_requests(status)`);
-    db.exec(`CREATE INDEX IF NOT EXISTS idx_sr_tenant ON subscription_requests(tenant_id)`);
-  } catch (err: any) {
-    console.error('[subscription-requests] Failed to ensure table:', err?.message);
-  }
-
   // ─── USER: Submit a plan request ─────────────────────────────────────
   // Any authenticated user can request a plan upgrade
   router.post('/request', (req: Request, res: Response) => {

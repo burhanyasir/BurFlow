@@ -682,3 +682,19 @@ CREATE INDEX idx_website_scans_next_scan ON website_scans(next_scan_at);
 CREATE INDEX idx_scanned_pages_scan ON scanned_pages(scan_id);
 CREATE INDEX idx_scanned_pages_tenant ON scanned_pages(tenant_id);
 CREATE INDEX idx_scanned_pages_url ON scanned_pages(tenant_id, url);
+
+CREATE TABLE subscription_requests (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL,
+  user_email TEXT NOT NULL,
+  user_name TEXT,
+  requested_plan TEXT NOT NULL,
+  billing_period TEXT DEFAULT 'monthly',
+  status TEXT DEFAULT 'pending',
+  owner_notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_sr_status ON subscription_requests(status);
+CREATE INDEX idx_sr_tenant ON subscription_requests(tenant_id);
