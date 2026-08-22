@@ -273,5 +273,59 @@ export function createSupportRoutes(
     } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
   });
 
+  // ─── WIDGET: Visitor requests human agent ──────────────────────────
+  router.post('/request-human', (req: Request, res: Response) => {
+    try {
+      const { sessionId, tenantId, message } = req.body;
+      if (!sessionId || !tenantId) return res.status(400).json({ error: 'sessionId and tenantId required' });
+
+      const now = new Date().toISOString();
+
+      // Create a support ticket so owner sees it in inbox
+      const ticketId = generateId();
+      db.prepare(
+        'INSERT INTO support_tickets (id, tenant_id, user_email, user_name, subject, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(ticketId, tenantId, 'visitor', 'Chatbot Visitor', `Human agent requested — session ${sessionId.slice(0, 8)}`, 'chatbot', 'open', now, now);
+
+      db.prepare(
+        'INSERT INTO support_messages (id, ticket_id, sender_type, sender_email, content, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(generateId(), ticketId, 'user', 'visitor', `[Session: ${sessionId}] ${message || "I'd like to talk to a human agent."}`, now);
+
+      createContextLogger(logger).info({ ticketId, sessionId, tenantId }, 'Human agent requested from widget');
+      res.json({ ok: true, ticketId });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Request human agent failed');
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  // ─── OWNER: Reply to chatbot conversation ──────────────────────────
+  router.post('/chatbot-conversations/:convId/reply', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { convId } = req.params;
+      const { content } = req.body;
+      if (!content) return res.status(400).json({ error: 'Content required' });
+
+      const conv = conversationRepo.findById(convId);
+      if (!conv) return res.status(404).json({ error: 'Conversation not found' });
+
+      const msg = messageRepo.create({
+        conversationId: conv.id,
+        tenantId: conv.tenantId,
+        role: 'assistant',
+        content,
+        sequenceNumber: conv.messageCount + 1,
+        sender: 'agent',
+      });
+      conversationRepo.incrementMessageCount(conv.id);
+
+      createContextLogger(logger).info({ convId, content: content.slice(0, 50) }, 'Owner replied to chatbot conversation');
+      res.json({ ok: true, messageId: msg.id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Reply to conversation failed');
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
   return router;
 }

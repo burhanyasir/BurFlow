@@ -943,6 +943,19 @@ export class ChatWidget {
     inputRow.appendChild(sendBtn);
     wrapper.appendChild(inputRow);
 
+    // --- Talk to Human button ---
+    const talkToHumanRow = document.createElement('div');
+    talkToHumanRow.style.cssText = 'padding:8px 0 4px;text-align:center;';
+    const talkBtn = document.createElement('button');
+    talkBtn.type = 'button';
+    talkBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:10px;border:1.5px solid #E0E4EB;background:#F8F9FB;color:#6B7280;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s ease;font-family:inherit;';
+    talkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Talk to a human';
+    talkBtn.addEventListener('mouseenter', () => { talkBtn.style.borderColor = '#006248'; talkBtn.style.color = '#006248'; talkBtn.style.background = '#F0FFF4'; });
+    talkBtn.addEventListener('mouseleave', () => { talkBtn.style.borderColor = '#E0E4EB'; talkBtn.style.color = '#6B7280'; talkBtn.style.background = '#F8F9FB'; });
+    talkBtn.addEventListener('click', () => this.requestHumanAgent());
+    talkToHumanRow.appendChild(talkBtn);
+    wrapper.appendChild(talkToHumanRow);
+
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:5px 0 8px;text-align:center;';
     footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:#006248;">BurFlow</b></span>';
@@ -1098,6 +1111,55 @@ export class ChatWidget {
     this.clearUiState();
     this.addMessage({ role: 'user', content: text });
     this.streamResponse(text);
+  }
+
+  private async requestHumanAgent(): Promise<void> {
+    if (this.isStreaming) return;
+
+    const msg = "I'd like to talk to a human agent, please.";
+    this.addMessage({ role: 'user', content: msg });
+
+    const assistantMsg = this.addMessage({ role: 'assistant', content: '', streaming: true });
+    this.scrollToBottom();
+    this.renderTypingIndicator();
+
+    try {
+      const apiUrl = this.config.apiUrl;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.config.tenantId) headers['x-tenant-id'] = this.config.tenantId;
+      if (this.config.apiKey) headers['x-api-key'] = this.config.apiKey;
+      if (this.config.widgetToken) headers['x-widget-token'] = this.config.widgetToken;
+
+      const res = await fetch(`${apiUrl}/api/support/request-human`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          sessionId: this.config.sessionId,
+          tenantId: this.config.tenantId,
+          message: msg,
+        }),
+        signal: this.abortController?.signal,
+      });
+
+      this.removeTypingIndicator();
+
+      if (res.ok) {
+        assistantMsg.content = "Thanks! A human agent has been notified and will join this conversation shortly. Please wait a moment.";
+        assistantMsg.streaming = false;
+        this.renderMessages();
+      } else {
+        assistantMsg.content = "I wasn't able to reach a human agent right now. Please try again later or email us at support.";
+        assistantMsg.streaming = false;
+        this.renderMessages();
+      }
+    } catch {
+      this.removeTypingIndicator();
+      assistantMsg.content = "Connection error. Please try again.";
+      assistantMsg.streaming = false;
+      this.renderMessages();
+    }
+
+    this.scrollToBottom();
   }
 
   private async streamResponse(userMessage: string): Promise<void> {

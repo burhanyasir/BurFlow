@@ -59,6 +59,8 @@ export default function OwnerInbox() {
 
   const [selectedConv, setSelectedConv] = useState<ChatbotConversation | null>(null);
   const [convMessages, setConvMessages] = useState<ChatMessage[]>([]);
+  const [convReply, setConvReply] = useState('');
+  const [sendingConvReply, setSendingConvReply] = useState(false);
 
   const [selectedPayment, setSelectedPayment] = useState<PaymentConfirmation | null>(null);
 
@@ -110,10 +112,24 @@ export default function OwnerInbox() {
   const openConversation = async (conv: ChatbotConversation) => {
     setSelectedConv(conv);
     setSelectedTicket(null);
+    setSelectedPayment(null);
     try {
       const res = await ownerFetch<{ messages: ChatMessage[] }>(`/chatbot-conversations/${conv.id}/messages`);
       setConvMessages(res.messages || []);
     } catch { /* ignore */ }
+  };
+
+  const sendConvReply = async () => {
+    if (!selectedConv || !convReply.trim()) return;
+    setSendingConvReply(true);
+    try {
+      await ownerFetch(`/chatbot-conversations/${selectedConv.id}/reply`, {
+        method: 'POST', body: JSON.stringify({ content: convReply.trim() }),
+      });
+      setConvReply('');
+      const res = await ownerFetch<{ messages: ChatMessage[] }>(`/chatbot-conversations/${selectedConv.id}/messages`);
+      setConvMessages(res.messages || []);
+    } catch { /* ignore */ } finally { setSendingConvReply(false); }
   };
 
   const approvePayment = async (id: string) => {
@@ -327,6 +343,20 @@ export default function OwnerInbox() {
                   <p className="text-[9px] text-muted-foreground/60 mt-1">{fmtDate(m.created_at)}</p>
                 </div>
               ))}
+            </div>
+            <div className="border-t border-hairline px-6 py-3">
+              <div className="flex gap-2">
+                <input
+                  value={convReply}
+                  onChange={e => setConvReply(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendConvReply()}
+                  placeholder="Reply as human agent..."
+                  className="flex-1 rounded-xl border border-hairline bg-surface-2 px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                />
+                <button onClick={sendConvReply} disabled={sendingConvReply || !convReply.trim()} className="flex items-center gap-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary/90 transition disabled:opacity-50">
+                  {sendingConvReply ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />} Send
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
