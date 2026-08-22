@@ -60,6 +60,8 @@ export default function OwnerInbox() {
   const [selectedConv, setSelectedConv] = useState<ChatbotConversation | null>(null);
   const [convMessages, setConvMessages] = useState<ChatMessage[]>([]);
 
+  const [selectedPayment, setSelectedPayment] = useState<PaymentConfirmation | null>(null);
+
   const loadInbox = useCallback(async () => {
     setLoading(true);
     try {
@@ -117,11 +119,13 @@ export default function OwnerInbox() {
   const approvePayment = async (id: string) => {
     await ownerFetch(`/payments/${id}/approve`, { method: 'POST', body: JSON.stringify({ notes: 'Approved via inbox' }) });
     await loadInbox();
+    setSelectedPayment(null);
   };
 
   const rejectPayment = async (id: string) => {
     await ownerFetch(`/payments/${id}/reject`, { method: 'POST', body: JSON.stringify({ reason: 'Rejected' }) });
     await loadInbox();
+    setSelectedPayment(null);
   };
 
   const fmtDate = (d: string | null) => d ? new Date(d).toLocaleString() : '—';
@@ -191,21 +195,14 @@ export default function OwnerInbox() {
           ) : (
             payments.length === 0 ? <p className="p-4 text-xs text-muted-foreground text-center">No payments</p> :
             payments.map(p => (
-              <div key={p.id} className="border-b border-hairline px-4 py-3">
+              <button key={p.id} onClick={() => { setSelectedPayment(p); setSelectedTicket(null); setSelectedConv(null); }} className={cn('w-full border-b border-hairline px-4 py-3 text-left transition hover:bg-surface-2', selectedPayment?.id === p.id && 'bg-surface-2')}>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium truncate max-w-[140px]">{p.user_email}</span>
                   <span className={cn('rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase', p.status === 'pending' ? 'bg-warning-300/20 text-warning-300' : p.status === 'approved' ? 'bg-success-300/20 text-success-300' : 'bg-error-300/20 text-error-300')}>{p.status}</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 capitalize">{p.requested_plan} plan &middot; {p.amount} {p.currency}</p>
-                <div className="mt-2 flex gap-1">
-                  {p.status === 'pending' && (
-                    <>
-                      <button onClick={() => approvePayment(p.id)} className="rounded-md bg-success-300/20 px-2 py-0.5 text-[9px] font-medium text-success-300 hover:bg-success-300/30">Approve</button>
-                      <button onClick={() => rejectPayment(p.id)} className="rounded-md bg-error-300/20 px-2 py-0.5 text-[9px] font-medium text-error-300 hover:bg-error-300/30">Reject</button>
-                    </>
-                  )}
-                </div>
-              </div>
+                <p className="text-[9px] text-muted-foreground/60 mt-0.5">{fmtDate(p.created_at)}</p>
+              </button>
             ))
           )}
         </div>
@@ -213,7 +210,7 @@ export default function OwnerInbox() {
 
       {/* Main content */}
       <div className="flex-1 overflow-y-auto">
-        {!selectedTicket && !selectedConv ? (
+        {!selectedTicket && !selectedConv && !selectedPayment ? (
           <div className="flex h-full items-center justify-center">
             <div className="text-center">
               <Inbox className="mx-auto mb-3 size-8 text-muted-foreground/40" />
@@ -223,6 +220,55 @@ export default function OwnerInbox() {
                 {tab === 'chatbot' && 'Read chatbot conversations from the landing page'}
                 {tab === 'payments' && 'Review payment confirmations and activate plans'}
               </p>
+            </div>
+          </div>
+        ) : selectedPayment ? (
+          <div className="flex h-full flex-col">
+            <div className="border-b border-hairline px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-bold">Payment from {selectedPayment.user_email}</h3>
+                  <p className="text-xs text-muted-foreground">{selectedPayment.requested_plan} plan &middot; {selectedPayment.amount} {selectedPayment.currency} &middot; {selectedPayment.billing_period}</p>
+                </div>
+                <span className={cn('rounded-full px-2.5 py-1 text-xs font-bold uppercase', selectedPayment.status === 'pending' ? 'bg-warning-300/20 text-warning-300' : selectedPayment.status === 'approved' ? 'bg-success-300/20 text-success-300' : 'bg-error-300/20 text-error-300')}>{selectedPayment.status}</span>
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="rounded-xl border border-hairline bg-surface-2 p-4 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Bank Account</p>
+                  <p className="font-mono text-lg font-bold">{selectedPayment.wallet_account}</p>
+                </div>
+                <div className="rounded-xl border border-hairline bg-surface-2 p-4 space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Submitted</p>
+                  <p className="text-sm">{fmtDate(selectedPayment.created_at)}</p>
+                </div>
+              </div>
+
+              {selectedPayment.screenshot_url ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Payment Screenshot</p>
+                  <div className="rounded-xl border border-hairline overflow-hidden">
+                    <img src={selectedPayment.screenshot_url} alt="Payment screenshot" className="w-full max-h-[500px] object-contain bg-black/20" />
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-hairline bg-surface-2 p-6 text-center">
+                  <p className="text-sm text-muted-foreground">No screenshot uploaded</p>
+                  <p className="text-xs text-muted-foreground/60 mt-1">The user hasn't uploaded a payment screenshot yet.</p>
+                </div>
+              )}
+
+              {selectedPayment.status === 'pending' && (
+                <div className="flex gap-3">
+                  <button onClick={() => approvePayment(selectedPayment.id)} className="flex items-center gap-2 rounded-xl bg-success-300/20 px-5 py-2.5 text-sm font-semibold text-success-300 hover:bg-success-300/30 transition">
+                    <CheckCircle className="size-4" /> Approve & Activate Plan
+                  </button>
+                  <button onClick={() => rejectPayment(selectedPayment.id)} className="flex items-center gap-2 rounded-xl bg-error-300/20 px-5 py-2.5 text-sm font-semibold text-error-300 hover:bg-error-300/30 transition">
+                    <XCircle className="size-4" /> Reject
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         ) : selectedTicket ? (
