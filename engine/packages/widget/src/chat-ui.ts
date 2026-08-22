@@ -1141,22 +1141,22 @@ export class ChatWidget {
         signal: this.abortController?.signal,
       });
 
-      this.removeTypingIndicator();
+      this.hideTypingIndicator();
 
       if (res.ok) {
         assistantMsg.content = "Thanks! A human agent has been notified and will join this conversation shortly. Please wait a moment.";
         assistantMsg.streaming = false;
-        this.renderMessages();
+        this.updateMessageContent(assistantMsg);
       } else {
         assistantMsg.content = "I wasn't able to reach a human agent right now. Please try again later or email us at support.";
         assistantMsg.streaming = false;
-        this.renderMessages();
+        this.updateMessageContent(assistantMsg);
       }
     } catch {
-      this.removeTypingIndicator();
+      this.hideTypingIndicator();
       assistantMsg.content = "Connection error. Please try again.";
       assistantMsg.streaming = false;
-      this.renderMessages();
+      this.updateMessageContent(assistantMsg);
     }
 
     this.scrollToBottom();
