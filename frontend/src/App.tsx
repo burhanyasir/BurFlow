@@ -103,6 +103,7 @@ const CookiesPage = lazy(() => import('./pages/legal/CookiesPage'));
 const DashboardPage = lazy(() => import('./pages/admin/dashboard/DashboardPage'));
 const AnalyticsDashboard = lazy(() => import('./pages/admin/analytics/AnalyticsDashboard'));
 const BillingDashboard = lazy(() => import('./pages/admin/billing/BillingDashboard'));
+const AdminManualBilling = lazy(() => import('./pages/admin/billing/AdminManualBilling'));
 const CitationDashboard = lazy(() => import('./pages/admin/citations/CitationDashboard'));
 const ConversationDashboard = lazy(() => import('./pages/admin/conversations/ConversationDashboard'));
 const ConversationDetailPage = lazy(() => import('./pages/admin/conversations/ConversationDetailPage'));
@@ -267,6 +268,7 @@ function RoutesWithAnimation() {
         <Route path="/dashboard/leads" element={<ProtectedRoute><LeadInboxPage /></ProtectedRoute>} />
         <Route path="/dashboard/insights" element={<ProtectedRoute><AdminRoute><InsightsDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/billing" element={<ProtectedRoute><BillingDashboard /></ProtectedRoute>} />
+        <Route path="/dashboard/billing/manual" element={<ProtectedRoute><AdminManualBilling /></ProtectedRoute>} />
         <Route path="/dashboard/widget" element={<ProtectedRoute><WidgetDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/unanswered" element={<ProtectedRoute><AdminRoute><UnansweredDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/citations" element={<ProtectedRoute><AdminRoute><CitationDashboard /></AdminRoute></ProtectedRoute>} />

@@ -165,6 +165,57 @@ export function createAdminRoutes(
     }
   });
 
+  const VALID_MANUAL_PLANS = ['free', 'starter', 'pro', 'professional', 'advanced', 'enterprise'];
+
+  router.post('/billing/activate', adminOnly, (req: Request, res: Response) => {
+    try {
+      const { plan, tenantId: targetTenantId } = req.body;
+      if (!plan || !VALID_MANUAL_PLANS.includes(plan)) {
+        return res.status(400).json({ error: `Invalid plan. Must be one of: ${VALID_MANUAL_PLANS.join(', ')}` });
+      }
+      const tid = targetTenantId || req.tenantId!;
+      const now = new Date().toISOString();
+      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const normalizedPlan = plan === 'professional' ? 'pro' : plan;
+      subRepo.update(tid, {
+        plan: normalizedPlan,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      });
+      tenantRepo.update(tid, { plan: normalizedPlan, subscriptionStatus: 'active', subscriptionPeriodEnd: periodEnd });
+      createContextLogger(logger).info({ tenantId: tid, plan: normalizedPlan }, 'Manual plan activation');
+      res.json({ ok: true, plan: normalizedPlan, status: 'active', periodEnd });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Manual activation failed');
+      res.status(500).json({ error: 'Failed to activate plan' });
+    }
+  });
+
+  router.get('/tenants', adminOnly, (_req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, Number(_req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(_req.query.limit) || 50));
+      const result = subRepo.list(page, limit);
+      const tenants = result.subscriptions.map(s => {
+        const tenant = tenantRepo.findById(s.tenantId);
+        const owner = tenant ? userRepo.findById(tenant.ownerId) : null;
+        return {
+          tenantId: s.tenantId,
+          tenantName: tenant?.name || 'Unknown',
+          ownerEmail: owner?.email || 'Unknown',
+          plan: s.plan,
+          status: s.status,
+          currentPeriodEnd: s.currentPeriodEnd,
+        };
+      });
+      res.json({ tenants, total: result.total, page, limit });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Tenant list failed');
+      res.status(500).json({ error: 'Failed to list tenants' });
+    }
+  });
+
   router.get('/api-keys', adminOnly, (req: Request, res: Response) => {
     try {
       const keys = apiKeyRepo.findByTenant(req.tenantId!);
