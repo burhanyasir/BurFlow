@@ -1,0 +1,359 @@
+import { Router, Request, Response } from 'express';
+import {
+  UserRepository, TenantRepository, ConversationRepository,
+  UsageRepository, KnowledgeBaseRepository, KbDocumentRepository,
+  ApiKeyRepository, AnalyticsRepository, SubscriptionRepository,
+  MessageRepository, LeadRepository, HandoffRequestRepository,
+  TeamMemberRepository,
+} from '@conversation-engine/saas-core';
+import { createLogger, createContextLogger } from '@conversation-engine/logger';
+
+const logger = createLogger('saas-api:owner-admin');
+
+const VALID_PLANS = ['free', 'starter', 'pro', 'professional', 'advanced', 'enterprise'];
+const VALID_STATUSES = ['active', 'trialing', 'past_due', 'cancelled', 'expired', 'paused'];
+
+export function createOwnerAdminRoutes(
+  userRepo: UserRepository,
+  tenantRepo: TenantRepository,
+  conversationRepo: ConversationRepository,
+  usageRepo: UsageRepository,
+  kbRepo: KnowledgeBaseRepository,
+  docRepo: KbDocumentRepository,
+  apiKeyRepo: ApiKeyRepository,
+  analyticsRepo: AnalyticsRepository,
+  subRepo: SubscriptionRepository,
+  messageRepo: MessageRepository,
+  leadRepo: LeadRepository,
+  handoffReqRepo: HandoffRequestRepository,
+  teamMemberRepo: TeamMemberRepository,
+): Router {
+  const router = Router();
+
+  const ownerOnly = (req: Request, res: Response, next: Function) => {
+    if (req.user?.role !== 'owner') {
+      return res.status(403).json({ error: 'Owner access required' });
+    }
+    next();
+  };
+
+  // ─── TENANT LIST with full details ───────────────────────────────────
+  router.get('/tenants', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+      const search = (req.query.search as string || '').toLowerCase();
+
+      let result = subRepo.list(page, limit);
+      let tenants = result.subscriptions.map(s => {
+        const tenant = tenantRepo.findById(s.tenantId);
+        const owner = tenant ? userRepo.findById(tenant.ownerId) : null;
+        const convs = conversationRepo.listByTenant(s.tenantId, 1, 1);
+        const currentUsage = usageRepo.getCurrentMonthConversations(s.tenantId);
+        const teamCount = teamMemberRepo.findByTenant(s.tenantId).length;
+        const kbCount = kbRepo.listByTenant(s.tenantId).length;
+
+        return {
+          tenantId: s.tenantId,
+          tenantName: tenant?.name || 'Unknown',
+          slug: tenant?.slug || '',
+          ownerEmail: owner?.email || 'Unknown',
+          ownerName: owner?.name || 'Unknown',
+          plan: s.plan,
+          status: s.status,
+          currentPeriodStart: s.currentPeriodStart,
+          currentPeriodEnd: s.currentPeriodEnd,
+          trialStart: s.trialStart,
+          trialEnd: s.trialEnd,
+          cancelledAt: s.cancelledAt,
+          totalConversations: convs.total,
+          currentMonthUsage: currentUsage,
+          teamMembers: teamCount,
+          knowledgeBases: kbCount,
+          createdAt: tenant ? (tenant as any).created_at : null,
+        };
+      });
+
+      if (search) {
+        tenants = tenants.filter(t =>
+          t.tenantName.toLowerCase().includes(search) ||
+          t.ownerEmail.toLowerCase().includes(search) ||
+          t.tenantId.toLowerCase().includes(search) ||
+          t.slug.toLowerCase().includes(search)
+        );
+      }
+
+      res.json({ tenants, total: result.total, page, limit });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner tenant list failed');
+      res.status(500).json({ error: 'Failed to list tenants' });
+    }
+  });
+
+  // ─── TENANT DETAIL ───────────────────────────────────────────────────
+  router.get('/tenants/:tenantId', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const tenant = tenantRepo.findById(tenantId);
+      if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
+
+      const owner = userRepo.findById(tenant.ownerId);
+      const sub = subRepo.findByTenant(tenantId);
+      const teamMembers = teamMemberRepo.findByTenant(tenantId);
+      const kbs = kbRepo.listByTenant(tenantId);
+      const docs = docRepo.listByTenant(tenantId);
+      const docStatus = docRepo.countByStatus(tenantId);
+      const convs = conversationRepo.listByTenant(tenantId, 1, 1);
+      const activeConvs = conversationRepo.listActiveByTenant(tenantId);
+      const currentUsage = usageRepo.getCurrentMonthConversations(tenantId);
+      const usageHistory = usageRepo.listByTenant(tenantId, 1, 12);
+      const leads = leadRepo.findByTenant(tenantId, 1, 1);
+      const apiKeys = apiKeyRepo.findByTenant(tenantId);
+
+      const planLimits = getPlanLimits(sub?.plan || 'free');
+
+      res.json({
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+          plan: tenant.plan,
+          subscriptionStatus: tenant.subscriptionStatus,
+          subscriptionPeriodEnd: tenant.subscriptionPeriodEnd,
+          customDomain: tenant.customDomain,
+          notificationEmail: tenant.notificationEmail,
+          createdAt: (tenant as any).created_at,
+          updatedAt: (tenant as any).updated_at,
+        },
+        owner: owner ? { id: owner.id, email: owner.email, name: owner.name, emailVerified: owner.emailVerified } : null,
+        subscription: sub ? {
+          plan: sub.plan,
+          status: sub.status,
+          currentPeriodStart: sub.currentPeriodStart,
+          currentPeriodEnd: sub.currentPeriodEnd,
+          trialStart: sub.trialStart,
+          trialEnd: sub.trialEnd,
+          cancelledAt: sub.cancelledAt,
+        } : null,
+        planLimits,
+        usage: {
+          currentMonth: currentUsage,
+          history: usageHistory.records,
+        },
+        stats: {
+          totalConversations: convs.total,
+          activeConversations: activeConvs.length,
+          totalLeads: leads.total,
+          totalKnowledgeBases: kbs.length,
+          totalDocuments: docs.length,
+          documentsByStatus: docStatus,
+          teamMembers: teamMembers.length,
+          apiKeys: apiKeys.length,
+        },
+        teamMembers: teamMembers.map(tm => ({
+          id: tm.id,
+          userId: tm.userId,
+          email: tm.email,
+          name: tm.name,
+          role: tm.role,
+          joinedAt: tm.joinedAt,
+        })),
+      });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner tenant detail failed');
+      res.status(500).json({ error: 'Failed to get tenant details' });
+    }
+  });
+
+  // ─── UPDATE PLAN ─────────────────────────────────────────────────────
+  router.post('/tenants/:tenantId/plan', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { plan, periodEnd } = req.body;
+
+      if (!plan || !VALID_PLANS.includes(plan)) {
+        return res.status(400).json({ error: `Invalid plan. Must be one of: ${VALID_PLANS.join(', ')}` });
+      }
+
+      const normalizedPlan = plan === 'professional' ? 'pro' : plan;
+      const now = new Date().toISOString();
+      const end = periodEnd || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      subRepo.update(tenantId, {
+        plan: normalizedPlan,
+        status: 'active',
+        currentPeriodStart: now,
+        currentPeriodEnd: end,
+        cancelledAt: undefined,
+      });
+      tenantRepo.update(tenantId, {
+        plan: normalizedPlan,
+        subscriptionStatus: 'active',
+        subscriptionPeriodEnd: end,
+      });
+
+      createContextLogger(logger).info({ tenantId, plan: normalizedPlan, periodEnd: end }, 'Owner updated plan');
+      res.json({ ok: true, plan: normalizedPlan, status: 'active', periodEnd: end });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner plan update failed');
+      res.status(500).json({ error: 'Failed to update plan' });
+    }
+  });
+
+  // ─── UPDATE SUBSCRIPTION STATUS ──────────────────────────────────────
+  router.post('/tenants/:tenantId/status', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { status } = req.body;
+
+      if (!status || !VALID_STATUSES.includes(status)) {
+        return res.status(400).json({ error: `Invalid status. Must be one of: ${VALID_STATUSES.join(', ')}` });
+      }
+
+      subRepo.update(tenantId, { status });
+      tenantRepo.update(tenantId, { subscriptionStatus: status });
+
+      createContextLogger(logger).info({ tenantId, status }, 'Owner updated subscription status');
+      res.json({ ok: true, status });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner status update failed');
+      res.status(500).json({ error: 'Failed to update status' });
+    }
+  });
+
+  // ─── EXTEND PERIOD ──────────────────────────────────────────────────
+  router.post('/tenants/:tenantId/extend', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { days } = req.body;
+      const addDays = Math.max(1, Math.min(365, Number(days) || 30));
+
+      const sub = subRepo.findByTenant(tenantId);
+      const currentEnd = sub?.currentPeriodEnd ? new Date(sub.currentPeriodEnd) : new Date();
+      const newEnd = new Date(currentEnd.getTime() + addDays * 24 * 60 * 60 * 1000).toISOString();
+
+      subRepo.update(tenantId, { currentPeriodEnd: newEnd });
+      tenantRepo.update(tenantId, { subscriptionPeriodEnd: newEnd });
+
+      createContextLogger(logger).info({ tenantId, days: addDays, newEnd }, 'Owner extended period');
+      res.json({ ok: true, newPeriodEnd: newEnd, daysAdded: addDays });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner extend period failed');
+      res.status(500).json({ error: 'Failed to extend period' });
+    }
+  });
+
+  // ─── CANCEL SUBSCRIPTION ─────────────────────────────────────────────
+  router.post('/tenants/:tenantId/cancel', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const now = new Date().toISOString();
+
+      subRepo.update(tenantId, { status: 'cancelled', cancelledAt: now });
+      tenantRepo.update(tenantId, { subscriptionStatus: 'cancelled' });
+
+      createContextLogger(logger).info({ tenantId }, 'Owner cancelled subscription');
+      res.json({ ok: true, status: 'cancelled', cancelledAt: now });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner cancel failed');
+      res.status(500).json({ error: 'Failed to cancel subscription' });
+    }
+  });
+
+  // ─── REACTIVATE ─────────────────────────────────────────────────────
+  router.post('/tenants/:tenantId/reactivate', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const now = new Date().toISOString();
+      const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      const sub = subRepo.findByTenant(tenantId);
+      const plan = sub?.plan && sub.plan !== 'free' ? sub.plan : 'starter';
+
+      subRepo.update(tenantId, { plan, status: 'active', currentPeriodStart: now, currentPeriodEnd: end, cancelledAt: undefined });
+      tenantRepo.update(tenantId, { plan, subscriptionStatus: 'active', subscriptionPeriodEnd: end });
+
+      createContextLogger(logger).info({ tenantId, plan }, 'Owner reactivated subscription');
+      res.json({ ok: true, plan, status: 'active', periodEnd: end });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner reactivate failed');
+      res.status(500).json({ error: 'Failed to reactivate subscription' });
+    }
+  });
+
+  // ─── DELETE TENANT ──────────────────────────────────────────────────
+  router.delete('/tenants/:tenantId', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const deleted = tenantRepo.delete(tenantId);
+      if (!deleted) return res.status(404).json({ error: 'Tenant not found' });
+
+      createContextLogger(logger).info({ tenantId }, 'Owner deleted tenant');
+      res.json({ ok: true });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Owner delete tenant failed');
+      res.status(500).json({ error: 'Failed to delete tenant' });
+    }
+  });
+
+  // ─── RENAME TENANT ──────────────────────────────────────────────────
+  router.post('/tenants/:tenantId/rename', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const { name } = req.body;
+      if (!name || name.trim().length < 2) {
+        return res.status(400).json({ error: 'Name must be at least 2 characters' });
+      }
+      tenantRepo.update(tenantId, { name: name.trim() });
+      res.json({ ok: true, name: name.trim() });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to rename tenant' });
+    }
+  });
+
+  // ─── PLATFORM STATS ─────────────────────────────────────────────────
+  router.get('/stats', ownerOnly, (_req: Request, res: Response) => {
+    try {
+      const allSubs = subRepo.list(1, 10000);
+      const planCounts: Record<string, number> = {};
+      const statusCounts: Record<string, number> = {};
+      let mrr = 0;
+
+      for (const s of allSubs.subscriptions) {
+        planCounts[s.plan] = (planCounts[s.plan] || 0) + 1;
+        statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
+        if (s.status === 'active' || s.status === 'trialing') {
+          mrr += getPlanPrice(s.plan);
+        }
+      }
+
+      res.json({
+        totalTenants: allSubs.total,
+        planCounts,
+        statusCounts,
+        mrr,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to get stats' });
+    }
+  });
+
+  return router;
+}
+
+function getPlanLimits(plan: string) {
+  const limits: Record<string, { conversations: number; documents: number; knowledgeBases: number; teamMembers: number }> = {
+    free: { conversations: 100, documents: 5, knowledgeBases: 1, teamMembers: 1 },
+    starter: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5 },
+    pro: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
+    professional: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
+    advanced: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50 },
+    enterprise: { conversations: 100000, documents: 5000, knowledgeBases: 100, teamMembers: 100 },
+  };
+  return limits[plan] || limits.free;
+}
+
+function getPlanPrice(plan: string): number {
+  const prices: Record<string, number> = { free: 0, starter: 49, pro: 99, professional: 99, advanced: 120, enterprise: 200 };
+  return prices[plan] || 0;
+}
