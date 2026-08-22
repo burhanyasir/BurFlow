@@ -1,4 +1,7 @@
--- Migration 004: Support messaging and payment confirmations
+-- Migration 005: Ensure support and payment tables exist
+-- The database was reset at some point and these tables were lost even though
+-- migration 004 was recorded as applied. This migration re-creates them
+-- idempotently so it's safe to run on any database state.
 
 CREATE TABLE IF NOT EXISTS support_tickets (
   id TEXT PRIMARY KEY,

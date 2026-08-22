@@ -43,15 +43,15 @@ function tempDir(files: Record<string, string>): string {
 }
 
 describe('migration runner — initial schema', () => {
-  it('applies the initial migration on an empty database', async () => {
+  it('applies all pending migrations on an empty database', async () => {
     const res = await migrate(adapter, REAL_MIGRATION_DIR);
     expect(res.error).toBeNull();
-    expect(res.executed).toEqual(['001']);
+    expect(res.executed).toEqual(['001', '002', '003', '004', '005']);
   });
 
-  it('records the migration in schema_migrations', async () => {
+  it('records all migrations in schema_migrations', async () => {
     const r = await adapter.query('SELECT version, name, applied_at FROM schema_migrations ORDER BY version');
-    expect(r.rows).toHaveLength(1);
+    expect(r.rows).toHaveLength(5);
     expect(r.rows[0].version).toBe('001');
     expect(r.rows[0].name).toBe('initial_schema');
     expect(r.rows[0].applied_at).toBeTruthy();
@@ -67,7 +67,7 @@ describe('migration runner — initial schema', () => {
   it('verification passes: 40 tables, 449 columns, 66 explicit indexes', async () => {
     const check = await verifySchema(adapter);
     expect(check.errors).toEqual([]);
-    expect(check.summary).toEqual({ tables: 40, columns: 449, indexes: 66 });
+    expect(check.summary).toEqual({ tables: 44, columns: 488, indexes: 75 });
   });
 });
 
