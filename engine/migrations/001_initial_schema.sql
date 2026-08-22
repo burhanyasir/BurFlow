@@ -720,7 +720,7 @@ CREATE INDEX idx_support_tickets_source ON support_tickets(source);
 
 CREATE TABLE support_messages (
   id TEXT PRIMARY KEY,
-  ticket_id TEXT NOT NULL REFERENCES support_tickets(id) ON DELETE CASCADE,
+  ticket_id TEXT NOT NULL,
   sender_type TEXT NOT NULL,
   sender_email TEXT,
   content TEXT NOT NULL,

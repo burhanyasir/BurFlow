@@ -17,6 +17,32 @@ export function createSupportRoutes(
 ): Router {
   const router = Router();
 
+  // Auto-create tables if they don't exist (for PostgreSQL where 001 was already applied)
+  try {
+    db.exec(`CREATE TABLE IF NOT EXISTS support_tickets (
+      id TEXT PRIMARY KEY, tenant_id TEXT, user_email TEXT NOT NULL, user_name TEXT,
+      subject TEXT NOT NULL, source TEXT NOT NULL DEFAULT 'dashboard', status TEXT DEFAULT 'open',
+      created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    db.exec(`CREATE TABLE IF NOT EXISTS support_messages (
+      id TEXT PRIMARY KEY, ticket_id TEXT NOT NULL,
+      sender_type TEXT NOT NULL, sender_email TEXT, content TEXT NOT NULL,
+      attachment_url TEXT, created_at TEXT NOT NULL)`);
+    db.exec(`CREATE TABLE IF NOT EXISTS payment_confirmations (
+      id TEXT PRIMARY KEY, tenant_id TEXT, user_email TEXT NOT NULL, requested_plan TEXT NOT NULL,
+      billing_period TEXT DEFAULT 'monthly', amount TEXT NOT NULL, currency TEXT DEFAULT 'PKR',
+      wallet_account TEXT NOT NULL, screenshot_url TEXT, status TEXT DEFAULT 'pending',
+      owner_notes TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_support_tickets_user ON support_tickets(user_email)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_support_tickets_tenant ON support_tickets(tenant_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_support_tickets_source ON support_tickets(source)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_support_messages_ticket ON support_messages(ticket_id)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_payment_confirmations_status ON payment_confirmations(status)`);
+    db.exec(`CREATE INDEX IF NOT EXISTS idx_payment_confirmations_tenant ON payment_confirmations(tenant_id)`);
+  } catch (err: any) {
+    console.error('[support] Failed to ensure tables:', err?.message);
+  }
+
   const ownerOnly = (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Auth required' });
