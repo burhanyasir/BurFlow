@@ -410,16 +410,16 @@ export function createOwnerAdminRoutes(
 function getPlanLimits(plan: string) {
   const limits: Record<string, { conversations: number; documents: number; knowledgeBases: number; teamMembers: number }> = {
     free: { conversations: 100, documents: 5, knowledgeBases: 1, teamMembers: 1 },
-    starter: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5 },
-    pro: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
-    professional: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
-    advanced: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50 },
+    starter: { conversations: 3000, documents: 50, knowledgeBases: 5, teamMembers: 5 },
+    pro: { conversations: 10000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
+    professional: { conversations: 10000, documents: 200, knowledgeBases: 20, teamMembers: 20 },
+    advanced: { conversations: 25000, documents: 1000, knowledgeBases: 50, teamMembers: 50 },
     enterprise: { conversations: 100000, documents: 5000, knowledgeBases: 100, teamMembers: 100 },
   };
   return limits[plan] || limits.free;
 }
 
 function getPlanPrice(plan: string): number {
-  const prices: Record<string, number> = { free: 0, starter: 49, pro: 99, professional: 99, advanced: 120, enterprise: 200 };
+  const prices: Record<string, number> = { free: 0, starter: 29, pro: 49, professional: 49, advanced: 99, enterprise: 200 };
   return prices[plan] || 0;
 }

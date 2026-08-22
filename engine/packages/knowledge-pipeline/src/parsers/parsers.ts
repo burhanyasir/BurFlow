@@ -472,8 +472,8 @@ export class WebsiteCrawler implements WebCrawler {
   }
 
   async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean; onProgress?: (pagesCrawled: number, queueRemaining: number) => void }): Promise<ParsedDocument[]> {
-    const maxDepth = Math.min(options?.maxDepth ?? 2, 15);
-    const maxPages = Math.min(options?.maxPages ?? 10, 1000);
+    const maxDepth = Math.min(options?.maxDepth ?? 5, 15);
+    const maxPages = Math.min(options?.maxPages ?? 50, 1000);
     const respectRobots = options?.respectRobotsTxt ?? true;
     const useSitemap = options?.useSitemap ?? true;
     const onProgress = options?.onProgress;
@@ -522,11 +522,14 @@ export class WebsiteCrawler implements WebCrawler {
 
       try {
         await this.rateLimit();
-        const response = await fetch(item.url, { signal: AbortSignal.timeout(10000) });
+        const response = await fetch(item.url, { signal: AbortSignal.timeout(30000) });
         if (!response.ok) { console.log(`[crawl] SKIP (HTTP ${response.status}): ${item.url}`); continue; }
 
         const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('text/html')) { console.log(`[crawl] SKIP (not html): ${item.url}`); continue; }
+        // Be permissive: allow any content type that isn't explicitly non-text
+        // Many modern sites return application/json or no content-type at all
+        const forbiddenTypes = ['image/', 'video/', 'audio/', 'application/pdf', 'application/'];
+        if (forbiddenTypes.some(t => contentType.startsWith(t))) { console.log(`[crawl] SKIP (non-text content): ${item.url}`); continue; }
 
         const html = await response.text();
         const canonical = this.extractCanonical(html) || item.url;

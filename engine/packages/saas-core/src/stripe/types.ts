@@ -45,13 +45,13 @@ export const STRIPE_PLANS: Record<string, StripePlanConfig> = {
     id: 'starter', name: 'Starter', price: 29, currency: 'USD', interval: 'month',
     stripePriceId: process.env.STRIPE_PRICE_STARTER_MONTHLY || '',
     features: ['1,000 conversations/month', '50 documents', '5 knowledge bases', '5 team members', 'Full analytics', 'Email support'],
-    limits: { conversations: 1000, documents: 50, knowledgeBases: 5, teamMembers: 5, apiCalls: 5000, storageMb: 500, widgets: 3 },
+    limits: { conversations: 3000, documents: 50, knowledgeBases: 5, teamMembers: 5, apiCalls: 5000, storageMb: 500, widgets: 3 },
   },
   professional: {
-    id: 'professional', name: 'Professional', price: 99, currency: 'USD', interval: 'month',
+    id: 'professional', name: 'Professional', price: 49, currency: 'USD', interval: 'month',
     stripePriceId: process.env.STRIPE_PRICE_PROFESSIONAL_MONTHLY || '',
-    features: ['5,000 conversations/month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'],
-    limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10 },
+    features: ['10,000 conversations/month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'],
+    limits: { conversations: 10000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10 },
   },
   enterprise: {
     id: 'enterprise', name: 'Enterprise', price: 299, currency: 'USD', interval: 'month',
@@ -61,16 +61,16 @@ export const STRIPE_PLANS: Record<string, StripePlanConfig> = {
   },
   // Modern Paddle catalog tiers (legacy 'professional'/'enterprise' kept above)
   pro: {
-    id: 'pro', name: 'Pro', price: 40, currency: 'USD', interval: 'month',
+    id: 'pro', name: 'Pro', price: 49, currency: 'USD', interval: 'month',
     stripePriceId: '',
-    features: ['5,000 conversations/month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'],
-    limits: { conversations: 5000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10 },
+    features: ['10,000 conversations/month', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'],
+    limits: { conversations: 10000, documents: 200, knowledgeBases: 20, teamMembers: 20, apiCalls: 25000, storageMb: 2000, widgets: 10 },
   },
   advanced: {
-    id: 'advanced', name: 'Advanced', price: 120, currency: 'USD', interval: 'month',
+    id: 'advanced', name: 'Advanced', price: 99, currency: 'USD', interval: 'month',
     stripePriceId: '',
-    features: ['50,000 conversations/month', '1,000 documents', '50 knowledge bases', '50 team members', 'Enterprise analytics', 'White-label branding', 'Dedicated support', 'SSO', 'SLA'],
-    limits: { conversations: 50000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50 },
+    features: ['25,000 conversations/month', '1,000 documents', '50 knowledge bases', '50 team members', 'Enterprise analytics', 'White-label branding', 'Dedicated support', 'SSO', 'SLA'],
+    limits: { conversations: 25000, documents: 1000, knowledgeBases: 50, teamMembers: 50, apiCalls: 250000, storageMb: 10000, widgets: 50 },
   },
 };
 
