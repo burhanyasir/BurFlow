@@ -226,9 +226,10 @@ export function createKnowledgeAdminRouter(
       if (!query) return res.status(400).json({ error: 'query is required' });
 
       const { KnowledgeRetriever, OpenAIEmbeddingProvider } = await import('@conversation-engine/knowledge-pipeline');
-      const embedder = process.env.OPENAI_API_KEY
-        ? new OpenAIEmbeddingProvider(process.env.OPENAI_API_KEY, 'text-embedding-3-small')
-        : (() => { throw new Error('OPENAI_API_KEY is required for knowledge search in production'); })();
+      const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+      if (!apiKey) throw new Error('OPENROUTER_API_KEY is required for knowledge search in production');
+      const apiUrl = process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1/embeddings' : undefined;
+      const embedder = new OpenAIEmbeddingProvider(apiKey, 'text-embedding-3-small', 30000, apiUrl);
       const retriever = new KnowledgeRetriever(embedder, vectorStore);
 
       const results = await retriever.retrieve({

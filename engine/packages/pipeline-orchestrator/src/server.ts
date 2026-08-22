@@ -39,8 +39,8 @@ const DATA_DIR = process.env.DATA_DIR || join(__dirname, '..', '..', '..', 'data
 // Production guard: reject development-only configurations
 const NODE_ENV = process.env.NODE_ENV || 'development';
 if (NODE_ENV === 'production') {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY is required in production. Mock embeddings are not allowed.');
+  if (!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY) {
+    throw new Error('OPENROUTER_API_KEY is required in production. Mock embeddings are not allowed.');
   }
 }
 

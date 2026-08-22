@@ -99,7 +99,7 @@ if (NODE_ENV === 'production') {
     { key: 'PIPELINE_URL', purpose: 'Internal URL for pipeline-orchestrator sync (no localhost fallback in production)' },
     { key: 'PADDLE_API_KEY', purpose: 'Paddle payment processing' },
     { key: 'PADDLE_WEBHOOK_SECRET', purpose: 'Paddle webhook signature verification' },
-    { key: 'OPENAI_API_KEY', purpose: 'OpenAI embeddings for knowledge pipeline (mock embeddings blocked in production)' },
+    { key: 'OPENROUTER_API_KEY', purpose: 'OpenRouter embeddings for knowledge pipeline (fallback: OPENAI_API_KEY)' },
     { key: 'INTERNAL_SYNC_KEY', purpose: 'Secure sync between API and pipeline services' },
     // NOTE: email API key (RESEND_API_KEY, with SENDGRID_API_KEY accepted as a
     // legacy fallback) is enforced in the Email Provider section below, since
@@ -551,7 +551,7 @@ app.use('/api/agency', auth, tenantGuard, createAgencyRoutes({
 const knowledgeDeps = {
   db,
   knowledgeDb: isPostgresDatabase(db) ? createKnowledgePipelineDb() : undefined,
-  embeddingApiKey: process.env.OPENAI_API_KEY,
+  embeddingApiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
   embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '128', 10),
   unansweredRepo,
 };

@@ -211,8 +211,10 @@ Examples by industry:
 
 function createPipeline(deps: KnowledgeRouteDeps): KnowledgePipeline {
   const dimension = deps.embeddingDimension || 128;
-  const embedder = deps.embeddingApiKey
-    ? new OpenAIEmbeddingProvider(deps.embeddingApiKey, 'text-embedding-3-small')
+  const apiKey = process.env.OPENROUTER_API_KEY || deps.embeddingApiKey;
+  const apiUrl = process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1/embeddings' : undefined;
+  const embedder = apiKey
+    ? new OpenAIEmbeddingProvider(apiKey, 'text-embedding-3-small', 30000, apiUrl)
     : new MockEmbeddingProvider(dimension);
 
   const vectorStore = getVectorStore(deps);
@@ -238,8 +240,10 @@ function createPipeline(deps: KnowledgeRouteDeps): KnowledgePipeline {
 
 function createRetriever(deps: KnowledgeRouteDeps) {
   const dimension = deps.embeddingDimension || 128;
-  const embedder = deps.embeddingApiKey
-    ? new OpenAIEmbeddingProvider(deps.embeddingApiKey, 'text-embedding-3-small')
+  const apiKey = process.env.OPENROUTER_API_KEY || deps.embeddingApiKey;
+  const apiUrl = process.env.OPENROUTER_API_KEY ? 'https://openrouter.ai/api/v1/embeddings' : undefined;
+  const embedder = apiKey
+    ? new OpenAIEmbeddingProvider(apiKey, 'text-embedding-3-small', 30000, apiUrl)
     : new MockEmbeddingProvider(dimension);
   const vectorStore = getVectorStore(deps);
   return new KnowledgeRetriever(embedder, vectorStore);
