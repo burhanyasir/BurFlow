@@ -85,6 +85,12 @@ export default function BillingDashboard() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    if (window.location.hash === '#support') {
+      setTimeout(() => document.getElementById('support')?.scrollIntoView({ behavior: 'smooth' }), 300);
+    }
+  }, []);
+
   const handleRequestPlan = async (plan: Plan) => {
     if (plan.price === 0) { addToast('You are already on the free plan.', 'info'); return; }
     setRequestingPlan(plan.id);
@@ -369,7 +375,7 @@ export default function BillingDashboard() {
               </Panel>
             )}
 
-            <Panel>
+            <div id="support"><Panel>
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10"><Inbox className="size-4 text-primary" /></div>
                 <div>
@@ -412,7 +418,7 @@ export default function BillingDashboard() {
                   </div>
                 </div>
               )}
-            </Panel>
+            </Panel></div>
           </>
         )}
       </div>

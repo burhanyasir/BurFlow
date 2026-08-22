@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronDown, LogOut, Settings, Sparkles } from 'lucide-react';
+import { ChevronLeft, ChevronDown, LogOut, Settings, Sparkles, LifeBuoy } from 'lucide-react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { cn } from '../../utils/cn';
@@ -136,6 +136,19 @@ export function DashboardSidebar({
           })}
         </nav>
 
+        {/* Support link */}
+        {!collapsed && (
+          <div className="border-t border-hairline px-2 pt-1 pb-0.5">
+            <button
+              onClick={() => onNavigate?.({ label: 'Support', href: '/dashboard/billing' })}
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-white/[0.04] hover:text-foreground"
+            >
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center"><LifeBuoy className="h-4 w-4" /></span>
+              <span className="flex-1 truncate">Support</span>
+            </button>
+          </div>
+        )}
+
         {/* Usage bar */}
         {!collapsed && usagePercent > 0 && (
           <div className="border-t border-hairline px-4 py-3">
@@ -208,6 +221,15 @@ export function DashboardSidebar({
                 </button>
               ))}
             </nav>
+            <div className="border-t border-hairline px-2 pt-1 pb-0.5">
+              <button
+                onClick={() => { onNavigate?.({ label: 'Support', href: '/dashboard/billing' }); setCollapsed(true); }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted-foreground transition hover:bg-white/[0.04] hover:text-foreground"
+              >
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center"><LifeBuoy className="h-4 w-4" /></span>
+                <span className="flex-1 truncate">Support</span>
+              </button>
+            </div>
             <div className="border-t border-hairline p-2">
               <SidebarUserMenu userName={userName} userEmail={userEmail} onLogout={onLogout} onSettings={onSettings} />
             </div>
