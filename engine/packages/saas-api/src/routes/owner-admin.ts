@@ -67,31 +67,27 @@ export function createOwnerAdminRoutes(
         const kbCount = kbRepo.listByTenant(s.tenantId).length;
 
         return {
-          tenantId: s.tenantId,
-          tenantName: tenant?.name || 'Unknown',
+          id: s.tenantId,
+          name: tenant?.name || 'Unknown',
           slug: tenant?.slug || '',
           ownerEmail: owner?.email || 'Unknown',
           ownerName: owner?.name || 'Unknown',
           plan: s.plan,
-          status: s.status,
-          currentPeriodStart: s.currentPeriodStart,
+          subscriptionStatus: s.status,
           currentPeriodEnd: s.currentPeriodEnd,
-          trialStart: s.trialStart,
           trialEnd: s.trialEnd,
-          cancelledAt: s.cancelledAt,
-          totalConversations: convs.total,
-          currentMonthUsage: currentUsage,
-          teamMembers: teamCount,
-          knowledgeBases: kbCount,
+          conversationsCount: convs.total,
+          teamMembersCount: teamCount,
+          knowledgeBasesCount: kbCount,
           createdAt: tenant ? (tenant as any).created_at : null,
         };
       });
 
       if (search) {
         tenants = tenants.filter(t =>
-          t.tenantName.toLowerCase().includes(search) ||
+          t.name.toLowerCase().includes(search) ||
           t.ownerEmail.toLowerCase().includes(search) ||
-          t.tenantId.toLowerCase().includes(search) ||
+          t.id.toLowerCase().includes(search) ||
           t.slug.toLowerCase().includes(search)
         );
       }
@@ -375,23 +371,33 @@ export function createOwnerAdminRoutes(
   router.get('/stats', ownerOnly, (_req: Request, res: Response) => {
     try {
       const allSubs = subRepo.list(1, 10000);
-      const planCounts: Record<string, number> = {};
-      const statusCounts: Record<string, number> = {};
       let mrr = 0;
+      let activeSubscriptions = 0;
+      let trialSubscriptions = 0;
+      let totalConversations = 0;
+      let totalTeamMembers = 0;
 
       for (const s of allSubs.subscriptions) {
-        planCounts[s.plan] = (planCounts[s.plan] || 0) + 1;
-        statusCounts[s.status] = (statusCounts[s.status] || 0) + 1;
-        if (s.status === 'active' || s.status === 'trialing') {
+        if (s.status === 'active') {
+          activeSubscriptions++;
           mrr += getPlanPrice(s.plan);
         }
+        if (s.status === 'trialing') {
+          trialSubscriptions++;
+        }
+        const convs = conversationRepo.listByTenant(s.tenantId, 1, 1);
+        totalConversations += convs.total;
+        const members = teamMemberRepo.findByTenant(s.tenantId);
+        totalTeamMembers += members.length;
       }
 
       res.json({
         totalTenants: allSubs.total,
-        planCounts,
-        statusCounts,
         mrr,
+        activeSubscriptions,
+        trialSubscriptions,
+        totalConversations,
+        totalTeamMembers,
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to get stats' });
