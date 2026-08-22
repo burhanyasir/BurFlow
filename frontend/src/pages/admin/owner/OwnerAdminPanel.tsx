@@ -96,53 +96,60 @@ interface PlanLimits {
 }
 
 interface TenantDetail {
-  id: string;
-  name: string;
-  slug: string;
-  createdAt: string;
+  tenant: {
+    id: string;
+    name: string;
+    slug: string;
+    plan: string;
+    subscriptionStatus: string;
+    subscriptionPeriodEnd: string | null;
+    customDomain?: string;
+    notificationEmail?: string;
+    createdAt: string;
+    updatedAt?: string;
+  };
   owner: {
     id: string;
     email: string;
     name: string;
     emailVerified: boolean;
-  };
+  } | null;
   subscription: {
-    planId: string;
-    planName: string;
+    plan: string;
     status: string;
-    paddleSubscriptionId?: string;
     currentPeriodStart: string | null;
     currentPeriodEnd: string | null;
+    trialStart: string | null;
     trialEnd: string | null;
     cancelledAt: string | null;
-    onTrial: boolean;
-    daysLeftInTrial: number | null;
-    conversationsLimit: number;
-    conversationsUsed: number;
-    documentsLimit: number;
-    documentsUsed: number;
-    features: string[];
-    planLimits: PlanLimits;
   } | null;
+  planLimits: {
+    conversations: number;
+    documents: number;
+    knowledgeBases: number;
+    teamMembers: number;
+  };
+  usage: {
+    currentMonth: number;
+    history: { date: string; conversations: number; messages: number }[];
+  };
   stats: {
     totalConversations: number;
     activeConversations: number;
-    leads: number;
-    documents: number;
+    totalLeads: number;
+    totalKnowledgeBases: number;
+    totalDocuments: number;
+    documentsByStatus: Record<string, number>;
     teamMembers: number;
     apiKeys: number;
   };
   teamMembers: {
     id: string;
+    userId?: string;
     email: string;
     name: string;
     role: string;
-    createdAt: string;
-  }[];
-  usageHistory: {
-    date: string;
-    conversations: number;
-    messages: number;
+    joinedAt?: string;
   }[];
 }
 
@@ -1066,14 +1073,14 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
   if (!detail) return null;
 
   const sub = detail.subscription;
-  const limits = sub?.planLimits;
+  const limits = detail.planLimits;
   const stats = detail.stats;
 
   return (
     <div className="rounded-2xl border border-primary/30 bg-surface p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h3 className="font-display text-lg font-bold tracking-tight">{detail.name}</h3>
-        <span className="text-xs text-muted-foreground">ID: {detail.id}</span>
+        <h3 className="font-display text-lg font-bold tracking-tight">{detail.tenant.name}</h3>
+        <span className="text-xs text-muted-foreground">ID: {detail.tenant.id}</span>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -1085,15 +1092,15 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Name</span>
-                <span className="font-medium">{detail.owner.name}</span>
+                <span className="font-medium">{detail.owner?.name ?? '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Email</span>
-                <span className="font-medium">{detail.owner.email}</span>
+                <span className="font-medium">{detail.owner?.email ?? '—'}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Verified</span>
-                {detail.owner.emailVerified ? (
+                {detail.owner?.emailVerified ? (
                   <span className="flex items-center gap-1 text-success-300"><CheckCircle className="size-3" /> Yes</span>
                 ) : (
                   <span className="flex items-center gap-1 text-muted-foreground"><XCircle className="size-3" /> No</span>
@@ -1101,7 +1108,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Created</span>
-                <span className="font-medium">{formatDate(detail.createdAt)}</span>
+                <span className="font-medium">{formatDate(detail.tenant.createdAt)}</span>
               </div>
             </div>
           </div>
@@ -1114,8 +1121,8 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Plan</span>
-                  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", planBadgeClasses(sub.planId))}>
-                    {sub.planName}
+                  <span className={cn("inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium", planBadgeClasses(sub.plan))}>
+                    {sub.plan}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1133,7 +1140,7 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                   <span className="text-muted-foreground">Period End</span>
                   <span className="font-medium">{formatDate(sub.currentPeriodEnd)}</span>
                 </div>
-                {sub.onTrial && (
+                {sub.status === 'trialing' && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Trial End</span>
                     <span className="font-medium">{formatDate(sub.trialEnd)}</span>
@@ -1143,12 +1150,6 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Cancelled At</span>
                     <span className="font-medium text-error-300">{formatDate(sub.cancelledAt)}</span>
-                  </div>
-                )}
-                {sub.paddleSubscriptionId && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Paddle Sub ID</span>
-                    <span className="font-mono text-xs">{sub.paddleSubscriptionId}</span>
                   </div>
                 )}
               </div>
@@ -1161,9 +1162,9 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               </h4>
               <div className="space-y-3">
                 {[
-                  { label: "Conversations", used: sub!.conversationsUsed, limit: limits.conversations },
-                  { label: "Documents", used: sub!.documentsUsed, limit: limits.documents },
-                  { label: "Knowledge Bases", used: 0, limit: limits.knowledgeBases },
+                  { label: "Conversations", used: detail.usage.currentMonth, limit: limits.conversations },
+                  { label: "Documents", used: detail.stats.totalDocuments, limit: limits.documents },
+                  { label: "Knowledge Bases", used: detail.stats.totalKnowledgeBases, limit: limits.knowledgeBases },
                   { label: "Team Members", used: detail.teamMembers.length, limit: limits.teamMembers },
                 ].map(({ label, used, limit }) => (
                   <div key={label}>
@@ -1182,12 +1183,6 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
                     </div>
                   </div>
                 ))}
-                <div className="grid grid-cols-2 gap-2 pt-2 text-xs text-muted-foreground">
-                  <span>API Calls: {limits.apiCalls.toLocaleString()}/mo</span>
-                  <span>Storage: {limits.storageMb.toLocaleString()} MB</span>
-                  <span>Widgets: {limits.widgets}</span>
-                  <span>Custom Branding: {limits.customBranding ? "Yes" : "No"}</span>
-                </div>
               </div>
             </div>
           )}
@@ -1202,8 +1197,8 @@ function TenantDetailPanel({ detail, loading }: { detail: TenantDetail | null; l
               {[
                 { icon: <MessageSquare className="size-4" />, label: "Total Convos", value: stats.totalConversations },
                 { icon: <MessageSquare className="size-4" />, label: "Active Convos", value: stats.activeConversations },
-                { icon: <Users className="size-4" />, label: "Leads", value: stats.leads },
-                { icon: <FileText className="size-4" />, label: "Documents", value: stats.documents },
+                { icon: <Users className="size-4" />, label: "Leads", value: stats.totalLeads },
+                { icon: <FileText className="size-4" />, label: "Documents", value: stats.totalDocuments },
                 { icon: <Users className="size-4" />, label: "Team Members", value: stats.teamMembers },
                 { icon: <Key className="size-4" />, label: "API Keys", value: stats.apiKeys },
               ].map(({ icon, label, value }) => (
