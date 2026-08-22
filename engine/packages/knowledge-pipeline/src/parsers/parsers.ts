@@ -145,6 +145,7 @@ export class HtmlParser implements DocumentParser {
     return html
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<(br|hr|\/p|\/div|\/h[1-6]|\/li|\/tr|\/blockquote)[^>]*>/gi, '\n')
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -152,7 +153,9 @@ export class HtmlParser implements DocumentParser {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#\d+;/g, m => String.fromCharCode(parseInt(m.slice(2, -1), 10)))
-      .replace(/\s+/g, ' ')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n\s*\n/g, '\n')
+      .replace(/^\n+|\n+$/g, '')
       .trim();
   }
 
@@ -522,13 +525,16 @@ export class WebsiteCrawler implements WebCrawler {
 
       try {
         await this.rateLimit();
-        const response = await fetch(item.url, { signal: AbortSignal.timeout(30000) });
+        const response = await fetch(item.url, {
+          signal: AbortSignal.timeout(30000),
+          headers: { 'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com)' },
+        });
         if (!response.ok) { console.log(`[crawl] SKIP (HTTP ${response.status}): ${item.url}`); continue; }
 
         const contentType = response.headers.get('content-type') || '';
         // Be permissive: allow any content type that isn't explicitly non-text
         // Many modern sites return application/json or no content-type at all
-        const forbiddenTypes = ['image/', 'video/', 'audio/', 'application/pdf', 'application/'];
+        const forbiddenTypes = ['image/', 'video/', 'audio/', 'application/pdf'];
         if (forbiddenTypes.some(t => contentType.startsWith(t))) { console.log(`[crawl] SKIP (non-text content): ${item.url}`); continue; }
 
         const html = await response.text();
@@ -603,14 +609,32 @@ export class WebsiteCrawler implements WebCrawler {
       const origin = `${parsed.protocol}//${parsed.host}`;
       if (cache.has(origin)) return cache.get(origin)!;
       const robotsUrl = `${origin}/robots.txt`;
-      const response = await fetch(robotsUrl, { signal: AbortSignal.timeout(5000) });
+      const response = await fetch(robotsUrl, {
+        signal: AbortSignal.timeout(5000),
+        headers: { 'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com)' },
+      });
       if (!response.ok) { cache.set(origin, true); return true; }
       const text = await response.text();
-      const allowed = !text.includes('Disallow: /');
+      const allowed = !this.isFullyBlockedByRobots(text);
       cache.set(origin, allowed);
       return allowed;
     } catch {
       return true;
     }
+  }
+
+  private isFullyBlockedByRobots(text: string): boolean {
+    const lines = text.split('\n').map(l => l.trim());
+    let appliesToUs = false;
+    for (const line of lines) {
+      if (line.toLowerCase().startsWith('user-agent:')) {
+        const ua = line.split(':').slice(1).join(':').trim();
+        appliesToUs = ua === '*' || ua.toLowerCase().includes('burflow');
+      } else if (appliesToUs && line.startsWith('Disallow:')) {
+        const path = line.split(':').slice(1).join(':').trim();
+        if (path === '/' || path === '') return true;
+      }
+    }
+    return false;
   }
 }
