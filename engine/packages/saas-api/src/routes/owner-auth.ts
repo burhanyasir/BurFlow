@@ -4,6 +4,7 @@ import { UserRepository, TenantRepository, comparePassword } from '@conversation
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 
 const logger = createLogger('saas-api:owner-auth');
+// ts-fix: User type has no 'role' field — owner role comes from JWT payload only
 
 export function createOwnerAuthRoutes(
   userRepo: UserRepository,
