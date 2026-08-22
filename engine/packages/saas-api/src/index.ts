@@ -53,6 +53,7 @@ import { createBillingRoutes } from './routes/billing';
 import { createAdminRoutes } from './routes/admin';
 import { createOwnerAdminRoutes } from './routes/owner-admin';
 import { createSubscriptionRequestRoutes } from './routes/subscription-requests';
+import { createSupportRoutes } from './routes/support';
 import { createOwnerAuthRoutes } from './routes/owner-auth';
 import { createActivationRoutes } from './routes/admin-activation';
 import { createTeamRoutes } from './routes/team';
@@ -523,6 +524,9 @@ app.use('/api/owner', createOwnerAdminRoutes(userRepo, tenantRepo, conversationR
 // Subscription request routes — users request plans, owner approves
 app.use('/api/billing/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));
 app.use('/api/owner/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));
+
+// Support routes — tickets, payments, inbox
+app.use('/api/support', createSupportRoutes(userRepo, tenantRepo, conversationRepo, messageRepo, db, JWT_SECRET));
 
 // Customer Activation routes
 app.use('/api/admin', auth, tenantGuard, createActivationRoutes(

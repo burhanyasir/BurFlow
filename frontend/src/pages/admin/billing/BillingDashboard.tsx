@@ -154,12 +154,29 @@ export default function BillingDashboard() {
         )}
 
         {pendingRequest && (
-          <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-300/25 px-4 py-3">
-            <Clock className="size-5 shrink-0 text-amber-500" />
-            <div className="flex-1 text-sm">
-              <span className="font-semibold">Pending plan request</span> — your request for the <span className="font-semibold">{pendingRequest.plan}</span> plan ({pendingRequest.billingPeriod}) is being reviewed. Submitted {new Date(pendingRequest.createdAt).toLocaleDateString()}.
+          <div className="rounded-2xl border border-amber-500/20 bg-amber-300/10 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Clock className="size-5 shrink-0 text-amber-500" />
+              <div className="text-sm">
+                <span className="font-semibold">Pending plan request</span> — your request for the <span className="font-semibold">{pendingRequest.plan}</span> plan ({pendingRequest.billingPeriod}) is being reviewed.
+              </div>
             </div>
-            <button onClick={() => setPendingRequest(null)} className="text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
+            <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+              <h4 className="text-sm font-bold">Payment Instructions</h4>
+              <p className="text-xs text-muted-foreground">Send payment to the following account to activate your plan:</p>
+              <div className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+                <CreditCard className="size-5 text-amber-500" />
+                <div>
+                  <p className="text-xs text-muted-foreground">JazzCash / EasyPaisa Account</p>
+                  <p className="text-lg font-bold font-mono tracking-wider text-foreground">PK58SADA0000003007645484</p>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                After sending payment, you can optionally upload a screenshot or message us at{' '}
+                <a href="mailto:burflow2026@gmail.com" className="text-primary hover:underline">burflow2026@gmail.com</a>
+              </p>
+            </div>
+            <button onClick={() => setPendingRequest(null)} className="mt-3 text-xs font-medium text-muted-foreground hover:text-foreground">Dismiss</button>
           </div>
         )}
 
@@ -198,7 +215,8 @@ export default function BillingDashboard() {
                 <div>
                   <h2 className="text-lg font-bold tracking-tight">Plans</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Select a plan — request is reviewed by the owner.
+                    Select a plan — request is reviewed by the owner. Questions?{' '}
+                    <a href="mailto:burflow2026@gmail.com" className="text-primary hover:underline">burflow2026@gmail.com</a>
                   </p>
                 </div>
                 <div className="flex items-center gap-1 rounded-full border border-hairline bg-surface-2 p-1">

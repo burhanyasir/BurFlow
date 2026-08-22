@@ -1,0 +1,244 @@
+import { Router, Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
+import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, type SqlDatabase } from '@conversation-engine/saas-core';
+import { createLogger, createContextLogger } from '@conversation-engine/logger';
+import { randomBytes } from 'crypto';
+
+const logger = createLogger('saas-api:support');
+function generateId(): string { return randomBytes(16).toString('hex'); }
+
+export function createSupportRoutes(
+  userRepo: UserRepository,
+  tenantRepo: TenantRepository,
+  conversationRepo: ConversationRepository,
+  messageRepo: MessageRepository,
+  db: SqlDatabase,
+  jwtSecret: string,
+): Router {
+  const router = Router();
+
+  const ownerOnly = (req: Request, res: Response, next: Function) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Auth required' });
+    try {
+      const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
+      if (payload.role !== 'owner' || payload.panel !== 'owner') return res.status(403).json({ error: 'Owner access required' });
+      next();
+    } catch { return res.status(401).json({ error: 'Invalid token' }); }
+  };
+
+  const userAuth = (req: Request, res: Response, next: Function) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return res.status(401).json({ error: 'Auth required' });
+    try {
+      jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] });
+      next();
+    } catch { return res.status(401).json({ error: 'Invalid token' }); }
+  };
+
+  // ─── OWNER: Inbox — aggregated view ─────────────────────────────────
+  router.get('/inbox', ownerOnly, (_req: Request, res: Response) => {
+    try {
+      const tickets = db.prepare('SELECT * FROM support_tickets ORDER BY updated_at DESC').all();
+      const payments = db.prepare('SELECT * FROM payment_confirmations ORDER BY created_at DESC').all();
+      const subRequests = db.prepare('SELECT * FROM subscription_requests WHERE status = ? ORDER BY created_at DESC').all('pending');
+
+      res.json({ tickets, payments, subRequests });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Inbox load failed');
+      res.status(500).json({ error: 'Failed to load inbox' });
+    }
+  });
+
+  // ─── OWNER: Chatbot conversations (from all tenants) ────────────────
+  router.get('/chatbot-conversations', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const rows = db.prepare(`
+        SELECT c.id, c.session_id, c.tenant_id, c.started_at, c.message_count, c.status,
+               t.name as tenant_name,
+               (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+               (SELECT created_at FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message_at
+        FROM conversations c
+        LEFT JOIN tenants t ON t.id = c.tenant_id
+        ORDER BY last_message_at DESC
+        LIMIT ?
+      `).all(limit);
+      res.json({ conversations: rows });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to load conversations' });
+    }
+  });
+
+  // ─── OWNER: Messages for a conversation ─────────────────────────────
+  router.get('/chatbot-conversations/:convId/messages', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { messages } = messageRepo.listByConversation(req.params.convId, 1, 100);
+      res.json({ messages });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  // ─── USER: Create support ticket ────────────────────────────────────
+  router.post('/tickets', userAuth, (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization!;
+      const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
+      const user = userRepo.findById(payload.sub);
+      const tenants = user ? tenantRepo.findByOwner(user.id) : [];
+      const tenant = tenants[0];
+
+      const { subject, message, source } = req.body;
+      if (!subject || !message) return res.status(400).json({ error: 'Subject and message required' });
+
+      const id = generateId();
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO support_tickets (id, tenant_id, user_email, user_name, subject, source, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, tenant?.id || null, user?.email || payload.email, user?.name || '', subject, source || 'dashboard', 'open', now, now);
+
+      db.prepare(
+        'INSERT INTO support_messages (id, ticket_id, sender_type, sender_email, content, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(generateId(), id, 'user', user?.email || payload.email, message, now);
+
+      createContextLogger(logger).info({ ticketId: id, email: user?.email }, 'Support ticket created');
+      res.json({ ok: true, ticketId: id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Create ticket failed');
+      res.status(500).json({ error: 'Failed to create ticket' });
+    }
+  });
+
+  // ─── OWNER: List tickets ────────────────────────────────────────────
+  router.get('/tickets', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const status = (req.query.status as string) || 'all';
+      const sql = status === 'all'
+        ? 'SELECT * FROM support_tickets ORDER BY updated_at DESC'
+        : 'SELECT * FROM support_tickets WHERE status = ? ORDER BY updated_at DESC';
+      const rows = status === 'all' ? db.prepare(sql).all() : db.prepare(sql).all(status);
+      res.json({ tickets: rows });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // ─── OWNER: Get ticket messages ─────────────────────────────────────
+  router.get('/tickets/:ticketId', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const ticket = db.prepare('SELECT * FROM support_tickets WHERE id = ?').get(req.params.ticketId);
+      if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
+      const messages = db.prepare('SELECT * FROM support_messages WHERE ticket_id = ? ORDER BY created_at ASC').all(req.params.ticketId);
+      res.json({ ticket, messages });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // ─── OWNER: Send message ────────────────────────────────────────────
+  router.post('/tickets/:ticketId/messages', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { content } = req.body;
+      if (!content) return res.status(400).json({ error: 'Message required' });
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO support_messages (id, ticket_id, sender_type, sender_email, content, created_at) VALUES (?, ?, ?, ?, ?, ?)'
+      ).run(generateId(), req.params.ticketId, 'owner', 'burflow2026@gmail.com', content, now);
+      db.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').run('replied', now, req.params.ticketId);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // ─── OWNER: Close ticket ────────────────────────────────────────────
+  router.post('/tickets/:ticketId/close', ownerOnly, (req: Request, res: Response) => {
+    try {
+      db.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').run('closed', new Date().toISOString(), req.params.ticketId);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // ─── USER: Submit payment confirmation ──────────────────────────────
+  router.post('/payment-confirm', userAuth, (req: Request, res: Response) => {
+    try {
+      const authHeader = req.headers.authorization!;
+      const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
+      const user = userRepo.findById(payload.sub);
+      const tenants = user ? tenantRepo.findByOwner(user.id) : [];
+      const tenant = tenants[0];
+
+      const { requestedPlan, amount, walletAccount, screenshotUrl, billingPeriod } = req.body;
+      if (!requestedPlan) return res.status(400).json({ error: 'Plan required' });
+
+      const id = generateId();
+      const now = new Date().toISOString();
+      db.prepare(
+        'INSERT INTO payment_confirmations (id, tenant_id, user_email, requested_plan, billing_period, amount, currency, wallet_account, screenshot_url, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).run(id, tenant?.id || null, user?.email || payload.email, requestedPlan, billingPeriod || 'monthly', amount || '0', 'PKR', walletAccount || 'PK58SADA0000003007645484', screenshotUrl || null, 'pending', now, now);
+
+      createContextLogger(logger).info({ paymentId: id, email: user?.email, plan: requestedPlan }, 'Payment confirmation submitted');
+      res.json({ ok: true, paymentId: id });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Payment confirm failed');
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  // ─── OWNER: List payments ───────────────────────────────────────────
+  router.get('/payments', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const status = (req.query.status as string) || 'all';
+      const sql = status === 'all'
+        ? 'SELECT * FROM payment_confirmations ORDER BY created_at DESC'
+        : 'SELECT * FROM payment_confirmations WHERE status = ? ORDER BY created_at DESC';
+      const rows = status === 'all' ? db.prepare(sql).all() : db.prepare(sql).all(status);
+      res.json({ payments: rows });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  // ─── OWNER: Approve payment ─────────────────────────────────────────
+  router.post('/payments/:id/approve', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const { id } = req.params;
+      const row = db.prepare('SELECT * FROM payment_confirmations WHERE id = ?').get(id) as any;
+      if (!row) return res.status(404).json({ error: 'Payment not found' });
+      if (row.status !== 'pending') return res.status(400).json({ error: 'Already processed' });
+
+      const now = new Date().toISOString();
+      const periodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+      // Activate plan on tenant
+      db.prepare(
+        'UPDATE subscriptions SET plan = ?, status = ?, current_period_start = ?, current_period_end = ? WHERE tenant_id = ?'
+      ).run(row.requested_plan, 'active', now, periodEnd, row.tenant_id);
+
+      db.prepare(
+        'UPDATE tenants SET plan = ?, subscription_status = ?, subscription_period_end = ? WHERE id = ?'
+      ).run(row.requested_plan, 'active', periodEnd, row.tenant_id);
+
+      // Also approve the subscription request if one exists
+      db.prepare(
+        'UPDATE subscription_requests SET status = ?, updated_at = ? WHERE tenant_id = ? AND status = ?'
+      ).run('approved', now, row.tenant_id, 'pending');
+
+      db.prepare(
+        'UPDATE payment_confirmations SET status = ?, owner_notes = ?, updated_at = ? WHERE id = ?'
+      ).run('approved', req.body.notes || '', now, id);
+
+      createContextLogger(logger).info({ paymentId: id, plan: row.requested_plan }, 'Payment approved');
+      res.json({ ok: true });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Approve payment failed');
+      res.status(500).json({ error: 'Failed' });
+    }
+  });
+
+  // ─── OWNER: Reject payment ──────────────────────────────────────────
+  router.post('/payments/:id/reject', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const now = new Date().toISOString();
+      db.prepare(
+        'UPDATE payment_confirmations SET status = ?, owner_notes = ?, updated_at = ? WHERE id = ?'
+      ).run('rejected', req.body.reason || '', now, req.params.id);
+      res.json({ ok: true });
+    } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
+  });
+
+  return router;
+}

@@ -49,6 +49,10 @@
       "destination": "https://burflow.onrender.com/api/owner/:match*"
     },
     {
+      "source": "/api/support/:match*",
+      "destination": "https://burflow.onrender.com/api/support/:match*"
+    },
+    {
       "source": "/api/tenants/:match*",
       "destination": "https://burflow.onrender.com/api/tenants/:match*"
     },

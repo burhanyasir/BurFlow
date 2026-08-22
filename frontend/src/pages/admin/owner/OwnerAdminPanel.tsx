@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useCallback, useRef } from 'react';
 import { cn } from '../../../utils/cn';
+import OwnerInbox from './OwnerInbox';
 import {
   Crown,
   Building2,
@@ -29,6 +30,7 @@ import {
   LogOut,
   Eye,
   Loader2,
+  Inbox,
 } from 'lucide-react';
 
 type PlanId = 'free' | 'starter' | 'pro' | 'advanced';
@@ -374,6 +376,7 @@ function LoginView({ onLogin }: { onLogin: (user: OwnerUser) => void }) {
 // ─── Admin Panel View ─────────────────────────────────────────────────
 function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => void }) {
   const { toasts, addToast, removeToast } = useToast();
+  const [view, setView] = useState<'tenants' | 'inbox'>('tenants');
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -632,17 +635,35 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
               <p className="text-xs text-muted-foreground">Welcome back, {user.name}</p>
             </div>
           </div>
-          <button
-            onClick={onLogout}
-            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
-          >
-            <LogOut className="size-4" />
-            Logout
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setView('tenants')}
+              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'tenants' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground')}
+            >
+              <Building2 className="size-3.5" /> Tenants
+            </button>
+            <button
+              onClick={() => setView('inbox')}
+              className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium transition', view === 'inbox' ? 'bg-white/10 text-foreground' : 'text-muted-foreground hover:bg-white/5 hover:text-foreground')}
+            >
+              <Inbox className="size-3.5" /> Inbox
+            </button>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-muted-foreground transition hover:bg-white/10 hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+        {view === 'inbox' ? (
+          <OwnerInbox />
+        ) : (
+        <>
         {/* Loading */}
         {loading && (
           <div className="animate-pulse space-y-6">
@@ -1050,6 +1071,8 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
               );
             })}
           </div>
+        )}
+        </>
         )}
       </main>
     </div>
