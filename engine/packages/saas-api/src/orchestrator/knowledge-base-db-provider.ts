@@ -42,30 +42,39 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   }
 
   getBusinessKnowledge(tenantId: string): string {
-    if (!this.db) return '';
+    if (!this.db) {
+      console.log(`[KnowledgeLookup] No DB configured — returning empty for tenant ${tenantId}`);
+      return '';
+    }
     const cached = this.crawledChunksCache.get(tenantId);
-    if (cached && Date.now() - cached.ts < this.CACHE_TTL) return cached.text;
+    if (cached && Date.now() - cached.ts < this.CACHE_TTL) {
+      console.log(`[KnowledgeLookup] Cache hit for tenant ${tenantId} (${cached.text.length} chars)`);
+      return cached.text;
+    }
 
     try {
       const rows = this.db.prepare(
         `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
       ).all(tenantId) as Array<{ chunk_data: string }>;
+      console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${rows.length} snapshot rows`);
       if (!rows.length) return '';
 
-      // Each chunk_data is a JSON array of chunks
       const allChunks = rows.flatMap(r => {
         try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
       });
+      console.log(`[KnowledgeLookup] tenantId=${tenantId} — parsed ${allChunks.length} total chunks`);
       if (!allChunks.length) return '';
 
       const parts = allChunks.map(chunk => {
-        const title = chunk.title || chunk.document_id || '';
+        const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
         return title ? `[${title}] ${chunk.content}` : chunk.content;
       });
       const text = parts.join('\n\n');
+      console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars of business knowledge`);
       this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
       return text;
-    } catch {
+    } catch (err) {
+      console.error(`[KnowledgeLookup] Error fetching knowledge for tenant ${tenantId}:`, err);
       return '';
     }
   }
