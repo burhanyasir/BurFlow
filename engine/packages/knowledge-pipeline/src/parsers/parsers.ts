@@ -1,6 +1,10 @@
 import { ParsedDocument, SourceType } from '../types';
 import { DocumentParser, WebCrawler } from '../interfaces';
 import { createHash, randomUUID } from 'crypto';
+import { lookup as dnsLookup } from 'dns';
+import { promisify } from 'util';
+
+const dnsLookupAsync = promisify(dnsLookup);
 
 export class TextParser implements DocumentParser {
   supports(sourceType: string): boolean {
@@ -412,180 +416,469 @@ export class DocxParser implements DocumentParser {
   }
 }
 
-async function parseSitemapUrl(sitemapUrl: string): Promise<string[]> {
+async function parseSitemapUrl(sitemapUrl: string, depth = 0): Promise<string[]> {
+  if (depth > 3) return [];
   const urls: string[] = [];
   try {
-    const response = await fetch(sitemapUrl, { signal: AbortSignal.timeout(15000) });
+    const response = await fetch(sitemapUrl, {
+      signal: AbortSignal.timeout(15000),
+      headers: { 'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com/bot)' },
+      redirect: 'follow',
+    });
     if (!response.ok) return urls;
     const xml = await response.text();
-
-    // Parse <url><loc>...</loc></url>
     const urlRegex = /<loc[^>]*>([^<]+)<\/loc>/gi;
     let match: RegExpExecArray | null;
     while ((match = urlRegex.exec(xml)) !== null) {
       const href = match[1].trim();
       if (href.startsWith('http')) urls.push(href);
     }
-
-    // Handle sitemap index: <sitemap><loc>...</loc></sitemap>
     const sitemapRegex = /<sitemap[^>]*>[\s\S]*?<loc[^>]*>([^<]+)<\/loc>[\s\S]*?<\/sitemap>/gi;
     while ((match = sitemapRegex.exec(xml)) !== null) {
-      const childUrls = await parseSitemapUrl(match[1].trim());
+      const childUrls = await parseSitemapUrl(match[1].trim(), depth + 1);
       urls.push(...childUrls);
     }
   } catch {}
   return [...new Set(urls)];
 }
 
+function normalizeUrl(urlStr: string): string {
+  try {
+    const u = new URL(urlStr);
+    let host = u.hostname.toLowerCase();
+    if (host.startsWith('www.')) host = host.slice(4);
+    let path = u.pathname.replace(/\/+$/, '').replace(/\/index\.\w+$/, '') || '/';
+    path = path.replace(/\.\w+$/, '');
+    const stripped = u.search
+      .split('&')
+      .filter(p => !/^(utm_|fbclid|gclid|ref|mc_cid|mc_eid|_ga|_gl)=/.test(p))
+      .join('&');
+    const norm = `${host}${path}${stripped ? '?' + stripped : ''}`;
+    return norm;
+  } catch {
+    return urlStr;
+  }
+}
+
+const CHALLENGE_SIGNATURES = [
+  /just a moment/i, /verify you are human/i, /checking your browser/i,
+  /enable javascript/i, /turnstile/i, /cf-challenge/i, /_cf_chl/i,
+  /reference #\d/i, /access denied/i, /request blocked/i,
+  /please enable cookies/i, /enable cookies/i, /ddos protection/i,
+  /ray id:/i, /cloudflare/i,
+];
+const SOFT_404_TITLES = /404|not found|page not found|access denied|error|oops/i;
+const BOILERPLATE_NAV = /^(menu|navigation|header|footer|sidebar|cookie|copyright|©|all rights reserved)/i;
+const TRACKING_PARAMS = /^(utm_|fbclid|gclid|ref|mc_cid|_ga|_gl)/;
+
+function isChallengeOrBlocked(text: string, title: string): boolean {
+  if (CHALLENGE_SIGNATURES.some(re => re.test(text))) return true;
+  if (SOFT_404_TITLES.test(title)) return true;
+  return false;
+}
+
+function contentQualityScore(text: string): { score: number; reason?: string } {
+  const len = text.length;
+  if (len < 200) return { score: 0, reason: 'too_short' };
+  const pTags = (text.match(/<p[\s>]/gi) || []).length;
+  const wordCount = text.split(/\s+/).length;
+  if (wordCount < 50) return { score: 0, reason: 'too_few_words' };
+  const lines = text.split('\n').filter(l => l.trim());
+  const uniqueLines = new Set(lines.map(l => l.trim().toLowerCase()));
+  const boilerplateRatio = 1 - (uniqueLines.size / Math.max(lines.length, 1));
+  if (boilerplateRatio > 0.9) return { score: 0, reason: 'high_boilerplate' };
+  return { score: Math.min(10, Math.floor(wordCount / 100) + (pTags > 0 ? 3 : 0)) };
+}
+
 export class WebsiteCrawler implements WebCrawler {
   private static PRIVATE_IP_PATTERNS = [
-    /^127\./,
-    /^10\./,
-    /^172\.(1[6-9]|2[0-9]|3[01])\./,
-    /^192\.168\./,
-    /^169\.254\./,
-    /^0\./,
-    /^::1$/,
-    /^fc00:/i,
-    /^fd[0-9a-f]{2}:/i,
-    /^fe80:/i,
-    /^localhost$/i,
+    /^127\./, /^10\./, /^172\.(1[6-9]|2[0-9]|3[01])\./, /^192\.168\./,
+    /^169\.254\./, /^0\./, /^::1$/, /^fc00:/i, /^fd[0-9a-f]{2}:/i, /^fe80:/i,
+    /^::ffff:(\d{1,3}\.){3}\d{1,3}$/i, /^100\.6[4-9]\./, /^100\.[7-9]\d\./,
+    /^100\.1[0-1]\d\./, /^100\.12[0-7]\./,
   ];
+  private static SCHEME_ALLOW = new Set(['http:', 'https:']);
+  private static MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
+  private static FIRST_BYTE_TIMEOUT_MS = 8000;
+  private static TOTAL_TIMEOUT_MS = 20000;
+  private static MAX_REDIRECTS = 5;
+  private static CIRCUIT_BREAKER_THRESHOLD = 3;
+  private static CIRCUIT_BREAKER_TIMEOUT_MS = 60000;
+
+  private hostFailures = new Map<string, number>();
+  private hostCircuitOpen = new Map<string, number>();
+  private robotsCache = new Map<string, { rules: RobotsRules; fetchedAt: number }>();
+  private contentHashes = new Set<string>();
+  private boilerplateHashes = new Map<string, number>();
+  private allTexts: string[] = [];
+
+  private static isPrivateIp(ip: string): boolean {
+    return WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(ip));
+  }
 
   private static isPrivateUrl(urlStr: string): boolean {
     try {
       const url = new URL(urlStr);
+      if (!WebsiteCrawler.SCHEME_ALLOW.has(url.protocol)) return true;
       const hostname = url.hostname;
       const isDev = process.env.NODE_ENV === 'development';
       if (/^localhost$/i.test(hostname)) return !isDev;
       if (hostname === '[::1]') return !isDev;
       if (/^127\./.test(hostname)) return !isDev;
-      if (/^10\./.test(hostname)) return true;
-      if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) return true;
-      if (/^192\.168\./.test(hostname)) return true;
-      if (/^169\.254\./.test(hostname)) return true;
-      if (/^0\./.test(hostname)) return true;
-      if (/^fc00:/i.test(hostname)) return true;
-      if (/^fd[0-9a-f]{2}:/i.test(hostname)) return true;
-      if (/^fe80:/i.test(hostname)) return true;
-      return false;
+      return WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(hostname));
     } catch {
       return true;
     }
   }
 
-  async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean; onProgress?: (pagesCrawled: number, queueRemaining: number) => void }): Promise<ParsedDocument[]> {
-    const maxDepth = Math.min(options?.maxDepth ?? 5, 15);
-    const maxPages = Math.min(options?.maxPages ?? 50, 1000);
-    const respectRobots = options?.respectRobotsTxt ?? true;
-    const useSitemap = options?.useSitemap ?? true;
-    const onProgress = options?.onProgress;
-
-    if (WebsiteCrawler.isPrivateUrl(url)) {
-      throw new Error('URL points to a private/internal network address');
+  private async resolveDns(hostname: string): Promise<string[]> {
+    try {
+      const result = await dnsLookupAsync(hostname, { all: true });
+      return result.map(r => r.address);
+    } catch {
+      return [];
     }
+  }
 
-    // Extract the target domain to stay on the same site
-    const initialParsed = new URL(url);
-    const targetDomain = initialParsed.hostname;
+  private async validateResolvedIp(hostname: string): Promise<boolean> {
+    const isDev = process.env.NODE_ENV === 'development';
+    if (/^localhost$/i.test(hostname) && isDev) return true;
+    const ips = await this.resolveDns(hostname);
+    if (ips.length === 0) return false;
+    return ips.every(ip => !WebsiteCrawler.isPrivateIp(ip));
+  }
 
-    const visited = new Set<string>();
-    const results: ParsedDocument[] = [];
-    const queue: Array<{ url: string; depth: number }> = [];
-    const parser = new HtmlParser();
-    const robotsCache = new Map<string, boolean>();
-
-    if (respectRobots) {
-      const allowed = await this.checkRobotsTxtCached(url, robotsCache);
-      if (!allowed) return [];
+  private isHostCircuitOpen(hostname: string): boolean {
+    const openAt = this.hostCircuitOpen.get(hostname);
+    if (!openAt) return false;
+    if (Date.now() - openAt > WebsiteCrawler.CIRCUIT_BREAKER_TIMEOUT_MS) {
+      this.hostCircuitOpen.delete(hostname);
+      this.hostFailures.delete(hostname);
+      return false;
     }
+    return true;
+  }
 
-    // Check for sitemap.xml and use it if available
-    if (useSitemap) {
-      const parsed = new URL(url);
-      const sitemapUrl = `${parsed.protocol}//${parsed.host}/sitemap.xml`;
-      const sitemapUrls = await parseSitemapUrl(sitemapUrl);
-      for (const su of sitemapUrls) {
-        if (queue.length + results.length < maxPages * 2) {
-          queue.push({ url: su, depth: 1 });
-        }
-      }
+  private recordHostFailure(hostname: string): void {
+    const count = (this.hostFailures.get(hostname) || 0) + 1;
+    this.hostFailures.set(hostname, count);
+    if (count >= WebsiteCrawler.CIRCUIT_BREAKER_THRESHOLD) {
+      this.hostCircuitOpen.set(hostname, Date.now());
     }
+  }
 
-    // If no sitemap results, use the original URL as seed
-    if (queue.length === 0) {
-      queue.push({ url, depth: 0 });
-    }
-
-    while (queue.length > 0 && results.length < maxPages) {
-      const item = queue.shift()!;
-      console.log(`[crawl] Processing: ${item.url} (depth=${item.depth}, visited=${visited.size}, queue=${queue.length}, results=${results.length})`);
-      if (visited.has(item.url)) { console.log(`[crawl] SKIP (visited)`); continue; }
-      if (WebsiteCrawler.isPrivateUrl(item.url)) { console.log(`[crawl] SKIP (private)`); continue; }
-
-      try {
-        await this.rateLimit();
-        const response = await fetch(item.url, {
-          signal: AbortSignal.timeout(30000),
-          headers: { 'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com)' },
-        });
-        if (!response.ok) { console.log(`[crawl] SKIP (HTTP ${response.status}): ${item.url}`); continue; }
-
-        const contentType = response.headers.get('content-type') || '';
-        // Be permissive: allow any content type that isn't explicitly non-text
-        // Many modern sites return application/json or no content-type at all
-        const forbiddenTypes = ['image/', 'video/', 'audio/', 'application/pdf'];
-        if (forbiddenTypes.some(t => contentType.startsWith(t))) { console.log(`[crawl] SKIP (non-text content): ${item.url}`); continue; }
-
-        const html = await response.text();
-        const canonical = this.extractCanonical(html) || item.url;
-        if (visited.has(canonical)) { console.log(`[crawl] SKIP (canonical duplicate): ${item.url} -> ${canonical}`); continue; }
-        visited.add(item.url);
-        visited.add(canonical);
-
-        const doc = await parser.parse(html, item.url, tenantId, { sourceUrl: item.url, canonicalUrl: canonical, crawlDepth: item.depth, fetchedAt: new Date().toISOString() });
-        results.push(doc);
-        if (onProgress) onProgress(results.length, queue.length);
-
-        if (item.depth < maxDepth) {
-          const links = this.extractLinks(html, item.url);
-          let added = 0;
-          for (const link of links) {
-            if (visited.has(link) || results.length + queue.length >= maxPages) continue;
-            if (WebsiteCrawler.isPrivateUrl(link)) continue;
-            // Stay on the same domain (or subdomain) as the initial URL
-            try {
-              const linkHost = new URL(link).hostname;
-              if (linkHost !== targetDomain && !linkHost.endsWith('.' + targetDomain)) continue;
-            } catch { continue; }
-            if (respectRobots) {
-              const allowed = await this.checkRobotsTxtCached(link, robotsCache);
-              if (!allowed) { console.log(`[crawl] SKIP (robots disallowed): ${link}`); continue; }
-            }
-            queue.push({ url: link, depth: item.depth + 1 });
-            added++;
-          }
-          console.log(`[crawl] ${item.url} -> ${links.length} links, ${added} added, queue=${queue.length}, results=${results.length}`);
-        }
-      } catch {
-        continue;
-      }
-    }
-    return results;
+  private resetHostFailure(hostname: string): void {
+    this.hostFailures.set(hostname, 0);
   }
 
   private lastFetchTime = 0;
-  private async rateLimit(): Promise<void> {
+  private async rateLimit(hostDelay = 250): Promise<void> {
     const now = Date.now();
-    const minInterval = 200; // max 5 requests per second
-    const wait = minInterval - (now - this.lastFetchTime);
+    const wait = hostDelay - (now - this.lastFetchTime);
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
     this.lastFetchTime = Date.now();
   }
 
-  private extractCanonical(html: string): string | null {
-    const match = html.match(/<link[^>]+rel=["']canonical["'][^>]+href=["']([^"']+)["']/i);
-    return match ? match[1] : null;
+  private async fetchWithLimits(urlStr: string): Promise<{ ok: boolean; status: number; contentType: string; body: string; redirected: boolean } | null> {
+    let redirected = false;
+    let currentUrl = urlStr;
+    let redirectCount = 0;
+
+    for (let hop = 0; hop <= WebsiteCrawler.MAX_REDIRECTS; hop++) {
+      const parsedUrl = new URL(currentUrl);
+      const hostname = parsedUrl.hostname;
+
+      if (this.isHostCircuitOpen(hostname)) return null;
+      if (!(await this.validateResolvedIp(hostname))) return null;
+
+      await this.rateLimit();
+
+      const controller = new AbortController();
+      const totalTimer = setTimeout(() => controller.abort(), WebsiteCrawler.TOTAL_TIMEOUT_MS);
+
+      try {
+        const response = await fetch(currentUrl, {
+          signal: controller.signal,
+          redirect: 'manual',
+          headers: {
+            'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com/bot)',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Accept-Encoding': 'gzip, br',
+            'Accept-Language': 'en-US,en;q=0.5',
+          },
+        });
+
+        clearTimeout(totalTimer);
+
+        if ([301, 302, 303, 307, 308].includes(response.status)) {
+          const location = response.headers.get('location');
+          if (!location) break;
+          try {
+            currentUrl = new URL(location, currentUrl).href;
+          } catch { break; }
+          const nextParsed = new URL(currentUrl);
+          if (!WebsiteCrawler.SCHEME_ALLOW.has(nextParsed.protocol)) return null;
+          if (await this.validateResolvedIp(nextParsed.hostname) === false) return null;
+          redirected = true;
+          redirectCount++;
+          continue;
+        }
+
+        const contentType = (response.headers.get('content-type') || '').toLowerCase().split(';')[0].trim();
+        const ALLOWED_TYPES = ['text/html', 'application/xhtml+xml', 'text/plain', 'application/xml', 'text/xml'];
+        const isAllowed = ALLOWED_TYPES.some(t => contentType.includes(t));
+
+        if (!isAllowed && contentType) {
+          const sniff = await response.clone().text().then(t => t.slice(0, 1024).trim(), () => '');
+          const looksLikeMarkup = /^<(!doctype|html|\/html|\?xml)/i.test(sniff) || /^<!doctype/i.test(sniff);
+          if (!looksLikeMarkup) return null;
+        }
+
+        const reader = response.body?.getReader();
+        if (!reader) return null;
+        const chunks: Uint8Array[] = [];
+        let totalBytes = 0;
+        const firstByteTimer = setTimeout(() => controller.abort(), WebsiteCrawler.FIRST_BYTE_TIMEOUT_MS);
+        let firstByteReceived = false;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (!firstByteReceived) { firstByteReceived = true; clearTimeout(firstByteTimer); }
+            chunks.push(value);
+            totalBytes += value.length;
+            if (totalBytes > WebsiteCrawler.MAX_RESPONSE_BYTES) { controller.abort(); break; }
+          }
+        } catch {}
+        clearTimeout(totalTimer);
+
+        const body = new TextDecoder('utf-8', { fatal: false }).decode(Buffer.concat(chunks));
+        return { ok: response.ok, status: response.status, contentType, body, redirected };
+      } catch {
+        clearTimeout(totalTimer);
+        this.recordHostFailure(hostname);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private async checkRobotsTxt(origin: string): Promise<RobotsRules> {
+    const cached = this.robotsCache.get(origin);
+    if (cached && Date.now() - cached.fetchedAt < 3600000) return cached.rules;
+
+    const rules: RobotsRules = { disallowAll: false, rules: [] };
+    try {
+      const robotsUrl = `${origin}/robots.txt`;
+      const resp = await this.fetchWithLimits(robotsUrl);
+      if (!resp || !resp.ok) { this.robotsCache.set(origin, { rules, fetchedAt: Date.now() }); return rules; }
+      this.parseRobotsTxt(resp.body, rules);
+    } catch {}
+    this.robotsCache.set(origin, { rules, fetchedAt: Date.now() });
+    return rules;
+  }
+
+  private parseRobotsTxt(text: string, rules: RobotsRules): void {
+    const lines = text.split('\n').map(l => l.replace(/\r$/, '').trim());
+    let currentAgents: string[] = [];
+    const rawDirectives: Array<{ agent: string; directive: string; value: string }> = [];
+
+    for (const line of lines) {
+      if (line.startsWith('#') || !line) continue;
+      const colonIdx = line.indexOf(':');
+      if (colonIdx < 0) continue;
+      const key = line.slice(0, colonIdx).trim().toLowerCase();
+      const val = line.slice(colonIdx + 1).trim();
+      if (key === 'user-agent') { currentAgents = [val]; }
+      else { for (const agent of currentAgents) { rawDirectives.push({ agent, directive: key, value: val }); } }
+    }
+
+    for (const d of rawDirectives) {
+      if (d.agent !== '*' && !d.agent.toLowerCase().includes('burflow')) continue;
+      if (d.directive === 'disallow' && d.value) {
+        rules.rules.push({ path: d.value, allow: false });
+      } else if (d.directive === 'allow' && d.value) {
+        rules.rules.push({ path: d.value, allow: true });
+      } else if (d.directive === 'disallow' && !d.value) {
+        rules.rules.push({ path: '/', allow: true });
+      }
+    }
+
+    const disallowRoot = rules.rules.find(r => !r.allow && (r.path === '/' || r.path === ''));
+    const allowRoot = rules.rules.find(r => r.allow && r.path === '/');
+    if (disallowRoot && !allowRoot) {
+      const hasAnyAllow = rules.rules.some(r => r.allow && r.path.length > 1);
+      if (!hasAnyAllow) rules.disallowAll = true;
+    }
+  }
+
+  private isAllowedByRobots(urlStr: string, rules: RobotsRules): boolean {
+    if (rules.disallowAll) return false;
+    try {
+      const path = new URL(urlStr).pathname;
+      let bestMatch: { length: number; allow: boolean } | null = null;
+      for (const rule of rules.rules) {
+        if (rule.path === '/') continue;
+        const pattern = rule.path.replace(/\*/g, '.*').replace(/\$/g, '');
+        const re = new RegExp(`^${pattern}`);
+        if (re.test(path)) {
+          if (!bestMatch || rule.path.length > bestMatch.length) {
+            bestMatch = { length: rule.path.length, allow: rule.allow };
+          }
+        }
+      }
+      return bestMatch ? bestMatch.allow : true;
+    } catch {
+      return true;
+    }
+  }
+
+  private scoreUrl(urlStr: string, inSitemap: boolean, inNav: boolean): number {
+    let score = 0;
+    try {
+      const path = new URL(urlStr).pathname.toLowerCase();
+      if (/(pricing|plans|services|products|about|faq|contact|how-it-works|solutions|docs|features)/.test(path)) score += 10;
+      if (/(blog|news|press|events|author|tag|category|archive|page\/\d)/.test(path)) score -= 5;
+      if (/\?.*=/.test(urlStr)) score -= 4;
+      if (/\/page\/\d+/.test(path)) score -= 8;
+      if (/\/20\d\d\/\d\d/.test(path)) score -= 3;
+      const segments = path.split('/').filter(Boolean);
+      if (segments.length <= 2) score += 2;
+      if (inSitemap) score += 4;
+      if (inNav) score += 4;
+      const depth = segments.length;
+      if (depth <= 1) score += 6;
+      else if (depth <= 2) score += 3;
+    } catch {}
+    return score;
+  }
+
+  async crawl(url: string, tenantId: string, options?: { respectRobotsTxt?: boolean; maxDepth?: number; maxPages?: number; useSitemap?: boolean; onProgress?: (pagesCrawled: number, queueRemaining: number) => void }): Promise<ParsedDocument[]> {
+    const maxPages = Math.min(options?.maxPages ?? 50, 200);
+    const respectRobots = options?.respectRobotsTxt ?? true;
+    const useSitemap = options?.useSitemap ?? true;
+    const onProgress = options?.onProgress;
+    const wallClockStart = Date.now();
+    const WALL_CLOCK_BUDGET_MS = 120000;
+
+    if (WebsiteCrawler.isPrivateUrl(url)) throw new Error('URL points to a private/internal network address');
+
+    const initialParsed = new URL(url);
+    const targetDomain = initialParsed.hostname;
+    const origin = `${initialParsed.protocol}//${initialParsed.host}`;
+
+    if (!(await this.validateResolvedIp(initialParsed.hostname))) {
+      throw new Error('DNS resolution failed or resolved to a private IP');
+    }
+
+    let robotsRules: RobotsRules = { disallowAll: false, rules: [] };
+    if (respectRobots) {
+      robotsRules = await this.checkRobotsTxt(origin);
+    }
+
+    const sitemapUrls = new Set<string>();
+    if (useSitemap) {
+      for (const path of ['/sitemap.xml', '/sitemap_index.xml', '/wp-sitemap.xml']) {
+        const found = await parseSitemapUrl(`${origin}${path}`);
+        for (const u of found) sitemapUrls.add(u);
+      }
+    }
+
+    const visited = new Set<string>();
+    const results: ParsedDocument[] = [];
+    const queue = PriorityQueue<{ url: string; depth: number; score: number }>((a, b) => b.score - a.score);
+    const parser = new HtmlParser();
+
+    if (sitemapUrls.size > 0) {
+      for (const su of sitemapUrls) {
+        if (visited.has(normalizeUrl(su))) continue;
+        const s = this.scoreUrl(su, true, false);
+        queue.push({ url: su, depth: 1, score: s });
+      }
+    } else {
+      queue.push({ url, depth: 0, score: 100 });
+    }
+
+    const consecutiveLowYield: number[] = [];
+    let totalAcceptedTokens = 0;
+
+    while (queue.size() > 0 && results.length < maxPages) {
+      if (Date.now() - wallClockStart > WALL_CLOCK_BUDGET_MS) break;
+
+      const item = queue.pop()!;
+      const normKey = normalizeUrl(item.url);
+      if (visited.has(normKey)) continue;
+      if (WebsiteCrawler.isPrivateUrl(item.url)) continue;
+
+      try {
+        const parsedUrl = new URL(item.url);
+        if (this.isHostCircuitOpen(parsedUrl.hostname)) continue;
+      } catch { continue; }
+
+      if (respectRobots && !this.isAllowedByRobots(item.url, robotsRules)) continue;
+
+      const result = await this.fetchWithLimits(item.url);
+      if (!result || !result.ok) {
+        try { this.recordHostFailure(new URL(item.url).hostname); } catch {}
+        continue;
+      }
+      try { this.resetHostFailure(new URL(item.url).hostname); } catch {}
+
+      const titleMatch = result.body.match(/<title[^>]*>([^<]*)<\/title>/i);
+      const title = titleMatch ? titleMatch[1].trim() : '';
+
+      if (isChallengeOrBlocked(result.body, title)) continue;
+      if (result.status === 403 || result.status === 503) continue;
+
+      const doc = await parser.parse(result.body, item.url, tenantId, {
+        sourceUrl: item.url, crawlDepth: item.depth,
+        fetchedAt: new Date().toISOString(), redirected: result.redirected,
+      });
+
+      const quality = contentQualityScore(doc.content);
+      if (quality.score === 0) continue;
+
+      const contentHash = createHash('sha256').update(doc.content.toLowerCase().slice(0, 4096)).digest('hex');
+      if (this.contentHashes.has(contentHash)) continue;
+      this.contentHashes.add(contentHash);
+
+      results.push(doc);
+      const docTokens = doc.content.split(/\s+/).length;
+      totalAcceptedTokens += docTokens;
+      consecutiveLowYield.push(docTokens);
+      if (consecutiveLowYield.length > 8) consecutiveLowYield.shift();
+
+      if (onProgress) onProgress(results.length, queue.size());
+
+      if (item.depth < 8) {
+        const links = this.extractLinks(result.body, item.url);
+        const navLinks = this.extractNavLinks(result.body);
+        for (const link of links) {
+          const linkNorm = normalizeUrl(link);
+          if (visited.has(linkNorm)) continue;
+          try {
+            const linkHost = new URL(link).hostname;
+            if (linkHost !== targetDomain && !linkHost.endsWith('.' + targetDomain)) continue;
+          } catch { continue; }
+          if (this.isHostCircuitOpen(new URL(link).hostname)) continue;
+          if (respectRobots) {
+            const linkOrigin = new URL(link).origin;
+            const linkRules = await this.checkRobotsTxt(linkOrigin);
+            if (!this.isAllowedByRobots(link, linkRules)) continue;
+          }
+          const score = this.scoreUrl(link, sitemapUrls.has(link), navLinks.has(new URL(link).pathname));
+          queue.push({ url: link, depth: item.depth + 1, score });
+          visited.add(linkNorm);
+        }
+      }
+
+      if (consecutiveLowYield.length >= 8) {
+        const avg = consecutiveLowYield.reduce((a, b) => a + b, 0) / consecutiveLowYield.length;
+        if (avg < 50) break;
+      }
+    }
+
+    return results;
   }
 
   private extractLinks(html: string, baseUrl: string): string[] {
@@ -593,48 +886,50 @@ export class WebsiteCrawler implements WebCrawler {
     const regex = /<a[^>]+href=["']([^"']+)["']/gi;
     let match: RegExpExecArray | null;
     while ((match = regex.exec(html)) !== null) {
+      const href = match[1];
+      if (/^(mailto:|tel:|javascript:|#)/.test(href)) continue;
+      if (/\.(pdf|zip|png|jpg|jpeg|gif|svg|ico|css|js|woff|woff2|ttf|eot)$/i.test(href)) continue;
       try {
-        const absolute = new URL(match[1], baseUrl).href;
-        if (absolute.startsWith('http') && !absolute.includes('#') && !absolute.match(/\.(pdf|zip|png|jpg|jpeg|gif|svg|ico)$/i)) {
-          links.push(absolute);
-        }
+        const absolute = new URL(href, baseUrl).href;
+        if (absolute.startsWith('http')) links.push(absolute);
       } catch {}
     }
     return [...new Set(links)];
   }
 
-  private async checkRobotsTxtCached(url: string, cache: Map<string, boolean>): Promise<boolean> {
-    try {
-      const parsed = new URL(url);
-      const origin = `${parsed.protocol}//${parsed.host}`;
-      if (cache.has(origin)) return cache.get(origin)!;
-      const robotsUrl = `${origin}/robots.txt`;
-      const response = await fetch(robotsUrl, {
-        signal: AbortSignal.timeout(5000),
-        headers: { 'User-Agent': 'BurFlowBot/1.0 (+https://burflow.com)' },
-      });
-      if (!response.ok) { cache.set(origin, true); return true; }
-      const text = await response.text();
-      const allowed = !this.isFullyBlockedByRobots(text);
-      cache.set(origin, allowed);
-      return allowed;
-    } catch {
-      return true;
-    }
-  }
-
-  private isFullyBlockedByRobots(text: string): boolean {
-    const lines = text.split('\n').map(l => l.trim());
-    let appliesToUs = false;
-    for (const line of lines) {
-      if (line.toLowerCase().startsWith('user-agent:')) {
-        const ua = line.split(':').slice(1).join(':').trim();
-        appliesToUs = ua === '*' || ua.toLowerCase().includes('burflow');
-      } else if (appliesToUs && line.startsWith('Disallow:')) {
-        const path = line.split(':').slice(1).join(':').trim();
-        if (path === '/' || path === '') return true;
+  private extractNavLinks(html: string): Set<string> {
+    const navLinks = new Set<string>();
+    const navRegex = /<(nav|header)[^>]*>([\s\S]*?)<\/\1>/gi;
+    let navMatch: RegExpExecArray | null;
+    while ((navMatch = navRegex.exec(html)) !== null) {
+      const linkRegex = /<a[^>]+href=["']([^"']+)["']/gi;
+      let linkMatch: RegExpExecArray | null;
+      while ((linkMatch = linkRegex.exec(navMatch[2])) !== null) {
+        try {
+          const path = new URL(linkMatch[1], 'http://x').pathname;
+          navLinks.add(path);
+        } catch {}
       }
     }
-    return false;
+    return navLinks;
   }
+}
+
+interface RobotsRules {
+  disallowAll: boolean;
+  rules: Array<{ path: string; allow: boolean }>;
+}
+
+type PriorityQueue<T> = {
+  push(item: T): void;
+  pop(): T | undefined;
+  size(): number;
+};
+
+function PriorityQueue<T>(comparator: (a: T, b: T) => number): PriorityQueue<T> {
+  const heap: T[] = [];
+  const push = (item: T) => { heap.push(item); heap.sort(comparator); };
+  const pop = () => heap.shift();
+  const size = () => heap.length;
+  return { push, pop, size };
 }
