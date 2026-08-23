@@ -229,6 +229,7 @@ function createKnowledgePipelineDb(): SqlDatabase {
 }
 
 const db: SqlDatabase = createSaaSDatabase();
+const knowledgeDb: SqlDatabase | undefined = isPostgresDatabase(db) ? createKnowledgePipelineDb() : undefined;
 const userRepo = new UserRepository(db);
 const tenantRepo = new TenantRepository(db);
 const apiKeyRepo = new ApiKeyRepository(db);
@@ -452,7 +453,7 @@ app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRep
 app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conversationRepo, messageRepo));
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
 app.use('/api/knowledge-bases', auth, tenantGuard, createKnowledgeBaseRoutes(kbRepo, docRepo));
-const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, db);
+const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, knowledgeDb || db);
 const leadService = new LeadService(leadRepo);
 // Live Human Agent Takeover / Session Handoff
 const sessionHandoff = new SessionHandoffService(conversationRepo);
@@ -550,7 +551,7 @@ app.use('/api/agency', auth, tenantGuard, createAgencyRoutes({
 // Knowledge pipeline routes (protected)
 const knowledgeDeps = {
   db,
-  knowledgeDb: isPostgresDatabase(db) ? createKnowledgePipelineDb() : undefined,
+  knowledgeDb,
   embeddingApiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
   embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '128', 10),
   unansweredRepo,
