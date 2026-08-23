@@ -462,10 +462,9 @@ function normalizeUrl(urlStr: string): string {
 
 const CHALLENGE_SIGNATURES = [
   /just a moment/i, /verify you are human/i, /checking your browser/i,
-  /enable javascript/i, /turnstile/i, /cf-challenge/i, /_cf_chl/i,
-  /reference #\d/i, /access denied/i, /request blocked/i,
-  /please enable cookies/i, /enable cookies/i, /ddos protection/i,
-  /ray id:/i, /cloudflare/i,
+  /turnstile/i, /cf-challenge/i, /_cf_chl/i,
+  /request blocked by security/i, /ddos protection by cloudflare/i,
+  /enable javascript to continue/i, /enable javascript and cookies to continue/i,
 ];
 const SOFT_404_TITLES = /404|not found|page not found|access denied|error|oops/i;
 const BOILERPLATE_NAV = /^(menu|navigation|header|footer|sidebar|cookie|copyright|©|all rights reserved)/i;
@@ -477,17 +476,17 @@ function isChallengeOrBlocked(text: string, title: string): boolean {
   return false;
 }
 
-function contentQualityScore(text: string): { score: number; reason?: string } {
+function contentQualityScore(text: string, rawHtml?: string): { score: number; reason?: string } {
   const len = text.length;
   if (len < 200) return { score: 0, reason: 'too_short' };
-  const pTags = (text.match(/<p[\s>]/gi) || []).length;
+  const pTags = (rawHtml?.match(/<p[\s>]/gi) || []).length;
   const wordCount = text.split(/\s+/).length;
   if (wordCount < 50) return { score: 0, reason: 'too_few_words' };
   const lines = text.split('\n').filter(l => l.trim());
   const uniqueLines = new Set(lines.map(l => l.trim().toLowerCase()));
   const boilerplateRatio = 1 - (uniqueLines.size / Math.max(lines.length, 1));
   if (boilerplateRatio > 0.9) return { score: 0, reason: 'high_boilerplate' };
-  return { score: Math.min(10, Math.floor(wordCount / 100) + (pTags > 0 ? 3 : 0)) };
+  return { score: Math.min(10, Math.floor(wordCount / 100) + (pTags > 3 ? 3 : pTags > 0 ? 1 : 0)) };
 }
 
 export class WebsiteCrawler implements WebCrawler {
@@ -509,8 +508,6 @@ export class WebsiteCrawler implements WebCrawler {
   private hostCircuitOpen = new Map<string, number>();
   private robotsCache = new Map<string, { rules: RobotsRules; fetchedAt: number }>();
   private contentHashes = new Set<string>();
-  private boilerplateHashes = new Map<string, number>();
-  private allTexts: string[] = [];
 
   private static isPrivateIp(ip: string): boolean {
     return WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(ip));
@@ -571,12 +568,13 @@ export class WebsiteCrawler implements WebCrawler {
     this.hostFailures.set(hostname, 0);
   }
 
-  private lastFetchTime = 0;
-  private async rateLimit(hostDelay = 250): Promise<void> {
+  private lastFetchByHost = new Map<string, number>();
+  private async rateLimit(hostname: string, hostDelay = 250): Promise<void> {
+    const lastFetch = this.lastFetchByHost.get(hostname) || 0;
     const now = Date.now();
-    const wait = hostDelay - (now - this.lastFetchTime);
+    const wait = hostDelay - (now - lastFetch);
     if (wait > 0) await new Promise(r => setTimeout(r, wait));
-    this.lastFetchTime = Date.now();
+    this.lastFetchByHost.set(hostname, Date.now());
   }
 
   private async fetchWithLimits(urlStr: string): Promise<{ ok: boolean; status: number; contentType: string; body: string; redirected: boolean } | null> {
@@ -591,7 +589,7 @@ export class WebsiteCrawler implements WebCrawler {
       if (this.isHostCircuitOpen(hostname)) return null;
       if (!(await this.validateResolvedIp(hostname))) return null;
 
-      await this.rateLimit();
+      await this.rateLimit(hostname);
 
       const controller = new AbortController();
       const totalTimer = setTimeout(() => controller.abort(), WebsiteCrawler.TOTAL_TIMEOUT_MS);
@@ -649,7 +647,7 @@ export class WebsiteCrawler implements WebCrawler {
             totalBytes += value.length;
             if (totalBytes > WebsiteCrawler.MAX_RESPONSE_BYTES) { controller.abort(); break; }
           }
-        } catch {}
+        } catch {} finally { clearTimeout(firstByteTimer); }
         clearTimeout(totalTimer);
 
         const body = new TextDecoder('utf-8', { fatal: false }).decode(Buffer.concat(chunks));
@@ -719,7 +717,8 @@ export class WebsiteCrawler implements WebCrawler {
       let bestMatch: { length: number; allow: boolean } | null = null;
       for (const rule of rules.rules) {
         if (rule.path === '/') continue;
-        const pattern = rule.path.replace(/\*/g, '.*').replace(/\$/g, '');
+        const escaped = rule.path.replace(/([.+?^${}()|[\]\\])/g, '\\$1');
+        const pattern = escaped.replace(/\*/g, '.*').replace(/\$/g, '');
         const re = new RegExp(`^${pattern}`);
         if (re.test(path)) {
           if (!bestMatch || rule.path.length > bestMatch.length) {
@@ -800,7 +799,6 @@ export class WebsiteCrawler implements WebCrawler {
     }
 
     const consecutiveLowYield: number[] = [];
-    let totalAcceptedTokens = 0;
 
     while (queue.size() > 0 && results.length < maxPages) {
       if (Date.now() - wallClockStart > WALL_CLOCK_BUDGET_MS) break;
@@ -835,7 +833,7 @@ export class WebsiteCrawler implements WebCrawler {
         fetchedAt: new Date().toISOString(), redirected: result.redirected,
       });
 
-      const quality = contentQualityScore(doc.content);
+      const quality = contentQualityScore(doc.content, result.body);
       if (quality.score === 0) continue;
 
       const contentHash = createHash('sha256').update(doc.content.toLowerCase().slice(0, 4096)).digest('hex');
@@ -844,7 +842,6 @@ export class WebsiteCrawler implements WebCrawler {
 
       results.push(doc);
       const docTokens = doc.content.split(/\s+/).length;
-      totalAcceptedTokens += docTokens;
       consecutiveLowYield.push(docTokens);
       if (consecutiveLowYield.length > 8) consecutiveLowYield.shift();
 
