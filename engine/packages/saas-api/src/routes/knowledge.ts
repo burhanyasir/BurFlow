@@ -474,15 +474,20 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
             return;
           }
 
-          const docIds: string[] = [];
+          let processed = 0;
+          let failed = 0;
           for (const doc of docs) {
-            const docId = await pipelineRef.enqueue(tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
-            await pipelineRef.processParsedDocument(docId, doc);
-            docIds.push(docId);
+            try {
+              const docId = await pipelineRef.enqueue(tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
+              await pipelineRef.processParsedDocument(docId, doc);
+              processed++;
+            } catch (err: any) {
+              failed++;
+              createContextLogger(logger).warn({ err, tenantId, url: doc.metadata?.sourceUrl }, 'Failed to process crawled page, continuing');
+            }
           }
 
-          const status = pipelineRef.getQueueStatus(docIds[0]);
-          setCrawlProgress(tenantId, { done: true, pagesCrawled: docs.length, queueRemaining: 0 });
+          setCrawlProgress(tenantId, { done: true, pagesCrawled: processed, queueRemaining: 0, warning: failed > 0 ? `${failed} of ${docs.length} pages failed to index` : undefined });
 
           const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
           try {

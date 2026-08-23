@@ -365,11 +365,11 @@ export function useOnboardingState() {
           }, 1500);
         }
         try {
-          await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
+          await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 3, maxPages: 50 });
           // Crawl runs async — poll progress until done
           const waitForCompletion = (): Promise<{ pagesCrawled: number; warning: string | null }> => new Promise((resolve) => {
             let attempts = 0;
-            const maxAttempts = 120;
+            const maxAttempts = 300;
             const poll = setInterval(async () => {
               attempts++;
               try {
