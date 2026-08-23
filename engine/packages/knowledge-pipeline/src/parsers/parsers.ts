@@ -519,9 +519,10 @@ export class WebsiteCrawler implements WebCrawler {
       if (!WebsiteCrawler.SCHEME_ALLOW.has(url.protocol)) return true;
       const hostname = url.hostname;
       const isDev = process.env.NODE_ENV === 'development';
-      if (/^localhost$/i.test(hostname)) return !isDev;
-      if (hostname === '[::1]') return !isDev;
-      if (/^127\./.test(hostname)) return !isDev;
+      const allowLocalhost = process.env.ALLOW_LOCALHOST_CRAWL === 'true';
+      if (/^localhost$/i.test(hostname)) return !(isDev || allowLocalhost);
+      if (hostname === '[::1]') return !(isDev || allowLocalhost);
+      if (/^127\./.test(hostname)) return !(isDev || allowLocalhost);
       return WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(hostname));
     } catch {
       return true;
@@ -539,7 +540,8 @@ export class WebsiteCrawler implements WebCrawler {
 
   private async validateResolvedIp(hostname: string): Promise<boolean> {
     const isDev = process.env.NODE_ENV === 'development';
-    if (/^localhost$/i.test(hostname) && isDev) return true;
+    const allowLocalhost = process.env.ALLOW_LOCALHOST_CRAWL === 'true';
+    if (/^localhost$/i.test(hostname) && (isDev || allowLocalhost)) return true;
     const ips = await this.resolveDns(hostname);
     if (ips.length === 0) return false;
     return ips.every(ip => !WebsiteCrawler.isPrivateIp(ip));

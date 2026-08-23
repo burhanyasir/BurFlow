@@ -99,9 +99,10 @@ function isValidPrivateUrl(urlStr: string): boolean {
     const url = new URL(urlStr);
     const hostname = url.hostname;
     const isDev = process.env.NODE_ENV === 'development';
-    if (/^localhost$/i.test(hostname)) return isDev;
-    if (hostname === '[::1]') return isDev;
-    if (/^127\./.test(hostname)) return isDev;
+    const allowLocalhost = process.env.ALLOW_LOCALHOST_CRAWL === 'true';
+    if (/^localhost$/i.test(hostname)) return isDev || allowLocalhost;
+    if (hostname === '[::1]') return isDev || allowLocalhost;
+    if (/^127\./.test(hostname)) return isDev || allowLocalhost;
     if (/^10\./.test(hostname)) return false;
     if (/^172\.(1[6-9]|2[0-9]|3[01])\./.test(hostname)) return false;
     if (/^192\.168\./.test(hostname)) return false;
