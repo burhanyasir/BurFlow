@@ -365,11 +365,29 @@ export function useOnboardingState() {
           }, 1500);
         }
         try {
-          const res = await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
+          await apiClient.post<{ pagesCrawled?: number; warning?: string | null }>('/knowledge/crawl', { url, maxDepth: 10, maxPages: 500 });
+          // Crawl runs async — poll progress until done
+          const waitForCompletion = (): Promise<{ pagesCrawled: number; warning: string | null }> => new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 120;
+            const poll = setInterval(async () => {
+              attempts++;
+              try {
+                const p = await apiClient.get<{ active: boolean; pagesCrawled: number; queueRemaining: number; maxPages: number; done?: boolean; warning?: string | null }>('/knowledge/crawl/progress');
+                if (onProgress) onProgress(p.pagesCrawled || 0, p.queueRemaining || 0, p.maxPages || 0);
+                if (p.done || attempts >= maxAttempts || (!p.active && attempts > 3)) {
+                  clearInterval(poll);
+                  resolve({ pagesCrawled: p.pagesCrawled || 0, warning: p.warning || null });
+                }
+              } catch {
+                if (attempts >= maxAttempts) { clearInterval(poll); resolve({ pagesCrawled: 0, warning: null }); }
+              }
+            }, 2000);
+          });
+          const finalProgress = await waitForCompletion();
           if (pollTimer) clearInterval(pollTimer);
-          // Final progress update
-          if (onProgress) onProgress(res.pagesCrawled || 0, 0, res.pagesCrawled || 0);
-          results.push({ url, pagesCrawled: res.pagesCrawled || 0, warning: res.warning || null });
+          if (onProgress) onProgress(finalProgress.pagesCrawled, 0, finalProgress.pagesCrawled);
+          results.push({ url, pagesCrawled: finalProgress.pagesCrawled, warning: finalProgress.warning });
         } catch (err: any) {
           if (pollTimer) clearInterval(pollTimer);
           console.error('Crawl failed for', url, err);

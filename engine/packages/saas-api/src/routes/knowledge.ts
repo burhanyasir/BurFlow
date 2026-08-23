@@ -431,61 +431,67 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         url, startedAt: Date.now(), done: false,
       });
 
-      const crawler = new WebsiteCrawler();
-      const docs = await crawler.crawl(url, tenantId, {
-        respectRobotsTxt: true,
-        maxDepth: crawlDepth,
-        maxPages: crawlPages,
-        useSitemap: true,
-        onProgress: (pagesCrawled: number, queueRemaining: number) => {
-          setCrawlProgress(tenantId, { pagesCrawled, queueRemaining });
-        },
-      });
-
-      if (!docs || docs.length === 0) {
-        setCrawlProgress(tenantId, { done: true, warning: 'No readable content was found' });
-        return res.status(200).json({
-          documentId: null,
-          status: 'no_content',
-          pagesCrawled: 0,
-          warning: 'No readable content was found on this page. The onboarding will continue with a basic setup.',
-        });
-      }
-
-      const docIds: string[] = [];
-      for (const doc of docs) {
-        const docId = await pipeline.enqueue(tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
-        await pipeline.processParsedDocument(docId, doc);
-        docIds.push(docId);
-      }
-
-      const status = pipeline.getQueueStatus(docIds[0]);
-      setCrawlProgress(tenantId, { done: true, pagesCrawled: docs.length, queueRemaining: 0 });
-
-      const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
-      try {
-        const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
-        const widgetConfigRepo = new WidgetConfigRepository(deps.db);
-        widgetConfigRepo.upsert(tenantId, { starterOptions });
-      } catch { /* ignore — starterOptions are best-effort */ }
-
-      setTimeout(() => clearCrawlProgress(tenantId), 30000);
+      // Return immediately — process crawl in background to avoid Render proxy timeout
+      const pipelineRef = pipeline;
+      const crawlerRef = new WebsiteCrawler();
       res.status(202).json({
-        documentId: docIds[0],
-        status: status?.status || 'published',
-        queuedAt: status?.queuedAt,
+        documentId: null,
+        status: 'crawling',
+        pagesCrawled: 0,
         crawlOptions: { maxDepth: crawlDepth, maxPages: crawlPages },
-        pagesCrawled: docs.length,
         warning: null,
       });
+
+      // Background crawl + embed
+      (async () => {
+        try {
+          const docs = await crawlerRef.crawl(url, tenantId, {
+            respectRobotsTxt: true,
+            maxDepth: crawlDepth,
+            maxPages: crawlPages,
+            useSitemap: true,
+            onProgress: (pagesCrawled: number, queueRemaining: number) => {
+              setCrawlProgress(tenantId, { pagesCrawled, queueRemaining });
+            },
+          });
+
+          if (!docs || docs.length === 0) {
+            setCrawlProgress(tenantId, { done: true, warning: 'No readable content was found' });
+            return;
+          }
+
+          const docIds: string[] = [];
+          for (const doc of docs) {
+            const docId = await pipelineRef.enqueue(tenantId, 'url', doc.title || url, url, { crawlDepth, crawlPages });
+            await pipelineRef.processParsedDocument(docId, doc);
+            docIds.push(docId);
+          }
+
+          const status = pipelineRef.getQueueStatus(docIds[0]);
+          setCrawlProgress(tenantId, { done: true, pagesCrawled: docs.length, queueRemaining: 0 });
+
+          const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
+          try {
+            const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
+            const widgetConfigRepo = new WidgetConfigRepository(deps.db);
+            widgetConfigRepo.upsert(tenantId, { starterOptions });
+          } catch { /* ignore — starterOptions are best-effort */ }
+
+          setTimeout(() => clearCrawlProgress(tenantId), 30000);
+        } catch (err: any) {
+          setCrawlProgress(tenantId, { done: true, warning: err.message || 'Crawl failed' });
+          setTimeout(() => clearCrawlProgress(tenantId), 30000);
+          createContextLogger(logger).warn({ err, tenantId, url }, 'Knowledge crawl failed during onboarding flow');
+        }
+      })();
     } catch (err: any) {
-      setCrawlProgress(tenantId, { done: true, warning: err.message || 'Crawl failed' });
-      setTimeout(() => clearCrawlProgress(tenantId), 30000);
       createContextLogger(logger).warn({ err, tenantId, url }, 'Knowledge crawl failed during onboarding flow; continuing with basic widget setup');
-      if (err.message?.includes('exceeds maximum')) {
-        return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+      if (!res.headersSent) {
+        if (err.message?.includes('exceeds maximum')) {
+          return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+        }
+        res.status(500).json({ error: err.message || 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }
-      res.status(500).json({ error: err.message || 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
     }
   });
 
