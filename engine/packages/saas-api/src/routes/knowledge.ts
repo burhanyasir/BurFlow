@@ -286,6 +286,13 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
     try {
       const docId = await pipeline.enqueue(req.user.tenantId, sourceType, safeFilename, content);
+
+      // Process synchronously in background — the saas-api has no worker to
+      // pick up queued items from its in-memory SQLite queue.
+      pipeline.processDocument(docId, content).catch((err: any) => {
+        createContextLogger(logger).warn({ err, docId, tenantId: req.user?.tenantId }, 'Background document processing failed');
+      });
+
       const status = pipeline.getQueueStatus(docId);
       res.status(202).json({
         documentId: docId,
@@ -329,6 +336,10 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
     try {
       const docId = await pipeline.enqueue(tenantId, 'faq', safeFilename, content);
+
+      pipeline.processDocument(docId, content).catch((err: any) => {
+        createContextLogger(logger).warn({ err, docId, tenantId }, 'Background unanswered-conversion processing failed');
+      });
 
       // Resolve this gap plus any unresolved duplicates of the same question
       // so the gap list stays clean after the FAQ lands in the knowledge base.
@@ -378,6 +389,9 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
     try {
       const docId = await pipeline.enqueue(req.user.tenantId, 'faq', safeFilename, content);
+      pipeline.processDocument(docId, content).catch((err: any) => {
+        createContextLogger(logger).warn({ err, docId, tenantId: req.user?.tenantId }, 'Background FAQ processing failed');
+      });
       const status = pipeline.getQueueStatus(docId);
       res.status(202).json({
         documentId: docId,
