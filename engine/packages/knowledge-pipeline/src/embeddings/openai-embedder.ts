@@ -10,7 +10,7 @@ export class OpenAIEmbeddingProvider implements EmbeddingProvider {
 
   constructor(apiKey: string, model = 'text-embedding-3-small', fetchTimeoutMs = 30000, apiUrl?: string) {
     this.apiKey = apiKey;
-    this.model = model;
+    this.model = apiUrl ? 'openai/text-embedding-3-small' : model;
     this.apiUrl = apiUrl || 'https://api.openai.com/v1/embeddings';
     this.fetchTimeoutMs = fetchTimeoutMs;
   }
