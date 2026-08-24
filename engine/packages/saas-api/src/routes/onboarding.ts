@@ -10,7 +10,7 @@ const BUSINESS_TYPES = ['ecommerce', 'saas', 'healthcare', 'finance', 'education
 const SAMPLE_CONVERSATIONS = [
   { sessionId: 'demo-session-1', messages: [{ role: 'user', content: 'How do I reset my password?' }, { role: 'assistant', content: 'To reset your password, go to Settings > Security > Change Password. You will need your current password to set a new one.' }] },
   { sessionId: 'demo-session-2', messages: [{ role: 'user', content: 'What are your business hours?' }, { role: 'assistant', content: 'Our business hours are Monday through Friday, 9 AM to 6 PM EST. We also offer 24/7 support for enterprise customers.' }] },
-  { sessionId: 'demo-session-3', messages: [{ role: 'user', content: 'Can I upgrade my plan?' }, { role: 'assistant', content: 'Yes, you can upgrade anytime from your billing settings. We offer Starter, Professional, and Enterprise plans.' }] },
+  { sessionId: 'demo-session-3', messages: [{ role: 'user', content: 'Can I upgrade my plan?' }, { role: 'assistant', content: 'Yes, you can upgrade anytime from your billing settings. Would you like me to walk you through the options?' }] },
   { sessionId: 'demo-session-4', messages: [{ role: 'user', content: 'How does the widget work?' }, { role: 'assistant', content: 'The widget is a JavaScript snippet you add to your website. It automatically loads your knowledge base and starts answering customer questions.' }] },
   { sessionId: 'demo-session-5', messages: [{ role: 'user', content: 'Do you have an API?' }, { role: 'assistant', content: 'Yes, we have a REST API. You can find the documentation in the API Keys section. All API requests need to be authenticated with an API key.' }] },
 ];
@@ -125,7 +125,7 @@ export function createOnboardingRoutes(
       const demoDocs = [
         { filename: 'Getting Started Guide', sourceType: 'text' as const, content: 'Welcome to the platform. This guide covers setup, configuration, and best practices for using AI Customer Support.' },
         { filename: 'FAQ - Common Questions', sourceType: 'faq' as const, content: 'Q: How do I reset my password?\nA: Go to Settings > Security > Change Password.\n\nQ: What are your business hours?\nA: Mon-Fri 9AM-6PM EST.' },
-        { filename: 'Pricing Overview', sourceType: 'text' as const, content: 'We offer three plans: Free (100 messages/mo), Starter ($49/mo, 1000 messages), Professional ($99/mo, 10000 messages), and Enterprise (custom).' },
+        { filename: 'Pricing Overview', sourceType: 'text' as const, content: 'For pricing information, please contact our sales team for a personalized quote based on your specific needs.' },
       ];
       for (const doc of demoDocs) {
         const kb = kbDocRepo.create({ knowledgeBaseId: 'demo', tenantId: tenantId!, filename: doc.filename, sourceType: doc.sourceType });
