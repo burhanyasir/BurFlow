@@ -2,8 +2,23 @@ import {
   WebhookRepository, WebhookDeliveryRepository, WebhookEvent, Webhook,
 } from '@conversation-engine/saas-core';
 import { createLogger } from '@conversation-engine/logger';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 const logger = createLogger('saas-api:webhook-dispatcher');
+
+/** Sign a webhook payload with HMAC-SHA256. Returns the hex signature. */
+export function signWebhookPayload(body: string, secret: string): string {
+  return createHmac('sha256', secret).update(body).digest('hex');
+}
+
+/** Verify a webhook signature against the expected HMAC-SHA256. */
+export function verifyWebhookSignature(body: string, secret: string, signature: string): boolean {
+  const expected = signWebhookPayload(body, secret);
+  const sigBuf = Buffer.from(signature, 'hex');
+  const expectedBuf = Buffer.from(expected, 'hex');
+  if (sigBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(sigBuf, expectedBuf);
+}
 
 export function findMatchingWebhooks(
   webhookRepo: WebhookRepository,
@@ -26,9 +41,23 @@ export function enqueueWebhookEvent(
   payload: Record<string, unknown>,
 ): number {
   const webhooks = findMatchingWebhooks(webhookRepo, tenantId, eventType);
+  const body = JSON.stringify(payload);
+  const timestamp = new Date().toISOString();
+
   for (const webhook of webhooks) {
     try {
-      deliveryRepo.create(webhook.id, tenantId, eventType, JSON.stringify(payload));
+      // C10: HMAC-SHA256 signing — if webhook has a secret, include signature headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-BurFlow-Event': eventType,
+        'X-BurFlow-Timestamp': timestamp,
+      };
+      if (webhook.signingSecret) {
+        const signature = signWebhookPayload(body, webhook.signingSecret);
+        headers['X-BurFlow-Signature'] = signature;
+      }
+
+      deliveryRepo.create(webhook.id, tenantId, eventType, body);
     } catch (err: any) {
       logger.error({ err, webhookId: webhook.id }, 'Failed to enqueue webhook delivery');
     }

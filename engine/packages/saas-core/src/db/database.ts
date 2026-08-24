@@ -932,4 +932,8 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN permissions TEXT DEFAULT '[]';`); } catch {}
   try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN total_requests INTEGER DEFAULT 0;`); } catch {}
   try { db.exec(`ALTER TABLE tenant_api_keys ADD COLUMN updated_at TEXT;`); } catch {}
+  // C6: Per-tenant cost instrumentation
+  try { db.exec(`ALTER TABLE usage_records ADD COLUMN cost_usd REAL DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE messages ADD COLUMN tokens_used INTEGER DEFAULT 0;`); } catch {}
+  try { db.exec(`ALTER TABLE messages ADD COLUMN cost_usd REAL DEFAULT 0;`); } catch {}
 }

@@ -517,6 +517,20 @@ export class UsageRepository {
       .run(count, usage.id);
   }
 
+  incrementCost(tenantId: string, period: string, costUsd: number): void {
+    const usage = this.getOrCreate(tenantId, period);
+    this.db.prepare('UPDATE usage_records SET cost_usd = cost_usd + ? WHERE id = ?')
+      .run(costUsd, usage.id);
+  }
+
+  /** Get total cost for a tenant in a given period. Returns 0 if no record exists. */
+  getCostUsd(tenantId: string, period: string): number {
+    const row = this.db.prepare(
+      'SELECT cost_usd FROM usage_records WHERE tenant_id = ? AND period = ?'
+    ).get(tenantId, period) as any;
+    return row?.cost_usd || 0;
+  }
+
   incrementApiCalls(tenantId: string, period: string, count = 1): void {
     const usage = this.getOrCreate(tenantId, period);
     this.db.prepare('UPDATE usage_records SET api_calls_used = api_calls_used + ? WHERE id = ?')

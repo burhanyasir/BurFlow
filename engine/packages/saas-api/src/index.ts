@@ -693,5 +693,22 @@ if (require.main === module) {
   server = app.listen(PORT, () => {
     logger.info({ port: PORT, env: process.env.NODE_ENV || 'development' }, 'SaaS API started');
     setInterval(() => refreshTokenRepo.cleanExpired(), 3600000).unref();
+
+    // C4: Startup health check — alert when tenants have active widgets but 0 knowledge chunks
+    try {
+      const tenants = db.prepare('SELECT id, name FROM tenants').all() as Array<{ id: string; name: string }>;
+      for (const tenant of tenants) {
+        const config = widgetConfigRepo.get(tenant.id);
+        if (!config) continue; // No widget configured
+        const chunkCount = knowledgeDb
+          ? (knowledgeDb.prepare('SELECT COUNT(*) as c FROM kb_chunks WHERE tenant_id = ?').get(tenant.id) as any)?.c || 0
+          : 0;
+        if (chunkCount === 0) {
+          console.warn(`[HealthCheck] TENANT_NO_KNOWLEDGE — tenant=${tenant.id} (${tenant.name}) has widget configured but 0 knowledge chunks`);
+        }
+      }
+    } catch (err) {
+      logger.error({ err }, 'Startup health check failed');
+    }
   });
 }

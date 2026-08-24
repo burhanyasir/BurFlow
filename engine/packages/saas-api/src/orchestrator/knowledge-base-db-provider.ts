@@ -96,33 +96,7 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
       return cached.text;
     }
 
-    // Source 1: SQLite knowledge_snapshots (pipeline store)
-    try {
-      const rows = this.db.prepare(
-        `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
-      ).all(tenantId) as Array<{ chunk_data: string }>;
-      console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${rows.length} snapshot rows in SQLite`);
-      if (rows.length > 0) {
-        const allChunks = rows.flatMap(r => {
-          try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
-        });
-        console.log(`[KnowledgeLookup] tenantId=${tenantId} — parsed ${allChunks.length} total chunks from SQLite`);
-        if (allChunks.length > 0) {
-          const parts = allChunks.map(chunk => {
-            const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
-            return title ? `[${title}] ${chunk.content}` : chunk.content;
-          });
-          const text = this.truncateToBudget(parts, tenantId);
-          console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from SQLite snapshots`);
-          this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
-          return text;
-        }
-      }
-    } catch (err) {
-      console.error(`[KnowledgeLookup] SQLite snapshot lookup error for tenant ${tenantId}:`, err);
-    }
-
-    // Source 2: PostgreSQL kb_chunks (persistent — survives Render deploys)
+    // C4: Postgres is the primary source of truth (survives Render deploys)
     if (this.pgDb) {
       try {
         const pgRows = this.pgDb.prepare(
@@ -145,6 +119,32 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
       } catch (err) {
         console.error(`[KnowledgeLookup] PostgreSQL kb_chunks lookup error for tenant ${tenantId}:`, err);
       }
+    }
+
+    // Fallback: SQLite knowledge_snapshots (warm cache — wiped on Render deploys)
+    try {
+      const rows = this.db.prepare(
+        `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
+      ).all(tenantId) as Array<{ chunk_data: string }>;
+      console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${rows.length} snapshot rows in SQLite (fallback)`);
+      if (rows.length > 0) {
+        const allChunks = rows.flatMap(r => {
+          try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
+        });
+        console.log(`[KnowledgeLookup] tenantId=${tenantId} — parsed ${allChunks.length} total chunks from SQLite`);
+        if (allChunks.length > 0) {
+          const parts = allChunks.map(chunk => {
+            const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
+            return title ? `[${title}] ${chunk.content}` : chunk.content;
+          });
+          const text = this.truncateToBudget(parts, tenantId);
+          console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from SQLite snapshots`);
+          this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
+          return text;
+        }
+      }
+    } catch (err) {
+      console.error(`[KnowledgeLookup] SQLite snapshot lookup error for tenant ${tenantId}:`, err);
     }
 
     console.log(`[KnowledgeLookup] tenantId=${tenantId} — no knowledge found in any source`);

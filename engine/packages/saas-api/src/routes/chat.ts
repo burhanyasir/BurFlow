@@ -225,6 +225,23 @@ export function createChatRoutes(
       const period = new Date().toISOString().slice(0, 7);
       usageRepo.incrementMessages(tenantId!, period);
 
+      // C6: Spend cap check — degrade to template response if tenant exceeded budget
+      const SPEND_CAP_USD = 50; // $50/month hard cap per tenant
+      const currentCost = usageRepo.getCostUsd(tenantId!, period);
+      if (currentCost >= SPEND_CAP_USD) {
+        console.warn(`[Chat] SPEND CAP REACHED — tenant=${tenantId} cost=$${currentCost.toFixed(2)}`);
+        const capResponse = "I want to make sure I give you an accurate answer. Let me connect you with our team who can help with that right away.";
+        messageRepo.create({
+          conversationId: conversation.id,
+          tenantId: tenantId!,
+          role: 'assistant',
+          content: capResponse,
+          sequenceNumber: conversation.messageCount + 2,
+        });
+        conversationRepo.incrementMessageCount(conversation.id);
+        return res.json({ response: capResponse, sessionId: convSessionId, conversationId: conversation.id });
+      }
+
       // ─── Live Human Takeover Guard ─────────────────────────────
       // When a human agent has taken over the session, the visitor's
       // message is stored in history (above) but the LLM brain is
@@ -379,6 +396,16 @@ export function createChatRoutes(
 
       conversationRepo.incrementMessageCount(conversation.id);
       conversationRepo.incrementMessageCount(conversation.id);
+
+      // C6: Per-message cost tracking — estimate from response length
+      // Rough: ~4 chars per token, GPT-4 class ~$0.03/1K input + $0.06/1K output
+      const estimatedTokens = Math.ceil((normalizedText.length + finalResponse.length) / 4);
+      const estimatedCost = estimatedTokens * 0.00004; // ~$0.04 per 1K tokens avg
+      const period = new Date().toISOString().slice(0, 7);
+      try {
+        usageRepo.incrementTokens(tenantId!, period, estimatedTokens);
+        usageRepo.incrementCost(tenantId!, period, estimatedCost);
+      } catch {} // non-critical — never fail the chat turn
 
       console.log(`[TRACE:${traceId}] Pipeline strategy=${strategy} mood=${mood} trust=${trustScore} buying=${buyingIntentScore} stage=${stage}`);
 
