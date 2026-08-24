@@ -126,23 +126,42 @@ function generateStarterOptionsFallback(docs: ParsedDocument[]): string[] {
   const options: string[] = [];
   const urls = docs.map(d => (d.metadata?.sourceUrl as string || '').toLowerCase());
   const titles = docs.map(d => (d.title || '').toLowerCase());
+  const allContent = docs.map(d => (d.content || '').toLowerCase()).join(' ');
 
   const hasPricing = urls.some(u => u.includes('pricing')) || titles.some(t => t.includes('pricing'));
-  const hasProducts = urls.some(u => u.includes('product')) || titles.some(t => t.includes('product'));
+  const hasServices = urls.some(u => u.includes('service')) || titles.some(t => t.includes('service')) || allContent.includes('our services');
   const hasContact = urls.some(u => u.includes('contact')) || titles.some(t => t.includes('contact'));
-  const hasFaq = urls.some(u => u.includes('faq') || u.includes('question')) || titles.some(t => t.includes('faq') || t.includes('question'));
-  const hasDemo = urls.some(u => u.includes('demo') || u.includes('trial')) || titles.some(t => t.includes('demo') || t.includes('trial'));
+  const hasTeam = urls.some(u => u.includes('team') || u.includes('doctor')) || titles.some(t => t.includes('team') || t.includes('doctor'));
   const hasAbout = urls.some(u => u.includes('about')) || titles.some(t => t.includes('about'));
 
-  if (hasPricing) options.push('Show me pricing');
-  if (hasProducts) options.push('What products do you offer?');
-  if (hasDemo) options.push('Can I try a demo?');
-  if (hasFaq) options.push('Frequently asked questions');
-  if (hasContact) options.push('How can I contact you?');
-  if (hasAbout) options.push('Tell me about your company');
+  // Detect industry from content
+  const isDental = allContent.includes('dentist') || allContent.includes('dental') || allContent.includes('smile') || allContent.includes('teeth');
+  const isRestaurant = allContent.includes('menu') || allContent.includes('reservation') || allContent.includes('restaurant');
+  const isSaaS = allContent.includes('saas') || allContent.includes('subscription') || allContent.includes('api') || allContent.includes('dashboard');
+
+  if (isDental) {
+    if (hasServices) options.push('What services do you offer?');
+    if (hasPricing) options.push('How much does it cost?');
+    options.push('Book an appointment');
+    if (hasTeam) options.push('Meet the dentists');
+    if (hasContact) options.push('Where are you located?');
+  } else if (isRestaurant) {
+    options.push('View the menu');
+    options.push('Make a reservation');
+    if (hasContact) options.push('Where are you located?');
+  } else if (isSaaS) {
+    if (hasPricing) options.push('Compare pricing plans');
+    options.push('Schedule a demo');
+    options.push('What features do you offer?');
+  } else {
+    if (hasPricing) options.push('Show me pricing');
+    if (hasServices) options.push('What do you offer?');
+    if (hasContact) options.push('How can I contact you?');
+    if (hasAbout) options.push('Tell me about you');
+  }
 
   if (options.length < 3) {
-    const defaults = ['How does it work?', 'Book a demo', 'What are your services?'];
+    const defaults = ['What services do you offer?', 'How can I contact you?', 'Tell me about your business'];
     for (const d of defaults) {
       if (options.length >= 3) break;
       if (!options.includes(d)) options.push(d);
@@ -537,7 +556,32 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
           try {
             const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
             const widgetConfigRepo = new WidgetConfigRepository(deps.db);
-            widgetConfigRepo.upsert(tenantId, { starterOptions });
+
+            // Derive business name and greeting from crawled content
+            let companyNameUpdate: string | undefined;
+            let greetingUpdate: string | undefined;
+            const homeDoc = docs.find(d => {
+              const url = (d.metadata?.sourceUrl as string || '').toLowerCase();
+              return url.endsWith('/') || url.endsWith('/index.html') || url.includes('index');
+            }) || docs[0];
+            if (homeDoc) {
+              const titleText = homeDoc.title || '';
+              // Extract business name from title like "BrightSmile Dental — Your Trusted Family Dentist in Austin, TX"
+              const dashMatch = titleText.match(/^(.+?)\s*[—–-]\s*(?:Your|The|A|Welcome)/i);
+              if (dashMatch) {
+                companyNameUpdate = dashMatch[1].trim();
+              } else if (titleText && !titleText.toLowerCase().includes('home')) {
+                companyNameUpdate = titleText.split(/\s*[—–-|]\s*/)[0].trim();
+              }
+              if (companyNameUpdate) {
+                greetingUpdate = `Hi! Welcome to ${companyNameUpdate}. How can we help you today?`;
+              }
+            }
+
+            const updatePayload: any = { starterOptions };
+            if (companyNameUpdate) updatePayload.companyName = companyNameUpdate;
+            if (greetingUpdate) updatePayload.greeting = greetingUpdate;
+            widgetConfigRepo.upsert(tenantId, updatePayload);
           } catch { /* ignore — starterOptions are best-effort */ }
 
           setTimeout(() => clearCrawlProgress(tenantId), 30000);
