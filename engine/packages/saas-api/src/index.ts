@@ -309,6 +309,10 @@ const publicCors = cors({ origin: true, credentials: false });
 app.use('/api/widget', publicCors);
 app.use('/api/chat', publicCors);
 app.use('/api/public', publicCors);
+
+// Serve widget dist files at /widget/* (snippet points to /widget/widget.js)
+const widgetDistPath = join(__dirname, '..', '..', 'widget', 'dist');
+app.use('/widget', express.static(widgetDistPath, { maxAge: '1h', index: false }));
 app.use(cors({ origin: CORS_ORIGIN === false ? false : (CORS_ORIGIN || false), credentials: true }));
 app.use(compression() as any);
 // Raw body parser for webhook signature verification (must come before json parser)
