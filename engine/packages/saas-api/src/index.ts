@@ -457,7 +457,7 @@ app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRep
 app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conversationRepo, messageRepo));
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
 app.use('/api/knowledge-bases', auth, tenantGuard, createKnowledgeBaseRoutes(kbRepo, docRepo));
-const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, knowledgeDb || db);
+const chatKbProvider = new DbKnowledgeBaseProvider(topicResponseRepo, knowledgeDb || db, undefined, knowledgeDb ? db : undefined);
 const leadService = new LeadService(leadRepo);
 // Live Human Agent Takeover / Session Handoff
 const sessionHandoff = new SessionHandoffService(conversationRepo);

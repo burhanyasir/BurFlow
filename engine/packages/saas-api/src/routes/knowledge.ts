@@ -490,6 +490,49 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
           setCrawlProgress(tenantId, { done: true, pagesCrawled: processed, queueRemaining: 0, warning: failed > 0 ? `${failed} of ${docs.length} pages failed to index` : undefined });
 
+          // Persist crawled chunks to PostgreSQL kb_chunks so they survive Render deploys
+          try {
+            const pgDb = deps.db;
+            const isPg = !!deps.knowledgeDb;
+            if (isPg && docs.length > 0) {
+              // Ensure a knowledge_base exists for this tenant
+              let kbId: string | null = null;
+              try {
+                const kbRow = pgDb.prepare('SELECT id FROM knowledge_bases WHERE tenant_id = ? LIMIT 1').get(tenantId) as any;
+                if (kbRow) { kbId = kbRow.id; }
+              } catch {}
+              if (!kbId) {
+                kbId = randomUUID();
+                try {
+                  pgDb.prepare(`INSERT INTO knowledge_bases (id, tenant_id, name, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+                    .run(kbId, tenantId, 'Website Crawl', new Date().toISOString(), new Date().toISOString());
+                } catch {}
+              }
+              // Create a kb_document for this crawl
+              const docId = randomUUID();
+              try {
+                pgDb.prepare(`INSERT INTO kb_documents (id, knowledge_base_id, tenant_id, filename, source_type, source_url, status, chunk_count, created_at, updated_at)
+                  VALUES (?, ?, ?, ?, 'url', ?, 'published', ?, ?, ?)`)
+                  .run(docId, kbId, tenantId, url, url, docs.length, new Date().toISOString(), new Date().toISOString());
+              } catch {}
+              // Insert each page as a chunk
+              for (const doc of docs) {
+                const chunkId = randomUUID();
+                const metadata = JSON.stringify({ title: doc.title || '', sourceUrl: doc.metadata?.sourceUrl || url });
+                try {
+                  pgDb.prepare(`INSERT INTO kb_chunks (id, document_id, knowledge_base_id, tenant_id, content, metadata, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)`)
+                    .run(chunkId, docId, kbId, tenantId, doc.content, metadata, new Date().toISOString());
+                } catch (err) {
+                  createContextLogger(logger).warn({ err, tenantId }, 'Failed to persist chunk to PostgreSQL');
+                }
+              }
+              createContextLogger(logger).info({ tenantId, chunkCount: docs.length }, 'Persisted crawled chunks to PostgreSQL');
+            }
+          } catch (err) {
+            createContextLogger(logger).warn({ err, tenantId }, 'Failed to persist crawl results to PostgreSQL (non-fatal)');
+          }
+
           const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
           try {
             const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');

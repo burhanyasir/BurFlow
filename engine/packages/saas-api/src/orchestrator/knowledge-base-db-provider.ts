@@ -17,6 +17,7 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
     private repo: TopicResponseTemplateRepository,
     private db?: SqlDatabase,
     fallback?: KnowledgeBaseProvider,
+    private pgDb?: SqlDatabase,
   ) {
     this.fallback = fallback || new DefaultKnowledgeBaseProvider();
   }
@@ -52,30 +53,58 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
       return cached.text;
     }
 
+    // Source 1: SQLite knowledge_snapshots (pipeline store)
     try {
       const rows = this.db.prepare(
         `SELECT chunk_data FROM knowledge_snapshots WHERE tenant_id = ? ORDER BY published_at DESC LIMIT 10`
       ).all(tenantId) as Array<{ chunk_data: string }>;
-      console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${rows.length} snapshot rows`);
-      if (!rows.length) return '';
-
-      const allChunks = rows.flatMap(r => {
-        try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
-      });
-      console.log(`[KnowledgeLookup] tenantId=${tenantId} — parsed ${allChunks.length} total chunks`);
-      if (!allChunks.length) return '';
-
-      const parts = allChunks.map(chunk => {
-        const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
-        return title ? `[${title}] ${chunk.content}` : chunk.content;
-      });
-      const text = parts.join('\n\n');
-      console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars of business knowledge`);
-      this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
-      return text;
+      console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${rows.length} snapshot rows in SQLite`);
+      if (rows.length > 0) {
+        const allChunks = rows.flatMap(r => {
+          try { return JSON.parse(r.chunk_data || '[]'); } catch { return []; }
+        });
+        console.log(`[KnowledgeLookup] tenantId=${tenantId} — parsed ${allChunks.length} total chunks from SQLite`);
+        if (allChunks.length > 0) {
+          const parts = allChunks.map(chunk => {
+            const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
+            return title ? `[${title}] ${chunk.content}` : chunk.content;
+          });
+          const text = parts.join('\n\n');
+          console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from SQLite snapshots`);
+          this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
+          return text;
+        }
+      }
     } catch (err) {
-      console.error(`[KnowledgeLookup] Error fetching knowledge for tenant ${tenantId}:`, err);
-      return '';
+      console.error(`[KnowledgeLookup] SQLite snapshot lookup error for tenant ${tenantId}:`, err);
     }
+
+    // Source 2: PostgreSQL kb_chunks (persistent — survives Render deploys)
+    if (this.pgDb) {
+      try {
+        const pgRows = this.pgDb.prepare(
+          `SELECT kc.content, kc.metadata FROM kb_chunks kc
+           WHERE kc.tenant_id = ? AND kc.content IS NOT NULL AND LENGTH(kc.content) > 0
+           ORDER BY kc.created_at DESC LIMIT 50`
+        ).all(tenantId) as Array<{ content: string; metadata: string }>;
+        console.log(`[KnowledgeLookup] tenantId=${tenantId} — found ${pgRows.length} chunks in PostgreSQL kb_chunks`);
+        if (pgRows.length > 0) {
+          const parts = pgRows.map(r => {
+            let title = '';
+            try { title = JSON.parse(r.metadata || '{}').title || ''; } catch {}
+            return title ? `[${title}] ${r.content}` : r.content;
+          });
+          const text = parts.join('\n\n');
+          console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from PostgreSQL kb_chunks`);
+          this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
+          return text;
+        }
+      } catch (err) {
+        console.error(`[KnowledgeLookup] PostgreSQL kb_chunks lookup error for tenant ${tenantId}:`, err);
+      }
+    }
+
+    console.log(`[KnowledgeLookup] tenantId=${tenantId} — no knowledge found in any source`);
+    return '';
   }
 }
