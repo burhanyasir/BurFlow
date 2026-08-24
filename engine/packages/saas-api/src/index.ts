@@ -299,6 +299,7 @@ app.use(helmet({
     },
   },
   crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: false,
 }));
 // Public widget/chat/lead endpoints are called from arbitrary customer sites
 // where the widget is embedded (bearer tokens, no cookies), so they reflect
