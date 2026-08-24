@@ -253,6 +253,9 @@ export function createAgentChatRoutes(
     });
     conversationRepo.incrementMessageCount(conversation.id);
 
+    // Reset the dead-man timer — operator is active
+    handoff.onOperatorMessage(req.tenantId!, conversation.sessionId);
+
     takeoverEvents.emit({
       type: 'OPERATOR_MESSAGE',
       tenantId: req.tenantId!,

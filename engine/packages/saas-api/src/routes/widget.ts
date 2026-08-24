@@ -15,6 +15,7 @@ const logger = createLogger('saas-api:widget');
 interface WidgetTokenPayload {
   tenantId: string;
   type: 'widget';
+  aud?: string;  // Origin the token was issued for (e.g. "https://example.com")
   iat: number;
   exp: number;
 }
@@ -293,7 +294,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     }
   }
 
-  function generateWidgetToken(tenantId: string): string {
+  function generateWidgetToken(tenantId: string, origin?: string): string {
     const secret = getWidgetSecret();
     if (!secret) {
       throw new Error('WIDGET_SECRET is not configured — refusing to issue widget tokens');
@@ -301,8 +302,9 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     const payload: WidgetTokenPayload = {
       tenantId,
       type: 'widget',
+      aud: origin || undefined,
       iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 86400,
+      exp: Math.floor(Date.now() / 1000) + 1800,  // 30 min TTL
     };
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const sig = signWidgetToken(encoded, secret);
@@ -324,7 +326,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     };
   }
 
-  function verifyWidgetToken(token: string): { tenantId: string } | null {
+  function verifyWidgetToken(token: string, requestOrigin?: string): { tenantId: string } | null {
     const secret = getWidgetSecret();
     if (!secret) return null;
     try {
@@ -337,6 +339,12 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (sigBuf.length === expectedBuf.length && timingSafeEqual(sigBuf, expectedBuf)) {
         const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString()) as WidgetTokenPayload;
         if (payload.type !== 'widget' || payload.exp < Math.floor(Date.now() / 1000)) return null;
+        // Origin binding: if token has aud, verify it matches request origin
+        if (payload.aud && requestOrigin) {
+          const tokenOrigin = new URL(payload.aud).origin;
+          const reqOrigin = new URL(requestOrigin).origin;
+          if (tokenOrigin !== reqOrigin) return null;
+        }
         return { tenantId: payload.tenantId };
       }
       return null;
@@ -389,6 +397,10 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!tenantId) {
         return res.status(400).json({ error: 'tenantId query parameter is required' });
       }
+
+      // Extract origin from request for binding
+      const origin = (req.headers.origin as string) || (req.headers.referer as string)?.split('/').slice(0, 3).join('/') || '';
+
       let resolvedTenantId = tenantId;
       if (tenantRepo) {
         const tenant = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
@@ -401,8 +413,22 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         // the seed script has run) fall through and mint a token carrying the
         // requested demo tenant id instead of failing the bootstrap.
       }
-      const token = generateWidgetToken(resolvedTenantId);
-      res.json({ token, tenantId: resolvedTenantId, expiresIn: 86400 });
+
+      // Domain allowlist: fail closed if configured and origin doesn't match
+      if (widgetConfigRepo && origin) {
+        const config = widgetConfigRepo.findByTenantId(resolvedTenantId);
+        const allowed = config?.allowedDomains;
+        if (Array.isArray(allowed) && allowed.length > 0) {
+          const originHost = new URL(origin).hostname;
+          const matched = allowed.some(d => originHost === d || originHost.endsWith('.' + d));
+          if (!matched) {
+            return res.status(403).json({ error: 'Origin not allowed' });
+          }
+        }
+      }
+
+      const token = generateWidgetToken(resolvedTenantId, origin);
+      res.json({ token, tenantId: resolvedTenantId, expiresIn: 1800 });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Public widget token generation failed');
       res.status(500).json({ error: 'Failed to generate widget token' });
@@ -415,7 +441,8 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!token || typeof token !== 'string') {
         return res.status(400).json({ error: 'Token is required' });
       }
-      const payload = verifyWidgetToken(token);
+      const origin = req.get('Origin') || req.get('Referer') || undefined;
+      const payload = verifyWidgetToken(token, origin);
       if (!payload) {
         return res.status(401).json({ error: 'Invalid or expired widget token' });
       }
@@ -435,7 +462,8 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         if (!token) {
           return res.status(400).json({ error: 'Widget token required' });
         }
-        const payload = verifyWidgetToken(token);
+        const origin = req.get('Origin') || req.get('Referer') || undefined;
+        const payload = verifyWidgetToken(token, origin);
         if (!payload) {
           return res.status(401).json({ error: 'Invalid or expired widget token' });
         }
@@ -564,7 +592,8 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         if (!token) {
           return res.status(400).json({ error: 'Widget token required' });
         }
-        const payload = verifyWidgetToken(token);
+        const origin = req.get('Origin') || req.get('Referer') || undefined;
+        const payload = verifyWidgetToken(token, origin);
         if (!payload) {
           return res.status(401).json({ error: 'Invalid or expired widget token' });
         }

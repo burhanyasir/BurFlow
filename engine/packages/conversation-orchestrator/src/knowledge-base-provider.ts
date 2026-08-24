@@ -10,6 +10,8 @@ export interface KnowledgeBaseProvider {
   getAvailableTopics(tenantId: string): DiscernedTopic[];
   resolveTopic?(rawQuery: string, tenantId: string): DiscernedTopic | null;
   getBusinessKnowledge?(tenantId: string): string;
+  /** Vector search: embed query, cosine top-k over tenant chunks, return relevant text. */
+  getRelevantKnowledge?(query: string, tenantId: string): string | Promise<string>;
 }
 
 export function simpleStem(word: string): string {

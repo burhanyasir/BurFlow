@@ -62,6 +62,7 @@ import { createWebhookRoutes } from './routes/webhooks';
 import { createPaddleWebhookRoutes } from './routes/paddle-webhooks';
 import { createWhatsAppRoutes } from './routes/whatsapp';
 import { WhatsAppClient } from '@conversation-engine/saas-core';
+import { takeoverEvents } from './services/takeover-events';
 import { createTrustRoutes } from './routes/trust';
 import { createLeadRoutes } from './routes/leads';
 import { createHardeningRoutes } from './routes/hardening';
@@ -463,6 +464,18 @@ const leadService = new LeadService(leadRepo);
 // Live Human Agent Takeover / Session Handoff
 const sessionHandoff = new SessionHandoffService(conversationRepo);
 
+// Wire up dead-man timeout: when no operator responds, auto-release and notify
+sessionHandoff.onDeadManTimeout = (tenantId, sessionId, conversationId) => {
+  // Emit takeover ended event so the widget knows to send the fallback message
+  takeoverEvents.emit({
+    type: 'TAKEOVER_ENDED',
+    tenantId,
+    sessionId,
+    conversationId,
+  });
+  console.log(`[Handoff] Dead-man timeout released session ${conversationId} for tenant ${tenantId}`);
+};
+
 // Transactional mailer (Nodemailer SMTP → Resend → console) + instant lead alerts
 const mailer = MailerService.fromEnv();
 const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
@@ -558,7 +571,7 @@ const knowledgeDeps = {
   db,
   knowledgeDb,
   embeddingApiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
-  embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '128', 10),
+    embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '512', 10),
   unansweredRepo,
 };
 app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps));

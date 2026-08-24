@@ -52,7 +52,7 @@ interface WidgetTokenPayload {
   exp: number;
 }
 
-function verifyWidgetToken(token: string): { tenantId: string } | null {
+function verifyWidgetToken(token: string, requestOrigin?: string): { tenantId: string } | null {
   const secret = getWidgetSecret();
   if (!secret) return null;
   try {
@@ -107,7 +107,8 @@ export function publicChatAuth(secret: string, apiKeyRepo?: ApiKeyRepository, te
     // Fall back to widget token (public widget visitors)
     const widgetToken = (req.headers['x-widget-token'] as string) || '';
     if (widgetToken) {
-      const result = verifyWidgetToken(widgetToken);
+      const origin = req.get('Origin') || req.get('Referer') || undefined;
+      const result = verifyWidgetToken(widgetToken, origin);
       if (result) {
         let tenantId = result.tenantId;
         if (tenantId === 'demo-tenant' && tenantRepo) {
@@ -165,7 +166,7 @@ export function requireTenant(req: Request, res: Response, next: NextFunction) {
 /**
  * Middleware that checks Origin/Referer against the tenant's allowed domains.
  * Enforced on POST /chat and token issuance to prevent unauthenticated LLM spend.
- * Skipped when allowedDomains is empty (no restriction configured).
+ * Fail closed: empty allowedDomains = not configured = block (7-day grace handled at dashboard level).
  */
 export function requireAllowedOrigin(widgetConfigRepo: WidgetConfigRepository) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -175,7 +176,9 @@ export function requireAllowedOrigin(widgetConfigRepo: WidgetConfigRepository) {
     try {
       const config = widgetConfigRepo.get(tenantId);
       if (!config || !config.allowedDomains || config.allowedDomains.length === 0) {
-        return next(); // No domain restriction configured
+        // No domain restriction configured — block to prevent abuse.
+        // Dashboard shows a setup wizard; the 7-day grace window is handled there.
+        return res.status(403).json({ error: 'Domain not configured — widget setup incomplete' });
       }
 
       const origin = req.get('Origin') || req.get('Referer') || '';
@@ -192,8 +195,8 @@ export function requireAllowedOrigin(widgetConfigRepo: WidgetConfigRepository) {
       }
       next();
     } catch {
-      // URL parse errors or config lookup failures — allow (fail open for availability)
-      next();
+      // Fail closed on errors — block rather than allow through
+      return res.status(403).json({ error: 'Domain verification failed' });
     }
   };
 }

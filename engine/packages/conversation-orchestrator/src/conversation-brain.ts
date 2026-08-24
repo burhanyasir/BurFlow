@@ -2392,7 +2392,19 @@ buyingIntentDetected: memory.buyingIntentDetected,
         return entry ? `### ${topic}\n${entry.answer}` : null;
       }).filter(Boolean).join('\n\n');
 
-      const crawledKnowledge = kbProvider?.getBusinessKnowledge?.(tenantIdForLLM) || '';
+      // Vector search: embed query → cosine top-k over tenant chunks
+      let crawledKnowledge = '';
+      if (kbProvider?.getRelevantKnowledge) {
+        try {
+          crawledKnowledge = await kbProvider.getRelevantKnowledge(input.message, tenantIdForLLM);
+        } catch (err) {
+          console.error(`[Brain] getRelevantKnowledge failed for tenant ${tenantIdForLLM}:`, err);
+        }
+      }
+      // Fallback to dump-all if vector search returned empty
+      if (!crawledKnowledge && kbProvider?.getBusinessKnowledge) {
+        crawledKnowledge = kbProvider.getBusinessKnowledge(tenantIdForLLM) || '';
+      }
 
       let businessContext = '';
       if (crawledKnowledge) {
@@ -2498,7 +2510,10 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
 
   // Surface the degradation signal to the CI result so callers can detect
   // knowledge gaps at chat time.
-  if (usedFallback) ciResult.isFallback = true;
+  if (usedFallback) {
+    ciResult.isFallback = true;
+    console.warn(`[brain] DEGRADED TURN (LLM fallback) — tenant=${tenantId || 'unknown'} — ${message.slice(0, 80)}`);
+  }
 
   enrichedResponse = enforceContinuity(enrichedResponse, memory, newTopics);
 
@@ -2753,8 +2768,19 @@ function buildTimeoutFallback(input: BrainInput): BrainOutput {
     lastGoal: memory.lastGoal,
     lastGoalStreak: memory.lastGoalStreak,
   };
+
+  // Honest low-confidence response — no false confidence
+  const degradedResponses = [
+    "I want to make sure I give you an accurate answer. Let me connect you with our team who can help with that right away.",
+    "That is a great question and I want to get it right. Would you like me to have someone from our team reach out with the details?",
+    "I am not fully confident I have the right answer for that. Let me get you connected with someone who can help.",
+  ];
+  const responseText = degradedResponses[memory.turnCount % degradedResponses.length];
+
+  console.warn(`[brain] DEGRADED TURN — tenant=${input.tenantId || 'unknown'} — ${input.message.slice(0, 80)}`);
+
   return {
-    responseText: 'Thanks for your patience — let me look that up for you. Could you repeat your question while I pull the details?',
+    responseText,
     cta: { primaryCTA: 'none' as CTAType, label: '', link: '' },
     quickReplies: [],
     uiState: { buttons: [], suggestedActions: [] },
