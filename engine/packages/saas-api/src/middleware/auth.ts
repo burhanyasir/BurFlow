@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { JwtPayload, verifyApiKey, TenantRepository } from '@conversation-engine/saas-core';
+import { JwtPayload, verifyApiKey, TenantRepository, WidgetConfigRepository } from '@conversation-engine/saas-core';
 import type { ApiKeyRepository } from '@conversation-engine/saas-core';
 import { createHmac, timingSafeEqual } from 'crypto';
 
@@ -160,4 +160,40 @@ export function requireTenant(req: Request, res: Response, next: NextFunction) {
     return res.status(400).json({ error: 'Tenant context required' });
   }
   next();
+}
+
+/**
+ * Middleware that checks Origin/Referer against the tenant's allowed domains.
+ * Enforced on POST /chat and token issuance to prevent unauthenticated LLM spend.
+ * Skipped when allowedDomains is empty (no restriction configured).
+ */
+export function requireAllowedOrigin(widgetConfigRepo: WidgetConfigRepository) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const tenantId = req.tenantId;
+    if (!tenantId) return next();
+
+    try {
+      const config = widgetConfigRepo.get(tenantId);
+      if (!config || !config.allowedDomains || config.allowedDomains.length === 0) {
+        return next(); // No domain restriction configured
+      }
+
+      const origin = req.get('Origin') || req.get('Referer') || '';
+      if (!origin) return next(); // No origin header — allow (server-to-server, curl, etc.)
+
+      const originHost = new URL(origin).hostname;
+      const allowed = config.allowedDomains.some((d: string) => {
+        if (d.startsWith('*.')) return originHost.endsWith(d.slice(1));
+        return originHost === d;
+      });
+
+      if (!allowed) {
+        return res.status(403).json({ error: 'Domain not allowed' });
+      }
+      next();
+    } catch {
+      // URL parse errors or config lookup failures — allow (fail open for availability)
+      next();
+    }
+  };
 }

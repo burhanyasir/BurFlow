@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 
 
@@ -7,6 +7,8 @@ interface Props {
   processing: { sourceIds: string[]; completedIds: string[]; statuses: Record<string, string>; error: string | null };
   onCheckStatus: () => Promise<{ completed: boolean; statuses: Record<string, string> }>;
 }
+
+const MAX_POLL_ATTEMPTS = 200; // 10 minutes at 3s intervals
 
 const STAGES = [
   { key: 'uploaded', label: 'Uploaded', desc: 'Files received by server' },
@@ -27,6 +29,8 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
   const [checking, setChecking] = useState(false);
   const [started, setStarted] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  const pollCountRef = useRef(0);
+  const [timedOut, setTimedOut] = useState(false);
 
   useEffect(() => {
     if (!started) return;
@@ -35,13 +39,17 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
   }, [started]);
 
   const poll = useCallback(async () => {
-    if (checking) return;
+    if (checking || timedOut) return;
     setChecking(true);
     try {
       await onCheckStatus();
+      pollCountRef.current++;
+      if (pollCountRef.current >= MAX_POLL_ATTEMPTS) {
+        setTimedOut(true);
+      }
     } catch {}
     setChecking(false);
-  }, [checking, onCheckStatus]);
+  }, [checking, timedOut, onCheckStatus]);
 
   // Auto-check on mount — crawl already processes inline, so sources may be published
   useEffect(() => {
@@ -76,6 +84,11 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
       </motion.div>
     );
   }
+
+  const hasError = !!processing.error || timedOut;
+  const allFailed = Object.values(processing.statuses).length > 0 &&
+    Object.values(processing.statuses).every(s => s === 'error');
+  const showTerminalFailure = (timedOut && !allReady) || allFailed;
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-xl mx-auto py-4">
@@ -150,6 +163,19 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
           {processing.error && (
             <div className="p-3 rounded-lg bg-[var(--color-error-50)] border border-[var(--color-error-100)] text-sm text-[var(--color-error-700)]">
               {processing.error}
+            </div>
+          )}
+
+          {showTerminalFailure && (
+            <div className="p-4 rounded-xl bg-[var(--color-error-50)] border border-[var(--color-error-200)]">
+              <p className="text-sm font-semibold text-[var(--color-error-700)]">
+                {timedOut ? 'Processing timed out' : 'Processing failed'}
+              </p>
+              <p className="text-xs text-[var(--color-error-600)] mt-1">
+                {timedOut
+                  ? 'The crawl took longer than expected. You can try again from Step 3, or continue — the widget will work with default responses until knowledge is indexed.'
+                  : 'Some sources failed to process. Try re-crawling from Step 3, or continue with the widget using default responses.'}
+              </p>
             </div>
           )}
 

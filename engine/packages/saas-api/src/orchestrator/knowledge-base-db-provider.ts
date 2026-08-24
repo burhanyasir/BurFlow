@@ -12,6 +12,8 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
   private fallback: KnowledgeBaseProvider;
   private crawledChunksCache = new Map<string, { text: string; ts: number }>();
   private CACHE_TTL = 60_000;
+  /** Hard cap on knowledge text injected into the LLM prompt (~2-3k tokens). */
+  private static KNOWLEDGE_CHAR_BUDGET = 10_000;
 
   constructor(
     private repo: TopicResponseTemplateRepository,
@@ -20,6 +22,23 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
     private pgDb?: SqlDatabase,
   ) {
     this.fallback = fallback || new DefaultKnowledgeBaseProvider();
+  }
+
+  /** Truncate assembled text to the char budget, clipping on a chunk boundary. */
+  private truncateToBudget(parts: string[], tenantId: string): string {
+    const budget = DbKnowledgeBaseProvider.KNOWLEDGE_CHAR_BUDGET;
+    let total = 0;
+    const kept: string[] = [];
+    for (const part of parts) {
+      const partLen = part.length + (kept.length > 0 ? 2 : 0); // +2 for \n\n separator
+      if (total + partLen > budget) {
+        console.log(`[KnowledgeLookup] tenantId=${tenantId} — clipped at ${kept.length}/${parts.length} chunks (${total} chars)`);
+        break;
+      }
+      kept.push(part);
+      total += partLen;
+    }
+    return kept.join('\n\n');
   }
 
   getTopicResponse(topic: DiscernedTopic, tenantId: string, depth: number): KnowledgeEntry | null {
@@ -69,7 +88,7 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
             const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
             return title ? `[${title}] ${chunk.content}` : chunk.content;
           });
-          const text = parts.join('\n\n');
+          const text = this.truncateToBudget(parts, tenantId);
           console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from SQLite snapshots`);
           this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
           return text;
@@ -94,7 +113,7 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
             try { title = JSON.parse(r.metadata || '{}').title || ''; } catch {}
             return title ? `[${title}] ${r.content}` : r.content;
           });
-          const text = parts.join('\n\n');
+          const text = this.truncateToBudget(parts, tenantId);
           console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from PostgreSQL kb_chunks`);
           this.crawledChunksCache.set(tenantId, { text, ts: Date.now() });
           return text;

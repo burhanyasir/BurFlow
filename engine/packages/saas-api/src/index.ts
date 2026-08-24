@@ -32,7 +32,7 @@ import {
   MailerService, Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
-import { authMiddleware, publicChatAuth } from './middleware/auth';
+import { authMiddleware, publicChatAuth, requireAllowedOrigin } from './middleware/auth';
 import { createRateLimit } from './middleware/rate-limit';
 import { requireTenant, enforceTenantAccess } from './middleware/tenant';
 import { createAuthRoutes } from './routes/auth';
@@ -492,7 +492,7 @@ const notifyLeadCaptured = (lead: Lead, context: { message: string }) => {
 // rate-limited so marketing traffic can never drown the API.
 app.use('/api/public', createRateLimit({ windowMs: 60_000, max: 30, keyFn: (req) => `public:${req.ip || 'unknown'}` }), createPublicRoutes(leadRepo, tenantRepo));
 
-app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), requireTenant(tenantRepo, { allowDemoTenants: true }), chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
+app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), requireTenant(tenantRepo, { allowDemoTenants: true }), requireAllowedOrigin(widgetConfigRepo), chatQuotaGuard, createChatRoutes(conversationRepo, messageRepo, usageRepo, chatKbProvider, {
   leadService,
   webhookRepo,
   webhookDeliveryRepo,
