@@ -571,7 +571,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
               if (dashMatch) {
                 companyNameUpdate = dashMatch[1].trim();
               } else if (titleText && !titleText.toLowerCase().includes('home')) {
-                companyNameUpdate = titleText.split(/\s*[—–-|]\s*/)[0].trim();
+                companyNameUpdate = titleText.split(/\s*[—–\-|]\s*/)[0].trim();
               }
               if (companyNameUpdate) {
                 greetingUpdate = `Hi! Welcome to ${companyNameUpdate}. How can we help you today?`;
