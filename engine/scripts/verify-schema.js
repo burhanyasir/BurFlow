@@ -82,7 +82,35 @@ function parseExpected(sql) {
     tables.set(name, { columns, pk, unique, checks, fks });
   }
 
-  const indexRe = /CREATE INDEX\s+(\w+)\s+ON\s+(\w+)\s*\(([\w,\s]+)\)/g;
+  // Handle ALTER TABLE ... ADD COLUMN from later migrations
+  const alterRe = /ALTER TABLE\s+(\w+)\s+ADD COLUMN\s+(?:IF NOT EXISTS\s+)?(\w+)\s+((?:TEXT|INTEGER|DOUBLE PRECISION|BYTEA|TIMESTAMPTZ|TIMESTAMP|BOOLEAN|BIGINT|SMALLINT|REAL|NUMERIC|JSONB|SERIAL|BIGSERIAL|NUMERIC))\b/gi;
+  let am;
+  while ((am = alterRe.exec(sql)) !== null) {
+    const tblName = am[1];
+    const colName = am[2];
+    const rawType = am[3].trim();
+    const type = TYPE_MAP[rawType] || rawType.toLowerCase();
+    if (!tables.has(tblName)) {
+      tables.set(tblName, { columns: [], pk: [], unique: [], checks: 0, fks: new Set() });
+    }
+    const tbl = tables.get(tblName);
+    if (!tbl.columns.some(c => c.name === colName)) {
+      tbl.columns.push({ name: colName, type, nullable: true });
+    }
+  }
+
+  // CREATE UNIQUE INDEX (supports partial indexes with WHERE clause)
+  const uniqueIndexRe = /CREATE UNIQUE INDEX\s+(?:IF NOT EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([\w,\s]+)\)/g;
+  let uim;
+  while ((uim = uniqueIndexRe.exec(sql)) !== null) {
+    indexes.push({
+      name: uim[1],
+      table: uim[2],
+      columns: uim[3].split(',').map((s) => s.trim()),
+    });
+  }
+
+  const indexRe = /CREATE INDEX\s+(?:IF NOT EXISTS\s+)?(\w+)\s+ON\s+(\w+)\s*\(([\w,\s]+)\)/g;
   let im;
   while ((im = indexRe.exec(sql)) !== null) {
     indexes.push({
@@ -183,8 +211,39 @@ async function collectActual(adapter) {
 
 /** Compare expected vs actual. Returns { errors, summary }. */
 async function verifySchema(adapter, sqlFile = DEFAULT_SQL_FILE) {
-  const sql = fs.readFileSync(sqlFile, 'utf8');
-  const expected = parseExpected(sql);
+  // Merge schema from 001_initial_schema.sql + all subsequent ALTER TABLE migrations
+  const expected = { tables: new Map(), indexes: [] };
+
+  // Load all .sql files in the migrations directory in order
+  const migrationDir = path.dirname(sqlFile);
+  const sqlFiles = fs.readdirSync(migrationDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort()
+    .map(f => path.join(migrationDir, f));
+
+  for (const file of sqlFiles) {
+    const sql = fs.readFileSync(file, 'utf8');
+    const parsed = parseExpected(sql);
+    // Merge tables
+    for (const [name, tbl] of parsed.tables) {
+      if (!expected.tables.has(name)) {
+        expected.tables.set(name, { columns: [...tbl.columns], pk: [...tbl.pk], unique: [...tbl.unique], checks: tbl.checks, fks: new Set(tbl.fks) });
+      } else {
+        const existing = expected.tables.get(name);
+        for (const col of tbl.columns) {
+          if (!existing.columns.some(c => c.name === col.name)) {
+            existing.columns.push(col);
+          }
+        }
+      }
+    }
+    // Merge indexes
+    for (const idx of parsed.indexes) {
+      if (!expected.indexes.some(e => e.name === idx.name)) {
+        expected.indexes.push(idx);
+      }
+    }
+  }
   const actual = await collectActual(adapter);
   const errors = [];
 
