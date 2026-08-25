@@ -310,6 +310,7 @@ app.use(helmet({
 const publicCors = cors({ origin: true, credentials: false });
 app.use('/api/widget', publicCors);
 app.use('/api/chat', publicCors);
+app.use('/api/support', publicCors);
 app.use('/api/public', publicCors);
 
 // Serve widget dist files at /widget/* (snippet points to /widget/widget.js)
