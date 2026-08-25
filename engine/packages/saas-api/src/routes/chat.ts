@@ -215,24 +215,6 @@ export function createChatRoutes(
       const conversationId = conversation.id;
       console.log(`[TRACE:${traceId}] conversationId: ${conversationId}`);
 
-      // S1: Idempotency check — return cached response if this exact request was already processed
-      if (idempotencyKey) {
-        const existing = db.prepare(
-          'SELECT id FROM messages WHERE conversation_id = ? AND idempotency_key = ? LIMIT 1'
-        ).get(conversation.id, idempotencyKey) as any;
-        if (existing) {
-          console.log(`[TRACE:${traceId}] IDEMPOTENT HIT — returning cached response for key=${idempotencyKey}`);
-          const cachedMsg = db.prepare(
-            'SELECT content FROM messages WHERE conversation_id = ? AND role = ? AND sequence_number > ? ORDER BY sequence_number DESC LIMIT 1'
-          ).get(conversation.id, 'assistant', conversation.messageCount) as any;
-          return res.json({
-            response: cachedMsg?.content || 'Already processed.',
-            sessionId: convSessionId,
-            conversationId: conversation.id,
-          });
-        }
-      }
-
       // S1: Atomic quota reserve + message insert — prevents race-condition over-quota
       const period = new Date().toISOString().slice(0, 7);
       const SPEND_CAP_USD = 50;
