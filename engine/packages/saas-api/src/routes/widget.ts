@@ -416,7 +416,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
 
       // Domain allowlist: fail closed if configured and origin doesn't match
       if (widgetConfigRepo && origin) {
-        const config = widgetConfigRepo.findByTenantId(resolvedTenantId);
+        const config = widgetConfigRepo.get(resolvedTenantId);
         const allowed = config?.allowedDomains;
         if (Array.isArray(allowed) && allowed.length > 0) {
           const originHost = new URL(origin).hostname;

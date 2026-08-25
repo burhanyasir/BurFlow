@@ -401,7 +401,6 @@ export function createChatRoutes(
       // Rough: ~4 chars per token, GPT-4 class ~$0.03/1K input + $0.06/1K output
       const estimatedTokens = Math.ceil((normalizedText.length + finalResponse.length) / 4);
       const estimatedCost = estimatedTokens * 0.00004; // ~$0.04 per 1K tokens avg
-      const period = new Date().toISOString().slice(0, 7);
       try {
         usageRepo.incrementTokens(tenantId!, period, estimatedTokens);
         usageRepo.incrementCost(tenantId!, period, estimatedCost);
