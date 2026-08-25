@@ -301,6 +301,7 @@ export function createChatRoutes(
           quickReplies: [],
           uiState: { state: 'handoff' },
           cta: null,
+          suggestedOptions: [],
           humanTakeover: true,
         });
       }
@@ -355,6 +356,7 @@ export function createChatRoutes(
         quickReplies,
         uiState,
         cta,
+        suggestedOptions,
         leadCapture,
       } = pipelineResult;
 
@@ -442,6 +444,7 @@ export function createChatRoutes(
             quickReplies,
             uiState,
             cta,
+            suggestedOptions,
           });
         }
 
@@ -454,7 +457,7 @@ export function createChatRoutes(
         for (const chunk of chunkText(finalResponse)) {
           writeSseEvent(res, { type: 'token', content: chunk });
         }
-        writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta });
+        writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta, suggestedOptions });
         writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId });
         writeSseEvent(res, { type: 'done', finishReason: 'stop' });
         return res.end();
@@ -475,6 +478,7 @@ export function createChatRoutes(
         quickReplies,
         uiState,
         cta,
+        suggestedOptions,
       });
     } catch (err: any) {
       console.log(`[TRACE:${traceId}] UNHANDLED EXCEPTION: ${err.message}`);

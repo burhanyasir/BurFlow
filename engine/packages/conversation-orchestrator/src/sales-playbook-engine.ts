@@ -507,7 +507,8 @@ export function buildSalesPlaybook(input: SalesPlaybookInput): SalesPlaybookStra
     planComparison: hasPlanComparisonSignal(input),
   };
 
-  const qualificationNeeded = !qualificationSignals.budget || !qualificationSignals.decisionAuthority || !qualificationSignals.timeline || !qualificationSignals.planComparison;
+  const qualSignalCount = [qualificationSignals.budget, qualificationSignals.decisionAuthority, qualificationSignals.timeline, qualificationSignals.planComparison].filter(Boolean).length;
+  const qualificationNeeded = qualSignalCount < 2;
   const funnelStage = classifyFunnelStage(signals, pricingReviewEligible, qualificationNeeded);
   const readiness = buildReadiness(funnelStage);
 

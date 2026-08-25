@@ -252,7 +252,7 @@ const benchmarkCases: SalesConversionBenchmarkCase[] = (() => {
       industry: 'Real Estate',
       title: 'Real estate commercial pricing inquiry',
       messageTemplate: 'We need pricing details for managing {companySize} commercial properties and agent commission structure.',
-      persona: 'entrepreneur',
+      persona: 'small_business',
       buyingStage: 'decision',
       visitorIntent: 'pricing',
       productComplexity: 'moderate',

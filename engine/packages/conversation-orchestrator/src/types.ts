@@ -167,7 +167,6 @@ export interface ObjectionResult {
   category: ObjectionCategory;
   groundedAnswer: string;
   sources: string[];
-  // additional mapped resources for objection resolution
   proof?: string;
   documentation?: string;
   caseStudy?: string;
@@ -186,13 +185,6 @@ export type ObjectionCategory =
   | 'enterprise_procurement'
   | 'developer_concerns'
   | 'none';
-
-export interface ObjectionResult {
-  isObjection: boolean;
-  category: ObjectionCategory;
-  groundedAnswer: string;
-  sources: string[];
-}
 
 export type CTAType =
   | 'start_free_trial'

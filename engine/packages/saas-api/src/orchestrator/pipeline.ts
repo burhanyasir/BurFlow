@@ -44,6 +44,7 @@ export interface PipelineResult {
   quickReplies: any[];
   uiState: any;
   cta: any;
+  suggestedOptions: string[];
   leadCapture?: { email?: string; phone?: string; name?: string; company?: string } | null;
 }
 
@@ -94,6 +95,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       quickReplies: [],
       uiState: { state: 'handoff', buttons: [], suggestedActions: [] },
       cta: null,
+      suggestedOptions: [],
       leadCapture: null,
     };
   }
@@ -180,6 +182,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       quickReplies: rapportQuickReplies,
       uiState: rapportUiState,
       cta: null,
+      suggestedOptions: [],
       leadCapture: rapportLeadCapture,
     };
   }
@@ -235,6 +238,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       quickReplies: [],
       uiState: { buttons: [], suggestedActions: [] },
       cta: null,
+      suggestedOptions: [],
     };
   }
 
@@ -307,6 +311,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     quickReplies: brainOutput?.quickReplies || [],
     uiState: brainOutput?.uiState || { buttons: [], suggestedActions: [] },
     cta: brainOutput?.cta || null,
+    suggestedOptions: brainOutput?.suggestedOptions || [],
     leadCapture: brainOutput?.extractedLead || null,
   };
 }

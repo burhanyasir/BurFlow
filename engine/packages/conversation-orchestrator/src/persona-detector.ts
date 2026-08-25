@@ -1,112 +1,106 @@
 import { PersonaType, PersonaDetectionResult } from './types';
 
-export function detectPersona(
-  message: string,
-  history: string[] = [],
-  previousPersona?: PersonaType
-): PersonaDetectionResult {
-  const text = (message + ' ' + history.join(' ')).toLowerCase();
+export interface PersonaDetectionInput {
+  message: string;
+  history?: string[];
+  previousPersona?: PersonaType;
+  previousConfidence?: number;
+  turnCount?: number;
+}
 
-  // 1. Developer
-  if (
-    /api|sdk|webhook|code|script|react|github|dev|curl|endpoint|json|rate limit|cors|head tag|embed/i.test(text)
-  ) {
-    return {
-      persona: 'developer',
-      confidence: 0.9,
-      reasoning: 'Detected technical/developer vocabulary (API, SDK, webhooks, code).'
-    };
+const PERSONA_PATTERNS: Array<{
+  persona: PersonaType;
+  patterns: RegExp;
+  confidence: number;
+  reasoning: string;
+}> = [
+  {
+    persona: 'enterprise',
+    patterns: /soc\s?2|soc2|saml|sso|hipaa|gdpr|procurement|msa|purchase order|net-30|net 30|vpc|data residency|security review|questionnaire|dedicated tam|sla|50,000|500,000|1,000,000|enterprise plan|enterprise tier|custom plan|annual contract|volume discount|compliance audit|penetration test/i,
+    confidence: 0.92,
+    reasoning: 'Detected enterprise security, compliance, or procurement criteria.',
+  },
+  {
+    persona: 'developer',
+    patterns: /\b(api|sdk|webhook|rest endpoint|graphql|curl|endpoint|rate limit|cors|head tag|embed code|npm|yarn|package|github|gitlab|repo|typescript|javascript|python|node\.?js|react|vue|angular|next\.?js|express|fastify|docker|kubernetes|terraform|ci\/cd|pipeline)\b/i,
+    confidence: 0.88,
+    reasoning: 'Detected technical/developer vocabulary (API, SDK, webhooks, code).',
+  },
+  {
+    persona: 'agency',
+    patterns: /agency|white label|white-label|client accounts|reseller|reselling|sub-billing|partner program|affiliate|multi-tenant|manage.*clients|client.*manage/i,
+    confidence: 0.88,
+    reasoning: 'Detected agency or reseller terms (white label, client accounts, affiliate).',
+  },
+  {
+    persona: 'ecommerce',
+    patterns: /shopify|woocommerce|magento|bigcommerce|cart|checkout|shipping|returns|refunds|sizing|store|orders|order tracking|black friday|product catalog|inventory|sku|fulfillment/i,
+    confidence: 0.86,
+    reasoning: 'Detected e-commerce keywords (Shopify, cart, checkout, returns, store).',
+  },
+  {
+    persona: 'support_manager',
+    patterns: /support team|support reps|csat|nps|zendesk|freshdesk|ticket.*volume|ticket.*deflect|resolution rate|agent burnout|first response time|handle time|escalation.*volume|agent.*capacity/i,
+    confidence: 0.87,
+    reasoning: 'Detected customer support operations terms (Zendesk, deflection, agent handoff).',
+  },
+  {
+    persona: 'startup',
+    patterns: /\b(saas|founder|co-founder|startup|early.stage|seed|pre-seed|mrr|arr|product hunt|investor|pricing tiers|deflect|micro-saas|bootstrapped|yc|y combinator)\b/i,
+    confidence: 0.84,
+    reasoning: 'Detected SaaS founder business metrics (SaaS, startup, MRR, ARR, ROI).',
+  },
+  {
+    persona: 'small_business',
+    patterns: /small business|bakery|plumber|local business|my website|no code|wordpress|non-technical|solo|part-time|freelancer|side hustle|sole proprietor|mom and pop/i,
+    confidence: 0.82,
+    reasoning: 'Detected small business owner or local service provider terms.',
+  },
+  {
+    persona: 'existing_customer',
+    patterns: /my account|my dashboard|current plan|upgrade my|billing setting|login issue|my subscription|my usage|my team|our account/i,
+    confidence: 0.85,
+    reasoning: 'Detected active customer account or dashboard management.',
+  },
+];
+
+export function detectPersona(input: PersonaDetectionInput | string): PersonaDetectionResult {
+  const message = typeof input === 'string' ? input : input.message;
+  const history = typeof input === 'string' ? [] : (input.history || []);
+  const previousPersona = typeof input === 'string' ? undefined : input.previousPersona;
+  const previousConfidence = typeof input === 'string' ? 0 : (input.previousConfidence || 0);
+  const turnCount = typeof input === 'string' ? 0 : (input.turnCount || 0);
+
+  const recentHistory = history.slice(-3);
+  const text = (message + ' ' + recentHistory.join(' ')).toLowerCase();
+
+  for (const { persona, patterns, confidence, reasoning } of PERSONA_PATTERNS) {
+    if (patterns.test(text)) {
+      if (persona === previousPersona && confidence <= previousConfidence) {
+        return {
+          persona,
+          confidence: Math.min(confidence, previousConfidence + 0.05),
+          reasoning: `Reinforced: ${reasoning}`,
+        };
+      }
+      return { persona, confidence, reasoning };
+    }
   }
 
-  // 2. Enterprise
-  if (
-    /soc 2|soc2|saml|sso|hipaa|gdpr|procurement|msa|purchase order|net-30|net 30|vpc|data residency|security review|questionnaire|dedicated tam|sla|50,000|500,000/i.test(text)
-  ) {
-    return {
-      persona: 'enterprise',
-      confidence: 0.92,
-      reasoning: 'Detected enterprise security, compliance, or procurement criteria.'
-    };
-  }
-
-  // 3. Digital Agency
-  if (
-    /agency|white label|white-label|client|clients|reseller|reselling|sub-billing|partner program|affiliate|multi-tenant/i.test(text)
-  ) {
-    return {
-      persona: 'agency',
-      confidence: 0.88,
-      reasoning: 'Detected agency or reseller terms (white label, client accounts, affiliate).'
-    };
-  }
-
-  // 4. E-Commerce
-  if (
-    /shopify|woocommerce|cart|checkout|shipping|returns|refunds|sizing|store|orders|order tracking|black friday/i.test(text)
-  ) {
-    return {
-      persona: 'ecommerce',
-      confidence: 0.86,
-      reasoning: 'Detected e-commerce keywords (Shopify, cart, checkout, returns, store).'
-    };
-  }
-
-  // 5. Support Operations Manager
-  if (
-    /support team|support reps|csat|zendesk|intercom|freshdesk|ticket|tickets|deflection|resolution rate|agent burnout|handoff|human agent/i.test(text)
-  ) {
-    return {
-      persona: 'support_manager',
-      confidence: 0.87,
-      reasoning: 'Detected customer support operations terms (Zendesk, deflection, agent handoff).'
-    };
-  }
-
-  // 6. SaaS Startup / Founder
-  if (
-    /saas|founder|startup|mrr|arr|product hunt|seed|investor|pricing tiers|deflect|micro-saas|roi/i.test(text)
-  ) {
-    return {
-      persona: 'startup',
-      confidence: 0.84,
-      reasoning: 'Detected SaaS founder business metrics (SaaS, startup, MRR, ARR, ROI).'
-    };
-  }
-
-  // 7. Small Business
-  if (
-    /small business|bakery|plumber|local|my website|no code|wordpress|non-technical|solo|part-time/i.test(text)
-  ) {
-    return {
-      persona: 'small_business',
-      confidence: 0.82,
-      reasoning: 'Detected small business owner or local service provider terms.'
-    };
-  }
-
-  // 8. Existing Customer
-  if (
-    /my account|my dashboard|current plan|upgrade my|billing setting|login issue/i.test(text)
-  ) {
-    return {
-      persona: 'existing_customer',
-      confidence: 0.85,
-      reasoning: 'Detected active customer account or dashboard management.'
-    };
-  }
-
-  // Fallback to previous persona or unknown
   if (previousPersona && previousPersona !== 'unknown') {
-    return {
-      persona: previousPersona,
-      confidence: 0.6,
-      reasoning: 'Retained previous persona from session memory.'
-    };
+    const decayedConfidence = Math.max(0.15, previousConfidence - (turnCount > 5 ? 0.03 * (turnCount - 5) : 0));
+    if (decayedConfidence >= 0.3) {
+      return {
+        persona: previousPersona,
+        confidence: decayedConfidence,
+        reasoning: 'Retained previous persona (decaying).',
+      };
+    }
   }
 
   return {
     persona: 'unknown',
     confidence: 0.3,
-    reasoning: 'Insufficient persona keywords matched.'
+    reasoning: 'Insufficient persona keywords matched.',
   };
 }

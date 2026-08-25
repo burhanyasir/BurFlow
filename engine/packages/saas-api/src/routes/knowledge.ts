@@ -12,7 +12,7 @@ import {
 import { SourceType, ParsedDocument } from '@conversation-engine/knowledge-pipeline';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { validateId, validationError, validateRequiredString, LABEL_MAX } from '../middleware/validate';
-import { UnansweredQuestionRepository } from '@conversation-engine/saas-core';
+import { UnansweredQuestionRepository, BrandExtractor } from '@conversation-engine/saas-core';
 import Groq from 'groq-sdk';
 
 const logger = createLogger('saas-api:knowledge');
@@ -553,9 +553,35 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
           }
 
           const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
+
           try {
             const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
             const widgetConfigRepo = new WidgetConfigRepository(deps.db);
+
+            // Extract brand intelligence (primaryGoal, businessType, topOffers) from crawled content
+            let brandProfileUpdate: Record<string, unknown> | undefined;
+            try {
+              const brandExtractor = new BrandExtractor();
+              const sample = docs.slice(0, 8).map(d => d.content || '').join('\n').slice(0, 8000);
+              if (sample.length > 50) {
+                const intelligence = await brandExtractor.extract(sample);
+                const existingProfile = widgetConfigRepo.get(tenantId)?.businessProfile || {};
+                const existingConfidence = (existingProfile as any)._confidenceScore as number || 0;
+                if (intelligence.confidenceScore > existingConfidence) {
+                  brandProfileUpdate = {};
+                  if (intelligence.primaryGoal) brandProfileUpdate.primary_goal = intelligence.primaryGoal;
+                  if (intelligence.businessType) {
+                    brandProfileUpdate.businessType = intelligence.businessType;
+                    brandProfileUpdate.business_type = intelligence.businessType;
+                  }
+                  if (intelligence.topOffers?.length) brandProfileUpdate.top_offers = intelligence.topOffers;
+                  if (intelligence.brandTone) brandProfileUpdate.brandTone = intelligence.brandTone;
+                  brandProfileUpdate._confidenceScore = intelligence.confidenceScore;
+                }
+              }
+            } catch {
+              // brand extraction is best-effort
+            }
 
             // Derive business name and greeting from crawled content
             let companyNameUpdate: string | undefined;
@@ -566,7 +592,6 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
             }) || docs[0];
             if (homeDoc) {
               const titleText = homeDoc.title || '';
-              // Extract business name from title like "BrightSmile Dental — Your Trusted Family Dentist in Austin, TX"
               const dashMatch = titleText.match(/^(.+?)\s*[—–-]\s*(?:Your|The|A|Welcome)/i);
               if (dashMatch) {
                 companyNameUpdate = dashMatch[1].trim();
@@ -581,6 +606,10 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
             const updatePayload: any = { starterOptions };
             if (companyNameUpdate) updatePayload.companyName = companyNameUpdate;
             if (greetingUpdate) updatePayload.greeting = greetingUpdate;
+            if (brandProfileUpdate) {
+              const existing = widgetConfigRepo.get(tenantId)?.businessProfile || {};
+              updatePayload.businessProfile = { ...existing, ...brandProfileUpdate };
+            }
             widgetConfigRepo.upsert(tenantId, updatePayload);
           } catch { /* ignore — starterOptions are best-effort */ }
 

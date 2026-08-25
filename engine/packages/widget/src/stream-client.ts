@@ -52,7 +52,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
         options.onHumanTakeover?.();
       }
       if (options.onUiState) {
-        options.onUiState(data.uiState, data.cta);
+        options.onUiState(data.uiState, data.cta, data.suggestedOptions);
       }
       return;
     } catch (err: any) {
@@ -105,7 +105,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
               if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'ui_state':
-              if (options.onUiState) options.onUiState(event.uiState, event.cta);
+              if (options.onUiState) options.onUiState(event.uiState, event.cta, event.suggestedOptions);
               if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'error':

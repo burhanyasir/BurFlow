@@ -69,6 +69,7 @@ export interface StreamEvent {
   error?: string;
   uiState?: ConversationUIState;
   cta?: Record<string, unknown>;
+  suggestedOptions?: string[];
   humanTakeover?: boolean;
 }
 
@@ -82,7 +83,7 @@ export interface StreamClientOptions {
   onToken: (delta: string) => void;
   onDone: (finishReason: string) => void;
   onComplete: (fullContent: string, turnId: string) => void;
-  onUiState?: (uiState: ConversationUIState | undefined, cta?: Record<string, unknown>) => void;
+  onUiState?: (uiState: ConversationUIState | undefined, cta?: Record<string, unknown>, suggestedOptions?: string[]) => void;
   onHumanTakeover?: () => void;
   onError: (error: string) => void;
   signal?: AbortSignal;

@@ -28,10 +28,10 @@ const ROUTING_RULES: Array<{ condition: (mem: ConversationIntelligenceMemory, re
   { condition: (mem, result) => result.objection.category === 'enterprise_procurement', decision: 'enterprise_sales', label: 'Route to Enterprise Sales — procurement objection' },
   { condition: (mem, result) => result.objection.category === 'security' && (mem.persona === 'enterprise' || mem.persona === 'unknown'), decision: 'sdr', label: 'Route to SDR — security objection needs human conversation' },
   { condition: (mem, result) => result.escalation.shouldEscalate, decision: 'escalate', label: 'Route to escalation — sentiment escalation' },
-  { condition: (mem, result) => result.buyingIntent.hasBuyingIntent && (mem.funnelStage === 'purchase_intent' || mem.funnelStage === 'evaluation'), decision: 'sales', label: 'Route to Sales — high buying intent' },
-  { condition: (mem, result) => result.buyingIntent.targetTier === 'enterprise', decision: 'enterprise_sales', label: 'Route to Enterprise Sales — enterprise tier interest' },
+  { condition: (mem, result) => result.buyingIntent.hasBuyingIntent && result.buyingIntent.confidence >= 0.8 && (mem.funnelStage === 'purchase_intent' || mem.funnelStage === 'evaluation'), decision: 'sales', label: 'Route to Sales — high buying intent with high confidence' },
+  { condition: (mem, result) => result.buyingIntent.targetTier === 'enterprise' && result.buyingIntent.confidence >= 0.7, decision: 'enterprise_sales', label: 'Route to Enterprise Sales — enterprise tier interest' },
   { condition: (mem, result) => result.isFallback, decision: 'support', label: 'Route to Support — fallback response may need human help' },
-  { condition: (mem, result) => mem.turns.length >= 8 && result.leadScore.overallScore > 70, decision: 'sales', label: 'Route to Sales — high engagement after 8+ turns' },
+  { condition: (mem, result) => mem.turns.length >= 5 && result.leadScore.overallScore > 75, decision: 'sales', label: 'Route to Sales — high engagement and score' },
 ];
 
 function detectAbandonmentRisk(message: string, memory: ConversationIntelligenceMemory): AbandonmentRisk {
@@ -86,8 +86,18 @@ function detectSentiment(message: string, history: ConversationIntelligenceMemor
   urgency = Math.max(0, Math.min(1, urgency));
 
   if (history.length > 0) {
-    const avgHistoryPolarity = history.reduce((sum, t) => sum + t.polarity, 0) / history.length;
-    polarity = (polarity + avgHistoryPolarity) / 2;
+    const weights: number[] = [];
+    const polarities: number[] = [];
+    const now = Date.now();
+    for (const turn of history) {
+      const ageMinutes = Math.max(1, (now - turn.timestamp) / 60000);
+      const weight = 1 / Math.log2(ageMinutes + 2);
+      weights.push(weight);
+      polarities.push(turn.polarity);
+    }
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    const weightedHistoryPolarity = polarities.reduce((sum, p, i) => sum + p * weights[i], 0) / totalWeight;
+    polarity = polarity * 0.7 + weightedHistoryPolarity * 0.3;
   }
 
   return { polarity, frustration, urgency };
@@ -130,13 +140,13 @@ function detectRepetition(message: string, history: ConversationIntelligenceMemo
 function computeLeadScore(memory: ConversationIntelligenceMemory, result: { polarity: number; frustration: number; urgency: number }): number {
   let score = 20;
 
-  if (memory.buyingIntentDetected) score += 30;
+  if (memory.buyingIntentDetected) score += 25;
   if (memory.qualificationState.completed) score += 15;
-  if (memory.turns.length >= 3) score += 10;
+  if (memory.turns.length >= 3) score += 8;
   if (memory.turns.length >= 6) score += 5;
 
   const objectionHasPrice = memory.objections.includes('price');
-  if (objectionHasPrice) score += 10;
+  if (objectionHasPrice) score -= 5;
 
   const personaScores: Partial<Record<PersonaType, number>> = {
     enterprise: 15,
@@ -145,7 +155,7 @@ function computeLeadScore(memory: ConversationIntelligenceMemory, result: { pola
     small_business: 5,
     agency: 10,
     ecommerce: 8,
-    support_manager: 3,
+    support_manager: 5,
   };
   score += personaScores[memory.persona as keyof typeof personaScores] || 0;
 
@@ -185,7 +195,7 @@ function computeEscalation(sentiment: { frustration: number; polarity: number },
 
 function computeQualificationProgress(state: QualificationState): number {
   if (state.completed) return 100;
-  const progress = state.questionsAskedCount * 33;
+  const progress = state.questionsAskedCount * 25;
   return Math.min(progress, 90);
 }
 
@@ -216,7 +226,7 @@ function buildQuickReplies(stage: FunnelStage, abandonment: AbandonmentRisk, rep
   const replies: SmartButton[] = [];
 
   if (abandonment.level === 'high') {
-    replies.push({ id: 'qr_discount', label: '🔥 Special Offer', action: 'send_text', payload: 'Tell me about your current promotions', variant: 'primary' });
+    replies.push({ id: 'qr_human', label: '👋 Talk to a Human', action: 'send_text', payload: 'I would like to speak with a human agent', variant: 'primary' });
     replies.push({ id: 'qr_demo', label: '📅 Book a Quick Demo', action: 'navigate', payload: '/demo', variant: 'secondary' });
     return replies;
   }
@@ -241,12 +251,8 @@ function buildQuickReplies(stage: FunnelStage, abandonment: AbandonmentRisk, rep
   const hasObjSecurity = memory?.objections?.includes('security');
   const hasObjImplementation = memory?.objections?.includes('implementation');
   const hasObjCompetition = memory?.objections?.includes('competition');
-  const buyingIntentDetected = memory?.buyingIntentDetected ?? false;
-  const qualCompleted = memory?.qualificationState?.completed ?? false;
-  const qualProgress = memory?.qualificationState?.questionsAskedCount ?? 0;
   const persona = memory?.persona;
 
-  // Extract topics mentioned from turn history
   const mentionedTopics = new Set<string>();
   for (const t of memory?.turns ?? []) {
     const lower = t.message.toLowerCase();
@@ -260,7 +266,6 @@ function buildQuickReplies(stage: FunnelStage, abandonment: AbandonmentRisk, rep
     if (/(walkthrough|how.*work|pipeline|architecture|technical.*overview)/i.test(lower)) mentionedTopics.add('walkthrough');
   }
 
-  // Objection-specific follow-up suggestions
   if (hasObjPrice) {
     replies.push({ id: 'qr_obj_price_roi', label: '📈 ROI Breakdown', action: 'send_text', payload: 'Show me the ROI calculation', variant: 'secondary' });
     replies.push({ id: 'qr_obj_price_trial', label: '🚀 Try Free', action: 'navigate', payload: '/signup', variant: 'primary' });
@@ -282,14 +287,14 @@ function buildQuickReplies(stage: FunnelStage, abandonment: AbandonmentRisk, rep
     return replies.slice(0, 3);
   }
 
-  // Qualification contextual
+  const qualCompleted = memory?.qualificationState?.completed ?? false;
+  const qualProgress = memory?.qualificationState?.questionsAskedCount ?? 0;
   if (!qualCompleted && turnCount >= 2 && qualProgress < 2) {
     replies.push({ id: 'qr_qual_help', label: '🎯 Help Me Choose', action: 'send_text', payload: 'Help me find the right plan', variant: 'primary' });
     replies.push({ id: 'qr_qual_features', label: '⚙️ Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary' });
     return replies.slice(0, 3);
   }
 
-  // Stage-appropriate suggestions using history awareness
   switch (stage) {
     case 'greeting':
     case 'discovery':
@@ -339,6 +344,9 @@ export function processConversationIntelligence(input: IntelligenceInput): { res
 
   const sentiment = detectSentiment(message, memory.turns);
 
+  const repetition = detectRepetition(message, memory.turns);
+  const cumulativeRepetitionCount = memory.repeatedPhraseCount + repetition.count;
+
   const updatedMemory: ConversationIntelligenceMemory = {
     ...memory,
     persona: orchestratorResult.persona.persona,
@@ -350,13 +358,13 @@ export function processConversationIntelligence(input: IntelligenceInput): { res
       ? [...memory.objections, orchestratorResult.objection.category]
       : memory.objections,
     qualificationState: orchestratorResult.qualification,
+    repeatedPhraseCount: cumulativeRepetitionCount,
     turns: [...memory.turns, { message, response: responseText, polarity: sentiment.polarity, frustration: sentiment.frustration, urgency: sentiment.urgency, timestamp: Date.now() }],
   };
 
-  const repetition = detectRepetition(message, memory.turns);
   const updatedRepetition: RepetitionStatus = {
     ...repetition,
-    count: memory.repeatedPhraseCount + repetition.count,
+    count: cumulativeRepetitionCount,
   };
 
   const abandonment = detectAbandonmentRisk(message, updatedMemory);

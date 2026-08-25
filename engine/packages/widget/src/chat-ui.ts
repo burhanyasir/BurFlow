@@ -340,6 +340,7 @@ export class ChatWidget {
   private actionPanel: HTMLDivElement | null = null;
   private uiState: ConversationUIState | null = null;
   private cta: Record<string, unknown> | null = null;
+  private suggestedOptions: string[] = [];
   private unreadBadge: HTMLSpanElement | null = null;
   private preOpenPanelEl: HTMLDivElement | null = null;
   private configLoadPromise: Promise<void> | null = null;
@@ -1186,9 +1187,10 @@ export class ChatWidget {
         this.scrollToBottom();
       },
       onDone: () => {},
-      onUiState: (uiState, cta) => {
+      onUiState: (uiState, cta, suggestedOptions) => {
         this.uiState = uiState || null;
         this.cta = cta || null;
+        this.suggestedOptions = suggestedOptions || [];
         this.renderUiState();
       },
       onHumanTakeover: () => {
@@ -1329,8 +1331,9 @@ export class ChatWidget {
     const hasActiveCard = Boolean(this.uiState?.activeCard);
     const hasCta = Boolean(this.cta && typeof this.cta === 'object' && typeof (this.cta as Record<string, unknown>).label === 'string');
     const hasButtons = buttonGroup.length > 0;
+    const hasSuggestedOptions = this.suggestedOptions.length > 0;
 
-    if (!hasActiveCard && !hasButtons && !hasCta) {
+    if (!hasActiveCard && !hasButtons && !hasCta && !hasSuggestedOptions) {
       this.actionPanel.style.display = 'none';
       this.actionPanel.innerHTML = '';
       return;
@@ -1352,6 +1355,27 @@ export class ChatWidget {
         buttonContainer.appendChild(this.createActionButton(button));
       });
       this.actionPanel.appendChild(buttonContainer);
+    }
+
+    if (this.suggestedOptions.length > 0) {
+      const optContainer = document.createElement('div');
+      optContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;';
+      this.suggestedOptions.slice(0, 3).forEach((opt) => {
+        const chip = document.createElement('button');
+        chip.className = 'cw-suggested-option';
+        chip.textContent = opt;
+        chip.style.cssText = 'background:#f0f0f0;border:1px solid #d0d0d0;border-radius:16px;padding:6px 14px;font-size:12px;cursor:pointer;color:#333;white-space:nowrap;transition:background .15s;';
+        chip.addEventListener('mouseenter', () => { chip.style.background = '#e0e0e0'; });
+        chip.addEventListener('mouseleave', () => { chip.style.background = '#f0f0f0'; });
+        chip.addEventListener('click', () => {
+          if (this.isStreaming) return;
+          if (this.inputEl) this.inputEl.value = opt;
+          this.clearUiState();
+          this.send();
+        });
+        optContainer.appendChild(chip);
+      });
+      this.actionPanel.appendChild(optContainer);
     }
 
     if (hasCta) {
@@ -1483,6 +1507,7 @@ export class ChatWidget {
   private clearUiState(): void {
     this.uiState = null;
     this.cta = null;
+    this.suggestedOptions = [];
     if (this.actionPanel) {
       this.actionPanel.style.display = 'none';
       this.actionPanel.innerHTML = '';

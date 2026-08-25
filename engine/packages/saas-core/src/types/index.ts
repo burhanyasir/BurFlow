@@ -244,6 +244,9 @@ export interface BrandIntelligence {
   brandTone: string;
   primaryCtas: string[];
   confidenceScore: number;
+  primaryGoal?: string;
+  businessType?: string;
+  topOffers?: string[];
 }
 
 export interface WidgetConfig {

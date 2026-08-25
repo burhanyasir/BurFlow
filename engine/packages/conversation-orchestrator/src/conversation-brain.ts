@@ -106,11 +106,21 @@ function buildMinimalCIResult(memory: ConversationMemoryData, message: string): 
 }
 
 function updateTrustFromSentiment(memory: ConversationMemoryData, polarity: number): void {
-  if (polarity > 0.2) memory.trustLevel = 'high';
-  else if (polarity > 0) memory.trustLevel = 'medium';
-  else if (polarity < -0.3) memory.trustLevel = 'low';
-  else if (memory.turnCount > 4 && memory.trustLevel === 'medium') memory.trustLevel = 'high';
-  else if (memory.turnCount > 1 && memory.trustLevel === 'low') memory.trustLevel = 'medium';
+  if (polarity > 0.3) {
+    memory.trustLevel = 'high';
+  } else if (polarity > 0.05) {
+    if (memory.trustLevel === 'low') memory.trustLevel = 'medium';
+    else if (memory.trustLevel === 'medium' && memory.turnCount > 4) memory.trustLevel = 'high';
+    else if (memory.trustLevel !== 'high') memory.trustLevel = 'medium';
+  } else if (polarity < -0.3) {
+    memory.trustLevel = 'low';
+  } else if (polarity < 0 && memory.trustLevel === 'high') {
+    memory.trustLevel = 'medium';
+  } else if (memory.turnCount > 4 && memory.trustLevel === 'medium') {
+    memory.trustLevel = 'high';
+  } else if (memory.turnCount > 2 && memory.trustLevel === 'low' && memory.leadScore > 40) {
+    memory.trustLevel = 'medium';
+  }
 }
 
 function calculateCustomerTemperature(
@@ -316,6 +326,10 @@ export interface BrainInput {
 export interface TenantCtaProfile {
   /** Primary business goal, e.g. 'book_demo' | 'direct_checkout' | 'product_recommendation' | 'appointment_booking'. */
   primary_goal?: string;
+  /** Current promotions or offers to mention when relevant. */
+  top_offers?: string[];
+  /** Brand tone extracted from the business website. */
+  brandTone?: string;
   /** Funnel CTA override (label + link) used for buying-oriented turns. */
   cta?: { type?: string; label: string; link: string };
   /** Replacement button catalog for dynamic quick replies (store/clinic chips). */
@@ -345,6 +359,7 @@ export interface BrainOutput {
   cta: CTASelectionResult;
   quickReplies: SmartButton[];
   uiState: ConversationUIState;
+  suggestedOptions: string[];
   memory: ConversationMemoryData;
   legacyMemory: ConversationIntelligenceMemory;
   plan: {
@@ -635,11 +650,12 @@ const PERSONA_SPECIFIC_CTA: Partial<Record<PersonaType, { primary: CTAType; labe
 
 function inferPersonaFromMessage(message: string, memory: ConversationMemoryData): PersonaType {
   const lower = message.toLowerCase();
-  if (/(shopify|woocommerce|magento|cart|checkout|ecommerce|store)/i.test(lower)) return 'ecommerce';
-  if (/(zendesk|intercom|freshdesk|customer support|support manager|ticket deflection|help desk)/i.test(lower)) return 'support_manager';
-  if (/(startup|founder|co-founder|saas|early stage|seed)/i.test(lower)) return 'startup';
-  if (/(enterprise|procurement|sso|soc 2|tam|security questionnaire|vpc)/i.test(lower)) return 'enterprise';
-  if (/(developer|api|sdk|webhook|code|integration)/i.test(lower)) return 'developer';
+  if (/(shopify|woocommerce|magento|bigcommerce|cart|checkout|ecommerce|e-commerce|store|product catalog|inventory)/i.test(lower)) return 'ecommerce';
+  if (/(support team|support reps|csat|nps|zendesk|freshdesk|ticket.*volume|ticket.*deflect|resolution rate|agent burnout|help desk)/i.test(lower)) return 'support_manager';
+  if (/(startup|founder|co-founder|saas|early stage|seed|mrr|arr|product hunt)/i.test(lower)) return 'startup';
+  if (/(enterprise|procurement|sso|soc 2|soc2|tam|security questionnaire|vpc|hipaa|gdpr|msa|purchase order)/i.test(lower)) return 'enterprise';
+  if (/\b(api|sdk|webhook|rest endpoint|graphql|curl|endpoint|rate limit|cors|npm|github|gitlab|repo|typescript|python|node\.?js)\b/i.test(lower)) return 'developer';
+  if (/(small business|bakery|plumber|local business|my website|no code|wordpress|freelancer|solo)/i.test(lower)) return 'small_business';
   if (memory.persona !== 'unknown') return memory.persona;
   return 'unknown';
 }
@@ -1681,14 +1697,16 @@ function updateMemoryFromBrain(
     if (ciResult.qualification.completed) memory.qualificationCollected.completed = true;
   }
 
-  if (ciResult.sentiment.polarity > 0.2) memory.trustLevel = 'high';
-  else if (ciResult.sentiment.polarity > 0) {
-    if (memory.trustLevel !== 'high') memory.trustLevel = 'medium';
+  if (ciResult.sentiment.polarity > 0.3) memory.trustLevel = 'high';
+  else if (ciResult.sentiment.polarity > 0.05) {
+    if (memory.trustLevel === 'low') memory.trustLevel = 'medium';
+    else if (memory.trustLevel === 'medium' && memory.turnCount > 4) memory.trustLevel = 'high';
+    else if (memory.trustLevel !== 'high') memory.trustLevel = 'medium';
   }
   else if (ciResult.sentiment.polarity < -0.3) memory.trustLevel = 'low';
-  else if (memory.turnCount > 3 && memory.trustLevel === 'medium') memory.trustLevel = 'high';
-  else if (memory.turnCount > 1 && memory.trustLevel === 'low') memory.trustLevel = 'medium';
-  else if (memory.trustLevel === 'low' && memory.leadScore > 50) memory.trustLevel = 'medium';
+  else if (ciResult.sentiment.polarity < 0 && memory.trustLevel === 'high') memory.trustLevel = 'medium';
+  else if (memory.turnCount > 4 && memory.trustLevel === 'medium') memory.trustLevel = 'high';
+  else if (memory.turnCount > 2 && memory.trustLevel === 'low' && memory.leadScore > 40) memory.trustLevel = 'medium';
 
   if (!memory.isLeaving && plan.customerIntent === 'leaving') {
     memory.isLeaving = true;
@@ -2152,6 +2170,7 @@ async function processConversationBrainInner(input: BrainInput): Promise<BrainOu
         ciResult,
         orchestratorResult: ciResult as any,
         extractedLead: extractLeadDetails(message),
+        suggestedOptions: [],
       };
     }
   }
@@ -2191,6 +2210,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
         extractedLead: extractLeadDetails(message),
+        suggestedOptions: [],
       };
     }
   }
@@ -2246,6 +2266,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       memory, legacyMemory: updatedLegacy, plan: { customerIntent: sIntent, funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
       validation: sValidation, ciResult, orchestratorResult: ciResult as any, acknowledgment: sAck,
       extractedLead: extractLeadDetails(message),
+      suggestedOptions: [],
     };
   }
 
@@ -2280,6 +2301,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'small_talk', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
         validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
         extractedLead: extractLeadDetails(message),
+        suggestedOptions: [],
       };
     }
   }
@@ -2313,6 +2335,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       responseText: ending.response, cta: eCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
       memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
       validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+      suggestedOptions: [],
     };
   }
 
@@ -2341,6 +2364,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       responseText: offTopicRedirect, cta: oCta, quickReplies: [], uiState: { buttons: [], suggestedActions: [] },
       memory, legacyMemory: updatedLegacy, plan: { customerIntent: 'off_topic', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'none', topicsToDiscuss: [], missingQualification: [] },
       validation: { valid: true, issues: [] }, ciResult, orchestratorResult: ciResult as any,
+      suggestedOptions: [],
     };
   }
 
@@ -2379,6 +2403,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
   let llmCtaHint: CTAType | null = null;
   let llmFunnelHint: string | null = null;
   const llmSuggestedTopics: string[] = [];
+  const llmSuggestedOptions: string[] = [];
   // True when this turn's reply came from the heuristic template engine instead of
   // the LLM (upstream failure, unparseable output, or no LLM key configured). This
   // is the signal downstream consumers use to record knowledge-base gaps.
@@ -2440,19 +2465,37 @@ buyingIntentDetected: memory.buyingIntentDetected,
       }
       messages.push({ role: 'user', content: normalizeMessageContent(message) });
 
-      const systemPrompt = `You are a helpful assistant for a real business. Answer visitor questions using ONLY the business knowledge below.
+      const businessProfile = (input as any).businessProfile as TenantCtaProfile | undefined;
+      const businessGoalLabel = businessProfile?.primary_goal || '';
+      const businessGoalHint = businessGoalLabel
+        ? `The business's primary conversion goal is "${businessGoalLabel}". When natural, guide the conversation toward this goal.`
+        : '';
+      const topOffers = (businessProfile as any)?.top_offers as string[] | undefined;
+      const topOffersHint = topOffers?.length
+        ? `Current promotions/offers: ${topOffers.join('; ')}. Mention these when relevant to the visitor's interest.`
+        : '';
+
+      const systemPrompt = `You are a helpful assistant for a real business. You speak on behalf of this specific business — adopt its tone and persona naturally.
+Answer visitor questions using ONLY the factual business knowledge provided below.
 Be concise (under 100 words), conversational, and genuinely helpful.
-Never invent pricing, features, or policies not listed below.
-If you don't know something, say so honestly and offer to connect them with someone who can help.
+Never invent pricing, features, policies, services, or any information not explicitly listed below.
+If you don't know something, say so honestly and immediately pivot to lead capture: offer to connect them with the team.
 
 CRITICAL RULES:
 1. Answer the question directly first. No filler openers like "For teams, this is especially relevant."
-2. Do not repeat filler phrases like "For small business teams..." and do not repeat questions that were already asked in previous turns of this conversation — vary your wording and only ask something new.
-3. Be concise, direct, and natural. Do not repeat greeting phrases, boilerplate intro lines, or questions that were already asked in previous turns.
-4. Use the specific business information below — don't give generic answers.
-5. If the visitor asks about pricing, services, or products, reference the actual business details provided.
-6. Only suggest booking a demo or contacting sales if the visitor explicitly asks for it.
+2. Do not repeat filler phrases. Vary your wording across turns.
+3. Be concise, direct, and natural. Never repeat questions already asked.
+4. Use ONLY the specific business information below — never give generic answers.
+5. If the visitor asks about pricing, services, or products, reference only the actual business details provided.
+6. Only suggest booking a demo or contacting sales if the visitor explicitly asks or the business goal calls for it.
 7. Be warm and helpful, not pushy.
+${businessGoalHint}
+${topOffersHint}
+
+KNOWLEDGE CONSTRAINT:
+If the visitor's question cannot be answered from the business knowledge below, respond with:
+"I want to make sure I give you an accurate answer — let me have our team confirm that for you directly. What is the best email or phone number to reach you?"
+This pivots unknown questions to lead capture. Never guess or fabricate information.
 
 LEAD CAPTURE:
 If the visitor shares contact details or company info in this message (email, phone, their name, or company), also include an "extractedLead" object with the fields email, phone, name, company (leave null when not provided). Never invent contact details.
@@ -2465,14 +2508,15 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
   "responseText": "your response to the visitor",
   "strategy": "one or two words describing your conversational strategy, e.g. educate, qualify, handle_objection, advance_funnel, recommend_plan, close_trial, schedule_demo, build_trust",
   "suggestedTopics": ["1-3 follow-up topics the visitor might care about next"],
+  "suggestedOptions": ["2-3 short clickable follow-up options the visitor might want to ask next, tailored to THIS business and the current conversation. Each is 2-6 words. Examples: 'Book an Appointment', 'Check Insurance Coverage', 'See Pricing Plans', 'Compare Features', 'Talk to Sales', 'Emergency Care Info'"],
   "ctaType": "one of: none, book_demo, start_free_trial, contact_sales, pricing, support",
   "funnelStage": "one of: greeting, awareness, interest, consideration, evaluation, purchase_intent, decision, customer, support"
 }`;
 
       const text = await callLLMWithFallback(systemPrompt, messages);
       const parsed = parseLLMResponse(text);
-      if (parsed) {
-        enrichedResponse = parsed.responseText || "I need a moment — could you tell me a bit more about what you're looking for?";
+      if (parsed && parsed.responseText && parsed.responseText.trim().length > 0) {
+        enrichedResponse = parsed.responseText;
         structuredLeadFields = parseStructuredLeadFields(parsed);
 
         // Apply structured hints from the LLM (validated against known enums)
@@ -2487,6 +2531,13 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
           for (const topic of parsed.suggestedTopics.slice(0, 5)) {
             if (typeof topic === 'string' && topic.trim() && !llmSuggestedTopics.includes(topic.trim())) {
               llmSuggestedTopics.push(topic.trim());
+            }
+          }
+        }
+        if (Array.isArray(parsed.suggestedOptions)) {
+          for (const opt of parsed.suggestedOptions.slice(0, 3)) {
+            if (typeof opt === 'string' && opt.trim().length > 0 && opt.trim().length <= 40) {
+              llmSuggestedOptions.push(opt.trim());
             }
           }
         }
@@ -2752,6 +2803,7 @@ funnelStage: ciResult.funnelStage,
     decisionTrace,
     debugPanel: buildDebugPanel(memory, plan, ciResult, quickReplies, nextBestAction, momentum),
     extractedLead: mergeLeadFields(extractLeadDetails(message), structuredLeadFields),
+    suggestedOptions: llmSuggestedOptions,
   };
 }
 
@@ -2807,6 +2859,7 @@ function buildTimeoutFallback(input: BrainInput): BrainOutput {
     ciResult,
     orchestratorResult: ciResult as any,
     extractedLead: extractLeadDetails(input.message),
+    suggestedOptions: [],
   };
 }
 

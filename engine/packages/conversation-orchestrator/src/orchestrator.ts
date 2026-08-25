@@ -31,7 +31,13 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
   const routing = routeQuery(message);
 
   // 2. Persona Detection
-  const persona = detectPersona(message, history, sessionMemory?.persona);
+  const persona = detectPersona({
+    message,
+    history,
+    previousPersona: sessionMemory?.persona,
+    previousConfidence: (sessionMemory as any)?.personaConfidence ?? 0.5,
+    turnCount: history.length,
+  });
 
   // 3. Buying Intent Detection
   const buyingIntent = detectBuyingIntent(message);
@@ -72,7 +78,11 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
   }
 
   // 9. CTA Selection
-  const cta = selectCTA(persona.persona, funnelStage, buyingIntent);
+  const cta = selectCTA({
+    persona: persona.persona,
+    stage: funnelStage,
+    buyingIntent,
+  });
 
   // 10. Conversation UI Engine (Buttons, Suggestions, Cards)
   const uiState = generateConversationUI(persona.persona, funnelStage, buyingIntent, objection, history, message);
