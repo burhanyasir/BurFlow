@@ -440,12 +440,12 @@ export class ConversationRepository {
 export class MessageRepository {
   constructor(private db: SqlDatabase) {}
 
-  create(data: { conversationId: string; tenantId: string; role: Message['role']; content: string; sequenceNumber: number; tokenCount?: number; latencyMs?: number; safetyFlags?: string[]; sender?: 'agent' | 'bot' }): Message {
+  create(data: { conversationId: string; tenantId: string; role: Message['role']; content: string; sequenceNumber: number; tokenCount?: number; latencyMs?: number; safetyFlags?: string[]; sender?: 'agent' | 'bot'; idempotencyKey?: string }): Message {
     const id = generateId();
     const now = new Date().toISOString();
     this.db.prepare(
-      'INSERT INTO messages (id, conversation_id, tenant_id, role, content, sequence_number, token_count, latency_ms, safety_flags, sender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(id, data.conversationId, data.tenantId, data.role, data.content, data.sequenceNumber, data.tokenCount || null, data.latencyMs || null, data.safetyFlags ? JSON.stringify(data.safetyFlags) : null, data.sender || null, now);
+      'INSERT INTO messages (id, conversation_id, tenant_id, role, content, sequence_number, token_count, latency_ms, safety_flags, sender, idempotency_key, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.conversationId, data.tenantId, data.role, data.content, data.sequenceNumber, data.tokenCount || null, data.latencyMs || null, data.safetyFlags ? JSON.stringify(data.safetyFlags) : null, data.sender || null, data.idempotencyKey || null, now);
     return this.findById(id)!;
   }
 

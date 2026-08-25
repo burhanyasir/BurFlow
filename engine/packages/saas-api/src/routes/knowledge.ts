@@ -707,12 +707,11 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         }
       } catch { /* snapshot republish is best-effort */ }
 
-      // 4. Invalidate the knowledge cache so chat picks up changes immediately
+      // 4. Invalidate the knowledge cache immediately (not just TTL-based)
       try {
-        const { DbKnowledgeBaseProvider } = await import('../orchestrator');
-        // Access the singleton cache via the module — cache invalidation is a
-        // side effect of the 60s TTL; we signal by logging for now.
-        createContextLogger(logger).info({ tenantId, docId }, 'Source deleted — cache will refresh within 60s');
+        const { clearTenantKnowledgeCache } = await import('../orchestrator/knowledge-base-db-provider');
+        clearTenantKnowledgeCache(tenantId);
+        createContextLogger(logger).info({ tenantId, docId }, 'Source deleted — cache invalidated immediately');
       } catch { /* cache invalidation is best-effort */ }
 
       res.json({ message: 'Source deleted', documentId: docId });

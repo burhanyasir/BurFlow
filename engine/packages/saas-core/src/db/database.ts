@@ -936,4 +936,7 @@ function migrate(db: Database.Database): void {
   try { db.exec(`ALTER TABLE usage_records ADD COLUMN cost_usd REAL DEFAULT 0;`); } catch {}
   try { db.exec(`ALTER TABLE messages ADD COLUMN tokens_used INTEGER DEFAULT 0;`); } catch {}
   try { db.exec(`ALTER TABLE messages ADD COLUMN cost_usd REAL DEFAULT 0;`); } catch {}
+  // S1: Idempotency — prevent duplicate messages from retries
+  try { db.exec(`ALTER TABLE messages ADD COLUMN idempotency_key TEXT;`); } catch {}
+  try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages(conversation_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`); } catch {}
 }

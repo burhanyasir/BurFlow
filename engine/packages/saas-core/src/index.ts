@@ -46,6 +46,7 @@ export { AnalyticsService } from './services/analytics';
 export {
   WebsiteScannerService, computeNextScanAt, hashContent, cleanHtml,
   chunkText, extractLinks, isSameOrigin, validateRootUrl, extractTitle,
+  sanitizeCrawledContent,
 } from './services/website-scanner';
 export type {
   CrawlPage, ScannerOptions, ScanStartOptions, ScannerDeps,

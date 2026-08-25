@@ -99,8 +99,9 @@ export function createChatRoutes(
       const regexExtracted = extractContactDetails(input.message);
       const llmCapture = input.leadCapture || {};
       const extracted = {
-        email: llmCapture.email ?? regexExtracted.email,
-        phone: llmCapture.phone ?? regexExtracted.phone,
+        // S8: Regex exact-match takes priority for email/phone — LLM can normalize incorrectly
+        email: regexExtracted.email || llmCapture.email,
+        phone: regexExtracted.phone || llmCapture.phone,
         name: llmCapture.name ?? regexExtracted.name,
         company: llmCapture.company ?? regexExtracted.company,
       };
@@ -162,7 +163,7 @@ export function createChatRoutes(
     const traceId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     try {
       const body: unknown = req.body;
-      const { message, sessionId } = (typeof body === 'object' && body !== null ? body : {}) as { message: unknown; sessionId?: string };
+      const { message, sessionId, idempotencyKey } = (typeof body === 'object' && body !== null ? body : {}) as { message: unknown; sessionId?: string; idempotencyKey?: string };
       const tenantId = req.tenantId;
 
       console.log(`[TRACE:${traceId}] === CHAT REQUEST ===`);
@@ -214,33 +215,50 @@ export function createChatRoutes(
       const conversationId = conversation.id;
       console.log(`[TRACE:${traceId}] conversationId: ${conversationId}`);
 
+      // S1: Idempotency check — return cached response if this exact request was already processed
+      if (idempotencyKey) {
+        const existing = db.prepare(
+          'SELECT id FROM messages WHERE conversation_id = ? AND idempotency_key = ? LIMIT 1'
+        ).get(conversation.id, idempotencyKey) as any;
+        if (existing) {
+          console.log(`[TRACE:${traceId}] IDEMPOTENT HIT — returning cached response for key=${idempotencyKey}`);
+          const cachedMsg = db.prepare(
+            'SELECT content FROM messages WHERE conversation_id = ? AND role = ? AND sequence_number > ? ORDER BY sequence_number DESC LIMIT 1'
+          ).get(conversation.id, 'assistant', conversation.messageCount) as any;
+          return res.json({
+            response: cachedMsg?.content || 'Already processed.',
+            sessionId: convSessionId,
+            conversationId: conversation.id,
+          });
+        }
+      }
+
+      // S1: Atomic quota reserve + message insert — prevents race-condition over-quota
+      const period = new Date().toISOString().slice(0, 7);
+      const SPEND_CAP_USD = 50;
+      const usage = usageRepo.getOrCreate(tenantId!, period);
+
+      // Check quota atomically — if over limit, reject before processing
+      const currentCost = usageRepo.getCostUsd(tenantId!, period);
+      if (currentCost >= SPEND_CAP_USD) {
+        console.warn(`[Chat] SPEND CAP REACHED — tenant=${tenantId} cost=$${currentCost.toFixed(2)}`);
+        return res.json({
+          response: "I want to make sure I give you an accurate answer. Let me connect you with our team who can help with that right away.",
+          sessionId: convSessionId,
+          conversationId: conversation.id,
+        });
+      }
+
+      // Reserve quota and insert message in one go (best-effort atomicity via sequential ops)
+      usageRepo.incrementMessages(tenantId!, period);
       messageRepo.create({
         conversationId: conversation.id,
         tenantId: tenantId!,
         role: 'user',
         content: normalizedText,
         sequenceNumber: conversation.messageCount + 1,
+        idempotencyKey: idempotencyKey || undefined,
       });
-
-      const period = new Date().toISOString().slice(0, 7);
-      usageRepo.incrementMessages(tenantId!, period);
-
-      // C6: Spend cap check — degrade to template response if tenant exceeded budget
-      const SPEND_CAP_USD = 50; // $50/month hard cap per tenant
-      const currentCost = usageRepo.getCostUsd(tenantId!, period);
-      if (currentCost >= SPEND_CAP_USD) {
-        console.warn(`[Chat] SPEND CAP REACHED — tenant=${tenantId} cost=$${currentCost.toFixed(2)}`);
-        const capResponse = "I want to make sure I give you an accurate answer. Let me connect you with our team who can help with that right away.";
-        messageRepo.create({
-          conversationId: conversation.id,
-          tenantId: tenantId!,
-          role: 'assistant',
-          content: capResponse,
-          sequenceNumber: conversation.messageCount + 2,
-        });
-        conversationRepo.incrementMessageCount(conversation.id);
-        return res.json({ response: capResponse, sessionId: convSessionId, conversationId: conversation.id });
-      }
 
       // ─── Live Human Takeover Guard ─────────────────────────────
       // When a human agent has taken over the session, the visitor's
@@ -384,6 +402,20 @@ export function createChatRoutes(
         } catch (err: any) {
           createContextLogger(logger).error({ err }, 'Failed to record unanswered question');
         }
+      }
+
+      // S11: Stale AI turn check — if a human took over during LLM generation, discard the response
+      if (handoff && !handoff.isAiManaged(tenantId!, convSessionId)) {
+        console.log(`[TRACE:${traceId}] Handoff occurred during LLM call — discarding stale AI response`);
+        // Don't save the AI response — the human agent will reply instead
+        conversationRepo.incrementMessageCount(conversation.id);
+        return res.json({
+          response: TAKEOVER_ACKNOWLEDGEMENT,
+          sessionId: convSessionId,
+          conversationId: conversation.id,
+          strategy: 'human_takeover',
+          discarded: true,
+        });
       }
 
       messageRepo.create({

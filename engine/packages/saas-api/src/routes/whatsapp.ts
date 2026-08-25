@@ -120,8 +120,9 @@ export function createWhatsAppRoutes(options: WhatsAppRouteOptions): Router {
       const regexExtracted = extractContactDetails(input.message);
       const llmCapture = input.leadCapture || {};
       const extracted = {
-        email: llmCapture.email ?? regexExtracted.email,
-        phone: llmCapture.phone ?? regexExtracted.phone,
+        // S8: Regex exact-match takes priority for email/phone
+        email: regexExtracted.email || llmCapture.email,
+        phone: regexExtracted.phone || llmCapture.phone,
         name: llmCapture.name ?? regexExtracted.name,
         company: llmCapture.company ?? regexExtracted.company,
       };

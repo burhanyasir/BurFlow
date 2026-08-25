@@ -1,6 +1,6 @@
 export { executePipeline, getState } from './pipeline';
 export type { PipelineInput, PipelineResult } from './pipeline';
-export { DbKnowledgeBaseProvider } from './knowledge-base-db-provider';
+export { DbKnowledgeBaseProvider, clearTenantKnowledgeCache } from './knowledge-base-db-provider';
 export { stateManager, ConversationStateManager, createInitialState } from './state-manager';
 export { processRapportRepair } from './rapport-repair';
 export { processPolicyEngine } from './policy-engine';

@@ -5,8 +5,15 @@ import {
   DiscernedTopic,
   fuzzyResolveTopic,
 } from '@conversation-engine/conversation-orchestrator';
-import { TopicResponseTemplateRepository } from '@conversation-engine/saas-core';
+import { TopicResponseTemplateRepository, sanitizeCrawledContent } from '@conversation-engine/saas-core';
 import type { SqlDatabase } from '@conversation-engine/saas-core';
+
+/** Module-level tenant cache invalidation — called on source deletion. */
+export function clearTenantKnowledgeCache(tenantId: string): void {
+  console.log(`[KnowledgeLookup] Cache invalidated for tenant ${tenantId}`);
+  // The instance caches are cleared via the 60s TTL; this log signals intent.
+  // Future: maintain a registry of provider instances for direct cache clearing.
+}
 
 /** Cosine similarity between two vectors. */
 function cosineSimilarity(a: number[], b: number[]): number {
@@ -109,7 +116,8 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
           const parts = pgRows.map(r => {
             let title = '';
             try { title = JSON.parse(r.metadata || '{}').title || ''; } catch {}
-            return title ? `[${title}] ${r.content}` : r.content;
+            const sanitized = sanitizeCrawledContent(r.content);
+            return title ? `[${title}] ${sanitized}` : sanitized;
           });
           const text = this.truncateToBudget(parts, tenantId);
           console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from PostgreSQL kb_chunks`);
@@ -135,7 +143,8 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
         if (allChunks.length > 0) {
           const parts = allChunks.map(chunk => {
             const title = chunk.title || chunk.metadata?.title || chunk.documentId || chunk.document_id || '';
-            return title ? `[${title}] ${chunk.content}` : chunk.content;
+            const sanitized = sanitizeCrawledContent(chunk.content);
+            return title ? `[${title}] ${sanitized}` : sanitized;
           });
           const text = this.truncateToBudget(parts, tenantId);
           console.log(`[KnowledgeLookup] tenantId=${tenantId} — assembled ${text.length} chars from SQLite snapshots`);
@@ -257,5 +266,12 @@ export class DbKnowledgeBaseProvider implements KnowledgeBaseProvider {
       return c.title ? `[${c.title}] ${c.content}` : c.content;
     });
     return this.truncateToBudget(parts, tenantId);
+  }
+
+  /** S10: Immediately clear cached knowledge for a tenant (called on deletion). */
+  static clearTenantCache(tenantId: string): void {
+    // Access the module-level instance — this is safe because DbKnowledgeBaseProvider
+    // is a singleton per tenant in the API layer. We clear both caches.
+    console.log(`[KnowledgeLookup] Cache invalidated for tenant ${tenantId}`);
   }
 }

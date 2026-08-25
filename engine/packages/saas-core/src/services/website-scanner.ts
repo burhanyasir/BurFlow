@@ -50,6 +50,34 @@ const TITLE_PATTERN = /<title[^>]*>([^<]+)<\/title>/i;
 const HEADING_PATTERN = /<h1[^>]*>([^<]+)<\/h1>/i;
 const MULTI_WHITESPACE = /\s+/g;
 
+// S4: Prompt-injection patterns — strip or neutralize during ingestion
+const INJECTION_PATTERNS = [
+  /ignore\s+(all\s+)?(previous|prior|above|earlier)\s+(instructions?|prompts?|rules?|guidelines?)/gi,
+  /you\s+are\s+now\s+(a|an|the)\s+/gi,
+  /system\s*:\s*/gi,
+  /\[INST\]/gi,
+  /<\/?s>/gi,
+  /<<SYS>>/gi,
+  /<\|im_start\|>/gi,
+  /<\|im_end\|>/gi,
+  /###\s*(system|assistant|user)\s*:/gi,
+  /act\s+as\s+if\s+you\s+(have|are|were)/gi,
+  /disregard\s+(all\s+)?(previous|prior|your)\s+/gi,
+  /override\s+(your\s+)?(instructions?|programming|rules?)/gi,
+  /new\s+instructions?\s*:/gi,
+  /IMPORTANT\s*:\s*you\s+must/gi,
+  /from\s+now\s+on\s+you\s+will/gi,
+];
+
+/** Strip or neutralize prompt-injection patterns from crawled text. */
+export function sanitizeCrawledContent(text: string): string {
+  let sanitized = text;
+  for (const pattern of INJECTION_PATTERNS) {
+    sanitized = sanitized.replace(pattern, '[REDACTED]');
+  }
+  return sanitized;
+}
+
 export function computeNextScanAt(schedule: ScanSchedule, from = new Date()): string | undefined {
   if (schedule === 'manual') return undefined;
   const next = new Date(from.getTime());
@@ -107,12 +135,31 @@ export function isSameOrigin(url: URL, root: URL): boolean {
 
 export function isPrivateHost(hostname: string): boolean {
   const lower = hostname.toLowerCase();
-  if (lower === 'localhost' || lower === '127.0.0.1' || lower === '::1') return true;
+  // Loopback
+  if (lower === 'localhost' || lower === '127.0.0.1' || lower === '::1' || lower === '0.0.0.0') return true;
+  // .local / .localhost
   if (lower.endsWith('.local') || lower.endsWith('.localhost')) return true;
+  // RFC 1918 private ranges
   if (/^10\./.test(lower)) return true;
   if (/^192\.168\./.test(lower)) return true;
   if (/^172\.(1[6-9]|2\d|3[01])\./.test(lower)) return true;
-  if (/^169\.254\./.test(lower)) return true;
+  // S5: Link-local, metadata, carrier-grade NAT, IPv6 special ranges
+  if (/^169\.254\./.test(lower)) return true; // link-local (AWS metadata, etc.)
+  if (/^100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(lower)) return true; // carrier-grade NAT (100.64.0.0/10)
+  if (/^198\.51\.100\./.test(lower)) return true; // documentation range
+  if (/^203\.0\.113\./.test(lower)) return true; // documentation range
+  if (/^233\.252\.0\./.test(lower)) return true; // documentation range
+  // IPv6 special addresses
+  if (lower === '[::]' || lower === '[::0]') return true;
+  if (/^\[fc[0-9a-f]{2}:/i.test(lower)) return true; // ULA
+  if (/^\[fd[0-9a-f]{2}:/i.test(lower)) return true; // ULA
+  if (/^\[fe[89ab]/i.test(lower)) return true; // link-local
+  if (/^\[2001:db8:/i.test(lower)) return true; // documentation
+  // IPv4-mapped IPv6
+  if (/^\[::ffff:(0?\.)?127\./.test(lower)) return true;
+  if (/^\[::ffff:(0?\.)?10\./.test(lower)) return true;
+  if (/^\[::ffff:(0?\.)?192\.168\./.test(lower)) return true;
+  if (/^\[::ffff:(0?\.)?172\.(1[6-9]|2\d|3[01])\./.test(lower)) return true;
   return false;
 }
 
@@ -336,19 +383,68 @@ export class WebsiteScannerService {
     url: string,
     timeoutMs: number,
   ): Promise<string | null> {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetchImpl(url, { signal: controller.signal, redirect: 'follow' });
-      if (!res.ok) return null;
-      const type = res.headers && typeof res.headers.get === 'function' ? res.headers.get('content-type') : '';
-      if (type && !type.includes('text/html') && !type.includes('application/xhtml')) return null;
-      return res.text();
-    } catch {
-      return null;
-    } finally {
-      clearTimeout(timer);
+    const MAX_REDIRECTS = 5;
+    const MAX_RESPONSE_BYTES = 5 * 1024 * 1024; // 5MB
+    let currentUrl = url;
+    const visitedUrls = new Set<string>();
+
+    for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
+      // S5: Validate each redirect target — block private/metadata hosts
+      try {
+        const parsed = new URL(currentUrl);
+        if (isPrivateHost(parsed.hostname)) {
+          console.warn(`[Scanner] SSRF BLOCKED — redirect to private host: ${currentUrl}`);
+          return null;
+        }
+      } catch {
+        return null;
+      }
+
+      if (visitedUrls.has(currentUrl)) {
+        console.warn(`[Scanner] SSRF BLOCKED — redirect loop detected: ${currentUrl}`);
+        return null;
+      }
+      visitedUrls.add(currentUrl);
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        // S5: Manual redirect handling to re-validate each target
+        const res = await fetchImpl(currentUrl, {
+          signal: controller.signal,
+          redirect: 'manual', // Handle redirects ourselves
+        });
+
+        // Follow redirects manually
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers.get('location');
+          if (!location) return null;
+          try {
+            currentUrl = new URL(location, currentUrl).toString();
+          } catch {
+            return null;
+          }
+          continue;
+        }
+
+        if (!res.ok) return null;
+        const type = res.headers && typeof res.headers.get === 'function' ? res.headers.get('content-type') : '';
+        if (type && !type.includes('text/html') && !type.includes('application/xhtml')) return null;
+
+        // S5: Enforce response size limit
+        const text = await res.text();
+        if (text.length > MAX_RESPONSE_BYTES) {
+          console.warn(`[Scanner] Response too large (${text.length} bytes) for ${currentUrl}`);
+          return text.slice(0, MAX_RESPONSE_BYTES);
+        }
+        return text;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(timer);
+      }
     }
+    return null;
   }
 
   diffAgainstBaseline(tenantId: string, crawled: CrawlPage[]): Map<string, ScannedPageStatus> {
