@@ -84,17 +84,17 @@ const compare = [
 ];
 
 const plans = [
-  { name: 'Free', price: '$0', note: 'Try it on one site', f: ['100 messages / mo', '1 site scan', 'Community support'], cta: 'Get started' },
-  { name: 'Starter', price: '$49', note: 'For growing sites', f: ['1,000 messages / mo', '3 site scans', 'Email support'], cta: 'Start free' },
+  { name: 'Free', price: '$0', note: 'Try it on one site', f: ['100 conversations / mo', '5 documents', '1 knowledge base', '1 team member'], cta: 'Get started' },
+  { name: 'Starter', price: '$29', note: 'For growing sites', f: ['3,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members'], cta: 'Start free' },
   {
-    name: 'Professional',
-    price: '$99',
+    name: 'Pro',
+    price: '$49',
     note: 'Most teams land here',
-    f: ['10,000 messages / mo', 'Unlimited scans', 'Priority support'],
+    f: ['10,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members'],
     cta: 'Start free',
     popular: true,
   },
-  { name: 'Enterprise', price: 'Custom', note: 'Security & scale', f: ['Unlimited usage', 'SSO + SLA', 'Dedicated onboarding'], cta: 'Talk to sales' },
+  { name: 'Advanced', price: '$99', note: 'Security & scale', f: ['25,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members'], cta: 'Contact sales' },
 ];
 
 const faqs = [

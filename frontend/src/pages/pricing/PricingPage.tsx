@@ -8,10 +8,10 @@ import { SITE_URL } from '../../lib/site';
 import { storage } from '../../lib/storage';
 
 const monthlyTiers: PricingTier[] = [
-  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '1 Knowledge Base', '10 Documents', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
-  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
-  { name: 'Pro', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['5,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], cta: 'Start Free Trial', ctaVariant: 'primary' },
-  { name: 'Advanced', price: '$120', period: '/ mo', variant: 'enterprise', features: ['50,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], cta: 'Contact Sales', ctaVariant: 'primary' }
+  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '5 documents', '1 knowledge base', '1 team member'], cta: 'Get Started', ctaVariant: 'ghost' },
+  { name: 'Starter', price: '$29', period: '/ mo', variant: 'starter', features: ['3,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members', 'Email support'], cta: 'Start Free Trial', ctaVariant: 'secondary' },
+  { name: 'Pro', price: '$49', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Custom branding', 'Priority support'], cta: 'Start Free Trial', ctaVariant: 'primary' },
+  { name: 'Advanced', price: '$99', period: '/ mo', variant: 'enterprise', features: ['25,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members', 'White-label branding', 'Dedicated support', 'SSO & SLA'], cta: 'Contact Sales', ctaVariant: 'primary' }
 ];
 
 const annualTiers: PricingTier[] = monthlyTiers.map(t => {

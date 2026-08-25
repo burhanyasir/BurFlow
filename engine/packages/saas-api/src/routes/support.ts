@@ -281,6 +281,16 @@ export function createSupportRoutes(
 
       const now = new Date().toISOString();
 
+      // Mark conversation as human_requested so agent inbox picks it up
+      try {
+        const conv = conversationRepo.findBySession(tenantId, sessionId);
+        if (conv) {
+          conversationRepo.updateStatus(conv.id, 'human_requested');
+        }
+      } catch {
+        // non-critical — ticket creation is the primary path
+      }
+
       // Create a support ticket so owner sees it in inbox
       const ticketId = generateId();
       db.prepare(

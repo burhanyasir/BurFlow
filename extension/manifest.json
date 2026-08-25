@@ -1,0 +1,59 @@
+{
+  "manifest_version": 3,
+  "name": "BurFlow - Google & Maps Lead Generator",
+  "version": "1.0.0",
+  "description": "Extract business leads from Google Search and Google Maps with contact info, ratings, and export to CSV/Excel.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.google.com/search*",
+        "https://google.com/search*",
+        "https://www.google.com/maps*",
+        "https://maps.google.com/maps*",
+        "https://www.google.co.uk/search*",
+        "https://www.google.ca/search*",
+        "https://www.google.com.au/search*",
+        "https://www.google.de/search*",
+        "https://www.google.fr/search*",
+        "https://www.google.pk/search*",
+        "https://www.google.co.in/search*",
+        "https://www.google.co.uk/maps*",
+        "https://www.google.ca/maps*",
+        "https://www.google.com.au/maps*",
+        "https://www.google.de/maps*",
+        "https://www.google.fr/maps*",
+        "https://www.google.pk/maps*",
+        "https://www.google.co.in/maps*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -232,12 +232,13 @@ export function createActivationRoutes(
 
       const planLimits: Record<string, { messages: number; tokens: number; storage: number; apiCalls: number; seats: number }> = {
         free: { messages: 100, tokens: 100000, storage: 100, apiCalls: 1000, seats: 1 },
-        starter: { messages: 1000, tokens: 500000, storage: 500, apiCalls: 5000, seats: 5 },
-        professional: { messages: 10000, tokens: 2000000, storage: 2000, apiCalls: 50000, seats: 20 },
-        enterprise: { messages: 100000, tokens: 10000000, storage: 10000, apiCalls: 500000, seats: 999 },
+        starter: { messages: 3000, tokens: 500000, storage: 500, apiCalls: 5000, seats: 5 },
+        pro: { messages: 10000, tokens: 2000000, storage: 2000, apiCalls: 50000, seats: 20 },
+        advanced: { messages: 25000, tokens: 10000000, storage: 10000, apiCalls: 500000, seats: 50 },
       };
 
-      const limits = planLimits[tenant?.plan || 'free'] || planLimits.free;
+      const normalizedPlan = tenant?.plan === 'professional' ? 'pro' : tenant?.plan === 'enterprise' ? 'advanced' : tenant?.plan || 'free';
+      const limits = planLimits[normalizedPlan] || planLimits.free;
       const pct = (used: number, limit: number) => limit > 0 ? Math.round((used / limit) * 100) : 0;
 
       const humanEscalations = conversationRepo.countTakeovers(tenantId);

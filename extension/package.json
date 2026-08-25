@@ -1,0 +1,12 @@
+{
+  "name": "burflow-lead-generator",
+  "version": "1.0.0",
+  "description": "BurFlow - Google & Maps Lead Generator Chrome Extension",
+  "scripts": {
+    "generate-icons": "node generate-icons.js",
+    "build": "npm run generate-icons && node build.js",
+    "package": "npm run build && cd dist && zip -r ../burflow-lead-generator.zip ."
+  },
+  "license": "UNLICENSED",
+  "private": true
+}

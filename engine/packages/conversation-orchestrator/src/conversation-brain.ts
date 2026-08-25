@@ -1916,12 +1916,18 @@ async function callAnthropic(systemPrompt: string, messages: Anthropic.MessagePa
     system: systemPrompt,
     messages,
   }, { signal });
-  return response.content
+  const text = response.content
     .filter((c): c is Anthropic.TextBlock => c.type === 'text')
     .map(c => c.text).join('').trim();
+  if (!text) {
+    console.error('[brain] Anthropic returned empty response — content blocks:', response.content.length);
+    throw new Error('Anthropic returned empty response');
+  }
+  return text;
 }
 
 async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
+  if (!client) throw new Error('Gemini client not configured');
   const model = client.getGenerativeModel({ 
     model: 'gemini-1.5-flash',
     systemInstruction: systemPrompt,
@@ -1936,7 +1942,12 @@ async function callGemini(client: GoogleGenerativeAI, systemPrompt: string, mess
   const chat = model.startChat({ history });
   const lastMessage = messages[messages.length - 1];
   const result = await chat.sendMessage(lastMessage.content as string, { signal });
-  return result.response.text().trim();
+  const text = result.response.text().trim();
+  if (!text) {
+    console.error('[brain] Gemini returned empty response');
+    throw new Error('Gemini returned empty response');
+  }
+  return text;
 }
 
 function mapMessagesForOpenAI(messages: Anthropic.MessageParam[]): Array<{ role: 'user' | 'assistant'; content: string }> {
@@ -1956,7 +1967,12 @@ async function callGroq(client: Groq, systemPrompt: string, messages: Anthropic.
       ...mapMessagesForOpenAI(messages),
     ],
   }, { signal });
-  return response.choices[0]?.message?.content?.trim() || '';
+  const text = response.choices[0]?.message?.content?.trim() || '';
+  if (!text) {
+    console.error(`[brain] Groq returned empty response — choices:`, response.choices.length, 'finish_reason:', response.choices[0]?.finish_reason || 'none');
+    throw new Error('Groq returned empty response');
+  }
+  return text;
 }
 
 async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
@@ -1982,7 +1998,12 @@ async function callGrok(apiKey: string, systemPrompt: string, messages: Anthropi
     throw new Error(`xAI Grok request failed (status=${response.status}): ${body.slice(0, 300)}`);
   }
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!text) {
+    console.error('[brain] xAI Grok returned empty response — choices:', data.choices?.length || 0);
+    throw new Error('xAI Grok returned empty response');
+  }
+  return text;
 }
 
 async function callOpenRouter(apiKey: string, systemPrompt: string, messages: Anthropic.MessageParam[], signal: AbortSignal): Promise<string> {
@@ -2012,7 +2033,12 @@ async function callOpenRouter(apiKey: string, systemPrompt: string, messages: An
     throw new Error(`OpenRouter request failed (status=${response.status}): ${body.slice(0, 300)}`);
   }
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-  return data.choices?.[0]?.message?.content?.trim() || '';
+  const text = data.choices?.[0]?.message?.content?.trim() || '';
+  if (!text) {
+    console.error('[brain] OpenRouter returned empty response — choices:', data.choices?.length || 0);
+    throw new Error('OpenRouter returned empty response');
+  }
+  return text;
 }
 
 const LLM_PROVIDER_TIMEOUT_MS = 8000;
@@ -2551,7 +2577,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
       const err = error as { status?: number; message?: string; provider?: string };
       const status = err.status;
       const messageStr = error instanceof Error ? error.message : String(error);
-      console.error(`[brain] LLM call failed (status=${status || 'no status'}): ${messageStr}`);
+      console.error(`[brain] LLM call failed — tenant=${input.tenantId || 'unknown'} status=${status || 'no status'}: ${messageStr}`);
 
       // Invalid payload (bad message content) must surface as a 400 to the caller.
       if (error instanceof PayloadValidationError) throw error;

@@ -95,23 +95,29 @@ export const INDUSTRIES: LandingIndustry[] = [
 
 export const PLANS: LandingPlan[] = [
   {
-    name: 'Starter', price: '$49', period: '/ month',
+    name: 'Free', price: '$0', period: '/ month',
+    description: 'Try BurFlow on one site with no commitment.',
+    features: ['100 conversations / mo', '5 documents', '1 knowledge base', '1 team member'],
+    cta: 'Get Started',
+  },
+  {
+    name: 'Starter', price: '$29', period: '/ month',
     description: 'For small teams launching AI-assisted support.',
-    features: ['1,000 conversations / mo', '5 knowledge sources', 'Grounded answers + citations', 'Email support'],
+    features: ['3,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members', 'Email support'],
     cta: 'Start Free Trial',
   },
   {
-    name: 'Business', price: '$249', period: '/ month',
+    name: 'Pro', price: '$49', period: '/ month',
     description: 'For growing companies with real support volume.',
-    features: ['10,000 conversations / mo', 'Unlimited knowledge sources', 'Confidence guardrails & handoff', 'Analytics & insights', 'Priority support'],
+    features: ['10,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members', 'Advanced analytics', 'Priority support'],
     cta: 'Start Free Trial',
     featured: true,
   },
   {
-    name: 'Enterprise', price: 'Custom', period: '',
+    name: 'Advanced', price: '$99', period: '/ month',
     description: 'For regulated industries and enterprise deployments.',
-    features: ['Unlimited conversations', 'SSO, SCIM, audit logs', 'Dedicated infrastructure', 'Custom SLAs & DPA', 'Named success manager'],
-    cta: 'Talk to Sales',
+    features: ['25,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members', 'SSO & SLA', 'Dedicated support'],
+    cta: 'Contact Sales',
   },
 ];
 

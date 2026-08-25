@@ -19,10 +19,10 @@ function SectionDivider() {
 }
 
 const previewTiers: PricingTier[] = [
-  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 messages / mo', '1 Knowledge Base', 'Community Support'], cta: 'Get Started', ctaVariant: 'ghost' },
-  { name: 'Starter', price: '$49', period: '/ mo', variant: 'starter', features: ['1,000 messages / mo', '3 Knowledge Bases', 'Email Support'], cta: 'Start free', ctaVariant: 'secondary' },
-  { name: 'Professional', price: '$99', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 messages / mo', '10 Knowledge Bases', 'Priority Support'], cta: 'Start free', ctaVariant: 'primary' },
-  { name: 'Enterprise', price: 'Custom', variant: 'enterprise', features: ['Unlimited messages', 'Unlimited Knowledge Bases', 'Dedicated SLA & SSO'], cta: 'Talk to Sales', ctaVariant: 'primary' }
+  { name: 'Free', price: '$0', period: '/ mo', variant: 'free', features: ['100 conversations / mo', '5 documents', '1 knowledge base', '1 team member'], cta: 'Get Started', ctaVariant: 'ghost' },
+  { name: 'Starter', price: '$29', period: '/ mo', variant: 'starter', features: ['3,000 conversations / mo', '50 documents', '5 knowledge bases', '5 team members'], cta: 'Start free', ctaVariant: 'secondary' },
+  { name: 'Pro', price: '$49', period: '/ mo', variant: 'professional', popular: true, features: ['10,000 conversations / mo', '200 documents', '20 knowledge bases', '20 team members'], cta: 'Start free', ctaVariant: 'primary' },
+  { name: 'Advanced', price: '$99', period: '/ mo', variant: 'enterprise', features: ['25,000 conversations / mo', '1,000 documents', '50 knowledge bases', '50 team members'], cta: 'Contact Sales', ctaVariant: 'primary' }
 ];
 
 const howItWorksSteps = [

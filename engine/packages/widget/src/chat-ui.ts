@@ -1145,7 +1145,7 @@ export class ChatWidget {
       this.hideTypingIndicator();
 
       if (res.ok) {
-        assistantMsg.content = "Thanks! A human agent has been notified and will join this conversation shortly. Please wait a moment.";
+        assistantMsg.content = "A team member has been notified and will join this conversation shortly. Please wait a moment.";
         assistantMsg.streaming = false;
         this.updateMessageContent(assistantMsg);
       } else {
