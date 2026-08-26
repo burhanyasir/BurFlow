@@ -1210,8 +1210,9 @@ export class ChatWidget {
         }
       },
       onError: (error) => {
+        console.error('[BurFlow Widget] Chat error:', error);
         assistantMsg.streaming = false;
-        assistantMsg.content = assistantMsg.content || 'I’m here to help, but the assistant is temporarily unavailable. Please try again in a moment.';
+        assistantMsg.content = assistantMsg.content || 'I\'m here to help, but the assistant is temporarily unavailable. Please try again in a moment.';
         this.updateMessageContent(assistantMsg);
         this.hideTypingIndicator();
         this.isStreaming = false;

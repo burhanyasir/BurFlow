@@ -27,6 +27,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
     });
   } catch (err: any) {
     if (err.name === 'AbortError') return;
+    console.error('[BurFlow Widget] Fetch error:', err);
     onError(err.message || 'Network error');
     return;
   }
@@ -37,6 +38,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
       const data = await response.json();
       errorMsg = data.error || errorMsg;
     } catch {}
+    console.error('[BurFlow Widget] HTTP error:', errorMsg, 'status:', response.status);
     onError(errorMsg);
     return;
   }
