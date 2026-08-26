@@ -572,20 +572,12 @@ interface RelevantKnownFacts {
   userContext: string[];
 }
 
-function getContextPrefix(memory: ConversationMemoryData, relevantFacts: RelevantKnownFacts, previousResponses: string[] = []): string | null {
-  const persona = memory.persona && memory.persona !== 'unknown' ? memory.persona.replace(/_/g, ' ') : null;
-  let phrase: string | null = null;
-  if (relevantFacts.industry) phrase = `For ${relevantFacts.industry} teams, this is especially relevant.`;
-  else if (persona) phrase = `For ${persona} teams, this is especially relevant.`;
-  else if (relevantFacts.useCase) phrase = `For ${relevantFacts.useCase} use cases, this is especially relevant.`;
-  else if (relevantFacts.companySize) phrase = `For a ${relevantFacts.companySize}-person team, this is especially relevant.`;
-  if (!phrase) return null;
-
-  // Never repeat the same context boilerplate if it was already used in an
-  // earlier turn of this conversation (detected via the telltale phrase).
-  const lower = phrase.toLowerCase().trim();
-  const alreadyUsed = previousResponses.some((r) => r.toLowerCase().includes(lower));
-  return alreadyUsed ? null : phrase;
+function getContextPrefix(_memory: ConversationMemoryData, _relevantFacts: RelevantKnownFacts, _previousResponses: string[] = []): string | null {
+  // The old "For X teams, this is especially relevant" filler was generating
+  // generic noise when the tenant had no knowledge base.  We now only inject
+  // context when we actually know the industry AND have knowledge to back it
+  // up — which is determined by the caller before invoking this function.
+  return null;
 }
 
 const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
@@ -2471,7 +2463,17 @@ buyingIntentDetected: memory.buyingIntentDetected,
       } else if (knowledgeSections) {
         businessContext = knowledgeSections;
       } else {
-        businessContext = 'No specific business knowledge available. Be helpful and ask clarifying questions.';
+        // No knowledge at all — be honest instead of hallucinating.
+        // Include company name so the LLM can at least greet by business name.
+        const companyName = (input as any).companyName || 'this business';
+        businessContext = [
+          `IMPORTANT: No specific business knowledge has been loaded for ${companyName}.`,
+          'Do NOT invent or guess services, pricing, hours, policies, or any business details.',
+          'If the visitor asks about something specific (services, pricing, hours, etc.), respond with:',
+          `"I'd love to help with that — let me connect you with our team who can give you the most accurate answer. What's the best email or phone number to reach you?"`,
+          'If the visitor just says hi or asks a general question, greet them warmly and ask how you can help.',
+          `The business name is: ${companyName}.`,
+        ].join('\n');
       }
 
       const turns = legacyMemory.turns || [];

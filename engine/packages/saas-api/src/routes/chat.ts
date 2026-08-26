@@ -314,7 +314,14 @@ export function createChatRoutes(
       let businessProfile: Record<string, unknown> | undefined;
       if (widgetConfigRepo) {
         try {
-          businessProfile = widgetConfigRepo.get(tenantId!)?.businessProfile;
+          const wc = widgetConfigRepo.get(tenantId!);
+          businessProfile = wc?.businessProfile;
+          // Inject companyName so the brain's no-knowledge prompt can greet by name
+          if (wc?.companyName && businessProfile) {
+            businessProfile.companyName = wc.companyName;
+          } else if (wc?.companyName) {
+            businessProfile = { companyName: wc.companyName };
+          }
         } catch {
           businessProfile = undefined;
         }
