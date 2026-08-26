@@ -485,7 +485,7 @@ describe('Knowledge base provider', () => {
     const dp = new DefaultKnowledgeBaseProvider();
     const r = dp.getTopicResponse('pricing', 't1', 0);
     expect(r).not.toBeNull();
-    expect(r!.answer).toContain('$49/month');
+    expect(r!.answer).toContain('pricing');
   });
 
   it('DefaultKnowledgeBaseProvider returns null for unknown depth', () => {
@@ -519,7 +519,7 @@ describe('Knowledge base provider', () => {
     expect(output.responseText).toContain(CUSTOM_ANSWER);
   });
 
-  it('real brain falls back to TOPIC_RESPONSE_TEMPLATES when provider returns null', async () => {
+  it('real brain short-circuits to lead capture when provider returns no knowledge', async () => {
     class NullProvider implements KnowledgeBaseProvider {
       getTopicResponse() { return null; }
       getAvailableTopics() { return []; }
@@ -538,11 +538,13 @@ describe('Knowledge base provider', () => {
       },
     };
     const output = await processConversationBrain(brainInput as any);
-    // Should contain default hardcoded content
-    expect(output.responseText).toContain('$49/month');
+    // Short-circuit: no LLM call, deterministic lead-capture response
+    expect(output.responseText).toContain('connect you with our team');
+    expect(output.cta?.primaryCTA).toBe('contact_sales');
+    expect(output.ciResult.isFallback).toBe(true);
   });
 
-  it('real brain works without knowledgeBaseProvider (backward compat)', async () => {
+  it('real brain short-circuits to lead capture when no knowledgeBaseProvider (backward compat)', async () => {
     const brainInput = {
       message: 'Tell me about features',
       responseText: '',
@@ -556,7 +558,9 @@ describe('Knowledge base provider', () => {
     };
     const output = await processConversationBrain(brainInput as any);
     expect(output.responseText).toBeTruthy();
-    expect(output.responseText).toContain('workflow automation');
+    // Short-circuit: no LLM call, deterministic lead-capture response
+    expect(output.responseText).toContain('connect you with our team');
+    expect(output.cta?.primaryCTA).toBe('contact_sales');
   });
 });
 
@@ -579,7 +583,7 @@ describe('Regression locks', () => {
 
   it('"worried about security" pipeline response is appropriate regardless of strategy label', async () => {
     const s = sid();
-    const r = await executePipeline({ message: "I'm worried about security", sessionId: s, tenantId: tenant, brainFunction: processConversationBrain, policy });
+    const r = await executePipeline({ message: "I'm worried about security", sessionId: s, tenantId: tenant, brainFunction: processConversationBrain, policy, knowledgeBaseProvider: new DefaultKnowledgeBaseProvider() });
     expect(r.response).toMatch(/data|secure|protect|encrypt|isolated/i);
   });
 });

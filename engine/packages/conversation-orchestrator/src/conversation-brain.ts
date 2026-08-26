@@ -2426,6 +2426,90 @@ buyingIntentDetected: memory.buyingIntentDetected,
   // the LLM (upstream failure, unparseable output, or no LLM key configured). This
   // is the signal downstream consumers use to record knowledge-base gaps.
   let usedFallback = false;
+
+  // ─── SHORT-CIRCUIT: zero-knowledge fast path ──────────────────────────
+  // Before doing ANY work (LLM calls, template assembly), check if the
+  // tenant has real business knowledge (DB chunks, crawled data, or a
+  // provider with topic responses). If not, return a deterministic
+  // lead-capture response immediately — sub-50ms, zero API cost.
+  {
+    const tenantIdForCheck = tenantId || 'default';
+    let hasKnowledge = false;
+    // 1. DB-backed methods (real knowledge from crawled docs / embeddings)
+    if (kbProvider?.getBusinessKnowledge) {
+      try { hasKnowledge = !!(kbProvider as any).getBusinessKnowledge(tenantIdForCheck); } catch {}
+    }
+    if (!hasKnowledge && kbProvider?.getRelevantKnowledge) {
+      try { hasKnowledge = !!(await (kbProvider as any).getRelevantKnowledge(input.message, tenantIdForCheck)); } catch {}
+    }
+    // 2. Topic-based provider with actual responses (DefaultKnowledgeBaseProvider, custom)
+    if (!hasKnowledge && kbProvider?.getAvailableTopics) {
+      const topics = kbProvider.getAvailableTopics(tenantIdForCheck) || [];
+      if (topics.length > 0 && kbProvider.getTopicResponse) {
+        hasKnowledge = topics.some(t => {
+          try { return !!kbProvider.getTopicResponse!(t, tenantIdForCheck, 0); } catch { return false; }
+        });
+      }
+    }
+    if (!hasKnowledge) {
+      const companyName = (input as any).companyName || 'this business';
+      const isGreeting = /^(hi|hello|hey|howdy|yo)\b/i.test(message.trim());
+      const noKnowledgeResponse = isGreeting
+        ? `Hi! Welcome to ${companyName}. I'd love to help — what can I do for you today?`
+        : `I'd love to help with that — let me connect you with our team at ${companyName} who can give you the most accurate answer. What's the best email or phone number to reach you?`;
+
+      memory.turnCount++;
+      const updatedLegacyShort: ConversationIntelligenceMemory = {
+        ...legacyMemory,
+        turns: [...legacyMemory.turns, { message, response: noKnowledgeResponse, polarity: 0, frustration: 0, urgency: 0, timestamp: Date.now() }],
+        persona: ciResult.persona?.persona ?? 'unknown',
+        lastGoal: memory.lastGoal,
+        lastGoalStreak: memory.lastGoalStreak,
+        funnelStage: ciResult.funnelStage,
+        buyingIntentDetected: memory.buyingIntentDetected,
+        buyingIntentPhrase: memory.buyingIntentPhrase,
+        buyingIntentTier: memory.buyingIntentTier,
+        objections: legacyMemory.objections,
+        qualificationState: ciResult.qualification,
+        repeatedPhraseCount: legacyMemory.repeatedPhraseCount,
+        topics: memory.topicsExplained.map(t => t.topic),
+        companySize: memory.companySize || legacyMemory.companySize,
+        industry: memory.industry || legacyMemory.industry,
+        useCase: memory.useCase || legacyMemory.useCase,
+        monthlyConversations: memory.monthlyConversations || legacyMemory.monthlyConversations,
+        currentHelpdesk: memory.currentHelpdesk || legacyMemory.currentHelpdesk,
+        budget: memory.budget || legacyMemory.budget,
+        decisionTimeline: memory.decisionTimeline || legacyMemory.decisionTimeline,
+      };
+      ciResult.isFallback = true;
+      console.warn(`[brain] ZERO-KNOWLEDGE SHORT-CIRCUIT — tenant=${tenantId || 'unknown'} — ${message.slice(0, 80)}`);
+
+      return {
+        responseText: noKnowledgeResponse,
+        cta: { primaryCTA: 'contact_sales', label: 'Contact Our Team', link: '/contact', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined },
+        quickReplies: buildDynamicQuickReplies(message, plan, memory, ciResult, (input as any).businessProfile),
+        uiState: { buttons: [], suggestedActions: [] },
+        memory,
+        legacyMemory: updatedLegacyShort,
+        plan: { customerIntent: plan.customerIntent, funnelStage: plan.funnelStage, conversationStage: plan.conversationStage, buyerRole: plan.buyerRole, goal: plan.goal, topicsToDiscuss: plan.topicsToDiscuss, missingQualification: plan.missingQualification },
+        validation: { valid: true, issues: [] },
+        ciResult,
+        orchestratorResult: ciResult as any,
+        planRecommendation: recommendPlan(memory),
+        contextReference: null,
+        acknowledgment: null,
+        strategy: { ...strategy, primaryGoal: 'answer_question' },
+        momentum: { answered: true, referencedContext: false, advanced: false, naturalEnding: true, momentumScore: 50, weakPoints: [], shouldRegenerate: false },
+        qualityMetrics: computeQualityMetrics(memory),
+        decisionTrace: { chosenButtons: [], buttonScores: {}, buttonClicked: input.clickedButtonIds, buttonCTR: {} },
+        debugPanel: { shortCircuit: true, reason: 'zero_knowledge_chunks' } as any,
+        extractedLead: extractLeadDetails(message),
+        suggestedOptions: [],
+      };
+    }
+  }
+  // ─── END SHORT-CIRCUIT ──────────────────────────────────────────────
+
   if (anthropicClient || openrouterApiKey || geminiClient1 || geminiClient2 || groqClient || groqClient2 || groqClient3 || groqClient4 || groqClient5 || grokApiKey) {
     try {
       const tenantIdForLLM = tenantId || 'default';
@@ -2462,18 +2546,6 @@ buyingIntentDetected: memory.buyingIntentDetected,
         ].join('\n');
       } else if (knowledgeSections) {
         businessContext = knowledgeSections;
-      } else {
-        // No knowledge at all — be honest instead of hallucinating.
-        // Include company name so the LLM can at least greet by business name.
-        const companyName = (input as any).companyName || 'this business';
-        businessContext = [
-          `IMPORTANT: No specific business knowledge has been loaded for ${companyName}.`,
-          'Do NOT invent or guess services, pricing, hours, policies, or any business details.',
-          'If the visitor asks about something specific (services, pricing, hours, etc.), respond with:',
-          `"I'd love to help with that — let me connect you with our team who can give you the most accurate answer. What's the best email or phone number to reach you?"`,
-          'If the visitor just says hi or asks a general question, greet them warmly and ask how you can help.',
-          `The business name is: ${companyName}.`,
-        ].join('\n');
       }
 
       const turns = legacyMemory.turns || [];
