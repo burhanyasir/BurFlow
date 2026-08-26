@@ -111,12 +111,16 @@ export function publicChatAuth(secret: string, apiKeyRepo?: ApiKeyRepository, te
       const result = verifyWidgetToken(widgetToken, origin);
       if (result) {
         let tenantId = result.tenantId;
-        if (tenantId === 'demo-tenant' && tenantRepo) {
-          const demoTenant = tenantRepo.findBySlug('demo-tenant')
-            || tenantRepo.findBySlugLike('%demo%')
-            || tenantRepo.findByNameLike('%Demo%');
-          if (demoTenant) {
-            tenantId = demoTenant.id;
+        if (tenantRepo) {
+          // Resolve slug to UUID if the token carries a slug, not an id
+          if (tenantId === 'demo-tenant') {
+            const demoTenant = tenantRepo.findBySlug('demo-tenant')
+              || tenantRepo.findBySlugLike('%demo%')
+              || tenantRepo.findByNameLike('%Demo%');
+            if (demoTenant) tenantId = demoTenant.id;
+          } else {
+            const resolved = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
+            if (resolved) tenantId = resolved.id;
           }
         }
         req.tenantId = tenantId;
