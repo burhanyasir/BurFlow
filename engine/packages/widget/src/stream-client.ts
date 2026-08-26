@@ -10,6 +10,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Accept': 'application/json',
   };
   if (tenantId) headers['x-tenant-id'] = tenantId;
   if (apiKey) headers['x-api-key'] = apiKey;
