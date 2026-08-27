@@ -3,26 +3,48 @@
 -- Previously, demo accounts were only created via SQLite seed scripts or
 -- ensureDemoTenant() which used a non-hashing placeholder string, causing
 -- all login attempts to fail with 401.
+--
+-- Uses ON CONFLICT (email) to handle the case where users already exist
+-- with different IDs (e.g. created by ensureDemoTenant at runtime).
 
 DO $seed$
 DECLARE
-  v_ecom_id TEXT := 'user-ecom-demo';
-  v_dentist_id TEXT := 'user-dentist-demo';
-  v_owner_id TEXT := 'user-owner-demo';
+  v_ecom_id TEXT;
+  v_dentist_id TEXT;
+  v_owner_id TEXT;
   v_now TEXT := NOW()::TEXT;
 BEGIN
-  -- Insert demo users with valid bcrypt hashes (skip if already exist)
-  INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
-  VALUES
-    (v_ecom_id, 'ecom@burflow-demo.com', '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', 'E-Commerce Demo', 1, v_now, v_now),
-    (v_dentist_id, 'dentist@burflow-demo.com', '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', 'Dental Practice Demo', 1, v_now, v_now),
-    (v_owner_id, 'burhanyasir82@gmail.com', '$2a$12$Y8xT.rMxgmOX9jJbH5YRUetueAxIBkwCkQIPHytw6q528dbAbYljC', 'Burhan Yasir', 1, v_now, v_now)
-  ON CONFLICT (id) DO UPDATE SET
-    password_hash = EXCLUDED.password_hash,
-    email_verified = 1,
-    updated_at = v_now;
+  -- Find or create ecom demo user
+  SELECT id INTO v_ecom_id FROM users WHERE email = 'ecom@burflow-demo.com';
+  IF v_ecom_id IS NULL THEN
+    v_ecom_id := 'user-ecom-demo';
+    INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
+    VALUES (v_ecom_id, 'ecom@burflow-demo.com', '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', 'E-Commerce Demo', 1, v_now, v_now);
+  ELSE
+    UPDATE users SET password_hash = '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', email_verified = 1, updated_at = v_now WHERE id = v_ecom_id;
+  END IF;
 
-  -- Create demo tenants linked to their users
+  -- Find or create dentist demo user
+  SELECT id INTO v_dentist_id FROM users WHERE email = 'dentist@burflow-demo.com';
+  IF v_dentist_id IS NULL THEN
+    v_dentist_id := 'user-dentist-demo';
+    INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
+    VALUES (v_dentist_id, 'dentist@burflow-demo.com', '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', 'Dental Practice Demo', 1, v_now, v_now);
+  ELSE
+    UPDATE users SET password_hash = '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', email_verified = 1, updated_at = v_now WHERE id = v_dentist_id;
+  END IF;
+
+  -- Find or create owner user
+  SELECT id INTO v_owner_id FROM users WHERE email = 'burhanyasir82@gmail.com';
+  IF v_owner_id IS NULL THEN
+    v_owner_id := 'user-owner-demo';
+    INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at)
+    VALUES (v_owner_id, 'burhanyasir82@gmail.com', '$2a$12$Y8xT.rMxgmOX9jJbH5YRUetueAxIBkwCkQIPHytw6q528dbAbYljC', 'Burhan Yasir', 1, v_now, v_now);
+  ELSE
+    UPDATE users SET password_hash = '$2a$12$Y8xT.rMxgmOX9jJbH5YRUetueAxIBkwCkQIPHytw6q528dbAbYljC', email_verified = 1, updated_at = v_now WHERE id = v_owner_id;
+  END IF;
+
+  -- Create demo tenants linked to their users (skip if already exist)
   INSERT INTO tenants (id, name, slug, owner_id, plan, subscription_status, settings, created_at, updated_at)
   VALUES
     ('tenant-ecom-demo', 'E-Commerce Store', 'ecom-store-demo', v_ecom_id, 'starter', 'active', '{}', v_now, v_now),
