@@ -454,8 +454,8 @@ export function useOnboardingState() {
       position: data.custom.position,
       greeting: data.custom.welcomeMessage,
       launcherText: data.custom.placeholder,
-      suggestedQuestions: data.custom.suggestedQuestions,
-      logo: data.custom.logo,
+      starterOptions: data.custom.suggestedQuestions,
+      logoUrl: data.custom.logo || undefined,
       businessProfile: getBusinessProfile(),
     });
   }, [data.custom, getBusinessProfile]);

@@ -300,9 +300,9 @@ describe('ChatWidget', () => {
     const cards = document.querySelectorAll('.cw-welcome-card');
     expect(cards.length).toBe(3);
     const labels = Array.from(cards).map((c) => c.textContent);
-    expect(labels.some((l) => l!.includes('Find the right plan'))).toBe(true);
-    expect(labels.some((l) => l!.includes('See BurFlow in action'))).toBe(true);
-    expect(labels.some((l) => l!.includes('Book a 15-min demo'))).toBe(true);
+    expect(labels.some((l) => l!.includes('How can you help me?'))).toBe(true);
+    expect(labels.some((l) => l!.includes('What do you offer?'))).toBe(true);
+    expect(labels.some((l) => l!.includes('Talk to a person'))).toBe(true);
   });
 
   it('fades out starter cards once the conversation sends a message', async () => {
@@ -336,7 +336,7 @@ describe('ChatWidget', () => {
     widget.toggle();
 
     const planCard = Array.from(document.querySelectorAll('.cw-welcome-card')).find(
-      (c) => c.textContent!.includes('Find the right plan')
+      (c) => c.textContent!.includes('How can you help me?')
     ) as HTMLButtonElement;
     expect(planCard).toBeTruthy();
     planCard.click();
@@ -344,7 +344,7 @@ describe('ChatWidget', () => {
     await new Promise((r) => setTimeout(r, 50));
     const msgs = widget.getMessages();
     expect(msgs[1].role).toBe('user');
-    expect(msgs[1].content).toBe('Find the right plan');
+    expect(msgs[1].content).toBe('How can you help me?');
   });
 
   it('uses custom starterOptions from config', () => {

@@ -8,6 +8,7 @@ import {
 } from '../middleware/validate';
 import { getEmailService } from '../services/email';
 import { randomBytes } from 'crypto';
+import type { KbJobQueue } from '../workers/kb-job-queue';
 
 const baseLogger = createLogger('saas-api:auth');
 const PIPELINE_URL = (process.env.PIPELINE_URL || '').replace(/\/+$/, '');
@@ -45,13 +46,13 @@ function generateRefreshToken(): { token: string; hash: string; expiresAt: strin
   return { token, hash: token, expiresAt };
 }
 
-export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository): Router {
+export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository, kbJobQueue?: KbJobQueue): Router {
   const router = Router();
   const auth = authMiddleware(jwtSecret);
 
   const handleSignup = (req: Request, res: Response) => {
     try {
-      const { email, password, name, companyName } = req.body;
+      const { email, password, name, companyName, websiteUrl } = req.body;
 
       const errors = [
         validateEmail(email, 'email'),
@@ -86,6 +87,30 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
 
       syncConfigToPipeline(tenant.id);
 
+      // ── Dispatch background crawl job ──────────────────────
+      // If the tenant provided a website URL during signup, enqueue a
+      // background crawl job immediately. The HTTP response returns
+      // instantly with the job ID so the client can poll progress.
+      let crawlJobId: string | null = null;
+      if (websiteUrl && typeof websiteUrl === 'string' && kbJobQueue) {
+        try {
+          const job = kbJobQueue.enqueueCrawl({
+            tenantId: tenant.id,
+            websiteUrl,
+            maxDepth: 2,
+            maxPages: 20,
+          });
+          crawlJobId = job.id;
+          createContextLogger(baseLogger).info(
+            { jobId: job.id, tenantId: tenant.id, url: websiteUrl },
+            'Dispatched background crawl job on signup',
+          );
+        } catch (err: any) {
+          // Non-fatal: signup must never fail because crawl dispatch failed
+          createContextLogger(baseLogger).warn({ err, tenantId: tenant.id }, 'Failed to dispatch crawl job on signup');
+        }
+      }
+
       const emailService = getEmailService();
       // Email delivery is best-effort: a failure must NEVER crash the API
       // (the global unhandledRejection handler shuts the process down), so the
@@ -115,6 +140,7 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, plan: tenant.plan },
         token: accessToken,
         refreshToken: refreshTokenValue,
+        ...(crawlJobId ? { crawlJobId } : {}),
       });
     } catch (err: any) {
       const log = createContextLogger(baseLogger);

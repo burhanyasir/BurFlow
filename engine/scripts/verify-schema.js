@@ -28,7 +28,7 @@ function parseExpected(sql) {
   const tables = new Map(); // name -> { columns: [{name, nullable, type}], pk: [], unique: [], checks: number, fks: Set<refTable> }
   const indexes = [];
 
-  const tableRe = /CREATE TABLE\s+(\w+)\s*\(([\s\S]*?)\);/g;
+  const tableRe = /CREATE TABLE\s+(?:IF NOT EXISTS\s+)?(\w+)\s*\(([\s\S]*?)\);/g;
   let tm;
   while ((tm = tableRe.exec(sql)) !== null) {
     const name = tm[1];

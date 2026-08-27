@@ -102,7 +102,7 @@ export class TenantRepository {
     this.db.transaction(() => {
       this.db.prepare(
         'INSERT INTO users (id, email, password_hash, name, email_verified, created_at, updated_at) VALUES (?, ?, ?, ?, 1, ?, ?) ON CONFLICT (id) DO NOTHING'
-      ).run(demoUserId, demoUserEmail, 'demo-account-no-login', 'BurFlow Demo', now, now);
+      ).run(demoUserId, demoUserEmail, '$2a$12$s3tAbmUDd9kEiRsUJhkthODr.sYmix9JuKTn4.0EmgMc9keqUBI8y', 'BurFlow Demo', now, now);
       this.db.prepare(
         'INSERT INTO tenants (id, name, slug, owner_id, plan, subscription_status, settings, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING'
       ).run(demoTenantId, tenantName, demoTenantId, demoUserId, 'free', 'trialing', JSON.stringify(DEFAULT_SETTINGS), now, now);

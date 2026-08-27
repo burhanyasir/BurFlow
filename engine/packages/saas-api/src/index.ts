@@ -39,6 +39,7 @@ import { createAuthRoutes } from './routes/auth';
 import { createPasswordResetRoutes } from './routes/auth-password-reset';
 import { createVerifyRoutes } from './routes/auth-verify';
 import { createTenantRoutes } from './routes/tenants';
+import { createKbStatusRoutes } from './routes/kb-status';
 import { createApiKeyRoutes } from './routes/api-keys';
 import { createConversationRoutes } from './routes/conversations';
 import { createUsageRoutes } from './routes/usage';
@@ -77,6 +78,7 @@ import { createAgentChatRoutes } from './routes/agent-chat';
 import { createWebsiteScannerRoutes } from './routes/website-scanner';
 import { createAgencyRoutes } from './routes/agency';
 import { dispatchLeadAlerts, LeadNotificationConfig } from './services/lead-notifier';
+import { KbJobQueue, KbIndexWorker } from './workers';
 
 const logger = createLogger('saas-api');
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -283,6 +285,15 @@ const websiteScanner = new WebsiteScannerService({
   brandExtractor: new BrandExtractor(),
 });
 
+// ─── Background KB Index Worker ───────────────────────────────────
+const kbJobQueue = new KbJobQueue(db);
+const kbIndexWorker = new KbIndexWorker({
+  db,
+  knowledgeDb,
+  embeddingApiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
+  embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '512', 10),
+});
+
 const app = express();
 
 app.use(helmet({
@@ -376,7 +387,7 @@ app.use('/api/auth/signup', createRateLimit({ windowMs: 900000, max: 10 }));
 app.use('/api/auth/forgot-password', createRateLimit({ windowMs: 900000, max: 5 }));
 
 // Public routes
-app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo));
+app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo, kbJobQueue));
 app.use('/api/auth', createPasswordResetRoutes(userRepo));
 app.use('/api/auth', createVerifyRoutes(userRepo, JWT_SECRET));
 
@@ -456,6 +467,7 @@ app.patch('/api/conversations/:id/resolve', auth, tenantGuard, (req: Request, re
 });
 
 app.use('/api/tenants', auth, tenantGuard, enforceTenantAccess(), createTenantRoutes(tenantRepo, userRepo));
+app.use('/api/tenants', auth, tenantGuard, enforceTenantAccess(), createKbStatusRoutes({ db, kbJobQueue }));
 app.use('/api/api-keys', auth, tenantGuard, createApiKeyRoutes(enhancedApiKeyRepo, tenantRepo, auditLogRepo));
 app.use('/api/conversations', auth, tenantGuard, createConversationRoutes(conversationRepo, messageRepo));
 app.use('/api/usage', auth, tenantGuard, createUsageRoutes(usageRepo));
@@ -577,6 +589,33 @@ const knowledgeDeps = {
 };
 app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps));
 
+// ─── KB Crawl Job Status ──────────────────────────────────────────
+// Lightweight endpoint for the frontend to poll crawl job progress after
+// signup.  Returns the same shape whether the job is pending, running,
+// completed, or failed.
+app.get('/api/knowledge/crawl-jobs/:jobId', auth, (req: Request, res: Response) => {
+  const job = kbJobQueue.getById(req.params.jobId);
+  if (!job || job.tenantId !== req.user?.tenantId) {
+    return res.status(404).json({ error: 'Job not found' });
+  }
+  res.json({
+    jobId: job.id,
+    status: job.status,
+    websiteUrl: job.websiteUrl,
+    progress: job.status === 'completed' ? job.result : null,
+    error: job.errorMessage,
+    createdAt: job.createdAt,
+    startedAt: job.startedAt,
+    completedAt: job.completedAt,
+  });
+});
+
+app.get('/api/knowledge/crawl-jobs', auth, (req: Request, res: Response) => {
+  if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
+  const jobs = kbJobQueue.listByTenant(req.user.tenantId, 20);
+  res.json({ jobs });
+});
+
 // Onboarding routes
 const onboardingDeps = { onboardingRepo, conversationRepo, messageRepo, usageRepo, docRepo };
 app.use('/api/onboarding', auth, tenantGuard, createOnboardingRoutes(onboardingRepo, conversationRepo, messageRepo, usageRepo, docRepo, userRepo, JWT_SECRET));
@@ -667,6 +706,7 @@ process.on('uncaughtException', (err: Error) => {
 let server: ReturnType<typeof app.listen> | null = null;
 function shutdown(signal: string) {
   logger.info({ signal }, 'Shutting down gracefully');
+  kbIndexWorker.stop(); // Stop accepting new crawl jobs
   const forceExit = setTimeout(() => {
     logger.info('Forcing shutdown');
     process.exit(signal === 'SIGINT' ? 0 : 1);
@@ -710,6 +750,14 @@ if (require.main === module) {
       }
     } catch (err) {
       logger.error({ err }, 'Startup health check failed');
+    }
+
+    // Start the background KB index worker (polls kb_jobs table)
+    try {
+      kbIndexWorker.start();
+      logger.info('KB index worker started');
+    } catch (err) {
+      logger.error({ err }, 'KB index worker failed to start (non-fatal)');
     }
   });
 }

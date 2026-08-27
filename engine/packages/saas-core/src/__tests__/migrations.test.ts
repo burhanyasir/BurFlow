@@ -46,12 +46,12 @@ describe('migration runner — initial schema', () => {
   it('applies all pending migrations on an empty database', async () => {
     const res = await migrate(adapter, REAL_MIGRATION_DIR);
     expect(res.error).toBeNull();
-    expect(res.executed).toEqual(['001', '002', '003', '004', '005']);
+    expect(res.executed).toEqual(['001', '002', '003', '004', '005', '006', '007', '008', '009', '010', '011', '012']);
   });
 
   it('records all migrations in schema_migrations', async () => {
     const r = await adapter.query('SELECT version, name, applied_at FROM schema_migrations ORDER BY version');
-    expect(r.rows).toHaveLength(5);
+    expect(r.rows).toHaveLength(12);
     expect(r.rows[0].version).toBe('001');
     expect(r.rows[0].name).toBe('initial_schema');
     expect(r.rows[0].applied_at).toBeTruthy();
@@ -64,10 +64,10 @@ describe('migration runner — initial schema', () => {
     expect(res.pending).toEqual([]);
   });
 
-  it('verification passes: 40 tables, 449 columns, 66 explicit indexes', async () => {
+  it('verification passes: 45 tables, 505 columns, 78 explicit indexes', async () => {
     const check = await verifySchema(adapter);
     expect(check.errors).toEqual([]);
-    expect(check.summary).toEqual({ tables: 44, columns: 488, indexes: 75 });
+    expect(check.summary).toEqual({ tables: 45, columns: 507, indexes: 79 });
   });
 });
 

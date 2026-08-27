@@ -40,11 +40,11 @@ const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || (typeof window !== 'un
 const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 const DEFAULT_SNIPPET = `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" data-tenant-id="YOUR_TENANT_ID" data-api-url="${WIDGET_API_URL}"></script>`;
 
-function buildSnippet(tabId: string, tenantId: string, color: string, position: string): string {
-  const attrs = `data-tenant-id="${tenantId}" data-api-url="${WIDGET_API_URL}" data-primary-color="${color}" data-position="${position}"`;
+function buildSnippet(tabId: string, tenantId: string, _color: string, position: string): string {
+  const attrs = `data-tenant-id="${tenantId}" data-api-url="${WIDGET_API_URL}" data-position="${position}"`;
   switch (tabId) {
     case 'vanilla': return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
-    case 'react': return `import { ChatWidget } from '@conversationengine/react';\n<ChatWidget tenantId="${tenantId}" apiUrl="${WIDGET_API_URL}" primaryColor="${color}" position="${position}" />`;
+    case 'react': return `import { ChatWidget } from '@conversationengine/react';\n<ChatWidget tenantId="${tenantId}" apiUrl="${WIDGET_API_URL}" position="${position}" />`;
     default: return `<!-- BurFlow Chatbot -->\n<script src="${WIDGET_CDN}" ${attrs}></script>`;
   }
 }

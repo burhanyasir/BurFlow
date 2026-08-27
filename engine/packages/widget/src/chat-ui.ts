@@ -292,7 +292,7 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   apiKey: undefined as any,
   sessionId: undefined as any,
   widgetToken: undefined as any,
-  title: 'BurFlow Assistant',
+  title: 'Chat Assistant',
   subtitle: 'AI assistant · Online',
   primaryColor: '#006248',
   avatarUrl: undefined as any,
@@ -309,12 +309,7 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   autoOpenDelay: 3,
   customCss: '',
   starterOptions: [],
-  suggestedActions: [
-    { id: 'plans', label: 'Find the right plan', action: 'send_text', payload: 'Find the right plan for my needs', variant: 'secondary', category: 'plans' },
-    { id: 'demo', label: 'Book a 15-min demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
-    { id: 'contact', label: 'Talk to sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary', category: 'sales' },
-    { id: 'faq', label: 'Common questions', action: 'send_text', payload: 'What are the most common questions?', variant: 'secondary', category: 'faq' },
-  ],
+  suggestedActions: [],
 };
 
 let messageIdCounter = 0;
@@ -699,11 +694,11 @@ export class ChatWidget {
     header.style.cssText = 'padding:12px 14px 8px;display:flex;align-items:center;gap:8px;';
     const brandMark = document.createElement('span');
     brandMark.style.cssText = 'width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:#006248;color:#fff;font-size:13px;font-weight:800;flex-shrink:0;';
-    brandMark.textContent = 'B';
+    brandMark.textContent = (this.config.companyName || 'C')[0].toUpperCase();
     header.appendChild(brandMark);
     const brandText = document.createElement('span');
     brandText.style.cssText = 'font-size:11.5px;font-weight:600;color:#111827;';
-    brandText.textContent = 'BurFlow';
+    brandText.textContent = this.config.companyName || 'Chat';
     header.appendChild(brandText);
     const statusDot = document.createElement('span');
     statusDot.style.cssText = 'font-size:10px;color:#6B7280;margin-left:auto;';
@@ -788,14 +783,16 @@ export class ChatWidget {
 
   private defaultStarterOptions(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
-    if (/ecommerce|retail|store|shop|medical|pharma/.test(type)) {
+    if (/ecommerce|retail|store|shop/.test(type)) {
       return ['Find the right product', 'How fast is delivery?', 'What is your return policy?'];
     }
-    if (/clinic|dental|healthcare|hospital/.test(type)) {
+    if (/clinic|dental|healthcare|hospital|medical|pharma/.test(type)) {
       return ['Book an appointment', 'What services do you offer?', 'What are your hours?'];
     }
-    // Outcome-led wording — answers "what will I get?" not "what is it?"
-    return ['Find the right plan', 'See BurFlow in action', 'Book a 15-min demo'];
+    if (/agency|consulting|services/.test(type)) {
+      return ['What services do you offer?', 'How does pricing work?', 'Book a consultation'];
+    }
+    return ['How can you help me?', 'What do you offer?', 'Talk to a person'];
   }
 
   private showPreOpenPanel(): void {
@@ -959,7 +956,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:5px 0 8px;text-align:center;';
-    footer.innerHTML = '<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:#006248;">BurFlow</b></span>';
+    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:#006248;">${this.config.companyName || 'AI Assistant'}</b></span>`;
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -1409,11 +1406,11 @@ export class ChatWidget {
     sectionHeader.className = 'cw-welcome-section-header';
     const sectionTitle = document.createElement('span');
     sectionTitle.className = 'cw-welcome-section-title';
-    sectionTitle.textContent = 'CHOOSE A QUICK PATH';
+    sectionTitle.textContent = 'HOW CAN I HELP?';
     sectionHeader.appendChild(sectionTitle);
     const sectionMeta = document.createElement('span');
     sectionMeta.className = 'cw-welcome-section-meta';
-    sectionMeta.textContent = 'Recommended for this page';
+    sectionMeta.textContent = 'Pick a topic or type your question';
     sectionHeader.appendChild(sectionMeta);
     section.appendChild(sectionHeader);
 
@@ -1843,6 +1840,14 @@ export class ChatWidget {
 
     if (this.isOpen && this.messages.length === 0 && this.config.greeting) {
       this.addMessage({ role: 'assistant', content: this.config.greeting });
+    }
+
+    if (this.config.autoOpen && !this.isOpen && !this.autoOpenTimer) {
+      const delayMs = Math.max(0, Math.min((this.config.autoOpenDelay ?? 3), 60)) * 1000;
+      this.autoOpenTimer = setTimeout(() => {
+        this.autoOpenTimer = null;
+        if (!this.isOpen) this.toggle();
+      }, delayMs);
     }
   }
 
