@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, SubscriptionRepository, type SqlDatabase } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { randomBytes } from 'crypto';
+import { verifyWidgetToken } from '../middleware/auth';
 
 const logger = createLogger('saas-api:support');
 function generateId(): string { return randomBytes(16).toString('hex'); }
@@ -276,8 +277,19 @@ export function createSupportRoutes(
   // ─── WIDGET: Visitor requests human agent ──────────────────────────
   router.post('/request-human', (req: Request, res: Response) => {
     try {
-      const { sessionId, tenantId, message } = req.body;
-      if (!sessionId || !tenantId) return res.status(400).json({ error: 'sessionId and tenantId required' });
+      let { sessionId, tenantId, message } = req.body;
+      if (!sessionId) return res.status(400).json({ error: 'sessionId is required' });
+
+      // Resolve tenantId from widget token header if missing from body
+      if (!tenantId) {
+        const widgetToken = (req.headers['x-widget-token'] as string) || '';
+        if (widgetToken) {
+          const origin = req.get('Origin') || req.get('Referer') || undefined;
+          const result = verifyWidgetToken(widgetToken, origin);
+          if (result) tenantId = result.tenantId;
+        }
+      }
+      if (!tenantId) return res.status(400).json({ error: 'tenantId is required (provide in body or via x-widget-token header)' });
 
       const now = new Date().toISOString();
 

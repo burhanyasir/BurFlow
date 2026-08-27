@@ -52,7 +52,7 @@ interface WidgetTokenPayload {
   exp: number;
 }
 
-function verifyWidgetToken(token: string, requestOrigin?: string): { tenantId: string } | null {
+export function verifyWidgetToken(token: string, requestOrigin?: string): { tenantId: string } | null {
   const secret = getWidgetSecret();
   if (!secret) return null;
   try {

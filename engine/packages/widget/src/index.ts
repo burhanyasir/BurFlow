@@ -78,7 +78,7 @@ if (typeof window !== 'undefined') {
           })
           .then((data) => {
             if (data && data.token) {
-              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title });
+              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title, tenantId: data.tenantId || tenantId });
             } else {
               // Token exchange returned no token — render with local defaults
               // so the bubble still appears (never fully dormant).
