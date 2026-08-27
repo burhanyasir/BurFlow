@@ -496,14 +496,10 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       }
       const starterOptions = config.starterOptions?.length
         ? config.starterOptions
-        : derived?.starterOptions?.length
-          ? derived.starterOptions
-          : undefined;
+        : derived?.starterOptions || [];
       const suggestedActions = config.suggestedActions?.length
         ? config.suggestedActions
-        : derived?.suggestedActions?.length
-          ? derived.suggestedActions
-          : undefined;
+        : derived?.suggestedActions || [];
       const origin = req.get('Origin') || req.get('Referer') || '';
       if (config.allowedDomains.length > 0 && origin) {
         try {
