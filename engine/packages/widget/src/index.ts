@@ -58,7 +58,14 @@ if (typeof window !== 'undefined') {
     try {
       const script = _scriptEl || resolveScriptEl();
       if (!script) return;
-      const apiUrl = script.getAttribute('data-api-url') || '';
+      let apiUrl = script.getAttribute('data-api-url') || '';
+      if (!apiUrl) {
+        const src = script.src || '';
+        try {
+          const u = new URL(src, location.href);
+          apiUrl = u.origin;
+        } catch {}
+      }
       const primaryColor = script.getAttribute('data-primary-color') || undefined;
       const position = script.getAttribute('data-position') as any || undefined;
       const title = script.getAttribute('data-title') || undefined;

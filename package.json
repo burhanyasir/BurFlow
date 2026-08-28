@@ -11,7 +11,7 @@
     "agency:e2e": "node agency_e2e.js"
   },
   "dependencies": {
-    "better-sqlite3": "^12.11.1",
+    "better-sqlite3": "^13.0.3",
     "cheerio": "^1.2.0",
     "cors": "^2.8.5",
     "cross-env": "^10.1.0",
