@@ -221,6 +221,31 @@ describe('streamChat', () => {
 
     expect(onHumanTakeover).not.toHaveBeenCalled();
   });
+
+  it('applies JSON ui_state before onComplete so chips are not cleared', async () => {
+    const order: string[] = [];
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (name: string) => (name === 'content-type' ? 'application/json' : null) },
+      json: vi.fn().mockResolvedValue({
+        response: 'We can book you this week.',
+        suggestedOptions: ['Book Appointment', 'Contact Team'],
+        uiState: { buttons: [], suggestedActions: [] },
+      }),
+    }));
+
+    await streamChat({
+      apiUrl: 'http://test',
+      onToken: vi.fn(),
+      onDone: vi.fn(),
+      onComplete: () => { order.push('complete'); },
+      onUiState: () => { order.push('ui_state'); },
+      onError: vi.fn(),
+    });
+
+    expect(order).toEqual(['ui_state', 'complete']);
+  });
 });
 
 // ─── ChatWidget Tests ───────────────────────────────────
@@ -741,5 +766,60 @@ describe('ChatWidget', () => {
     await new Promise(r => setTimeout(r, 200));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
     expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
+  });
+
+  it('renders suggested option chips even when complete arrives before ui_state', async () => {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'token', content: 'We offer cleanings and Invisalign.' })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', fullContent: 'We offer cleanings and Invisalign.', turnId: 't1', suggestedOptions: ['Book Appointment', 'View Pricing'] })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'ui_state', suggestedOptions: ['Book Appointment', 'View Pricing'] })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, body: stream }));
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'What services do you offer?';
+    widget.send();
+    await new Promise((r) => setTimeout(r, 50));
+
+    const chips = Array.from(document.querySelectorAll('.cw-suggested-option')).map((el) => el.textContent);
+    expect(chips).toEqual(['Book Appointment', 'View Pricing']);
+  });
+
+  it('clears stale suggested options when a new message is sent', async () => {
+    const encoder = new TextEncoder();
+    const first = new ReadableStream({
+      start(controller) {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'ui_state', suggestedOptions: ['Book Appointment'] })}\n\n`));
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'complete', fullContent: 'Hello', turnId: 't1' })}\n\n`));
+        controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+        controller.close();
+      },
+    });
+    const hanging = new ReadableStream({ start() { /* leave the second turn streaming */ } });
+    const fetchFn = vi.fn()
+      .mockResolvedValueOnce({ ok: true, body: first })
+      .mockResolvedValueOnce({ ok: true, body: hanging });
+    vi.stubGlobal('fetch', fetchFn);
+
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
+    widget.mount();
+    widget.toggle();
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'Hi';
+    widget.send();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(document.querySelectorAll('.cw-suggested-option').length).toBe(1);
+
+    input.value = 'Hours?';
+    widget.send();
+    expect(document.querySelectorAll('.cw-suggested-option').length).toBe(0);
   });
 });

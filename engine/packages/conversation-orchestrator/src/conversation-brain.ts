@@ -59,6 +59,14 @@ import {
   PayloadValidationError,
   UpstreamLLMError,
 } from './message-content';
+import {
+  OUT_OF_KNOWLEDGE_REPLY,
+  buildGroundedSystemPrompt,
+  fallbackSuggestedOptions,
+  replaceUngroundedPlatformSpeech,
+  resolveTenantIdentity,
+  sanitizeSuggestedOptions,
+} from './tenant-grounding';
 
 function detectSentimentPolarity(message: string): number {
   const lower = message.toLowerCase();
@@ -324,6 +332,11 @@ export interface BrainInput {
  * built-in SaaS CTAs; when absent, the default SaaS behavior is unchanged.
  */
 export interface TenantCtaProfile {
+  companyName?: string;
+  company_name?: string;
+  domain?: string;
+  website?: string;
+  websiteUrl?: string;
   /** Primary business goal, e.g. 'book_demo' | 'direct_checkout' | 'product_recommendation' | 'appointment_booking'. */
   primary_goal?: string;
   /** Current promotions or offers to mention when relevant. */
@@ -2422,6 +2435,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
   let llmFunnelHint: string | null = null;
   const llmSuggestedTopics: string[] = [];
   const llmSuggestedOptions: string[] = [];
+  let groundingKnowledge = '';
   // True when this turn's reply came from the heuristic template engine instead of
   // the LLM (upstream failure, unparseable output, or no LLM key configured). This
   // is the signal downstream consumers use to record knowledge-base gaps.
@@ -2452,11 +2466,15 @@ buyingIntentDetected: memory.buyingIntentDetected,
       }
     }
     if (!hasKnowledge) {
-      const companyName = (input as any).companyName || 'this business';
+      const identity = resolveTenantIdentity({
+        ...(businessProfile || {}),
+        companyName: (businessProfile as any)?.companyName || (input as any).companyName,
+      });
+      const companyName = identity.name || 'this business';
       const isGreeting = /^(hi|hello|hey|howdy|yo)\b/i.test(message.trim());
       const noKnowledgeResponse = isGreeting
         ? `Hi! Welcome to ${companyName}. I'd love to help — what can I do for you today?`
-        : `I'd love to help with that — let me connect you with our team at ${companyName} who can give you the most accurate answer. What's the best email or phone number to reach you?`;
+        : OUT_OF_KNOWLEDGE_REPLY;
 
       memory.turnCount++;
       const updatedLegacyShort: ConversationIntelligenceMemory = {
@@ -2504,7 +2522,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         decisionTrace: { chosenButtons: [], buttonScores: {}, buttonClicked: input.clickedButtonIds, buttonCTR: {} },
         debugPanel: { shortCircuit: true, reason: 'zero_knowledge_chunks' } as any,
         extractedLead: extractLeadDetails(message),
-        suggestedOptions: [],
+        suggestedOptions: fallbackSuggestedOptions(businessProfile),
       };
     }
   }
@@ -2547,6 +2565,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       } else if (knowledgeSections) {
         businessContext = knowledgeSections;
       }
+      groundingKnowledge = crawledKnowledge || knowledgeSections || businessContext;
 
       const turns = legacyMemory.turns || [];
       const recentTurns = turns.slice(-8);
@@ -2575,43 +2594,12 @@ buyingIntentDetected: memory.buyingIntentDetected,
         ? `Current promotions/offers: ${topOffers.join('; ')}. Mention these when relevant to the visitor's interest.`
         : '';
 
-      const systemPrompt = `You are a helpful assistant for a real business. You speak on behalf of this specific business — adopt its tone and persona naturally.
-Answer visitor questions using ONLY the factual business knowledge provided below.
-Be concise (under 100 words), conversational, and genuinely helpful.
-Never invent pricing, features, policies, services, or any information not explicitly listed below.
-If you don't know something, say so honestly and immediately pivot to lead capture: offer to connect them with the team.
-
-CRITICAL RULES:
-1. Answer the question directly first. No filler openers like "For teams, this is especially relevant."
-2. Do not repeat filler phrases. Vary your wording across turns.
-3. Be concise, direct, and natural. Never repeat questions already asked.
-4. Use ONLY the specific business information below — never give generic answers.
-5. If the visitor asks about pricing, services, or products, reference only the actual business details provided.
-6. Only suggest booking a demo or contacting sales if the visitor explicitly asks or the business goal calls for it.
-7. Be warm and helpful, not pushy.
-${businessGoalHint}
-${topOffersHint}
-
-KNOWLEDGE CONSTRAINT:
-If the visitor's question cannot be answered from the business knowledge below, respond with:
-"I want to make sure I give you an accurate answer — let me have our team confirm that for you directly. What is the best email or phone number to reach you?"
-This pivots unknown questions to lead capture. Never guess or fabricate information.
-
-LEAD CAPTURE:
-If the visitor shares contact details or company info in this message (email, phone, their name, or company), also include an "extractedLead" object with the fields email, phone, name, company (leave null when not provided). Never invent contact details.
-
-BUSINESS KNOWLEDGE:
-${businessContext}
-
-Respond with ONLY a JSON object — no markdown, no explanation, using exactly this shape:
-{
-  "responseText": "your response to the visitor",
-  "strategy": "one or two words describing your conversational strategy, e.g. educate, qualify, handle_objection, advance_funnel, recommend_plan, close_trial, schedule_demo, build_trust",
-  "suggestedTopics": ["1-3 follow-up topics the visitor might care about next"],
-  "suggestedOptions": ["2-3 short clickable follow-up options the visitor might want to ask next, tailored to THIS business and the current conversation. Each is 2-6 words. Examples: 'Book an Appointment', 'Check Insurance Coverage', 'See Pricing Plans', 'Compare Features', 'Talk to Sales', 'Emergency Care Info'"],
-  "ctaType": "one of: none, book_demo, start_free_trial, contact_sales, pricing, support",
-  "funnelStage": "one of: greeting, awareness, interest, consideration, evaluation, purchase_intent, decision, customer, support"
-}`;
+      const systemPrompt = buildGroundedSystemPrompt({
+        businessProfile,
+        businessContext,
+        businessGoalHint,
+        topOffersHint,
+      });
 
       const text = await callLLMWithFallback(systemPrompt, messages);
       const parsed = parseLLMResponse(text);
@@ -2635,11 +2623,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
           }
         }
         if (Array.isArray(parsed.suggestedOptions)) {
-          for (const opt of parsed.suggestedOptions.slice(0, 3)) {
-            if (typeof opt === 'string' && opt.trim().length > 0 && opt.trim().length <= 40) {
-              llmSuggestedOptions.push(opt.trim());
-            }
-          }
+          llmSuggestedOptions.push(...sanitizeSuggestedOptions(parsed.suggestedOptions));
         }
       } else {
         // LLM responded with unparseable output — degrade gracefully to the
@@ -2875,6 +2859,12 @@ funnelStage: ciResult.funnelStage,
     buttonCTR: Object.fromEntries(Object.entries(telemetrySnapshot.byButton).map(([buttonId, record]) => [buttonId, record.ctr])),
   };
 
+  enrichedResponse = replaceUngroundedPlatformSpeech(enrichedResponse, groundingKnowledge);
+  const groundedSuggestedOptions = sanitizeSuggestedOptions([
+    ...llmSuggestedOptions,
+    ...fallbackSuggestedOptions(businessProfile),
+  ]).slice(0, 3);
+
   return {
     responseText: enrichedResponse,
     cta,
@@ -2903,7 +2893,7 @@ funnelStage: ciResult.funnelStage,
     decisionTrace,
     debugPanel: buildDebugPanel(memory, plan, ciResult, quickReplies, nextBestAction, momentum),
     extractedLead: mergeLeadFields(extractLeadDetails(message), structuredLeadFields),
-    suggestedOptions: llmSuggestedOptions,
+    suggestedOptions: groundedSuggestedOptions,
   };
 }
 
@@ -2959,7 +2949,7 @@ function buildTimeoutFallback(input: BrainInput): BrainOutput {
     ciResult,
     orchestratorResult: ciResult as any,
     extractedLead: extractLeadDetails(input.message),
-    suggestedOptions: [],
+    suggestedOptions: fallbackSuggestedOptions(input.businessProfile),
   };
 }
 

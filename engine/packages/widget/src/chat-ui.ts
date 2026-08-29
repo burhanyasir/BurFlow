@@ -1185,9 +1185,11 @@ export class ChatWidget {
       },
       onDone: () => {},
       onUiState: (uiState, cta, suggestedOptions) => {
-        this.uiState = uiState || null;
-        this.cta = cta || null;
-        this.suggestedOptions = suggestedOptions || [];
+        this.uiState = uiState || this.uiState || null;
+        this.cta = cta || this.cta || null;
+        if (Array.isArray(suggestedOptions)) {
+          this.suggestedOptions = suggestedOptions;
+        }
         this.renderUiState();
       },
       onHumanTakeover: () => {
@@ -1202,7 +1204,9 @@ export class ChatWidget {
         this.isStreaming = false;
         this.updateSendButton();
         this.scrollToBottom();
-        if (!this.uiState) {
+        if (this.suggestedOptions.length > 0 || this.uiState || this.cta) {
+          this.renderUiState();
+        } else {
           this.clearUiState();
         }
       },
@@ -1803,17 +1807,18 @@ export class ChatWidget {
     if (!this.config.widgetToken) return;
 
     try {
-      // Empty apiUrl means same-origin — a relative /api/... URL resolves
-      // against the page origin (Vite proxy in dev, nginx in prod).
       const url = `${this.config.apiUrl}/api/widget/config?token=${encodeURIComponent(this.config.widgetToken)}`;
       const response = await fetch(url, {
         headers: { 'Content-Type': 'application/json' },
       });
-      if (!response.ok) return;
+      if (!response.ok) {
+        console.warn(`[BurFlow Widget] Config fetch failed: HTTP ${response.status} — tenant-specific options may not load.`);
+        return;
+      }
       const remoteConfig = await response.json();
       this.applyRemoteConfig(remoteConfig);
-    } catch {
-      // Ignore fetch failures and continue with default config
+    } catch (err: any) {
+      console.warn('[BurFlow Widget] Config fetch error:', err?.message || err, '— falling back to defaults. Check CORS / network.');
     }
   }
 
@@ -1840,6 +1845,16 @@ export class ChatWidget {
 
     if (this.isOpen && this.messages.length === 0 && this.config.greeting) {
       this.addMessage({ role: 'assistant', content: this.config.greeting });
+    }
+
+    // If the chat is open and shows only the initial greeting (no user
+    // messages yet), re-render the welcome cards so tenant-specific
+    // starterOptions arrive from the server without requiring a page reload.
+    if (this.isOpen && this.messages.length <= 1) {
+      const hasUserMessages = this.messages.some((m) => m.role === 'user');
+      if (!hasUserMessages) {
+        this.renderInitialActions();
+      }
     }
 
     if (this.config.autoOpen && !this.isOpen && !this.autoOpenTimer) {

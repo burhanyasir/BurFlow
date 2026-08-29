@@ -148,11 +148,13 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     let rapportQuickReplies: any[] = [];
     let rapportUiState: any = { buttons: [], suggestedActions: [] };
     let rapportLeadCapture: any = null;
+    let rapportBrainOutputSuggested: string[] = [];
     try {
       const rapportBrainOutput = await brainFunction(rapportBrainInput);
       rapportQuickReplies = rapportBrainOutput?.quickReplies || [];
       rapportUiState = rapportBrainOutput?.uiState || rapportUiState;
       rapportLeadCapture = rapportBrainOutput?.extractedLead || null;
+      rapportBrainOutputSuggested = rapportBrainOutput?.suggestedOptions || [];
     } catch {}
 
     const latencyMs = Date.now() - startTime;
@@ -182,7 +184,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
       quickReplies: rapportQuickReplies,
       uiState: rapportUiState,
       cta: null,
-      suggestedOptions: [],
+      suggestedOptions: rapportBrainOutputSuggested,
       leadCapture: rapportLeadCapture,
     };
   }

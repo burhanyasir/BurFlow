@@ -311,19 +311,85 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     return `${encoded}.${sig}`;
   }
 
-  function getDemoWidgetConfig(): Record<string, unknown> {
-    return {
-      theme: 'light',
-      position: 'bottom-right',
-      primaryColor: '#006248',
-      logoUrl: undefined,
-      companyName: 'BurFlow',
-      greeting: 'Hi! I’m BurFlow. How can I help you today?',
-      launcherText: 'Start a conversation',
-      allowedDomains: [],
-      autoOpen: false,
-      autoOpenDelay: 3,
+  function getDemoWidgetConfig(tenantId?: string): Record<string, unknown> {
+    const configs: Record<string, Record<string, unknown>> = {
+      'demo-dental': {
+        theme: 'light',
+        position: 'bottom-right',
+        primaryColor: '#2563eb',
+        logoUrl: undefined,
+        companyName: 'Bright Smile Dental',
+        greeting: 'Hi! Welcome to Bright Smile Dental. How can I help you today?',
+        launcherText: 'Chat with us',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        businessProfile: { business_type: 'clinic', primary_goal: 'appointment_booking' },
+        starterOptions: ['What services do you offer?', 'Book an appointment', 'Where are you located?'],
+        suggestedActions: [],
+      },
+      'demo-ecommerce': {
+        theme: 'light',
+        position: 'bottom-right',
+        primaryColor: '#A8244B',
+        logoUrl: undefined,
+        companyName: 'Urban Fashion Store',
+        greeting: 'Hi! Welcome to Urban Fashion. How can I help you find the right product?',
+        launcherText: 'Chat with us',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        businessProfile: { business_type: 'ecommerce', primary_goal: 'sales' },
+        starterOptions: ['Find the right product', 'How fast is delivery?', 'What is your return policy?'],
+        suggestedActions: [],
+      },
+      'bright-smile-dental-4b7e29': {
+        theme: 'light',
+        position: 'right',
+        primaryColor: '#0e7a5f',
+        logoUrl: undefined,
+        companyName: 'BrightSmile Dental',
+        greeting: 'Hi! Welcome to BrightSmile Dental. I can help with appointments, insurance, or service info.',
+        launcherText: 'Chat with us',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        businessProfile: { business_type: 'clinic', primary_goal: 'appointment_booking' },
+        starterOptions: ['What services do you offer?', 'Book an appointment', 'What are your hours?'],
+        suggestedActions: [],
+      },
+      'burflow-store-212de6': {
+        theme: 'light',
+        position: 'right',
+        primaryColor: '#111827',
+        logoUrl: undefined,
+        companyName: 'BurFlow Store',
+        greeting: 'Hi! Welcome to BurFlow Store. How can I help you today?',
+        launcherText: 'Chat with us',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        businessProfile: { business_type: 'ecommerce', primary_goal: 'sales' },
+        starterOptions: ['Find the right product', 'How fast is delivery?', 'What is your return policy?'],
+        suggestedActions: [],
+      },
+      'demo-tenant': {
+        theme: 'light',
+        position: 'bottom-right',
+        primaryColor: '#006248',
+        logoUrl: undefined,
+        companyName: 'BurFlow',
+        greeting: "Hi! I'm BurFlow. How can I help you today?",
+        launcherText: 'Start a conversation',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        starterOptions: ['How can you help me?', 'What do you offer?', 'Talk to a person'],
+        suggestedActions: [],
+      },
     };
+
+    return configs[tenantId || ''] || configs['demo-tenant'];
   }
 
   function verifyWidgetToken(token: string, requestOrigin?: string): { tenantId: string } | null {
@@ -472,7 +538,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       const config = widgetConfigRepo.get(tenantId);
       if (!config) {
         if (DEMO_TENANT_IDS.has(tenantId)) {
-          const demoConfig = getDemoWidgetConfig();
+          const demoConfig = getDemoWidgetConfig(tenantId);
           return res.json(demoConfig);
         }
         return res.status(404).json({ error: 'Widget not configured' });

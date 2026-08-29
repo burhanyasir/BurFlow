@@ -18,6 +18,14 @@ export * from './conversation-validator';
 export { processConversationBrain } from './conversation-brain';
 export type { BrainInput, BrainOutput } from './conversation-brain';
 export {
+  OUT_OF_KNOWLEDGE_REPLY,
+  buildGroundedSystemPrompt,
+  fallbackSuggestedOptions,
+  replaceUngroundedPlatformSpeech,
+  resolveTenantIdentity,
+  sanitizeSuggestedOptions,
+} from './tenant-grounding';
+export {
   normalizeMessageContent,
   normalizeToNormalizedContent,
   PayloadValidationError,

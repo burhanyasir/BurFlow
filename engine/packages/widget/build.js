@@ -1,6 +1,5 @@
 const { execSync } = require('child_process');
 const path = require('path');
-const fs = require('fs');
 
 const esbuild = path.resolve(__dirname, '../../node_modules/esbuild/bin/esbuild');
 const src = path.resolve(__dirname, 'src/index.ts');

@@ -322,6 +322,9 @@ export function createChatRoutes(
           } else if (wc?.companyName) {
             businessProfile = { companyName: wc.companyName };
           }
+          if (wc?.allowedDomains?.length) {
+            businessProfile = { ...(businessProfile || {}), domain: (businessProfile as any)?.domain || wc.allowedDomains[0] };
+          }
         } catch {
           businessProfile = undefined;
         }
@@ -465,7 +468,7 @@ export function createChatRoutes(
           writeSseEvent(res, { type: 'token', content: chunk });
         }
         writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta, suggestedOptions });
-        writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId });
+        writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId, suggestedOptions });
         writeSseEvent(res, { type: 'done', finishReason: 'stop' });
         return res.end();
       }

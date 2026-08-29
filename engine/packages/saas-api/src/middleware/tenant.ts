@@ -11,7 +11,14 @@ const logger = createLogger('saas-api:tenant');
  * conversations, messages and usage are keyed by the tenant id string, so no
  * tenant row is required for chat to work.
  */
-export const DEMO_TENANT_IDS = new Set(['burflow-saas', 'demo-tenant']);
+export const DEMO_TENANT_IDS = new Set([
+  'burflow-saas',
+  'demo-tenant',
+  'demo-dental',
+  'demo-ecommerce',
+  'bright-smile-dental-4b7e29',
+  'burflow-store-212de6',
+]);
 
 export function requireTenant(tenantRepo: TenantRepository, opts?: { allowDemoTenants?: boolean }) {
   return (req: Request, res: Response, next: NextFunction): void => {

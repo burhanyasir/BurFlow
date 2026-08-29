@@ -48,14 +48,14 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
   if (contentType.includes('application/json')) {
     try {
       const data = await response.json();
-      if (data.response) {
-        onComplete(data.response, data.turnId || '');
-      }
       if (data.humanTakeover) {
         options.onHumanTakeover?.();
       }
       if (options.onUiState) {
         options.onUiState(data.uiState, data.cta, data.suggestedOptions);
+      }
+      if (data.response) {
+        onComplete(data.response, data.turnId || '');
       }
       return;
     } catch (err: any) {
@@ -104,6 +104,9 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
               if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'complete':
+              if (options.onUiState && (event.suggestedOptions || event.uiState || event.cta)) {
+                options.onUiState(event.uiState, event.cta, event.suggestedOptions);
+              }
               onComplete(event.fullContent || '', event.turnId || '');
               if (event.humanTakeover) options.onHumanTakeover?.();
               break;

@@ -13,16 +13,21 @@ const _scriptEl = typeof document !== 'undefined' ? document.currentScript as HT
 /**
  * Best-effort resolution of the widget's script element. Prefers the script
  * that is currently executing (document.currentScript); when that is null
- * (async/defer/module loading) finds the first script tagged with widget
- * bootstrap attributes in the document.
+ * (async/defer/module loading) finds the last script tagged with widget
+ * bootstrap attributes in the document (last wins, matching typical
+ * single-widget-per-page usage).
  */
 function resolveScriptEl(): HTMLScriptElement | null {
   if (typeof document === 'undefined') return null;
   const current = document.currentScript as HTMLScriptElement | null;
   if (current) return current;
-  return document.querySelector<HTMLScriptElement>(
+  // querySelectorAll returns in document order; reverse to prefer the last
+  // script tag (most recently added), which is the one the page author just
+  // pasted rather than an older or bundled copy.
+  const candidates = document.querySelectorAll<HTMLScriptElement>(
     'script[data-tenant-id], script[data-token]',
   );
+  return candidates.length > 0 ? candidates[candidates.length - 1] : null;
 }
 
 export function initChatWidget(config: WidgetConfig): ChatWidget {
@@ -56,14 +61,22 @@ if (typeof window !== 'undefined') {
   //    proxy or an nginx /api reverse proxy need no extra configuration.
   function autoInit() {
     try {
-      const script = _scriptEl || resolveScriptEl();
+      // Prefer the live currentScript at call time, fall back to the captured
+      // reference, then DOM scan. This handles async/defer loading where
+      // _scriptEl was null at module eval time.
+      const script = (document.currentScript as HTMLScriptElement | null) || _scriptEl || resolveScriptEl();
       if (!script) return;
       let apiUrl = script.getAttribute('data-api-url') || '';
       if (!apiUrl) {
         const src = script.src || '';
         try {
-          const u = new URL(src, location.href);
-          apiUrl = u.origin;
+          const scriptOrigin = new URL(src, location.href).origin;
+          // Only set apiUrl when the script is hosted on a different origin
+          // than the page (cross-origin widget hosting). Same-origin keeps
+          // apiUrl empty so requests use relative /api/ paths.
+          if (scriptOrigin && scriptOrigin !== location.origin) {
+            apiUrl = scriptOrigin;
+          }
         } catch {}
       }
       const primaryColor = script.getAttribute('data-primary-color') || undefined;
