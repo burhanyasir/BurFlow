@@ -22,11 +22,18 @@ export const DEMO_TENANT_IDS = new Set([
 
 export function requireTenant(tenantRepo: TenantRepository, opts?: { allowDemoTenants?: boolean }) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    const tenantId = req.tenantId || req.params.tenantId;
+    // Owner JWTs may not carry a tenantId; allow query/header fallback so the
+    // agent inbox and other admin routes can work across tenants.
+    const tenantId = req.tenantId
+      || req.params.tenantId
+      || (typeof req.query?.tenantId === 'string' ? req.query.tenantId : undefined)
+      || req.headers['x-tenant-id'] as string | undefined;
     if (!tenantId) {
       res.status(400).json({ error: 'Tenant context required' });
       return;
     }
+    // Ensure req.tenantId is set for downstream handlers (e.g. agent-chat).
+    if (!req.tenantId) req.tenantId = tenantId;
     let tenant = tenantRepo.findById(tenantId);
     if (!tenant) {
       // Public demo tenants may operate before their row is seeded (e.g. the

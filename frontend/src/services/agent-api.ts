@@ -60,8 +60,9 @@ export interface AgentMessageResponse {
 }
 
 /** Active sessions for the agent inbox. */
-export async function fetchSessions(): Promise<{ sessions: AgentSession[]; total: number }> {
-  return apiClient.get<{ sessions: AgentSession[]; total: number }>('/sessions');
+export async function fetchSessions(tenantId?: string): Promise<{ sessions: AgentSession[]; total: number }> {
+  const qs = tenantId ? `?tenantId=${encodeURIComponent(tenantId)}` : '';
+  return apiClient.get<{ sessions: AgentSession[]; total: number }>(`/sessions${qs}`);
 }
 
 /** Full message thread for a session. */

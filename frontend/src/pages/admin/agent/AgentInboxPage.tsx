@@ -70,9 +70,39 @@ export default function AgentInboxPage() {
   const [pollError, setPollError] = useState<string | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
+  // Resolve tenant context: owner JWTs have no tenantId, so we auto-resolve
+  // from the first owned tenant or pass it via query string.
+  const [tenantId, setTenantId] = useState<string | null>(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('tenantId');
+  });
+
+  useEffect(() => {
+    if (tenantId) return;
+    // Try to resolve from the user's auth session or owner tenant list
+    const sessionRaw = localStorage.getItem('burflow_auth_session');
+    if (sessionRaw) {
+      try {
+        const session = JSON.parse(sessionRaw);
+        if (session.tenant?.id) { setTenantId(session.tenant.id); return; }
+      } catch {}
+    }
+    const ownerToken = localStorage.getItem('owner_token');
+    if (ownerToken) {
+      fetch('/api/owner/tenants', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+      })
+        .then(r => r.json())
+        .then((data) => {
+          if (data.tenants?.length) setTenantId(data.tenants[0].id);
+        })
+        .catch(() => {});
+    }
+  }, [tenantId]);
+
   const refreshSessions = useCallback(async () => {
     try {
-      const res = await fetchSessions();
+      const res = await fetchSessions(tenantId || undefined);
       setSessions(res.sessions);
       setPollError(null);
     } catch (err: any) {
@@ -80,7 +110,7 @@ export default function AgentInboxPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [tenantId]);
 
   const refreshThread = useCallback(async (conversationId: string) => {
     try {
