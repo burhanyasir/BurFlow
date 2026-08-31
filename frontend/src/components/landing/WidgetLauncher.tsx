@@ -13,6 +13,7 @@ const STYLE_ID = 'burflow-widget-styles';
 // page immediately, with no per-deployment configuration. Override via
 // VITE_WIDGET_TENANT_ID in .env.production/.env.development.
 const DEFAULT_TENANT_ID = 'burflow-saas';
+const WIDGET_CDN = 'https://burflow.onrender.com';
 
 export function WidgetLauncher() {
   useEffect(() => {
@@ -28,13 +29,13 @@ export function WidgetLauncher() {
       const style = document.createElement('link');
       style.id = STYLE_ID;
       style.rel = 'stylesheet';
-      style.href = '/widget/styles.css';
+      style.href = WIDGET_CDN + '/widget/styles.css';
       document.head.appendChild(style);
     }
 
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
-    script.src = '/widget/widget.js';
+    script.src = WIDGET_CDN + '/widget/widget.js';
     script.async = true;
     // The widget's autoInit reads these attributes and bootstraps itself.
     script.setAttribute('data-tenant-id', tenantId);

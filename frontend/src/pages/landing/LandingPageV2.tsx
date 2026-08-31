@@ -11,7 +11,7 @@ import { cn } from '../../utils/cn';
 // SaaS demo tenant.
 const DEV_WIDGET_TENANT_ID = import.meta.env.DEV ? 'burflow-saas' : undefined;
 const WIDGET_TENANT_ID = (import.meta.env.VITE_WIDGET_TENANT_ID as string | undefined) || DEV_WIDGET_TENANT_ID;
-const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || '/widget/widget.js';
+const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://burflow.onrender.com/widget/widget.js';
 const WIDGET_API_URL = import.meta.env.VITE_API_URL || '';
 
 const fadeUp = { initial: { opacity: 0, y: 24 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-60px' } };
