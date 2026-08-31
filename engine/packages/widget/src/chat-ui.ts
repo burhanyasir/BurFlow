@@ -405,6 +405,7 @@ export class ChatWidget {
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
       .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
       .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
+      .cw-header { background:linear-gradient(135deg,color-mix(in srgb, var(--cw-primary-color,#006248) 70%, black) 0%,var(--cw-primary-color,#006248) 60%,color-mix(in srgb, var(--cw-primary-color,#006248) 80%, white) 100%) !important; }
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px color-mix(in srgb, var(--cw-primary-color,#006248) 55%, transparent) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
@@ -969,7 +970,11 @@ export class ChatWidget {
     talkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Talk to a human';
     talkBtn.addEventListener('mouseenter', () => { const tc = this.config.primaryColor || '#006248'; talkBtn.style.borderColor = tc; talkBtn.style.color = tc; talkBtn.style.background = '#F0FFF4'; });
     talkBtn.addEventListener('mouseleave', () => { talkBtn.style.borderColor = '#E0E4EB'; talkBtn.style.color = '#6B7280'; talkBtn.style.background = '#F8F9FB'; });
-    talkBtn.addEventListener('click', () => this.requestHumanAgent());
+    talkBtn.addEventListener('click', () => {
+      if (confirm('Connect with a live team member? An agent will be notified to join this conversation.')) {
+        this.requestHumanAgent();
+      }
+    });
     talkToHumanRow.appendChild(talkBtn);
     wrapper.appendChild(talkToHumanRow);
 

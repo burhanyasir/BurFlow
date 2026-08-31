@@ -7,6 +7,7 @@ import { Avatar } from '../../../components/ui/Avatar';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Skeleton } from '../../../components/ui/Skeleton';
 import { useToast } from '../../../components/ui/Toast';
+import { useAuth } from '../../../lib/auth-context';
 import type { SidebarItem } from '../../../layouts/Sidebar';
 import {
   fetchSessions, fetchMessages, initiateTakeover, releaseTakeover, sendAgentMessage, openAgentEventStream,
@@ -57,6 +58,7 @@ function stateLabel(state: AgentSession['sessionState']): string {
 export default function AgentInboxPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { tenant } = useAuth();
 
   const [sessions, setSessions] = useState<AgentSession[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -70,23 +72,22 @@ export default function AgentInboxPage() {
   const [pollError, setPollError] = useState<string | null>(null);
   const threadEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Resolve tenant context: owner JWTs have no tenantId, so we auto-resolve
-  // from the first owned tenant or pass it via query string.
+  // Resolve tenant context: owner JWTs have no tenantId in the JWT payload,
+  // so we use the auth context (which stores it from login/refreshUser).
   const [tenantId, setTenantId] = useState<string | null>(() => {
     const params = new URLSearchParams(window.location.search);
     return params.get('tenantId');
   });
 
+  // Sync tenant from auth context (for non-owner users whose JWT carries tenantId)
+  useEffect(() => {
+    if (tenantId || !tenant?.id) return;
+    setTenantId(tenant.id);
+  }, [tenant, tenantId]);
+
+  // Fallback for owner users: fetch from owner API
   useEffect(() => {
     if (tenantId) return;
-    // Try to resolve from the user's auth session or owner tenant list
-    const sessionRaw = localStorage.getItem('burflow_auth_session');
-    if (sessionRaw) {
-      try {
-        const session = JSON.parse(sessionRaw);
-        if (session.tenant?.id) { setTenantId(session.tenant.id); return; }
-      } catch {}
-    }
     const ownerToken = localStorage.getItem('owner_token');
     if (ownerToken) {
       fetch('/api/owner/tenants', {
