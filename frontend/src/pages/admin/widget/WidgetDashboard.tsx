@@ -62,6 +62,7 @@ export default function WidgetDashboard() {
   const [autoOpenDelay, setAutoOpenDelay] = useState(3);
   const [activeTab, setActiveTab] = useState('vanilla');
   const [agentId, setAgentId] = useState<string | null>(null);
+  const [tenantId, setTenantId] = useState<string | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -73,6 +74,7 @@ export default function WidgetDashboard() {
       const tenantRes = await apiClient.get<{ tenants: Array<{ id: string; slug: string }> }>('/tenants');
       const ts = tenantRes.tenants || [];
       if (ts.length > 0) {
+        setTenantId(ts[0].id);
         const slug = ts[0].slug;
         setAgentId(slug);
         const tokenRes = await apiClient.post<{ token: string }>('/widget/token');
@@ -99,6 +101,7 @@ export default function WidgetDashboard() {
   const handleSave = async () => {
     setSaving(true); try {
       await apiClient.put('/widget/config', {
+        tenantId: tenantId || undefined,
         primaryColor,
         position,
         greeting: welcomeMessage,

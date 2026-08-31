@@ -450,6 +450,7 @@ export function useOnboardingState() {
 
   const updateWidgetConfig = useCallback(async (): Promise<void> => {
     await apiClient.put('/widget/config', {
+      tenantId: data.workspace.tenantId || undefined,
       primaryColor: data.custom.primaryColor,
       position: data.custom.position,
       greeting: data.custom.welcomeMessage,

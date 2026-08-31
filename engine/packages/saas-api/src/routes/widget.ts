@@ -463,7 +463,20 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
-      const token = generateWidgetToken(req.tenantId!);
+      if (!req.tenantId) {
+        const bodyTenantId = (req.body as any)?.tenantId;
+        if (bodyTenantId) {
+          req.tenantId = bodyTenantId;
+        } else if (tenantRepo) {
+          const tenants = tenantRepo.findByOwner(req.user.sub);
+          if (tenants.length > 0) req.tenantId = tenants[0].id;
+        }
+      }
+      if (!req.tenantId) {
+        return res.status(400).json({ error: 'Tenant context required' });
+      }
+
+      const token = generateWidgetToken(req.tenantId);
       res.json({
         token,
         expiresIn: 86400,
@@ -636,8 +649,19 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!req.user?.role || !allowed.includes(req.user.role)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
-      // Same schema validation as PATCH — never upsert the raw body. Unknown
-      // keys would otherwise be written as arbitrary columns (incl. tenant_id).
+      // Owner JWTs may not carry tenantId. Resolve from body or first owned tenant.
+      if (!req.tenantId) {
+        const bodyTenantId = (req.body as any)?.tenantId;
+        if (bodyTenantId) {
+          req.tenantId = bodyTenantId;
+        } else if (tenantRepo) {
+          const tenants = tenantRepo.findByOwner(req.user.sub);
+          if (tenants.length > 0) req.tenantId = tenants[0].id;
+        }
+      }
+      if (!req.tenantId) {
+        return res.status(400).json({ error: 'Tenant context required' });
+      }
       const result = sanitizeWidgetConfig(req.body);
       if (!result.ok) {
         return res.status(400).json({ error: result.error });
@@ -660,6 +684,18 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       const allowed = ['admin', 'owner'];
       if (!req.user?.role || !allowed.includes(req.user.role)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
+      }
+      if (!req.tenantId) {
+        const bodyTenantId = (req.body as any)?.tenantId;
+        if (bodyTenantId) {
+          req.tenantId = bodyTenantId;
+        } else if (tenantRepo) {
+          const tenants = tenantRepo.findByOwner(req.user.sub);
+          if (tenants.length > 0) req.tenantId = tenants[0].id;
+        }
+      }
+      if (!req.tenantId) {
+        return res.status(400).json({ error: 'Tenant context required' });
       }
       const result = sanitizeWidgetConfig(req.body);
       if (!result.ok) {
