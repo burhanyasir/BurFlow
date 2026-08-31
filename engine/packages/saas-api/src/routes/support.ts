@@ -302,10 +302,27 @@ export function createSupportRoutes(
       // Keep status='active' (inbox only queries active conversations)
       // and use session_state to indicate handoff request
       try {
-        const conv = conversationRepo.findBySession(tenantId, sessionId);
-        if (conv) {
+        let conv = conversationRepo.findBySession(tenantId, sessionId);
+        // If no conversation exists yet (visitor clicked Talk to Human without chatting), create one
+        if (!conv) {
+          const convId = generateId();
+          db.prepare(
+            'INSERT INTO conversations (id, tenant_id, session_id, message_count, status, session_state, started_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+          ).run(convId, tenantId, sessionId, 0, 'active', 'human_takeover', now);
+          conv = conversationRepo.findById(convId);
+        } else {
           try {
             db.prepare('UPDATE conversations SET session_state = ? WHERE id = ?').run('human_takeover', conv.id);
+          } catch { /* non-critical */ }
+        }
+        // Also record the visitor message in the conversation
+        if (conv) {
+          try {
+            const msgId = generateId();
+            db.prepare(
+              'INSERT INTO messages (id, conversation_id, tenant_id, role, content, sequence_number, sender, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+            ).run(msgId, conv.id, tenantId, 'user', message || "I'd like to talk to a human agent.", 1, 'visitor', now);
+            db.prepare('UPDATE conversations SET message_count = message_count + 1 WHERE id = ?').run(conv.id);
           } catch { /* non-critical */ }
         }
       } catch {
