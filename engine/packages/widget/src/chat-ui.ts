@@ -405,33 +405,33 @@ export class ChatWidget {
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
       .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
       .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
-      .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px rgba(0,98,72,0.55) !important; }
-      .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px rgba(0,98,72,0.4) !important; }
+      .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px color-mix(in srgb, var(--cw-primary-color,#006248) 55%, transparent) !important; }
+      .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
-      .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px rgba(0,98,72,0.12) !important; background:#fff !important; }
+      .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--cw-primary-color,#006248) 12%, transparent) !important; background:#fff !important; }
       .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
-      .cw-preopen-pill { background:#E8F5E9 !important; color:#006248 !important; border:1px solid #C8E6C9 !important; }
-      .cw-preopen-pill:hover { background:#006248 !important; color:#fff !important; }
+      .cw-preopen-pill { background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white) !important; color:var(--cw-primary-color,#006248) !important; border:1px solid color-mix(in srgb, var(--cw-primary-color,#006248) 20%, white) !important; }
+      .cw-preopen-pill:hover { background:var(--cw-primary-color,#006248) !important; color:#fff !important; }
       /* Welcome action cards */
       .cw-welcome-cards { display:flex; flex-direction:column; gap:6px; padding:2px 0 6px; }
       .cw-welcome-card { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid #E8ECF1; border-radius:12px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
       .cw-welcome-card:hover { border-color:#A5D6A7; background:#F0FAF4; transform:translateY(-1px); box-shadow:0 4px 16px rgba(0,98,72,0.08); }
       .cw-welcome-card:active { transform:translateY(0); box-shadow:none; }
-      .cw-welcome-card-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; flex-shrink:0; }
+      .cw-welcome-card-icon { width:32px; height:32px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white); color:var(--cw-primary-color,#006248); flex-shrink:0; }
       .cw-welcome-card-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
       .cw-welcome-card-body { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
       .cw-welcome-card-body b { font-size:13px; font-weight:600; color:#1F2937; letter-spacing:-0.01em; line-height:1.35; }
       .cw-welcome-card-body small { font-size:11px; color:#6B7280; line-height:1.35; white-space:normal; overflow:visible; }
-      .cw-welcome-card-badge { display:inline-block; padding:2px 6px; border-radius:999px; background:#E8F5E9; color:#006248; font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; width:fit-content; }
+      .cw-welcome-card-badge { display:inline-block; padding:2px 6px; border-radius:999px; background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white); color:var(--cw-primary-color,#006248); font-size:9px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:2px; width:fit-content; }
       .cw-welcome-card-arrow { width:16px; height:16px; flex-shrink:0; color:#9CA3AF; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; transition:transform 0.15s ease, color 0.15s ease; }
       .cw-welcome-card:hover .cw-welcome-card-arrow { transform:translateX(2px); color:#006248; }
       .cw-welcome-section { margin-top:12px; }
       .cw-welcome-section-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
       .cw-welcome-section-title { font-size:10px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#374151; }
       .cw-welcome-section-meta { font-size:10px; color:#9CA3AF; }
-      .cw-welcome-escape { display:block; width:100%; padding:6px 0; margin-top:4px; border:0; background:transparent; color:#006248; font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; border-radius:8px; transition:background 0.15s ease; }
+      .cw-welcome-escape { display:block; width:100%; padding:6px 0; margin-top:4px; border:0; background:transparent; color:var(--cw-primary-color,#006248); font-size:12px; font-weight:600; font-family:inherit; cursor:pointer; text-align:center; border-radius:8px; transition:background 0.15s ease; }
       .cw-welcome-escape:hover { background:#F0FAF4; }
-      .cw-welcome-icon { width:30px; height:30px; display:grid; place-items:center; border-radius:10px; background:#E8F5E9; color:#006248; margin-bottom:8px; }
+      .cw-welcome-icon { width:30px; height:30px; display:grid; place-items:center; border-radius:10px; background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white); color:var(--cw-primary-color,#006248); margin-bottom:8px; }
       .cw-welcome-icon svg { width:18px; height:18px; fill:none; stroke:currentColor; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
       html[data-cw-theme='dark'] .cw-container { background:#111827 !important; }
       html[data-cw-theme='dark'] .cw-messages { background:#0F172A !important; }
@@ -705,7 +705,8 @@ export class ChatWidget {
     const header = document.createElement('div');
     header.style.cssText = 'padding:12px 14px 8px;display:flex;align-items:center;gap:8px;';
     const brandMark = document.createElement('span');
-    brandMark.style.cssText = 'width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:#006248;color:#fff;font-size:13px;font-weight:800;flex-shrink:0;';
+    const bc = this.config.primaryColor || '#006248';
+    brandMark.style.cssText = `width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:${bc};color:#fff;font-size:13px;font-weight:800;flex-shrink:0;`;
     brandMark.textContent = (this.config.companyName || 'C')[0].toUpperCase();
     header.appendChild(brandMark);
     const brandText = document.createElement('span');
@@ -731,7 +732,8 @@ export class ChatWidget {
 
     // Escape link
     const escapeLink = document.createElement('div');
-    escapeLink.style.cssText = 'padding:6px 14px 12px;text-align:center;font-size:11.5px;color:#006248;font-weight:600;cursor:pointer;transition:background 0.15s ease;border-radius:0 0 14px 14px;';
+    const ec = this.config.primaryColor || '#006248';
+    escapeLink.style.cssText = `padding:6px 14px 12px;text-align:center;font-size:11.5px;color:${ec};font-weight:600;cursor:pointer;transition:background 0.15s ease;border-radius:0 0 14px 14px;`;
     escapeLink.textContent = 'Ask something else →';
     escapeLink.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -770,7 +772,8 @@ export class ChatWidget {
 
       const pill = document.createElement('span');
       pill.className = 'cw-preopen-pill';
-      pill.style.cssText = 'display:inline-flex;align-items:center;padding:6px 12px;border-radius:9px;background:#E8F5E9;color:#006248;font-size:12.5px;font-weight:500;white-space:nowrap;border:1px solid #C8E6C9;transition:all 0.18s ease;line-height:1.3;flex:1;';
+      const pc = this.config.primaryColor || '#006248';
+      pill.style.cssText = `display:inline-flex;align-items:center;padding:6px 12px;border-radius:9px;background:${this.hexToRgba(pc, 0.1)};color:${pc};font-size:12.5px;font-weight:500;white-space:nowrap;border:1px solid ${this.hexToRgba(pc, 0.2)};transition:all 0.18s ease;line-height:1.3;flex:1;`;
       pill.textContent = text;
       row.appendChild(pill);
 
@@ -852,7 +855,10 @@ export class ChatWidget {
   private createHeader(): HTMLDivElement {
     const header = document.createElement('div');
     header.className = 'cw-header';
-    header.style.cssText = `background:linear-gradient(135deg,#003d2d 0%,#006248 60%,#00855e 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0;`;
+    const c = this.config.primaryColor || '#006248';
+    const cLight = this.lightenHex(c, 0.2);
+    const cDark = this.darkenHex(c, 0.3);
+    header.style.cssText = `background:linear-gradient(135deg,${cDark} 0%,${c} 60%,${cLight} 100%);color:#fff;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0;`;
 
     const info = document.createElement('div');
     info.style.cssText = 'display:flex;align-items:center;gap:9px;';
@@ -944,7 +950,8 @@ export class ChatWidget {
     const sendBtn = document.createElement('button');
     sendBtn.className = 'cw-send';
     sendBtn.setAttribute('aria-label', 'Send message');
-    sendBtn.style.cssText = `background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border:none;border-radius:12px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px rgba(0,98,72,0.3);transition:transform 0.15s ease,box-shadow 0.15s ease;`;
+    const sc = this.config.primaryColor || '#006248';
+    sendBtn.style.cssText = `background:linear-gradient(135deg,${sc} 0%,${this.darkenHex(sc, 0.2)} 100%);color:#fff;border:none;border-radius:12px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px ${this.hexToRgba(sc, 0.3)};transition:transform 0.15s ease,box-shadow 0.15s ease;`;
     sendBtn.innerHTML = this.getSendIconSvg();
     sendBtn.addEventListener('click', () => this.send());
     this.sendBtnEl = sendBtn;
@@ -960,7 +967,7 @@ export class ChatWidget {
     talkBtn.type = 'button';
     talkBtn.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:10px;border:1.5px solid #E0E4EB;background:#F8F9FB;color:#6B7280;font-size:12px;font-weight:500;cursor:pointer;transition:all 0.15s ease;font-family:inherit;';
     talkBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Talk to a human';
-    talkBtn.addEventListener('mouseenter', () => { talkBtn.style.borderColor = '#006248'; talkBtn.style.color = '#006248'; talkBtn.style.background = '#F0FFF4'; });
+    talkBtn.addEventListener('mouseenter', () => { const tc = this.config.primaryColor || '#006248'; talkBtn.style.borderColor = tc; talkBtn.style.color = tc; talkBtn.style.background = '#F0FFF4'; });
     talkBtn.addEventListener('mouseleave', () => { talkBtn.style.borderColor = '#E0E4EB'; talkBtn.style.color = '#6B7280'; talkBtn.style.background = '#F8F9FB'; });
     talkBtn.addEventListener('click', () => this.requestHumanAgent());
     talkToHumanRow.appendChild(talkBtn);
@@ -968,7 +975,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:5px 0 8px;text-align:center;';
-    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:#006248;">BurFlow</b></span>`;
+    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:${this.config.primaryColor || '#006248'};">BurFlow</b></span>`;
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -989,7 +996,7 @@ export class ChatWidget {
       <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
         <span style="font-size:14px;flex-shrink:0;">👤</span>
         <div>
-          <p style="margin:0;font-size:12px;font-weight:600;color:#003d2d;">Human agent joined</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:${this.config.primaryColor || '#006248'};">Human agent joined</p>
           <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">A real person is now assisting this conversation. Replies will come from them shortly.</p>
         </div>
       </div>`;
@@ -1020,7 +1027,7 @@ export class ChatWidget {
     if (userMessages >= 3) {
       this.handoffEl.style.display = 'block';
       this.handoffEl.innerHTML = `
-        <button class="cw-handoff-link" style="background:none;border:none;color:#006248;font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
+        <button class="cw-handoff-link" style="background:none;border:none;color:${this.config.primaryColor || '#006248'};font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
           Talk to a human
         </button>`;
       this.handoffEl.querySelector('.cw-handoff-link')?.addEventListener('click', () => this.showHandoffForm());
@@ -1035,7 +1042,7 @@ export class ChatWidget {
         <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">Leave your email and we'll reach out shortly.</p>
         <div style="display:flex;gap:8px;">
           <input type="email" class="cw-handoff-email" placeholder="you@company.com" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
-          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
+          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,${this.config.primaryColor || '#006248'} 0%,${this.darkenHex(this.config.primaryColor || '#006248', 0.2)} 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
         </div>
       </div>`;
     this.handoffEl.querySelector('.cw-handoff-submit')?.addEventListener('click', () => this.submitHandoff());
@@ -1158,11 +1165,13 @@ export class ChatWidget {
         assistantMsg.streaming = false;
         this.updateMessageContent(assistantMsg);
       } else {
+        console.warn(`[BurFlow Widget] Talk to Human failed: HTTP ${res.status}`);
         assistantMsg.content = "I wasn't able to reach a human agent right now. Please try again later or email us at support.";
         assistantMsg.streaming = false;
         this.updateMessageContent(assistantMsg);
       }
-    } catch {
+    } catch (err: any) {
+      console.warn('[BurFlow Widget] Talk to Human error:', err?.message || err);
       this.hideTypingIndicator();
       assistantMsg.content = "Connection error. Please try again.";
       assistantMsg.streaming = false;
@@ -1268,8 +1277,9 @@ export class ChatWidget {
     bubble.className = 'cw-message-bubble';
     const isUser = msg.role === 'user';
     const isAgent = msg.sender === 'agent';
+    const uc = this.config.primaryColor || '#006248';
     const bubbleStyle = isUser
-      ? 'background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;'
+      ? `background:linear-gradient(135deg,${uc} 0%,${this.darkenHex(uc, 0.2)} 100%);color:#fff;border-bottom-right-radius:6px;box-shadow:none;`
       : isAgent
         ? 'background:#E8F5E9;color:#1F2937;border:1px solid #C8E6C9;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);'
         : 'background:#F3F4F6;color:#1F2937;border-bottom-left-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,0.04);';
@@ -1286,7 +1296,7 @@ export class ChatWidget {
       const label = document.createElement('div');
       label.className = 'cw-agent-label';
       label.textContent = 'Agent';
-      label.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#006248;margin-bottom:4px;';
+      label.style.cssText = `font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${this.config.primaryColor || '#006248'};margin-bottom:4px;`;
       bubble.appendChild(label);
     }
 
@@ -1540,7 +1550,7 @@ export class ChatWidget {
     title.appendChild(titleText);
     const badge = document.createElement('span');
     badge.textContent = 'Recommended';
-    badge.style.cssText = 'font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px;background:#E8F5E9;color:#006248;';
+    badge.style.cssText = `font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px;background:${this.hexToRgba(this.config.primaryColor || '#006248', 0.1)};color:${this.config.primaryColor || '#006248'};`;
     title.appendChild(badge);
     el.appendChild(title);
 
@@ -1712,9 +1722,35 @@ export class ChatWidget {
     }
   }
 
+  private hexToRgba(hex: string, alpha: number): string {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+
+  private darkenHex(hex: string, factor: number): string {
+    const h = hex.replace('#', '');
+    const r = Math.round(parseInt(h.substring(0, 2), 16) * (1 - factor));
+    const g = Math.round(parseInt(h.substring(2, 4), 16) * (1 - factor));
+    const b = Math.round(parseInt(h.substring(4, 6), 16) * (1 - factor));
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  private lightenHex(hex: string, factor: number): string {
+    const h = hex.replace('#', '');
+    const r = Math.round(parseInt(h.substring(0, 2), 16) + (255 - parseInt(h.substring(0, 2), 16)) * factor);
+    const g = Math.round(parseInt(h.substring(2, 4), 16) + (255 - parseInt(h.substring(2, 4), 16)) * factor);
+    const b = Math.round(parseInt(h.substring(4, 6), 16) + (255 - parseInt(h.substring(4, 6), 16)) * factor);
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
   private getBubbleStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
-    return `position:fixed;bottom:20px;${pos}height:48px;padding:0 18px;border-radius:24px;background:linear-gradient(135deg,#006248 0%,#004d38 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:9px;box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
+    const c = this.config.primaryColor || '#006248';
+    const dark = this.darkenHex(c, 0.2);
+    return `position:fixed;bottom:20px;${pos}height:48px;padding:0 18px;border-radius:24px;background:linear-gradient(135deg,${c} 0%,${dark} 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:9px;box-shadow:0 8px 32px ${this.hexToRgba(c, 0.45)},0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
   }
 
   private getContainerStyles(): string {
