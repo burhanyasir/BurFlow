@@ -298,13 +298,14 @@ export function createSupportRoutes(
 
       const now = new Date().toISOString();
 
-      // Mark conversation as human_requested so agent inbox picks it up
+      // Mark conversation for human handoff so agent inbox picks it up
+      // Keep status='active' (inbox only queries active conversations)
+      // and use session_state to indicate handoff request
       try {
         const conv = conversationRepo.findBySession(tenantId, sessionId);
         if (conv) {
-          conversationRepo.updateStatus(conv.id, 'human_requested');
           try {
-            db.prepare('UPDATE conversations SET session_state = ? WHERE id = ?').run('needs_human', conv.id);
+            db.prepare('UPDATE conversations SET session_state = ? WHERE id = ?').run('human_takeover', conv.id);
           } catch { /* non-critical */ }
         }
       } catch {

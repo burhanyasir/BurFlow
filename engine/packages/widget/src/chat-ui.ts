@@ -355,6 +355,7 @@ export class ChatWidget {
   private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
   private agentPollTimer: ReturnType<typeof setInterval> | null = null;
+  private configPollTimer: ReturnType<typeof setInterval> | null = null;
   private lastAgentSeq = 0;
   private get placeholders(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
@@ -473,6 +474,7 @@ export class ChatWidget {
     this.createChatWindow();
     if (this.config.widgetToken) {
       this.configLoadPromise = this.fetchRemoteConfig();
+      this.startConfigPolling();
     }
     this.startAgentPolling();
     this.subscribeTakeoverEvents();
@@ -485,6 +487,7 @@ export class ChatWidget {
     if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
+    if (this.configPollTimer) { clearInterval(this.configPollTimer); this.configPollTimer = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
     this.container = null;
@@ -504,6 +507,12 @@ export class ChatWidget {
     const POLL_INTERVAL_MS = 4000;
     this.agentPollTimer = setInterval(() => { this.pollForAgentMessages(); }, POLL_INTERVAL_MS);
     this.pollForAgentMessages();
+  }
+
+  private startConfigPolling(): void {
+    if (this.configPollTimer) return;
+    const CONFIG_POLL_MS = 30000;
+    this.configPollTimer = setInterval(() => { this.fetchRemoteConfig(); }, CONFIG_POLL_MS);
   }
 
   /**
@@ -1832,8 +1841,8 @@ export class ChatWidget {
     const prevPrimaryColor = this.config.primaryColor;
     const prevAccentColor = (this.config as any).accentColor;
     this.config = { ...this.config, ...merged };
-    // Preserve the embed data-primary-color — it is the site owner's explicit choice.
-    if (this.embedPrimaryColor) {
+    // Only use embed primaryColor as fallback when server has none set
+    if (this.embedPrimaryColor && !merged.primaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
     this.businessProfile = this.deriveBusinessProfileFromConfig();
