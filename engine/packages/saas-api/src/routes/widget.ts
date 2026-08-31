@@ -662,16 +662,13 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!req.tenantId) {
         return res.status(400).json({ error: 'Tenant context required' });
       }
-      const result = sanitizeWidgetConfig(req.body);
+      // Strip tenantId before schema validation — it's a routing hint, not a config field.
+      const { tenantId: _tid, tenant_id: _tnid, ...bodyWithoutTenant } = (req.body as any) || {};
+      const result = sanitizeWidgetConfig(bodyWithoutTenant);
       if (!result.ok) {
         return res.status(400).json({ error: result.error });
       }
-      // Tenant ownership is always bound from the authenticated session — never
-      // from the request body. Strip any tenant key defensively and override the
-      // canonical identifier so a crafted payload cannot reassign the row.
-      delete result.data.tenantId;
-      delete (result.data as Record<string, unknown>)['tenant_id'];
-      const config = widgetConfigRepo.upsert(req.tenantId!, result.data);
+      const config = widgetConfigRepo.upsert(req.tenantId, result.data);
       res.json({ config });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Widget config update failed');
@@ -697,11 +694,12 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!req.tenantId) {
         return res.status(400).json({ error: 'Tenant context required' });
       }
-      const result = sanitizeWidgetConfig(req.body);
+      const { tenantId: _tid, tenant_id: _tnid, ...bodyWithoutTenant } = (req.body as any) || {};
+      const result = sanitizeWidgetConfig(bodyWithoutTenant);
       if (!result.ok) {
         return res.status(400).json({ error: result.error });
       }
-      const config = widgetConfigRepo.upsert(req.tenantId!, result.data);
+      const config = widgetConfigRepo.upsert(req.tenantId, result.data);
       res.json({ config });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Widget config patch failed');
