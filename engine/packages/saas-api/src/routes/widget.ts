@@ -75,7 +75,7 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
   const raw = body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
   const KNOWN_KEYS = new Set([
-    'primaryColor', 'theme', 'themeMode', 'position', 'widgetPosition',
+    'primaryColor', 'accentColor', 'theme', 'themeMode', 'position', 'widgetPosition',
     'greeting', 'greetingText', 'avatarUrl', 'logoUrl', 'companyName',
     'launcherText', 'starterOptions', 'allowedDomains', 'autoOpen',
     'autoOpenDelay', 'customCss', 'notificationEmail', 'slackWebhookUrl',
@@ -91,6 +91,13 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
       return { ok: false, error: 'primaryColor must be a hex color like #3B82F6 or #38f' };
     }
     data.primaryColor = raw.primaryColor.trim().toLowerCase();
+  }
+
+  if (raw.accentColor !== undefined) {
+    if (typeof raw.accentColor !== 'string' || !HEX_COLOR_RE.test(raw.accentColor.trim())) {
+      return { ok: false, error: 'accentColor must be a hex color like #3B82F6 or #38f' };
+    }
+    data.accentColor = raw.accentColor.trim().toLowerCase();
   }
 
   const theme = raw.themeMode !== undefined ? raw.themeMode : raw.theme;
@@ -387,6 +394,25 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         starterOptions: ['How can you help me?', 'What do you offer?', 'Talk to a person'],
         suggestedActions: [],
       },
+      'burflow-saas': {
+        theme: 'light',
+        position: 'bottom-right',
+        primaryColor: '#006248',
+        logoUrl: undefined,
+        companyName: 'BurFlow',
+        greeting: "Hi! I'm BurFlow. How can I help you today?",
+        launcherText: 'Start a conversation',
+        allowedDomains: [],
+        autoOpen: false,
+        autoOpenDelay: 3,
+        starterOptions: ['How can you help me?', 'What do you offer?', 'Talk to a person'],
+        suggestedActions: [],
+        notificationEmail: 'burflow2026@gmail.com',
+        slackWebhookUrl: undefined,
+        customWebhookUrl: undefined,
+        alertEmails: ['burflow2026@gmail.com'],
+        notifyThreshold: 'all',
+      },
     };
 
     return configs[tenantId || ''] || configs['demo-tenant'];
@@ -585,6 +611,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         theme: config.theme,
         position: config.position,
         primaryColor: config.primaryColor,
+        accentColor: (config as any).accentColor,
         logoUrl: config.logoUrl,
         avatarUrl: config.avatarUrl,
         companyName: config.companyName,

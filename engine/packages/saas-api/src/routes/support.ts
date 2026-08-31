@@ -1,9 +1,11 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, SubscriptionRepository, type SqlDatabase } from '@conversation-engine/saas-core';
+import { UserRepository, TenantRepository, ConversationRepository, MessageRepository, SubscriptionRepository, WidgetConfigRepository, TeamMemberRepository, type SqlDatabase, MailerService } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { randomBytes } from 'crypto';
 import { verifyWidgetToken } from '../middleware/auth';
+import { dispatchLeadAlerts, LeadNotificationConfig } from '../services/lead-notifier';
+import { takeoverEvents } from '../services/takeover-events';
 
 const logger = createLogger('saas-api:support');
 function generateId(): string { return randomBytes(16).toString('hex'); }
@@ -14,8 +16,11 @@ export function createSupportRoutes(
   conversationRepo: ConversationRepository,
   messageRepo: MessageRepository,
   subRepo: SubscriptionRepository,
+  widgetConfigRepo: WidgetConfigRepository,
+  teamMemberRepo: TeamMemberRepository,
   db: SqlDatabase,
   jwtSecret: string,
+  mailer: MailerService,
 ): Router {
   const router = Router();
 
@@ -298,6 +303,9 @@ export function createSupportRoutes(
         const conv = conversationRepo.findBySession(tenantId, sessionId);
         if (conv) {
           conversationRepo.updateStatus(conv.id, 'human_requested');
+          try {
+            db.prepare('UPDATE conversations SET session_state = ? WHERE id = ?').run('needs_human', conv.id);
+          } catch { /* non-critical */ }
         }
       } catch {
         // non-critical — ticket creation is the primary path
@@ -314,6 +322,57 @@ export function createSupportRoutes(
       ).run(generateId(), ticketId, 'user', 'visitor', `[Session: ${sessionId}] ${message || "I'd like to talk to a human agent."}`, now);
 
       createContextLogger(logger).info({ ticketId, sessionId, tenantId }, 'Human agent requested from widget');
+
+      // Dispatch tenant-specific notification (email/slack/webhook) using widget config
+      try {
+        const wc = widgetConfigRepo.get(tenantId);
+        if (wc) {
+          const config: LeadNotificationConfig = {
+            notificationEmail: wc.notificationEmail,
+            slackWebhookUrl: wc.slackWebhookUrl,
+            customWebhookUrl: wc.customWebhookUrl,
+            alertEmails: wc.alertEmails,
+            notifyThreshold: wc.notifyThreshold,
+          };
+          const tenant = tenantRepo.findById(tenantId);
+          const teamEmails = teamMemberRepo ? teamMemberRepo.findByTenant(tenantId).map(m => m.email) : [];
+          dispatchLeadAlerts(mailer, {
+            config,
+            tenantNotificationEmail: tenant?.notificationEmail,
+            teamEmails,
+            lead: {
+              id: ticketId,
+              tenantId,
+              sessionId,
+              conversationId: '',
+              email: 'visitor',
+              name: 'Chatbot Visitor',
+              leadScore: 100,
+              buyingIntent: 'high',
+              source: 'chatbot_handoff',
+              createdAt: now,
+              updatedAt: now,
+            } as any,
+            tenantName: tenant?.name || 'Tenant',
+            conversationSummary: `[Session: ${sessionId}] ${message || "I'd like to talk to a human agent."}`.slice(0, 500),
+          });
+        }
+      } catch (err: any) {
+        createContextLogger(logger).error({ err, tenantId }, 'Human handoff notification dispatch failed');
+      }
+
+      // Emit TAKEOVER_STARTED so widget gets real-time SSE notification
+      try {
+        const conv = conversationRepo.findBySession(tenantId, sessionId);
+        takeoverEvents.emit({
+          type: 'TAKEOVER_STARTED',
+          tenantId,
+          sessionId,
+          conversationId: conv?.id || '',
+          payload: { reason: 'visitor_requested', ticketId },
+        });
+      } catch { /* non-critical */ }
+
       res.json({ ok: true, ticketId });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Request human agent failed');

@@ -7,6 +7,7 @@ export interface WidgetConfig {
   title?: string;
   subtitle?: string;
   primaryColor?: string;
+  accentColor?: string;
   avatarUrl?: string;
   greeting?: string;
   greetingText?: string;

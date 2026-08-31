@@ -32,6 +32,8 @@ export function createOwnerAdminRoutes(
 ): Router {
   const router = Router();
 
+  const OWNER_EMAIL = 'burhanyasir82@gmail.com';
+
   const ownerOnly = (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -41,6 +43,9 @@ export function createOwnerAdminRoutes(
       const payload = jwt.verify(authHeader.slice(7), jwtSecret, { algorithms: ['HS256'] }) as any;
       if (payload.role !== 'owner' || payload.panel !== 'owner') {
         return res.status(403).json({ error: 'Owner panel access required' });
+      }
+      if (payload.email !== OWNER_EMAIL) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       req.user = payload;
       req.tenantId = payload.tenantId;

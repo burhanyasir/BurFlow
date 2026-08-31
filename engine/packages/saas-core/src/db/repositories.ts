@@ -860,6 +860,7 @@ export class WidgetConfigRepository {
     if (data.theme) { cols.push('theme'); vals.push(data.theme); }
     if (data.position) { cols.push('position'); vals.push(data.position); }
     if (data.primaryColor) { cols.push('primary_color'); vals.push(data.primaryColor); }
+    if ((data as any).accentColor) { cols.push('accent_color'); vals.push((data as any).accentColor); }
     if (data.logoUrl) { cols.push('logo_url'); vals.push(data.logoUrl); }
     if (data.avatarUrl) { cols.push('avatar_url'); vals.push(data.avatarUrl); }
     if (data.greeting) { cols.push('greeting'); vals.push(data.greeting); }
@@ -884,8 +885,8 @@ export class WidgetConfigRepository {
     return {
       id: row.id, tenantId: row.tenant_id,
       theme: row.theme, position: row.position,
-      primaryColor: row.primary_color, logoUrl: row.logo_url,
-      avatarUrl: row.avatar_url || undefined,
+      primaryColor: row.primary_color, accentColor: row.accent_color,
+      logoUrl: row.logo_url, avatarUrl: row.avatar_url || undefined,
       companyName: row.company_name, greeting: row.greeting,
       launcherText: row.launcher_text,
       allowedDomains: JSON.parse(row.allowed_domains || '[]'),

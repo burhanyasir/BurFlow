@@ -255,6 +255,7 @@ export interface WidgetConfig {
   theme: 'light' | 'dark' | 'auto';
   position: 'right' | 'left' | 'bottom-right' | 'bottom-left';
   primaryColor: string;
+  accentColor?: string;
   logoUrl?: string;
   avatarUrl?: string;
   companyName: string;

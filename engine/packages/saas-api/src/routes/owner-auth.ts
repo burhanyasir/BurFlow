@@ -14,6 +14,7 @@ export function createOwnerAuthRoutes(
   const router = Router();
 
   const OWNER_PASSWORD = process.env.OWNER_PASSWORD || 'burflow-owner-2026';
+  const OWNER_EMAIL = 'burhanyasir82@gmail.com';
 
   router.post('/login', (req: Request, res: Response) => {
     try {
@@ -21,6 +22,10 @@ export function createOwnerAuthRoutes(
 
       if (!email || !password) {
         return res.status(400).json({ error: 'Email and password required' });
+      }
+
+      if (email !== OWNER_EMAIL) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
 
       const user = userRepo.findByEmail(email);
@@ -33,11 +38,6 @@ export function createOwnerAuthRoutes(
         const isUserPassword = comparePassword(password, user.passwordHash);
         if (!isOwnerPassword && !isUserPassword) {
           createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        const tenants = tenantRepo.findByOwner(user.id);
-        if (tenants.length === 0 && !isOwnerPassword) {
-          createContextLogger(logger).info({ email }, 'Owner login failed - not a tenant owner');
           return res.status(401).json({ error: 'Invalid credentials' });
         }
         loginUserId = user.id;

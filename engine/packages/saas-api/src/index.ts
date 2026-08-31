@@ -558,7 +558,7 @@ app.use('/api/billing/requests', createSubscriptionRequestRoutes(userRepo, tenan
 app.use('/api/owner/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));
 
 // Support routes — tickets, payments, inbox
-app.use('/api/support', createSupportRoutes(userRepo, tenantRepo, conversationRepo, messageRepo, subRepo, db, JWT_SECRET));
+app.use('/api/support', createSupportRoutes(userRepo, tenantRepo, conversationRepo, messageRepo, subRepo, widgetConfigRepo, teamMemberRepo, db, JWT_SECRET, mailer));
 
 // Customer Activation routes
 app.use('/api/admin', auth, tenantGuard, createActivationRoutes(

@@ -295,6 +295,7 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   title: 'Chat Assistant',
   subtitle: 'AI assistant · Online',
   primaryColor: '#006248',
+  accentColor: '#006248',
   avatarUrl: undefined as any,
   greeting: 'Hi! What brings you here today?',
   greetingText: undefined as any,
@@ -624,7 +625,9 @@ export class ChatWidget {
   private applyBrandingVars(): void {
     if (typeof document === 'undefined') return;
     const primary = this.config.primaryColor || '#3B82F6';
+    const accent = (this.config as any).accentColor || primary;
     document.documentElement.style.setProperty('--cw-primary-color', primary);
+    document.documentElement.style.setProperty('--cw-accent-color', accent);
 
     let theme = this.config.theme || 'light';
     if (theme === 'auto') {
@@ -1824,6 +1827,10 @@ export class ChatWidget {
 
   private applyRemoteConfig(remote: Partial<WidgetConfig>): void {
     const merged = this.normalizeAliases(remote);
+    const prevTheme = this.config.theme;
+    const prevPosition = this.config.position;
+    const prevPrimaryColor = this.config.primaryColor;
+    const prevAccentColor = (this.config as any).accentColor;
     this.config = { ...this.config, ...merged };
     // Preserve the embed data-primary-color — it is the site owner's explicit choice.
     if (this.embedPrimaryColor) {
@@ -1837,6 +1844,23 @@ export class ChatWidget {
     this.applyBrandingVars();
     this.updateBubbleAndContainerStyles();
     this.updateHeaderText();
+
+    // Re-apply theme if it changed (light/dark/auto)
+    if (merged.theme && merged.theme !== prevTheme) {
+      this.applyBrandingVars();
+    }
+    // Re-create container if position changed
+    if (merged.position && merged.position !== prevPosition && this.container) {
+      this.container.style.cssText = this.getContainerStyles();
+      this.bubbleEl && (this.bubbleEl.style.cssText = this.getBubbleStyles());
+    }
+    // Re-render header/launcher if primaryColor or accentColor changed
+    if ((merged.primaryColor && merged.primaryColor !== prevPrimaryColor) ||
+        (merged.accentColor && merged.accentColor !== prevAccentColor)) {
+      this.applyBrandingVars();
+      this.updateBubbleAndContainerStyles();
+      this.updateHeaderText();
+    }
 
     if (this.config.launcherText && this.bubbleEl) {
       this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
@@ -1855,6 +1879,13 @@ export class ChatWidget {
       if (!hasUserMessages) {
         this.renderInitialActions();
       }
+    }
+
+    // If chat is open and has content, refresh the action panel UI state
+    // to reflect any new suggestedActions or business profile changes
+    if (this.isOpen && this.messages.length > 0) {
+      this.clearUiState();
+      this.renderUiState();
     }
 
     if (this.config.autoOpen && !this.isOpen && !this.autoOpenTimer) {
