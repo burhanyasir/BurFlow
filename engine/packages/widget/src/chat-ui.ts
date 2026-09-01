@@ -645,8 +645,6 @@ export class ChatWidget {
       }
       case 'TAKEOVER_ENDED':
         this.hideTakeoverBanner();
-        // AI is back in control — restore the starter chips.
-        this.renderInitialActions();
         break;
     }
   }
@@ -1184,11 +1182,7 @@ export class ChatWidget {
     if (isFirstOpen) {
       this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
     }
-    if (isFirstOpen) {
-      this.renderInitialActions();
-    } else {
-      this.renderUiState();
-    }
+    this.renderUiState();
     this.scrollToBottom();
   }
 
@@ -2015,16 +2009,6 @@ export class ChatWidget {
 
     if (this.isOpen && this.messages.length === 0 && this.config.greeting) {
       this.addMessage({ role: 'assistant', content: this.config.greeting });
-    }
-
-    // If the chat is open and shows only the initial greeting (no user
-    // messages yet), re-render the welcome cards so tenant-specific
-    // starterOptions arrive from the server without requiring a page reload.
-    if (this.isOpen && this.messages.length <= 1) {
-      const hasUserMessages = this.messages.some((m) => m.role === 'user');
-      if (!hasUserMessages) {
-        this.renderInitialActions();
-      }
     }
 
     // If chat is open and has content, refresh the action panel UI state

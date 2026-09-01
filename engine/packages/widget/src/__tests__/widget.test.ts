@@ -316,34 +316,30 @@ describe('ChatWidget', () => {
     expect(widget.getMessages().length).toBe(1);
   });
 
-  it('renders starter option cards on first open', () => {
+  it('does not render welcome cards inside the chat on first open', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Welcome!' });
     widget.mount();
     widget.toggle();
 
     const cards = document.querySelectorAll('.cw-welcome-card');
-    expect(cards.length).toBe(3);
-    const labels = Array.from(cards).map((c) => c.textContent);
-    expect(labels.some((l) => l!.includes('How can you help me?'))).toBe(true);
-    expect(labels.some((l) => l!.includes('What do you offer?'))).toBe(true);
-    expect(labels.some((l) => l!.includes('Talk to a person'))).toBe(true);
+    expect(cards.length).toBe(0);
+    // Welcome message should still appear
+    const msgs = widget.getMessages();
+    expect(msgs.length).toBe(1);
+    expect(msgs[0].role).toBe('assistant');
   });
 
-  it('fades out starter cards once the conversation sends a message', async () => {
+  it('shows greeting and allows typing on open', async () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: '' });
     widget.mount();
     widget.toggle();
-    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
+    expect(document.querySelector('.cw-welcome-cards')).toBeNull();
 
     const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
-    input.value = 'Hello';
-    widget.send();
-    await new Promise((r) => setTimeout(r, 300));
-
-    expect(document.querySelector('.cw-welcome-cards')).toBeNull();
+    expect(input).toBeTruthy();
   });
 
-  it('sends the starter prompt when a chip is clicked', async () => {
+  it('sends a message when typed and sent', async () => {
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       start(controller) {
@@ -359,11 +355,9 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
-    const planCard = Array.from(document.querySelectorAll('.cw-welcome-card')).find(
-      (c) => c.textContent!.includes('How can you help me?')
-    ) as HTMLButtonElement;
-    expect(planCard).toBeTruthy();
-    planCard.click();
+    const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
+    input.value = 'How can you help me?';
+    widget.send();
 
     await new Promise((r) => setTimeout(r, 50));
     const msgs = widget.getMessages();
@@ -380,26 +374,21 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
+    // Welcome cards no longer render inside the chat
     const cards = document.querySelectorAll('.cw-welcome-card');
-    expect(cards.length).toBe(3);
-    const labels = Array.from(cards).map((c) => c.textContent);
-    expect(labels.some((l) => l!.includes('Tell me about your pricing'))).toBe(true);
-    expect(labels.some((l) => l!.includes('Book a consultation'))).toBe(true);
-    expect(labels.some((l) => l!.includes('View case studies'))).toBe(true);
+    expect(cards.length).toBe(0);
   });
 
-  it('renders welcome cards with card styling', () => {
+  it('does not render card styling inside chat', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hi!' });
     widget.mount();
     widget.toggle();
 
     const card = document.querySelector('.cw-welcome-card') as HTMLElement;
-    expect(card).toBeTruthy();
-    expect(card.classList.contains('cw-welcome-card')).toBe(true);
-    expect(card.tagName).toBe('BUTTON');
+    expect(card).toBeNull();
   });
 
-  it('attaches welcome cards inside the first assistant message bubble', () => {
+  it('does not attach welcome cards inside the first assistant message bubble', () => {
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: 'Hello!' });
     widget.mount();
     widget.toggle();
@@ -407,7 +396,7 @@ describe('ChatWidget', () => {
     const bubble = document.querySelector('.cw-message-assistant .cw-message-bubble');
     expect(bubble).toBeTruthy();
     const cardsInside = bubble!.querySelectorAll('.cw-welcome-card');
-    expect(cardsInside.length).toBe(3);
+    expect(cardsInside.length).toBe(0);
   });
 
   it('adds user message on send', () => {
@@ -748,16 +737,14 @@ describe('ChatWidget', () => {
     // Directly invoke the handler (simulates what SSE delivers)
     (widget as any).handleTakeoverEvent({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } });
 
-    // TAKEOVER_STARTED: banner visible, starter cards removed.
+    // TAKEOVER_STARTED: banner visible.
     await new Promise(r => setTimeout(r, 10));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('block');
-    expect(document.querySelector('.cw-welcome-cards')).toBeFalsy();
 
-    // TAKEOVER_ENDED: banner hidden, starter cards restored.
+    // TAKEOVER_ENDED: banner hidden.
     (widget as any).handleTakeoverEvent({ type: 'TAKEOVER_ENDED', sessionId: 's1', conversationId: 'c1', payload: {} });
     await new Promise(r => setTimeout(r, 10));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
-    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
   });
 
   it('ignores TAKEOVER_STARTED when user did not request human agent', async () => {
@@ -770,7 +757,6 @@ describe('ChatWidget', () => {
 
     await new Promise(r => setTimeout(r, 10));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
-    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
   });
 
   it('renders suggested option chips even when complete arrives before ui_state', async () => {
