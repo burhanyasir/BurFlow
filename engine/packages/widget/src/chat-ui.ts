@@ -415,6 +415,7 @@ export class ChatWidget {
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
       html.cw-widget-open .cw-bubble { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
+      .cw-bubble-hidden { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--cw-primary-color,#006248) 12%, transparent) !important; background:#fff !important; }
       .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
       .cw-preopen-pill { background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white) !important; color:var(--cw-primary-color,#006248) !important; border:1px solid color-mix(in srgb, var(--cw-primary-color,#006248) 20%, white) !important; }
@@ -1094,10 +1095,12 @@ export class ChatWidget {
     document.documentElement.classList.toggle('cw-widget-open', this.isOpen);
     if (!this.container) return;
     this.container.style.display = this.isOpen ? 'flex' : 'none';
-    // Hide the bubble when the widget is open — belt-and-suspenders: CSS rule,
-    // inline display, and visibility all enforce the same state so no single
-    // code path can leave the bubble visible on top of the open panel.
+    // Hide the bubble when the widget is open — triple redundancy:
+    // 1) CSS class rule on <html> (parent selector)
+    // 2) cw-bubble-hidden class directly on the bubble element
+    // 3) Inline style properties
     if (this.bubbleEl) {
+      this.bubbleEl.classList.toggle('cw-bubble-hidden', this.isOpen);
       this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
       this.bubbleEl.style.visibility = this.isOpen ? 'hidden' : 'visible';
       this.bubbleEl.style.pointerEvents = this.isOpen ? 'none' : 'auto';
@@ -1867,10 +1870,13 @@ export class ChatWidget {
       this.bubbleEl.style.cssText = this.getBubbleStyles();
       // Re-enforce bubble visibility after full cssText rewrite.
       if (this.isOpen) {
+        this.bubbleEl.classList.add('cw-bubble-hidden');
         this.bubbleEl.style.display = 'none';
         this.bubbleEl.style.visibility = 'hidden';
         this.bubbleEl.style.pointerEvents = 'none';
         this.bubbleEl.style.zIndex = '-1';
+      } else {
+        this.bubbleEl.classList.remove('cw-bubble-hidden');
       }
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
