@@ -1101,10 +1101,18 @@ export class ChatWidget {
     // 3) Inline style properties
     if (this.bubbleEl) {
       this.bubbleEl.classList.toggle('cw-bubble-hidden', this.isOpen);
-      this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
-      this.bubbleEl.style.visibility = this.isOpen ? 'hidden' : 'visible';
-      this.bubbleEl.style.pointerEvents = this.isOpen ? 'none' : 'auto';
-      this.bubbleEl.style.zIndex = this.isOpen ? '-1' : '999999';
+      if (this.isOpen) {
+        this.bubbleEl.style.setProperty('display', 'none', 'important');
+        this.bubbleEl.style.setProperty('visibility', 'hidden', 'important');
+        this.bubbleEl.style.setProperty('pointer-events', 'none', 'important');
+        this.bubbleEl.style.setProperty('z-index', '-1', 'important');
+      } else {
+        this.bubbleEl.style.removeProperty('display');
+        this.bubbleEl.style.removeProperty('visibility');
+        this.bubbleEl.style.removeProperty('pointer-events');
+        this.bubbleEl.style.removeProperty('z-index');
+        this.bubbleEl.style.cssText = this.getBubbleStyles();
+      }
     }
     if (this.isOpen) {
       this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
@@ -1871,10 +1879,10 @@ export class ChatWidget {
       // Re-enforce bubble visibility after full cssText rewrite.
       if (this.isOpen) {
         this.bubbleEl.classList.add('cw-bubble-hidden');
-        this.bubbleEl.style.display = 'none';
-        this.bubbleEl.style.visibility = 'hidden';
-        this.bubbleEl.style.pointerEvents = 'none';
-        this.bubbleEl.style.zIndex = '-1';
+        this.bubbleEl.style.setProperty('display', 'none', 'important');
+        this.bubbleEl.style.setProperty('visibility', 'hidden', 'important');
+        this.bubbleEl.style.setProperty('pointer-events', 'none', 'important');
+        this.bubbleEl.style.setProperty('z-index', '-1', 'important');
       } else {
         this.bubbleEl.classList.remove('cw-bubble-hidden');
       }
