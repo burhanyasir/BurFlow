@@ -13,7 +13,9 @@ const STYLE_ID = 'burflow-widget-styles';
 // page immediately, with no per-deployment configuration. Override via
 // VITE_WIDGET_TENANT_ID in .env.production/.env.development.
 const DEFAULT_TENANT_ID = 'burflow-saas';
-const WIDGET_CDN = 'https://burflow.onrender.com';
+// Serve widget from the same origin so Vercel's prebuild sync-widget.js
+// always provides the latest bundle. Falling back to Render CDN if needed.
+const WIDGET_CDN = '';
 
 export function WidgetLauncher() {
   useEffect(() => {
