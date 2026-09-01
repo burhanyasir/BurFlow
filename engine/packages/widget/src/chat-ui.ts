@@ -1843,7 +1843,9 @@ export class ChatWidget {
 
   private updateBubbleAndContainerStyles(): void {
     if (this.bubbleEl) {
+      const currentDisplay = this.bubbleEl.style.display;
       this.bubbleEl.style.cssText = this.getBubbleStyles();
+      if (currentDisplay) this.bubbleEl.style.display = currentDisplay;
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
         this.bubbleEl.title = this.config.launcherText;
