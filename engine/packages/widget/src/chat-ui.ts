@@ -350,6 +350,10 @@ export class ChatWidget {
   private headerLogoEl: HTMLImageElement | null = null;
   /** The primaryColor from the embed data-attribute — preserved over remote config. */
   private embedPrimaryColor: string | null = null;
+  /** Small floating teaser chips shown next to the bubble. */
+  private teaserEl: HTMLDivElement | null = null;
+  private teaserShowTimer: ReturnType<typeof setTimeout> | null = null;
+  private teaserDismissTimer: ReturnType<typeof setTimeout> | null = null;
   /** Long-lived SSE stream of takeover events (TAKEOVER_STARTED / OPERATOR_MESSAGE / TAKEOVER_ENDED). */
   private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
@@ -408,6 +412,7 @@ export class ChatWidget {
       @keyframes cw-blink { 0%,100%{opacity:1} 50%{opacity:0} }
       @keyframes cw-pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
       @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+      @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
       .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
       .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
@@ -516,10 +521,14 @@ export class ChatWidget {
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
     if (this.configPollTimer) { clearInterval(this.configPollTimer); this.configPollTimer = null; }
+    if (this.teaserShowTimer) { clearTimeout(this.teaserShowTimer); this.teaserShowTimer = null; }
+    if (this.teaserDismissTimer) { clearTimeout(this.teaserDismissTimer); this.teaserDismissTimer = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
+    this.teaserEl?.remove();
     this.container = null;
     this.bubbleEl = null;
+    this.teaserEl = null;
     this.messagesEl = null;
     this.inputEl = null;
     // Clear the global widget reference so a new instance can mount.
@@ -725,6 +734,58 @@ export class ChatWidget {
 
     document.body.appendChild(bubble);
     this.bubbleEl = bubble;
+    this.createTeaser();
+  }
+
+  private createTeaser(): void {
+    const pos = this.config.position === 'bottom-left' ? 'left:80px;' : 'right:80px;';
+    const el = document.createElement('div');
+    el.style.cssText = `position:fixed;bottom:28px;${pos}z-index:999999;display:none;gap:6px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);`;
+    const options = this.config.starterOptions?.length
+      ? this.config.starterOptions
+      : this.defaultStarterOptions();
+    const pc = this.config.primaryColor || '#006248';
+    options.forEach((text) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.style.cssText = `padding:6px 14px;border-radius:20px;background:#fff;color:#1F2937;font-size:12px;font-weight:500;border:1px solid #E5E7EB;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:all 0.15s ease;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
+      chip.textContent = text;
+      chip.addEventListener('mouseenter', () => { chip.style.borderColor = pc; chip.style.color = pc; chip.style.background = '#F0FAF4'; });
+      chip.addEventListener('mouseleave', () => { chip.style.borderColor = '#E5E7EB'; chip.style.color = '#1F2937'; chip.style.background = '#fff'; });
+      chip.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.dismissTeaser();
+        this.applyWidgetState('open');
+        if (!this.container) return;
+        if (this.messages.length === 0) {
+          this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
+        }
+        this.renderUiState();
+        this.scrollToBottom();
+        setTimeout(() => { if (this.inputEl) { this.inputEl.value = text; this.send(); } }, 150);
+      });
+      el.appendChild(chip);
+    });
+    document.body.appendChild(el);
+    this.teaserEl = el;
+    this.scheduleTeaser();
+  }
+
+  private scheduleTeaser(): void {
+    if (this.teaserShowTimer) clearTimeout(this.teaserShowTimer);
+    this.teaserShowTimer = setTimeout(() => {
+      if (this.widgetState === 'closed' && this.teaserEl) {
+        this.teaserEl.style.display = 'flex';
+        if (this.teaserDismissTimer) clearTimeout(this.teaserDismissTimer);
+        this.teaserDismissTimer = setTimeout(() => this.dismissTeaser(), 10000);
+      }
+    }, 2000);
+  }
+
+  private dismissTeaser(): void {
+    if (this.teaserEl) this.teaserEl.style.display = 'none';
+    if (this.teaserShowTimer) { clearTimeout(this.teaserShowTimer); this.teaserShowTimer = null; }
+    if (this.teaserDismissTimer) { clearTimeout(this.teaserDismissTimer); this.teaserDismissTimer = null; }
   }
 
   private defaultStarterOptions(): string[] {
@@ -1007,6 +1068,13 @@ export class ChatWidget {
     this.widgetState = state;
     this.isOpen = state === 'open';
     document.documentElement.classList.toggle('cw-widget-open', this.isOpen);
+
+    // --- teaser ---
+    if (state === 'open') {
+      this.dismissTeaser();
+    } else {
+      this.scheduleTeaser();
+    }
 
     // --- bubble ---
     if (state === 'closed') {
