@@ -202,7 +202,7 @@ CREATE TABLE widget_configs (
   tenant_id TEXT NOT NULL UNIQUE REFERENCES tenants(id) ON DELETE CASCADE,
   theme TEXT DEFAULT 'light' CHECK (theme IN ('light','dark','auto')),
   position TEXT DEFAULT 'right' CHECK (position IN ('right','left','bottom-right','bottom-left')),
-  primary_color TEXT DEFAULT '#3B82F6',
+  primary_color TEXT DEFAULT '#006248',
   logo_url TEXT,
   company_name TEXT NOT NULL,
   greeting TEXT DEFAULT 'Hello! How can I help you today?',

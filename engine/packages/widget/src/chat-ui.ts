@@ -1900,8 +1900,9 @@ export class ChatWidget {
     const prevPrimaryColor = this.config.primaryColor;
     const prevAccentColor = (this.config as any).accentColor;
     this.config = { ...this.config, ...merged };
-    // Only use embed primaryColor as fallback when server has none set
-    if (this.embedPrimaryColor && !merged.primaryColor) {
+    // Embed primaryColor always wins — the site owner explicitly set it
+    // in their embed code and it should not be overridden by server defaults.
+    if (this.embedPrimaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
     this.businessProfile = this.deriveBusinessProfileFromConfig();

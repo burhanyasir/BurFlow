@@ -3,7 +3,7 @@ import { User, Tenant, TenantApiKey, Conversation, Message, UsageRecord, TenantS
 import { generateId, hashPassword, generateApiKey, slugify, hashToken } from '../auth';
 
 const DEFAULT_SETTINGS: TenantSettings = {
-  branding: { primaryColor: '#3B82F6', companyName: 'My Company', welcomeMessage: 'Hello! How can I help you today?', offlineMessage: 'We are currently offline. Please leave a message.' },
+  branding: { primaryColor: '#006248', companyName: 'My Company', welcomeMessage: 'Hello! How can I help you today?', offlineMessage: 'We are currently offline. Please leave a message.' },
   safety: { contentFilterThreshold: 'moderate', crisisResponseEnabled: true, piiRedactionMode: 'mask' },
   ai: { systemPrompt: 'You are a helpful customer support assistant.', model: 'gpt-4', temperature: 0.7, maxTokens: 1024, fallbackResponse: 'I apologize, but I am unable to process your request at this time.' },
   widget: { position: 'bottom-right', theme: 'light', autoOpen: false },

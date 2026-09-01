@@ -25,7 +25,7 @@ BEGIN
       'light',
       'BurFlow AI',
       'right',
-      '#3B82F6',
+      '#006248',
       NOW(),
       NOW()
     )
