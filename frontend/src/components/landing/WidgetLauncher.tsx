@@ -47,6 +47,16 @@ export function WidgetLauncher() {
     script.setAttribute('data-position', 'bottom-right');
     script.setAttribute('data-title', 'BurFlow');
     document.body.appendChild(script);
+
+    // Clean up when this component unmounts so the widget doesn't linger
+    // and cause duplicate windows if another component mounts a widget.
+    return () => {
+      const widget = (window as any).__BurFlowWidgetInstance as
+        { destroy?: () => void; unmount?: () => void } | undefined;
+      widget?.destroy?.() ?? widget?.unmount?.();
+      document.getElementById(SCRIPT_ID)?.remove();
+      document.getElementById(STYLE_ID)?.remove();
+    };
   }, []);
 
   return null;

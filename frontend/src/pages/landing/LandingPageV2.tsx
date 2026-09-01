@@ -166,35 +166,9 @@ function WidgetHealthIndicator() {
 }
 
 function WidgetEmbedLoader() {
-  useEffect(() => {
-    if (!WIDGET_TENANT_ID || typeof document === 'undefined') return;
-    if (document.querySelector(`script[src^="${WIDGET_CDN}"]`)) return;
-
-    const script = document.createElement('script');
-    script.src = WIDGET_CDN;
-    script.async = true;
-    script.defer = true;
-    // The widget's autoInit reads these attributes and bootstraps a fresh
-    // token from /api/widget/public-token (same-origin when VITE_API_URL is
-    // unset — the Vite dev proxy forwards /api to the SaaS API).
-    script.setAttribute('data-tenant-id', WIDGET_TENANT_ID);
-    if (WIDGET_API_URL) script.setAttribute('data-api-url', WIDGET_API_URL);
-    script.setAttribute('data-position', 'bottom-right');
-    script.setAttribute('data-primary-color', '#006248');
-    script.setAttribute('data-greeting', '👋 Hey there! I know everything about this website\u2019s products and pricing. Ask me anything!');
-    script.setAttribute('data-launcher-text', 'Try for free');
-
-    document.body.appendChild(script);
-    return () => script.remove();
-  }, []);
-
-  return (
-    <div className="rounded-2xl border border-[var(--color-neutral-200)] bg-white p-8 text-center shadow-[0_20px_60px_-15px_rgba(0,0,0,0.1)]">
-      <p className="text-base font-semibold text-[var(--color-neutral-900)]">Your live BurFlow widget is ready in the corner.</p>
-      <p className="mt-2 text-sm text-[var(--color-neutral-500)]">Open the bubble to see the proactive sales flow with suggestion chips and guided next steps.</p>
-      <WidgetHealthIndicator />
-    </div>
-  );
+  // Widget is loaded globally by WidgetLauncher in PublicLayout.
+  // This component is a no-op placeholder for the demo section layout.
+  return null;
 }
 
 function openWidget() {

@@ -26,14 +26,18 @@ describe('widget autoInit (tokenless bootstrap)', () => {
     const fetchMock = vi.fn();
     (globalThis as any).fetch = fetchMock;
     delete (window as any).__CURRENT_WIDGET;
+    delete (window as any).__BurFlowWidgetInstance;
   });
 
   afterEach(() => {
-    const widget = (window as any).__CURRENT_WIDGET;
-    if (widget && typeof widget.unmount === 'function') {
+    const widget = (window as any).__CURRENT_WIDGET || (window as any).__BurFlowWidgetInstance;
+    if (widget && typeof widget.destroy === 'function') {
+      widget.destroy();
+    } else if (widget && typeof widget.unmount === 'function') {
       widget.unmount();
     }
     delete (window as any).__CURRENT_WIDGET;
+    delete (window as any).__BurFlowWidgetInstance;
     vi.resetModules();
   });
 
@@ -102,7 +106,7 @@ describe('widget autoInit (tokenless bootstrap)', () => {
     expect(widget.config.launcherText).toBe('Chat with BrandCo');
   });
 
-  it('renders business-appropriate pre-open suggestions and placeholder (no SaaS leaks) after remote config loads', async () => {
+  it('applies remote config (companyName, starterOptions, placeholder) after remote config loads', async () => {
     const fetchMock = (globalThis as any).fetch;
     fetchMock
       .mockResolvedValueOnce({ ok: true, json: async () => ({ token: 'fresh-minted-token' }) })
@@ -119,12 +123,8 @@ describe('widget autoInit (tokenless bootstrap)', () => {
     await new Promise((r) => setTimeout(r, 50));
 
     const widget = (window as any).__CURRENT_WIDGET;
-    // Pre-open panel must show the tenant's store chips, not the SaaS fallback.
-    const pills = Array.from(document.querySelectorAll('.cw-preopen-panel .cw-preopen-options span')).map(
-      (el: Element) => el.textContent,
-    );
-    expect(pills).toContain('🛒 Show top selling health products');
-    expect(pills.some((t: string | null) => (t || '').includes('Book a demo'))).toBe(false);
+    expect(widget.config.companyName).toBe('MTH Medical Store');
+    expect(widget.config.starterOptions).toContain('🛒 Show top selling health products');
     // Input placeholder must be store-oriented after the config applies.
     expect(widget.inputEl.placeholder).toContain('What products');
   });

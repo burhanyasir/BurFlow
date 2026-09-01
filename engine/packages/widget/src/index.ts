@@ -5,10 +5,14 @@ export { ChatWidget } from './chat-ui';
 export { streamChat } from './stream-client';
 export type { WidgetConfig, ChatMessage, StreamEvent, StreamClientOptions } from './types';
 
-// Capture the script element IMMEDIATELY during execution — currentScript is null after this.
+  // Capture the script element IMMEDIATELY during execution — currentScript is null after this.
 // Bundles loaded with async/defer or as modules report currentScript as null even during
 // execution, so autoInit falls back to scanning the DOM (resolveScriptEl).
 const _scriptEl = typeof document !== 'undefined' ? document.currentScript as HTMLScriptElement | null : null;
+
+/** Synchronous guard: prevents overlapping autoInit() calls from both triggering
+ *  async token-fetch → initChatWidget chains before the first one resolves. */
+let _autoInitRunning = false;
 
 /**
  * Best-effort resolution of the widget's script element. Prefers the script
@@ -35,6 +39,7 @@ export function initChatWidget(config: WidgetConfig): ChatWidget {
   widget.mount();
   if (typeof window !== 'undefined') {
     (window as any).__CURRENT_WIDGET = widget;
+    (window as any).__BurFlowWidgetInstance = widget;
   }
   return widget;
 }
@@ -44,6 +49,8 @@ declare global {
     ChatWidget: typeof ChatWidget;
     initChatWidget: typeof initChatWidget;
     __CURRENT_WIDGET?: ChatWidget;
+    /** Strict singleton — exactly one ChatWidget instance per page context. */
+    __BurFlowWidgetInstance?: ChatWidget;
   }
 }
 
@@ -61,6 +68,12 @@ if (typeof window !== 'undefined') {
   //    proxy or an nginx /api reverse proxy need no extra configuration.
   function autoInit() {
     try {
+      // Prevent double-mount: if a widget is already mounted on this page, skip.
+      if ((window as any).__CURRENT_WIDGET || (window as any).__BurFlowWidgetInstance) return;
+      // Synchronous guard: blocks overlapping async autoInit chains before the
+      // first fetch() resolves and sets __CURRENT_WIDGET.
+      if (_autoInitRunning) return;
+      _autoInitRunning = true;
       // Prefer the live currentScript at call time, fall back to the captured
       // reference, then DOM scan. This handles async/defer loading where
       // _scriptEl was null at module eval time.

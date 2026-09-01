@@ -54,12 +54,12 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
   const [previewActive, setPreviewActive] = useState(false);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const widgetRef = useRef<{ unmount?: () => void } | null>(null);
+  const widgetRef = useRef<{ destroy?: () => void; unmount?: () => void } | null>(null);
 
   // Tear the preview widget down when leaving this step so it never lingers
   // on other onboarding screens.
   useEffect(() => () => {
-    widgetRef.current?.unmount?.();
+    widgetRef.current?.destroy?.() ?? widgetRef.current?.unmount?.();
     widgetRef.current = null;
   }, []);
 
@@ -77,6 +77,12 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
     setPreviewError(null);
     setPreviewLoading(true);
     try {
+      // Tear down any widget that autoInit created when we loaded the bundle
+      // script — without this, the page ends up with two chat windows.
+      const stale = (window as any).__BurFlowWidgetInstance as
+        { destroy?: () => void; unmount?: () => void } | undefined;
+      stale?.destroy?.() ?? stale?.unmount?.();
+
       await loadWidgetBundle();
       const Ctor = (window as any).ChatWidget as { new (config: Record<string, unknown>): { mount: () => void } };
       if (!Ctor) throw new Error('Widget bundle failed to load — check that /widget/widget.js is reachable.');
@@ -88,7 +94,8 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
         position: 'right',
       });
       widget.mount();
-      widgetRef.current = widget as { unmount?: () => void };
+      widgetRef.current = widget as { destroy?: () => void; unmount?: () => void };
+      (window as any).__BurFlowWidgetInstance = widget;
       setPreviewActive(true);
     } catch (err: any) {
       setPreviewError(err?.message || 'Preview failed to load');
@@ -98,7 +105,7 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
   };
 
   const stopPreview = () => {
-    widgetRef.current?.unmount?.();
+    widgetRef.current?.destroy?.() ?? widgetRef.current?.unmount?.();
     widgetRef.current = null;
     setPreviewActive(false);
   };

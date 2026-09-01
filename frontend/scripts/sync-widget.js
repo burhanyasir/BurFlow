@@ -18,7 +18,7 @@ const targets = [
 ];
 
 try {
-  execSync('npm run build', { cwd: widgetPkg, stdio: 'inherit' });
+  execSync('node build.js', { cwd: widgetPkg, stdio: 'inherit' });
   mkdirSync(join(publicDir, 'widget'), { recursive: true });
   for (const target of targets) {
     copyFileSync(widgetDist, target);
