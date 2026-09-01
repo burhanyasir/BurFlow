@@ -12,7 +12,7 @@
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
       html.cw-widget-open .cw-bubble { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-bubble-hidden { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
-      .cw-container { display:flex !important; flex-direction:column !important; overflow:hidden !important; }
+      .cw-container { flex-direction:column !important; overflow:hidden !important; }
       .cw-messages { flex:1 1 0 !important; min-height:0 !important; overflow-y:auto !important; }
       .cw-input-area { flex-shrink:0 !important; }
       .cw-action-panel { flex-shrink:0 !important; }
