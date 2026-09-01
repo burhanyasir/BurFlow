@@ -1755,7 +1755,8 @@ export class ChatWidget {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
     const c = this.config.primaryColor || '#006248';
     const dark = this.darkenHex(c, 0.2);
-    return `position:fixed;bottom:20px;${pos}height:48px;padding:0 18px;border-radius:24px;background:linear-gradient(135deg,${c} 0%,${dark} 100%);color:#fff;cursor:pointer;display:flex;align-items:center;gap:9px;box-shadow:0 8px 32px ${this.hexToRgba(c, 0.45)},0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
+    const vis = this.isOpen ? 'none' : 'flex';
+    return `position:fixed;bottom:20px;${pos}height:48px;padding:0 18px;border-radius:24px;background:linear-gradient(135deg,${c} 0%,${dark} 100%);color:#fff;cursor:pointer;display:${vis};align-items:center;gap:9px;box-shadow:0 8px 32px ${this.hexToRgba(c, 0.45)},0 2px 8px rgba(0,0,0,0.1);z-index:999999;transition:transform 0.2s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.2s ease;border:2px solid rgba(255,255,255,0.2);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:13.5px;font-weight:600;letter-spacing:0.01em;white-space:nowrap;animation:cw-bubble-pulse 3s ease-in-out infinite;`;
   }
 
   private getContainerStyles(): string {
@@ -1843,9 +1844,7 @@ export class ChatWidget {
 
   private updateBubbleAndContainerStyles(): void {
     if (this.bubbleEl) {
-      const currentDisplay = this.bubbleEl.style.display;
       this.bubbleEl.style.cssText = this.getBubbleStyles();
-      if (currentDisplay) this.bubbleEl.style.display = currentDisplay;
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
         this.bubbleEl.title = this.config.launcherText;
