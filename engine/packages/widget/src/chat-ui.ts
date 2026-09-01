@@ -339,8 +339,10 @@ export class ChatWidget {
   private cta: Record<string, unknown> | null = null;
   private suggestedOptions: string[] = [];
   private unreadBadge: HTMLSpanElement | null = null;
+  private preOpenPanelEl: HTMLDivElement | null = null;
   private configLoadPromise: Promise<void> | null = null;
   private suggestionHistory: SmartButton[] = [];
+  private preOpenDismissed = false;
   private handoffEl: HTMLDivElement | null = null;
   private handoffShown = false;
   private takeoverEl: HTMLDivElement | null = null;
@@ -350,10 +352,6 @@ export class ChatWidget {
   private headerLogoEl: HTMLImageElement | null = null;
   /** The primaryColor from the embed data-attribute — preserved over remote config. */
   private embedPrimaryColor: string | null = null;
-  /** Small floating teaser chips shown next to the bubble. */
-  private teaserEl: HTMLDivElement | null = null;
-  private teaserShowTimer: ReturnType<typeof setTimeout> | null = null;
-  private teaserDismissTimer: ReturnType<typeof setTimeout> | null = null;
   /** Long-lived SSE stream of takeover events (TAKEOVER_STARTED / OPERATOR_MESSAGE / TAKEOVER_ENDED). */
   private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
@@ -375,6 +373,11 @@ export class ChatWidget {
     }
     return ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
   }
+  private boundDismissPreOpen = (e: Event) => {
+    if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
+      this.dismissPreOpenPanel();
+    }
+  };
 
   constructor(config: WidgetConfig) {
     // Singleton guard: if another widget instance already exists on this page,
@@ -421,6 +424,7 @@ export class ChatWidget {
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
       html.cw-widget-open .cw-bubble { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
+      html.cw-widget-open .cw-preopen-panel { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-bubble-hidden { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-container { flex-direction:column !important; overflow:hidden !important; }
       .cw-messages { flex:1 1 0 !important; min-height:0 !important; overflow-y:auto !important; }
@@ -429,6 +433,9 @@ export class ChatWidget {
       .cw-takeover { flex-shrink:0 !important; }
       .cw-handoff { flex-shrink:0 !important; }
       .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--cw-primary-color,#006248) 12%, transparent) !important; background:#fff !important; }
+      .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
+      .cw-preopen-pill { background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white) !important; color:var(--cw-primary-color,#006248) !important; border:1px solid color-mix(in srgb, var(--cw-primary-color,#006248) 20%, white) !important; }
+      .cw-preopen-pill:hover { background:var(--cw-primary-color,#006248) !important; color:#fff !important; }
       /* Welcome action cards */
       .cw-welcome-cards { display:flex; flex-direction:column; gap:6px; padding:2px 0 6px; }
       .cw-welcome-card { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid #E8ECF1; border-radius:12px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
@@ -458,11 +465,15 @@ export class ChatWidget {
       html[data-cw-theme='dark'] .cw-card { background:#1F2937 !important; border-color:#374151 !important; color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-msg-user { background:var(--cw-primary-color,#006248) !important; color:#fff !important; }
       html[data-cw-theme='dark'] .cw-bubble-label { color:#E5E7EB !important; }
+      html[data-cw-theme='dark'] .cw-preopen-panel { background:#1F2937 !important; border-color:#374151 !important; }
+      html[data-cw-theme='dark'] .cw-preopen-panel div { color:#E5E7EB !important; }
       html[data-cw-theme='dark'] .cw-highlight { background: rgba(255,255,255,0.1) !important; }
       @media (max-width:640px) {
         .cw-container { left:10px !important; right:10px !important; bottom:10px !important; width:auto !important; height:min(70dvh, 600px) !important; border-radius:20px !important; }
         .cw-container .cw-header { border-radius:20px 20px 0 0 !important; }
         .cw-bubble { bottom:16px !important; }
+        .cw-preopen-panel { bottom:72px !important; left:auto !important; right:16px !important; max-width:264px !important; border-radius:14px !important; }
+        .cw-preopen-pill { padding:8px 12px !important; font-size:12.5px !important; }
         .cw-header { padding:10px 12px !important; }
         .cw-header .cw-logo { width:28px !important; height:28px !important; }
         .cw-messages { padding:12px 12px !important; gap:10px !important; }
@@ -521,14 +532,12 @@ export class ChatWidget {
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
     if (this.configPollTimer) { clearInterval(this.configPollTimer); this.configPollTimer = null; }
-    if (this.teaserShowTimer) { clearTimeout(this.teaserShowTimer); this.teaserShowTimer = null; }
-    if (this.teaserDismissTimer) { clearTimeout(this.teaserDismissTimer); this.teaserDismissTimer = null; }
     this.container?.remove();
     this.bubbleEl?.remove();
-    this.teaserEl?.remove();
+    this.preOpenPanelEl?.remove();
     this.container = null;
     this.bubbleEl = null;
-    this.teaserEl = null;
+    this.preOpenPanelEl = null;
     this.messagesEl = null;
     this.inputEl = null;
     // Clear the global widget reference so a new instance can mount.
@@ -734,58 +743,120 @@ export class ChatWidget {
 
     document.body.appendChild(bubble);
     this.bubbleEl = bubble;
-    this.createTeaser();
+    this.createPreOpenPanel();
   }
 
-  private createTeaser(): void {
+  private createPreOpenPanel(): void {
+    const panel = document.createElement('div');
+    panel.className = 'cw-preopen-panel';
     const pos = this.config.position === 'bottom-left' ? 'left:80px;' : 'right:80px;';
-    const el = document.createElement('div');
-    el.style.cssText = `position:fixed;bottom:28px;${pos}z-index:999999;display:none;gap:6px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);`;
+    panel.style.cssText = `position:fixed;bottom:76px;${pos}z-index:999990;display:none;max-width:264px;animation:cw-slide-in 0.3s cubic-bezier(0.16,1,0.3,1);background:#fff;border:1px solid #E5E7EB;border-radius:14px;overflow:hidden;box-shadow:0 20px 60px rgba(15,23,42,0.12),0 8px 32px rgba(0,0,0,0.06);`;
+
+    const header = document.createElement('div');
+    header.style.cssText = 'padding:12px 14px 8px;display:flex;align-items:center;gap:8px;';
+    const brandMark = document.createElement('span');
+    const bc = this.config.primaryColor || '#006248';
+    brandMark.style.cssText = `width:22px;height:22px;display:grid;place-items:center;border-radius:7px;background:${bc};color:#fff;font-size:13px;font-weight:800;flex-shrink:0;`;
+    brandMark.textContent = (this.config.companyName || 'C')[0].toUpperCase();
+    header.appendChild(brandMark);
+    const brandText = document.createElement('span');
+    brandText.style.cssText = 'font-size:11.5px;font-weight:600;color:#111827;';
+    brandText.textContent = this.config.companyName || 'Chat';
+    header.appendChild(brandText);
+    const statusDot = document.createElement('span');
+    statusDot.style.cssText = 'font-size:10px;color:#6B7280;margin-left:auto;';
+    statusDot.textContent = 'Online now';
+    header.appendChild(statusDot);
+    panel.appendChild(header);
+
+    const questionEl = document.createElement('div');
+    questionEl.style.cssText = 'padding:0 14px 8px;font-size:12.5px;color:#374151;line-height:1.5;';
+    questionEl.textContent = 'Not sure where to start? Pick a quick path below.';
+    panel.appendChild(questionEl);
+
+    const optionsWrap = document.createElement('div');
+    optionsWrap.className = 'cw-preopen-options';
+    panel.appendChild(optionsWrap);
+
+    const escapeLink = document.createElement('div');
+    const ec = this.config.primaryColor || '#006248';
+    escapeLink.style.cssText = `padding:6px 14px 12px;text-align:center;font-size:11.5px;color:${ec};font-weight:600;cursor:pointer;transition:background 0.15s ease;border-radius:0 0 14px 14px;`;
+    escapeLink.textContent = 'Ask something else →';
+    escapeLink.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.dismissPreOpenPanel();
+      if (!this.isOpen) this.toggle();
+    });
+    panel.appendChild(escapeLink);
+
+    document.body.appendChild(panel);
+    this.preOpenPanelEl = panel;
+    this.renderPreOpenOptions();
+
+    setTimeout(() => {
+      if (!this.preOpenDismissed && !this.isOpen && panel.parentNode) {
+        panel.style.display = 'block';
+      }
+    }, 2000);
+    setTimeout(() => this.dismissPreOpenPanel(), 12000);
+    document.addEventListener('click', this.boundDismissPreOpen);
+  }
+
+  private renderPreOpenOptions(): void {
+    if (!this.preOpenPanelEl) return;
+    const wrap = this.preOpenPanelEl.querySelector('.cw-preopen-options');
+    if (!wrap) return;
+    wrap.innerHTML = '';
+
     const options = this.config.starterOptions?.length
       ? this.config.starterOptions
       : this.defaultStarterOptions();
-    const pc = this.config.primaryColor || '#006248';
-    options.forEach((text) => {
-      const chip = document.createElement('button');
-      chip.type = 'button';
-      chip.style.cssText = `padding:6px 14px;border-radius:20px;background:#fff;color:#1F2937;font-size:12px;font-weight:500;border:1px solid #E5E7EB;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.08);transition:all 0.15s ease;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;`;
-      chip.textContent = text;
-      chip.addEventListener('mouseenter', () => { chip.style.borderColor = pc; chip.style.color = pc; chip.style.background = '#F0FAF4'; });
-      chip.addEventListener('mouseleave', () => { chip.style.borderColor = '#E5E7EB'; chip.style.color = '#1F2937'; chip.style.background = '#fff'; });
-      chip.addEventListener('click', (e) => {
+
+    options.forEach((text, i) => {
+      const row = document.createElement('div');
+      row.style.cssText = `padding:8px 14px;display:flex;align-items:center;gap:8px;${i < options.length - 1 ? 'border-bottom:1px solid #F3F4F6;' : ''}transition:all 0.18s ease;cursor:pointer;`;
+
+      const pill = document.createElement('span');
+      pill.className = 'cw-preopen-pill';
+      const pc = this.config.primaryColor || '#006248';
+      pill.style.cssText = `display:inline-flex;align-items:center;padding:6px 12px;border-radius:9px;background:${this.hexToRgba(pc, 0.1)};color:${pc};font-size:12.5px;font-weight:500;white-space:nowrap;border:1px solid ${this.hexToRgba(pc, 0.2)};transition:all 0.18s ease;line-height:1.3;flex:1;`;
+      pill.textContent = text;
+      row.appendChild(pill);
+
+      const chevron = document.createElement('span');
+      chevron.style.cssText = 'color:#9CA3AF;font-size:11px;flex-shrink:0;transition:transform 0.15s ease;';
+      chevron.textContent = '›';
+      row.appendChild(chevron);
+
+      row.addEventListener('mouseenter', () => { row.style.background = '#F0FAF4'; pill.style.transform = 'translateX(3px)'; });
+      row.addEventListener('mouseleave', () => { row.style.background = 'transparent'; pill.style.transform = 'translateX(0)'; });
+      row.addEventListener('click', (e) => {
         e.stopPropagation();
-        this.dismissTeaser();
-        this.applyWidgetState('open');
-        if (!this.container) return;
-        if (this.messages.length === 0) {
-          this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
-        }
-        this.renderUiState();
-        this.scrollToBottom();
-        setTimeout(() => { if (this.inputEl) { this.inputEl.value = text; this.send(); } }, 150);
+        this.dismissPreOpenPanel();
+        if (!this.isOpen) this.toggle();
+        setTimeout(() => {
+          if (this.inputEl) { this.inputEl.value = text; this.send(); }
+        }, 150);
       });
-      el.appendChild(chip);
+      wrap.appendChild(row);
     });
-    document.body.appendChild(el);
-    this.teaserEl = el;
-    this.scheduleTeaser();
   }
 
-  private scheduleTeaser(): void {
-    if (this.teaserShowTimer) clearTimeout(this.teaserShowTimer);
-    this.teaserShowTimer = setTimeout(() => {
-      if (this.widgetState === 'closed' && this.teaserEl) {
-        this.teaserEl.style.display = 'flex';
-        if (this.teaserDismissTimer) clearTimeout(this.teaserDismissTimer);
-        this.teaserDismissTimer = setTimeout(() => this.dismissTeaser(), 10000);
-      }
-    }, 2000);
+  private showPreOpenPanel(): void {
+    if (this.preOpenDismissed || this.isOpen || !this.preOpenPanelEl) return;
+    this.preOpenPanelEl.style.setProperty('display', 'block');
+    this.preOpenPanelEl.style.setProperty('visibility', 'visible');
+    this.preOpenPanelEl.style.setProperty('pointer-events', 'auto');
+    this.preOpenDismissed = true;
+    setTimeout(() => this.dismissPreOpenPanel(), 12000);
   }
 
-  private dismissTeaser(): void {
-    if (this.teaserEl) this.teaserEl.style.display = 'none';
-    if (this.teaserShowTimer) { clearTimeout(this.teaserShowTimer); this.teaserShowTimer = null; }
-    if (this.teaserDismissTimer) { clearTimeout(this.teaserDismissTimer); this.teaserDismissTimer = null; }
+  private dismissPreOpenPanel(): void {
+    if (this.preOpenPanelEl) {
+      this.preOpenPanelEl.style.setProperty('display', 'none', 'important');
+      this.preOpenPanelEl.style.setProperty('visibility', 'hidden', 'important');
+      this.preOpenPanelEl.style.setProperty('pointer-events', 'none', 'important');
+    }
   }
 
   private defaultStarterOptions(): string[] {
@@ -1068,13 +1139,6 @@ export class ChatWidget {
     this.widgetState = state;
     this.isOpen = state === 'open';
     document.documentElement.classList.toggle('cw-widget-open', this.isOpen);
-
-    // --- teaser ---
-    if (state === 'open') {
-      this.dismissTeaser();
-    } else {
-      this.scheduleTeaser();
-    }
 
     // --- bubble ---
     if (state === 'closed') {
