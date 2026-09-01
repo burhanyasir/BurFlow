@@ -746,7 +746,6 @@ export class ChatWidget {
     container.className = 'cw-container';
     container.style.cssText = this.getContainerStyles();
     container.style.display = 'none';
-    container.style.flexDirection = 'column';
 
     container.appendChild(this.createHeader());
     this.messagesEl = this.createMessagesArea();
@@ -759,7 +758,7 @@ export class ChatWidget {
     this.handoffEl = this.createHandoffArea();
     container.appendChild(this.handoffEl);
 
-    document.body.appendChild(container);
+    // Do NOT append to DOM yet — only attach when the widget opens.
     this.container = container;
 
     if (this.config.autoOpen) {
@@ -1024,10 +1023,12 @@ export class ChatWidget {
     // --- container ---
     if (this.container) {
       if (state === 'open') {
+        if (!this.container.parentNode) document.body.appendChild(this.container);
         this.container.style.display = 'flex';
         this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
       } else {
         this.container.style.display = 'none';
+        if (this.container.parentNode) this.container.parentNode.removeChild(this.container);
       }
     }
   }

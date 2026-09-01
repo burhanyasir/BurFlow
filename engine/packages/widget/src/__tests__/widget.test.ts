@@ -256,12 +256,12 @@ describe('ChatWidget', () => {
     widget?.unmount();
   });
 
-  it('mounts bubble and container to DOM', () => {
+  it('mounts bubble to DOM; container stays off-DOM until open', () => {
     widget = new ChatWidget({ apiUrl: 'http://test' });
     widget.mount();
 
     expect(document.querySelector('.cw-bubble')).toBeTruthy();
-    expect(document.querySelector('.cw-container')).toBeTruthy();
+    expect(document.querySelector('.cw-container')).toBeNull();
   });
 
   it('does not double-mount', () => {
@@ -270,7 +270,6 @@ describe('ChatWidget', () => {
     widget.mount();
 
     expect(document.querySelectorAll('.cw-bubble').length).toBe(1);
-    expect(document.querySelectorAll('.cw-container').length).toBe(1);
   });
 
   it('unmounts removes elements from DOM', () => {
@@ -279,21 +278,21 @@ describe('ChatWidget', () => {
     widget.unmount();
 
     expect(document.querySelector('.cw-bubble')).toBeNull();
-    expect(document.querySelector('.cw-container')).toBeNull();
   });
 
   it('toggle opens and closes chat window', () => {
     widget = new ChatWidget({ apiUrl: 'http://test' });
     widget.mount();
 
-    const container = document.querySelector('.cw-container') as HTMLElement;
-    expect(container.style.display).toBe('none');
+    expect(document.querySelector('.cw-container')).toBeNull();
 
     widget.toggle();
+    const container = document.querySelector('.cw-container') as HTMLElement;
+    expect(container).toBeTruthy();
     expect(container.style.display).toBe('flex');
 
     widget.toggle();
-    expect(container.style.display).toBe('none');
+    expect(document.querySelector('.cw-container')).toBeNull();
   });
 
   it('shows greeting message on first open', () => {
