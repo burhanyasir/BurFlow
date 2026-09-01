@@ -3,7 +3,7 @@
 // the current widget. Wired into `npm run dev`, `build`, and `preview` via
 // the pre* hooks in package.json.
 import { execSync } from 'node:child_process';
-import { copyFileSync, mkdirSync } from 'node:fs';
+import { copyFileSync, mkdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -17,8 +17,17 @@ const targets = [
   join(publicDir, 'widget.js'),
 ];
 
+const esbuildBin = join(root, 'engine', 'node_modules', 'esbuild', 'bin', 'esbuild');
+
 try {
-  execSync('node build.js', { cwd: widgetPkg, stdio: 'inherit' });
+  if (existsSync(esbuildBin)) {
+    execSync('node build.js', { cwd: widgetPkg, stdio: 'inherit' });
+  } else {
+    console.log('[widget] esbuild not found — using pre-built dist/widget.js');
+  }
+  if (!existsSync(widgetDist)) {
+    throw new Error('dist/widget.js not found — run the engine build first');
+  }
   mkdirSync(join(publicDir, 'widget'), { recursive: true });
   for (const target of targets) {
     copyFileSync(widgetDist, target);
