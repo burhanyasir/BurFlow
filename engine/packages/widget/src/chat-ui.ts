@@ -356,6 +356,11 @@ export class ChatWidget {
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
   private agentPollTimer: ReturnType<typeof setInterval> | null = null;
   private configPollTimer: ReturnType<typeof setInterval> | null = null;
+  /** True only when the visitor explicitly clicked "Talk to a human" + confirmed dialog.
+   *  Guards against the backend returning humanTakeover:true on a stale session or
+   *  the SSE stream pushing TAKEOVER_STARTED for a session that was already in
+   *  human_takeover state from a prior page load. */
+  private humanTakeoverRequested = false;
   private lastAgentSeq = 0;
   private get placeholders(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
@@ -409,6 +414,7 @@ export class ChatWidget {
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px color-mix(in srgb, var(--cw-primary-color,#006248) 55%, transparent) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
+      html.cw-widget-open .cw-bubble { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-input:focus { border-color:var(--cw-primary-color,#006248) !important; box-shadow:0 0 0 3px color-mix(in srgb, var(--cw-primary-color,#006248) 12%, transparent) !important; background:#fff !important; }
       .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
       .cw-preopen-pill { background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white) !important; color:var(--cw-primary-color,#006248) !important; border:1px solid color-mix(in srgb, var(--cw-primary-color,#006248) 20%, white) !important; }
@@ -576,8 +582,10 @@ export class ChatWidget {
   private handleTakeoverEvent(event: { type?: string; payload?: Record<string, unknown> }): void {
     switch (event.type) {
       case 'TAKEOVER_STARTED':
-        this.showTakeoverBanner();
-        this.hideStarterChips();
+        if (this.humanTakeoverRequested) {
+          this.showTakeoverBanner();
+          this.hideStarterChips();
+        }
         break;
       case 'OPERATOR_MESSAGE': {
         const payload = event.payload || {};
@@ -634,7 +642,7 @@ export class ChatWidget {
 
   private applyBrandingVars(): void {
     if (typeof document === 'undefined') return;
-    const primary = this.config.primaryColor || '#3B82F6';
+    const primary = this.config.primaryColor || '#006248';
     const accent = (this.config as any).accentColor || primary;
     document.documentElement.style.setProperty('--cw-primary-color', primary);
     document.documentElement.style.setProperty('--cw-accent-color', accent);
@@ -1083,8 +1091,10 @@ export class ChatWidget {
   toggle(): void {
     this.isOpen = !this.isOpen;
     this.dismissPreOpenPanel();
+    document.documentElement.classList.toggle('cw-widget-open', this.isOpen);
     if (!this.container) return;
     this.container.style.display = this.isOpen ? 'flex' : 'none';
+    // Sync bubble inline display so a stale config poll can't leave it invisible.
     if (this.bubbleEl) this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
     if (this.isOpen) {
       this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
@@ -1137,6 +1147,7 @@ export class ChatWidget {
 
   private async requestHumanAgent(): Promise<void> {
     if (this.isStreaming) return;
+    this.humanTakeoverRequested = true;
 
     const msg = "I'd like to talk to a human agent, please.";
     this.addMessage({ role: 'user', content: msg });
@@ -1219,8 +1230,10 @@ export class ChatWidget {
         this.renderUiState();
       },
       onHumanTakeover: () => {
-        this.showTakeoverBanner();
-        this.hideStarterChips();
+        if (this.humanTakeoverRequested) {
+          this.showTakeoverBanner();
+          this.hideStarterChips();
+        }
       },
       onComplete: (fullContent) => {
         if (fullContent) assistantMsg.content = fullContent;
@@ -1313,7 +1326,7 @@ export class ChatWidget {
     if (msg.streaming) {
       const cursor = document.createElement('span');
       cursor.className = 'cw-cursor';
-      cursor.style.cssText = 'display:inline-block;width:2px;height:14px;background:' + (isUser ? '#fff' : this.config.primaryColor) + ';margin-left:2px;animation:cw-blink 1s step-end infinite;vertical-align:text-bottom;';
+      cursor.style.cssText = 'display:inline-block;width:2px;height:14px;background:' + (isUser ? '#fff' : (this.config.primaryColor || '#006248')) + ';margin-left:2px;animation:cw-blink 1s step-end infinite;vertical-align:text-bottom;';
       bubble.appendChild(cursor);
     }
 
@@ -1636,7 +1649,7 @@ export class ChatWidget {
     btn.type = 'button';
     btn.className = 'cw-action-button';
     btn.textContent = button.label;
-    btn.style.cssText = `padding:8px 12px;border-radius:999px;border:none;cursor:pointer;font-size:12.5px;transition:transform 0.15s ease, box-shadow 0.15s ease;${button.variant === 'primary' ? `background:${this.config.primaryColor};color:#fff;box-shadow:0 10px 20px rgba(0,98,72,0.16);` : 'background:#fff;color:#1F2937;border:1px solid #D1D5DB;'}`;
+    btn.style.cssText = `padding:8px 12px;border-radius:999px;border:none;cursor:pointer;font-size:12.5px;transition:transform 0.15s ease, box-shadow 0.15s ease;${button.variant === 'primary' ? `background:${this.config.primaryColor || '#006248'};color:#fff;box-shadow:0 10px 20px rgba(0,98,72,0.16);` : 'background:#fff;color:#1F2937;border:1px solid #D1D5DB;'}`;
     if (button.category) {
       const iconMap: Record<string, string> = { demo: '🎯', plans: '💰', guidance: '🧠', sales: '🤝', faq: '❓', products: '📦' };
       btn.textContent = `${iconMap[button.category] || '•'} ${button.label}`;
@@ -1704,7 +1717,7 @@ export class ChatWidget {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.textContent = label;
-    btn.style.cssText = `width:100%;padding:10px 14px;border:none;border-radius:10px;background:${this.config.primaryColor};color:#fff;font-weight:700;cursor:pointer;font-size:13px;`;
+    btn.style.cssText = `width:100%;padding:10px 14px;border:none;border-radius:10px;background:${this.config.primaryColor || '#006248'};color:#fff;font-weight:700;cursor:pointer;font-size:13px;`;
     btn.addEventListener('click', () => window.open(link, '_blank'));
     wrapper.appendChild(btn);
     return wrapper;
@@ -1844,7 +1857,11 @@ export class ChatWidget {
 
   private updateBubbleAndContainerStyles(): void {
     if (this.bubbleEl) {
+      const bubbleDisplay = this.bubbleEl.style.display;
       this.bubbleEl.style.cssText = this.getBubbleStyles();
+      // Preserve current display state — getBubbleStyles() returns the wrong value
+      // when a config poll fires while the widget is open.
+      if (bubbleDisplay) this.bubbleEl.style.display = bubbleDisplay;
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
         this.bubbleEl.title = this.config.launcherText;
@@ -1903,7 +1920,11 @@ export class ChatWidget {
     // Re-create container if position changed
     if (merged.position && merged.position !== prevPosition && this.container) {
       this.container.style.cssText = this.getContainerStyles();
-      this.bubbleEl && (this.bubbleEl.style.cssText = this.getBubbleStyles());
+      if (this.bubbleEl) {
+        const bd = this.bubbleEl.style.display;
+        this.bubbleEl.style.cssText = this.getBubbleStyles();
+        if (bd) this.bubbleEl.style.display = bd;
+      }
     }
     // Re-render header/launcher if primaryColor or accentColor changed
     if ((merged.primaryColor && merged.primaryColor !== prevPrimaryColor) ||

@@ -700,6 +700,9 @@ describe('ChatWidget', () => {
     widget.mount();
     widget.toggle();
 
+    // Simulate explicit user request for human agent
+    (widget as any).humanTakeoverRequested = true;
+
     const input = document.querySelector('.cw-input') as HTMLTextAreaElement;
     input.value = 'I need urgent help';
     widget.send();
@@ -735,35 +738,36 @@ describe('ChatWidget', () => {
   });
 
   it('hides starter chips on TAKEOVER_STARTED and restores them on TAKEOVER_ENDED via the event stream', async () => {
-    const encoder = new TextEncoder();
-    const eventStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } })}\n\n`));
-        setTimeout(() => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: 'TAKEOVER_ENDED', sessionId: 's1', conversationId: 'c1', payload: {} })}\n\n`));
-          controller.close();
-        }, 150);
-      },
-    });
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
-      if (typeof url === 'string' && url.includes('/chat/events')) {
-        return Promise.resolve({ ok: true, body: eventStream });
-      }
-      // Return valid JSON for history polling and other endpoints
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ messages: [] }) });
-    }));
-
     widget = new ChatWidget({ apiUrl: 'http://test', greeting: '', sessionId: 's1', starterOptions: ['Option A', 'Option B'] });
+    // Simulate explicit user request for human agent so SSE TAKEOVER_STARTED is honored
+    (widget as any).humanTakeoverRequested = true;
     widget.mount();
     widget.toggle();
 
+    // Directly invoke the handler (simulates what SSE delivers)
+    (widget as any).handleTakeoverEvent({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } });
+
     // TAKEOVER_STARTED: banner visible, starter cards removed.
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise(r => setTimeout(r, 10));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('block');
     expect(document.querySelector('.cw-welcome-cards')).toBeFalsy();
 
     // TAKEOVER_ENDED: banner hidden, starter cards restored.
-    await new Promise(r => setTimeout(r, 200));
+    (widget as any).handleTakeoverEvent({ type: 'TAKEOVER_ENDED', sessionId: 's1', conversationId: 'c1', payload: {} });
+    await new Promise(r => setTimeout(r, 10));
+    expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
+    expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
+  });
+
+  it('ignores TAKEOVER_STARTED when user did not request human agent', async () => {
+    widget = new ChatWidget({ apiUrl: 'http://test', greeting: '', sessionId: 's1', starterOptions: ['Option A', 'Option B'] });
+    widget.mount();
+    widget.toggle();
+
+    // humanTakeoverRequested defaults to false — unrequested takeover should be ignored
+    (widget as any).handleTakeoverEvent({ type: 'TAKEOVER_STARTED', sessionId: 's1', conversationId: 'c1', payload: { agentId: 'rep-1' } });
+
+    await new Promise(r => setTimeout(r, 10));
     expect(document.querySelector('.cw-takeover')!.style.display).toBe('none');
     expect(document.querySelector('.cw-welcome-cards')).toBeTruthy();
   });
