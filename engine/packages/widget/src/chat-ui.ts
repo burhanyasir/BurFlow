@@ -1100,17 +1100,12 @@ export class ChatWidget {
     // 2) cw-bubble-hidden class directly on the bubble element
     // 3) Inline style properties
     if (this.bubbleEl) {
-      this.bubbleEl.classList.toggle('cw-bubble-hidden', this.isOpen);
+      // Nuclear option: physically detach bubble from DOM when open,
+      // re-attach when closed. No CSS specificity can override removal.
       if (this.isOpen) {
-        this.bubbleEl.style.setProperty('display', 'none', 'important');
-        this.bubbleEl.style.setProperty('visibility', 'hidden', 'important');
-        this.bubbleEl.style.setProperty('pointer-events', 'none', 'important');
-        this.bubbleEl.style.setProperty('z-index', '-1', 'important');
-      } else {
-        this.bubbleEl.style.removeProperty('display');
-        this.bubbleEl.style.removeProperty('visibility');
-        this.bubbleEl.style.removeProperty('pointer-events');
-        this.bubbleEl.style.removeProperty('z-index');
+        this.bubbleEl.remove();
+      } else if (!this.bubbleEl.parentNode) {
+        document.body.appendChild(this.bubbleEl);
         this.bubbleEl.style.cssText = this.getBubbleStyles();
       }
     }
@@ -1876,15 +1871,11 @@ export class ChatWidget {
   private updateBubbleAndContainerStyles(): void {
     if (this.bubbleEl) {
       this.bubbleEl.style.cssText = this.getBubbleStyles();
-      // Re-enforce bubble visibility after full cssText rewrite.
+      // Re-enforce bubble state after full cssText rewrite.
       if (this.isOpen) {
-        this.bubbleEl.classList.add('cw-bubble-hidden');
-        this.bubbleEl.style.setProperty('display', 'none', 'important');
-        this.bubbleEl.style.setProperty('visibility', 'hidden', 'important');
-        this.bubbleEl.style.setProperty('pointer-events', 'none', 'important');
-        this.bubbleEl.style.setProperty('z-index', '-1', 'important');
-      } else {
-        this.bubbleEl.classList.remove('cw-bubble-hidden');
+        if (this.bubbleEl.parentNode) this.bubbleEl.remove();
+      } else if (!this.bubbleEl.parentNode) {
+        document.body.appendChild(this.bubbleEl);
       }
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);

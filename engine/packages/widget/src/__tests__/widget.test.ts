@@ -545,6 +545,8 @@ describe('ChatWidget', () => {
     await vi.waitFor(() => {
       expect(document.documentElement.style.getPropertyValue('--cw-primary-color')).toBe('#22C55E');
     });
+    // Bubble is removed from DOM when widget is open; close it first to inspect styles.
+    widget.toggle();
     const bubble = document.querySelector('.cw-bubble') as HTMLElement;
     expect(bubble.style.left).toBe('20px');
     expect(bubble.style.right).toBe('');
