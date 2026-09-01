@@ -1094,8 +1094,15 @@ export class ChatWidget {
     document.documentElement.classList.toggle('cw-widget-open', this.isOpen);
     if (!this.container) return;
     this.container.style.display = this.isOpen ? 'flex' : 'none';
-    // Sync bubble inline display so a stale config poll can't leave it invisible.
-    if (this.bubbleEl) this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
+    // Hide the bubble when the widget is open — belt-and-suspenders: CSS rule,
+    // inline display, and visibility all enforce the same state so no single
+    // code path can leave the bubble visible on top of the open panel.
+    if (this.bubbleEl) {
+      this.bubbleEl.style.display = this.isOpen ? 'none' : 'flex';
+      this.bubbleEl.style.visibility = this.isOpen ? 'hidden' : 'visible';
+      this.bubbleEl.style.pointerEvents = this.isOpen ? 'none' : 'auto';
+      this.bubbleEl.style.zIndex = this.isOpen ? '-1' : '999999';
+    }
     if (this.isOpen) {
       this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
       this.unreadCount = 0;
@@ -1857,11 +1864,14 @@ export class ChatWidget {
 
   private updateBubbleAndContainerStyles(): void {
     if (this.bubbleEl) {
-      const bubbleDisplay = this.bubbleEl.style.display;
       this.bubbleEl.style.cssText = this.getBubbleStyles();
-      // Preserve current display state — getBubbleStyles() returns the wrong value
-      // when a config poll fires while the widget is open.
-      if (bubbleDisplay) this.bubbleEl.style.display = bubbleDisplay;
+      // Re-enforce bubble visibility after full cssText rewrite.
+      if (this.isOpen) {
+        this.bubbleEl.style.display = 'none';
+        this.bubbleEl.style.visibility = 'hidden';
+        this.bubbleEl.style.pointerEvents = 'none';
+        this.bubbleEl.style.zIndex = '-1';
+      }
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
         this.bubbleEl.title = this.config.launcherText;
@@ -1921,11 +1931,6 @@ export class ChatWidget {
     // Re-create container if position changed
     if (merged.position && merged.position !== prevPosition && this.container) {
       this.container.style.cssText = this.getContainerStyles();
-      if (this.bubbleEl) {
-        const bd = this.bubbleEl.style.display;
-        this.bubbleEl.style.cssText = this.getBubbleStyles();
-        if (bd) this.bubbleEl.style.display = bd;
-      }
     }
     // Re-render header/launcher if primaryColor or accentColor changed
     if ((merged.primaryColor && merged.primaryColor !== prevPrimaryColor) ||
