@@ -37,7 +37,8 @@ export function WidgetLauncher() {
 
     const script = document.createElement('script');
     script.id = SCRIPT_ID;
-    script.src = WIDGET_CDN + '/widget/widget.js';
+    // Cache-bust so users always get the latest widget bundle after deploys
+    script.src = WIDGET_CDN + '/widget/widget.js?v=' + Date.now();
     script.async = true;
     // The widget's autoInit reads these attributes and bootstraps itself.
     script.setAttribute('data-tenant-id', tenantId);
