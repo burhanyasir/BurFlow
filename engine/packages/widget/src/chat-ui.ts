@@ -1057,16 +1057,7 @@ export class ChatWidget {
   }
 
   private updateHandoffVisibility(): void {
-    if (!this.handoffEl || this.handoffShown) return;
-    const userMessages = this.messages.filter(m => m.role === 'user').length;
-    if (userMessages >= 3) {
-      this.handoffEl.style.display = 'block';
-      this.handoffEl.innerHTML = `
-        <button class="cw-handoff-link" style="background:none;border:none;color:${this.config.primaryColor || '#006248'};font-size:12px;cursor:pointer;padding:4px 0;font-family:inherit;text-decoration:underline;text-underline-offset:2px;">
-          Talk to a human
-        </button>`;
-      this.handoffEl.querySelector('.cw-handoff-link')?.addEventListener('click', () => this.showHandoffForm());
-    }
+    // Removed: "Talk to a human" link no longer shown automatically
   }
 
   private showHandoffForm(): void {
