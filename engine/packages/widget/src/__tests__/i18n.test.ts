@@ -6,9 +6,9 @@ describe('i18n', () => {
     expect(t('bubble.label')).toBe('Chat with us');
   });
 
-  it('falls back to English when translation not yet added', () => {
-    expect(t('bubble.label', 'es')).toBe('Chat with us');
-    expect(t('bubble.label', 'nl')).toBe('Chat with us');
+  it('returns translated text for locales with translations', () => {
+    expect(t('bubble.label', 'es')).toBe('Chatea con nosotros');
+    expect(t('bubble.label', 'nl')).toBe('Chat met ons');
   });
 
   it('falls back to English for unknown locale', () => {
