@@ -95,10 +95,11 @@ if (typeof window !== 'undefined') {
       const primaryColor = script.getAttribute('data-primary-color') || undefined;
       const position = script.getAttribute('data-position') as any || undefined;
       const title = script.getAttribute('data-title') || undefined;
+      const lang = script.getAttribute('data-lang') || undefined;
 
       const token = script.getAttribute('data-token');
       if (token) {
-        initChatWidget({ widgetToken: token, apiUrl, primaryColor, position, title });
+        initChatWidget({ widgetToken: token, apiUrl, primaryColor, position, title, locale: lang });
         return;
       }
 
@@ -111,11 +112,11 @@ if (typeof window !== 'undefined') {
           })
           .then((data) => {
             if (data && data.token) {
-              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title, tenantId: data.tenantId || tenantId });
+              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title, tenantId: data.tenantId || tenantId, locale: lang });
             } else {
               // Token exchange returned no token — render with local defaults
               // so the bubble still appears (never fully dormant).
-              initChatWidget({ apiUrl, primaryColor, position, title });
+              initChatWidget({ apiUrl, primaryColor, position, title, locale: lang });
             }
           })
           .catch(() => {
@@ -123,7 +124,7 @@ if (typeof window !== 'undefined') {
             // local default config instead of staying dormant. This preserves
             // the pre-tokenless behavior where a failed config fetch still
             // showed the launcher with mock content.
-            initChatWidget({ apiUrl, primaryColor, position, title });
+            initChatWidget({ apiUrl, primaryColor, position, title, locale: lang });
           });
       }
     } catch {}

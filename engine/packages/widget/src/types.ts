@@ -24,6 +24,7 @@ export interface WidgetConfig {
   suggestedActions?: SmartButton[];
   businessProfile?: Record<string, unknown>;
   starterOptions?: string[];
+  locale?: string;
 }
 
 export interface ChatMessage {

@@ -311,6 +311,7 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   customCss: '',
   starterOptions: [],
   suggestedActions: [],
+  locale: 'en',
 };
 
 let messageIdCounter = 0;
@@ -389,6 +390,18 @@ export class ChatWidget {
       }
     }
     this.config = { ...DEFAULT_CONFIG, ...this.normalizeAliases(config) };
+    // Resolve effective locale: data-lang > document.lang > browser > 'en'
+    if (!this.config.locale || this.config.locale === 'en') {
+      const docLang = typeof document !== 'undefined' ? document.documentElement?.lang?.slice(0, 2) : undefined;
+      if (docLang && ['bg','hr','cs','da','nl','en','et','fi','fr','de','el','hu','ga','it','lv','lt','mt','pl','pt','ro','sk','sl','es','sv'].includes(docLang)) {
+        this.config.locale = docLang;
+      } else if (typeof navigator !== 'undefined') {
+        const navLang = navigator.language?.slice(0, 2);
+        if (navLang && ['bg','hr','cs','da','nl','en','et','fi','fr','de','el','hu','ga','it','lv','lt','mt','pl','pt','ro','sk','sl','es','sv'].includes(navLang)) {
+          this.config.locale = navLang;
+        }
+      }
+    }
     this.embedPrimaryColor = config.primaryColor || null;
     this.restoreSessionId();
     this.businessProfile = this.deriveBusinessProfileFromConfig();
