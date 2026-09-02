@@ -636,6 +636,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         customCss: config.customCss,
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
+        locale: config.locale,
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Widget config fetch failed');

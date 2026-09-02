@@ -877,6 +877,7 @@ export class WidgetConfigRepository {
     if (data.customWebhookUrl) { cols.push('custom_webhook_url'); vals.push(data.customWebhookUrl); }
     if (data.alertEmails) { cols.push('alert_emails'); vals.push(data.alertEmails); }
     if (data.notifyThreshold !== undefined) { cols.push('notify_threshold'); vals.push(data.notifyThreshold); }
+    if (data.locale !== undefined) { cols.push('locale'); vals.push(data.locale); }
     this.db.prepare(`INSERT INTO widget_configs (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`).run(...vals);
     return this.get(tenantId)!;
   }
@@ -900,6 +901,7 @@ export class WidgetConfigRepository {
       customWebhookUrl: row.custom_webhook_url || undefined,
       alertEmails: row.alert_emails || undefined,
       notifyThreshold: row.notify_threshold || 'all',
+      locale: row.locale || undefined,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }

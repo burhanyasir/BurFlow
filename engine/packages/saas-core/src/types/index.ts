@@ -275,6 +275,7 @@ export interface WidgetConfig {
   /** Comma-separated alert recipients (in addition to notificationEmail). */
   alertEmails?: string;
   notifyThreshold?: 'all' | 'sales_qualified_only';
+  locale?: string;
   createdAt: string;
   updatedAt: string;
 }
