@@ -146,19 +146,34 @@ export class HtmlParser implements DocumentParser {
   }
 
   private stripHtml(html: string): string {
-    return html
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    // Remove script, style, svg, noscript, iframe, form first
+    let clean = html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-      .replace(/<(br|hr|\/p|\/div|\/h[1-6]|\/li|\/tr|\/blockquote)[^>]*>/gi, '\n')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<svg[^>]*>[\s\S]*?<\/svg>/gi, '')
+      .replace(/<noscript[^>]*>[\s\S]*?<\/noscript>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<form[^>]*>[\s\S]*?<\/form>/gi, '');
+    
+    // Remove nav/header/footer/aside - boilerplate
+    clean = clean
+      .replace(/<nav[^>]*>[\s\S]*?<\/nav>/gi, '')
+      .replace(/<footer[^>]*>[\s\S]*?<\/footer>/gi, '')
+      .replace(/<header[^>]*>[\s\S]*?<\/header>/gi, '')
+      .replace(/<aside[^>]*>[\s\S]*?<\/aside>/gi, '');
+    
+    // Now strip remaining HTML tags, convert block elements to newlines
+    return clean
+      .replace(/<(br|hr|\/p|\/div|\/h[1-6]|\/li|\/tr|\/blockquote|p|div|h[1-6]|li|tr|blockquote)[^>]*>/gi, '\n')
       .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
-      .replace(/&#\d+;/g, m => String.fromCharCode(parseInt(m.slice(2, -1), 10)))
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
       .replace(/[ \t]+/g, ' ')
-      .replace(/\n\s*\n/g, '\n')
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
       .replace(/^\n+|\n+$/g, '')
       .trim();
   }
@@ -482,7 +497,21 @@ function contentQualityScore(text: string, rawHtml?: string): { score: number; r
   const pTags = (rawHtml?.match(/<p[\s>]/gi) || []).length;
   const wordCount = text.split(/\s+/).length;
   if (wordCount < 50) return { score: 0, reason: 'too_few_words' };
+  
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('cookie') && (lowerText.includes('accept') || lowerText.includes('consent')) && len < 800) {
+    return { score: 0, reason: 'cookie_banner' };
+  }
+  if (lowerText.includes('please log in') || lowerText.includes('sign in to continue') || lowerText.includes('login required')) {
+    return { score: 0, reason: 'login_wall' };
+  }
+
   const lines = text.split('\n').filter(l => l.trim());
+  const shortLines = lines.filter(l => l.split(' ').length <= 2 && l.length < 20).length;
+  if (lines.length > 5 && (shortLines / lines.length) > 0.6) {
+    return { score: 0, reason: 'nav_heavy' };
+  }
+
   const uniqueLines = new Set(lines.map(l => l.trim().toLowerCase()));
   const boilerplateRatio = 1 - (uniqueLines.size / Math.max(lines.length, 1));
   if (boilerplateRatio > 0.9) return { score: 0, reason: 'high_boilerplate' };
@@ -508,6 +537,81 @@ export class WebsiteCrawler implements WebCrawler {
   private hostCircuitOpen = new Map<string, number>();
   private robotsCache = new Map<string, { rules: RobotsRules; fetchedAt: number }>();
   private contentHashes = new Set<string>();
+  private _brandSignals: Record<string, unknown> | null = null;
+
+  private extractBrandSignals(html: string, urlStr: string): Record<string, unknown> {
+    const signals: Record<string, unknown> = {};
+    
+    const ogImage = html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i);
+    const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+    const ogDesc = html.match(/<meta[^>]*property=["']og:description["'][^>]*content=["']([^"']+)["']/i);
+    const ogSiteName = html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i);
+    const themeColor = html.match(/<meta[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/i);
+    const appleIcon = html.match(/<link[^>]*rel=["']apple-touch-icon["'][^>]*href=["']([^"']+)["']/i);
+    const favicon = html.match(/<link[^>]*rel=["'](?:shortcut icon|icon)["'][^>]*href=["']([^"']+)["']/i);
+    const h1Match = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+
+    if (ogImage) signals.ogImage = ogImage[1];
+    if (ogTitle) signals.ogTitle = ogTitle[1];
+    if (ogDesc) signals.ogDescription = ogDesc[1];
+    if (ogSiteName) signals.ogSiteName = ogSiteName[1];
+    if (themeColor) signals.themeColor = themeColor[1];
+    
+    // Logo detection
+    if (appleIcon) {
+      signals.logoUrl = appleIcon[1];
+    } else {
+      const logoMatch = html.match(/<img[^>]*src=["']([^"']*(?:logo)[^"']*)["']/i) || 
+                        html.match(/<img[^>]*alt=["'][^"']*(?:logo)[^"']*["'][^>]*src=["']([^"']+)["']/i);
+      if (logoMatch) {
+        try {
+          signals.logoUrl = new URL(logoMatch[1], urlStr).href;
+        } catch {
+          signals.logoUrl = logoMatch[1];
+        }
+      } else if (ogImage) {
+        signals.logoUrl = ogImage[1];
+      }
+    }
+
+    if (favicon) {
+      try {
+        signals.favicon = new URL(favicon[1], urlStr).href;
+      } catch {
+        signals.favicon = favicon[1];
+      }
+    }
+
+    if (h1Match) {
+      signals.h1Text = h1Match[1].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    // Primary color detection from CSS vars
+    const styleMatch = html.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+    if (styleMatch) {
+      const css = styleMatch[1];
+      const colorMatch = css.match(/--(?:primary|brand|accent|main)[^:]*:\s*(#[A-Fa-f0-9]{3,8})/i) ||
+                         css.match(/background-color:\s*(#[A-Fa-f0-9]{3,8})/i);
+      if (colorMatch) signals.primaryColor = colorMatch[1];
+    }
+    if (!signals.primaryColor && themeColor) {
+      signals.primaryColor = themeColor[1];
+    }
+
+    // CTA texts
+    const ctas: string[] = [];
+    const btnRegex = /<(?:button|a)[^>]*(?:class=["'][^"']*(?:btn|button|cta)[^"']*["'])?[^>]*>([\s\S]*?)<\/(?:button|a)>/gi;
+    let bMatch;
+    while ((bMatch = btnRegex.exec(html)) !== null && ctas.length < 5) {
+      const text = bMatch[1].replace(/<[^>]+>/g, '').trim();
+      if (text.length > 2 && text.length < 60) {
+        ctas.push(text);
+      }
+    }
+    if (ctas.length > 0) signals.ctaTexts = ctas;
+
+    return signals;
+  }
 
   private static isPrivateIp(ip: string): boolean {
     return WebsiteCrawler.PRIVATE_IP_PATTERNS.some(p => p.test(ip));
@@ -841,6 +945,12 @@ export class WebsiteCrawler implements WebCrawler {
       const contentHash = createHash('sha256').update(doc.content.toLowerCase().slice(0, 4096)).digest('hex');
       if (this.contentHashes.has(contentHash)) continue;
       this.contentHashes.add(contentHash);
+
+      // Store brand signals from the homepage (first or shallowest page)
+      if (item.depth === 0 || (results.length === 0 && !this._brandSignals)) {
+        this._brandSignals = this.extractBrandSignals(result.body, item.url);
+        doc.metadata = { ...doc.metadata, brandSignals: this._brandSignals };
+      }
 
       results.push(doc);
       const docTokens = doc.content.split(/\s+/).length;

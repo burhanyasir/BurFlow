@@ -14,6 +14,7 @@ import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { validateId, validationError, validateRequiredString, LABEL_MAX } from '../middleware/validate';
 import { UnansweredQuestionRepository, BrandExtractor } from '@conversation-engine/saas-core';
 import Groq from 'groq-sdk';
+import { applyBrandAdaptation } from '../services/scan-brand-adapter';
 
 const logger = createLogger('saas-api:knowledge');
 
@@ -611,6 +612,9 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
               updatePayload.businessProfile = { ...existing, ...brandProfileUpdate };
             }
             widgetConfigRepo.upsert(tenantId, updatePayload);
+
+            // Apply full brand adaptation (colors, logo, greeting, system prompt hint)
+            await applyBrandAdaptation(tenantId, docs, widgetConfigRepo);
           } catch { /* ignore — starterOptions are best-effort */ }
 
           setTimeout(() => clearCrawlProgress(tenantId), 30000);

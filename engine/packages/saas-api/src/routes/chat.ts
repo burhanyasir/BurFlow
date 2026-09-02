@@ -312,22 +312,36 @@ export function createChatRoutes(
       // e-commerce / clinic tenants replace SaaS "Book a demo / Free trial"
       // CTAs and quick replies with store-appropriate ones. Never fails the turn.
       let businessProfile: Record<string, unknown> | undefined;
+      let systemPromptHint: string | undefined;
       if (widgetConfigRepo) {
         try {
           const wc = widgetConfigRepo.get(tenantId!);
-          businessProfile = wc?.businessProfile;
+          businessProfile = wc?.businessProfile ? { ...wc.businessProfile } : {};
           // Inject companyName so the brain's no-knowledge prompt can greet by name
-          if (wc?.companyName && businessProfile) {
+          if (wc?.companyName) {
             businessProfile.companyName = wc.companyName;
-          } else if (wc?.companyName) {
-            businessProfile = { companyName: wc.companyName };
           }
           if (wc?.allowedDomains?.length) {
-            businessProfile = { ...(businessProfile || {}), domain: (businessProfile as any)?.domain || wc.allowedDomains[0] };
+            businessProfile.domain = (businessProfile as any).domain || wc.allowedDomains[0];
+          }
+          // Extract greeting from widget config
+          if (wc?.greeting) {
+            businessProfile.greeting = wc.greeting;
+          }
+          // Extract the system prompt hint set by the brand adapter after scanning
+          if (typeof (businessProfile as any).systemPromptHint === 'string') {
+            systemPromptHint = (businessProfile as any).systemPromptHint as string;
           }
         } catch {
           businessProfile = undefined;
         }
+      }
+
+      // Propagate the scanned website knowledge hint into the brain's context.
+      // The brain function reads businessProfile._systemPromptHint to prepend
+      // website-derived knowledge to the system prompt.
+      if (systemPromptHint && businessProfile) {
+        (businessProfile as any)._systemPromptHint = systemPromptHint;
       }
 
       const pipelineResult = await executePipeline({

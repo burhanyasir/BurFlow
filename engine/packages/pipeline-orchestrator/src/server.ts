@@ -157,7 +157,7 @@ if (process.env.SEED_DEMO === 'true') {
 
 const deps: PipelineDeps = { tenantRegistry, sessionStore, configStore, dedupStore, vault, llmApiKey: process.env.LLM_API_KEY, tripWire, inputGuardrail, piiDetector, outputGuardrail, groundingVerifier, responseGenerator, knowledgeRetriever };
 
-const app = express();
+const app: express.Express = express();
 app.use(express.json({ limit: '1mb' }));
 
 // ─── Root Route (HTML Dashboard) ──────────────────────────────

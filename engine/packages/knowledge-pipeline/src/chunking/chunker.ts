@@ -36,22 +36,54 @@ export class ContentChunker implements Chunker {
 
   private chunkText(text: string, doc: NormalizedDocument, sectionPath: string, basePosition: number, config: ChunkingConfig): Chunk[] {
     const chunks: Chunk[] = [];
-    const words = text.split(/\s+/);
-    const targetWords = Math.floor(config.chunkSize / 1.3);
-    const overlapWords = Math.floor(config.overlap / 1.3);
-    let start = 0;
+    const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+    const targetTokens = config.chunkSize;
+    const overlapTokens = config.overlap;
 
-    while (start < words.length) {
-      const end = Math.min(start + targetWords, words.length);
-      const content = words.slice(start, end).join(' ');
+    let currentChunkContent = '';
+    let currentTokens = 0;
 
-      if (content.trim()) {
-        chunks.push(this.makeChunk(content, doc, sectionPath, basePosition + chunks.length, null, config));
+    for (let i = 0; i < paragraphs.length; i++) {
+      const p = paragraphs[i];
+      const pTokens = this.estimateTokens(p);
+
+      // If a single paragraph is too huge, split it by sentences
+      if (pTokens > targetTokens) {
+        if (currentChunkContent) {
+          chunks.push(this.makeChunk(currentChunkContent.trim(), doc, sectionPath, basePosition + chunks.length, null, config));
+          currentChunkContent = '';
+          currentTokens = 0;
+        }
+
+        const sentences = p.split(/(?<=[.?!])\s+/);
+        for (const sentence of sentences) {
+          const sTokens = this.estimateTokens(sentence);
+          if (currentTokens + sTokens > targetTokens && currentTokens > 0) {
+            chunks.push(this.makeChunk(currentChunkContent.trim(), doc, sectionPath, basePosition + chunks.length, null, config));
+            // Keep overlap
+            const words = currentChunkContent.split(/\s+/);
+            currentChunkContent = words.slice(-Math.floor(overlapTokens / 1.3)).join(' ') + ' ' + sentence;
+            currentTokens = this.estimateTokens(currentChunkContent);
+          } else {
+            currentChunkContent = currentChunkContent ? currentChunkContent + ' ' + sentence : sentence;
+            currentTokens += sTokens;
+          }
+        }
+      } else {
+        if (currentTokens + pTokens > targetTokens && currentTokens > 0) {
+          chunks.push(this.makeChunk(currentChunkContent.trim(), doc, sectionPath, basePosition + chunks.length, null, config));
+          // Overlap: keep the last paragraph if small, else just overlap tokens
+          currentChunkContent = pTokens < overlapTokens ? paragraphs[i-1] + '\n\n' + p : p;
+          currentTokens = this.estimateTokens(currentChunkContent);
+        } else {
+          currentChunkContent = currentChunkContent ? currentChunkContent + '\n\n' + p : p;
+          currentTokens += pTokens;
+        }
       }
+    }
 
-      start += targetWords - overlapWords;
-      if (start >= words.length) break;
-      if (start + targetWords > words.length) start = Math.max(start, words.length - targetWords);
+    if (currentChunkContent.trim()) {
+      chunks.push(this.makeChunk(currentChunkContent.trim(), doc, sectionPath, basePosition + chunks.length, null, config));
     }
 
     return chunks;
@@ -61,6 +93,24 @@ export class ContentChunker implements Chunker {
     const tokenCount = this.estimateTokens(content);
     const chunkId = this.generateChunkId(doc.documentId, sectionPath, position);
     const checksum = createHash('sha256').update(content).digest('hex');
+
+    // Classification / quality scoring for RAG
+    const lowerContent = content.toLowerCase();
+    const sourceUrl = (doc.metadata?.sourceUrl as string || '').toLowerCase();
+    let qualityScore = 1.0;
+    
+    if (lowerContent.includes('price') || lowerContent.includes('cost') || lowerContent.includes('plan') || sourceUrl.includes('pricing')) {
+      qualityScore += 0.5;
+    }
+    if (lowerContent.includes('faq') || lowerContent.includes('frequently asked') || sourceUrl.includes('faq') || /\?\s*[a-z]/i.test(content)) {
+      qualityScore += 0.4;
+    }
+    if (lowerContent.includes('contact') || lowerContent.includes('email') || lowerContent.includes('phone') || sourceUrl.includes('contact')) {
+      qualityScore += 0.3;
+    }
+    if (doc.title?.toLowerCase().includes('home') && position === 1) {
+      qualityScore += 0.6; // High priority to homepage hero/intro
+    }
 
     return {
       chunkId,
@@ -78,6 +128,7 @@ export class ContentChunker implements Chunker {
         originalName: doc.originalName,
         title: doc.title,
         chunkingVersion: config.chunkingVersion,
+        qualityScore,
       },
     };
   }

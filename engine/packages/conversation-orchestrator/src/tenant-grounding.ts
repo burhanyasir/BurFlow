@@ -63,8 +63,17 @@ export function buildGroundedSystemPrompt(input: {
   const brand = identity.domain ? `${identity.name} (${identity.domain})` : identity.name;
   const goalHint = input.businessGoalHint || '';
   const offersHint = input.topOffersHint || '';
+  
+  let systemPromptHint = '';
+  if (input.businessProfile && typeof (input.businessProfile as any)._systemPromptHint === 'string') {
+    systemPromptHint = (input.businessProfile as any)._systemPromptHint;
+  }
 
-  return `You are an AI assistant for ${identity.name}. You speak only on behalf of this imported website brand (${brand}) — never as BurFlow or any other platform.
+  const baseIdentity = systemPromptHint
+    ? systemPromptHint
+    : `You are an AI assistant for ${identity.name}. You speak only on behalf of this imported website brand (${brand}) — never as BurFlow or any other platform.`;
+
+  return `${baseIdentity}
 You MUST ONLY answer using the provided website knowledge base.
 NEVER mention BurFlow, BurFlow platform features, or SaaS pricing ($29/$49/$99) unless the imported website knowledge below explicitly contains that information.
 Be concise (under 100 words), conversational, and genuinely helpful.

@@ -644,6 +644,68 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     }
   });
 
+  // GET /config/:tenantId — Public config endpoint (no token required).
+  // Safely returns non-sensitive widget UI settings based on Origin checking.
+  router.get('/config/:tenantId', (req: Request, res: Response) => {
+    try {
+      const { tenantId } = req.params;
+      const config = widgetConfigRepo.get(tenantId);
+      if (!config) {
+        if (DEMO_TENANT_IDS.has(tenantId)) {
+          return res.json(getDemoWidgetConfig(tenantId));
+        }
+        return res.status(404).json({ error: 'Widget not configured' });
+      }
+
+      const origin = req.get('Origin') || req.get('Referer') || '';
+      if (config.allowedDomains.length > 0 && origin) {
+        try {
+          const originHost = new URL(origin).hostname;
+          const allowed = config.allowedDomains.some((d: string) => {
+            if (d.startsWith('*.')) return originHost.endsWith(d.slice(1));
+            return originHost === d;
+          });
+          if (!allowed) {
+            return res.status(403).json({ error: 'Domain not allowed' });
+          }
+        } catch { /* ignore parse error */ }
+      }
+
+      let derived: WidgetDerivedDefaults | undefined;
+      try {
+        const chunks = loadKnowledgeChunks(tenantId);
+        if (chunks.length) derived = deriveWidgetDefaults(chunks);
+      } catch {}
+
+      const businessProfile = config.businessProfile ? { ...config.businessProfile } : {};
+      if (derived?.businessType && !businessProfile.businessType && !businessProfile.business_type) {
+        businessProfile.businessType = derived.businessType;
+        businessProfile.business_type = derived.businessType;
+      }
+
+      res.json({
+        theme: config.theme,
+        position: config.position,
+        primaryColor: config.primaryColor,
+        logoUrl: config.logoUrl,
+        avatarUrl: config.avatarUrl,
+        companyName: config.companyName,
+        greeting: config.greeting,
+        launcherText: config.launcherText,
+        businessProfile,
+        starterOptions: config.starterOptions?.length ? config.starterOptions : derived?.starterOptions || [],
+        suggestedActions: config.suggestedActions?.length ? config.suggestedActions : derived?.suggestedActions || [],
+        customCss: config.customCss,
+        autoOpen: config.autoOpen,
+        autoOpenDelay: config.autoOpenDelay,
+        locale: config.locale,
+      });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Failed to fetch public widget config');
+      res.status(500).json({ error: 'Failed to fetch config' });
+    }
+  });
+
   router.put('/config', widgetAuth || ((_req, _res, next) => next()), requireJsonObject, (req: Request, res: Response) => {
     try {
       const allowed = ['admin', 'owner'];
@@ -744,6 +806,53 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Snippet generation failed');
       res.status(500).json({ error: 'Failed to generate snippet' });
+    }
+  });
+
+  // GET /context — Returns top knowledge snippets for the widget (public, rate-limited)
+  // Used by the widget UI to surface contextual starter content.
+  // Auth: same as /config — accepts a JWT (admin/owner) or a widget token (?token=...).
+  router.get('/context', (req: Request, res: Response) => {
+    try {
+      let tenantId: string | null = tryJwtAuth(req);
+      if (!tenantId) {
+        const token = req.query.token as string;
+        if (!token) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+        const origin = req.get('Origin') || req.get('Referer') || undefined;
+        const payload = verifyWidgetToken(token, origin);
+        if (!payload) {
+          return res.status(401).json({ error: 'Invalid or expired widget token' });
+        }
+        tenantId = payload.tenantId;
+      }
+
+      // Load the widget config for greeting/company branding
+      const config = widgetConfigRepo.get(tenantId);
+      const businessProfile = config?.businessProfile || {};
+      const systemPromptHint = typeof (businessProfile as any).systemPromptHint === 'string'
+        ? (businessProfile as any).systemPromptHint
+        : null;
+      const businessType = (businessProfile as any).businessType
+        || (businessProfile as any).business_type
+        || 'general';
+      const description = (businessProfile as any).description || null;
+
+      res.json({
+        tenantId,
+        companyName: config?.companyName || null,
+        greeting: config?.greeting || null,
+        primaryColor: config?.primaryColor || null,
+        logoUrl: config?.logoUrl || null,
+        starterOptions: config?.starterOptions || [],
+        businessType,
+        description,
+        hasKnowledge: !!systemPromptHint,
+      });
+    } catch (err: any) {
+      createContextLogger(logger).error({ err }, 'Widget context fetch failed');
+      res.status(500).json({ error: 'Failed to fetch widget context' });
     }
   });
 
