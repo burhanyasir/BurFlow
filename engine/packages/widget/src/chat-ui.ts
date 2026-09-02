@@ -426,7 +426,7 @@ export class ChatWidget {
       html.cw-widget-open .cw-bubble { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       html.cw-widget-open .cw-preopen-panel { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
       .cw-bubble-hidden { display:none !important; visibility:hidden !important; opacity:0 !important; pointer-events:none !important; }
-      .cw-container { flex-direction:column !important; overflow:hidden !important; }
+      .cw-container { display:none !important; flex-direction:column !important; overflow:hidden !important; }
       .cw-messages { flex:1 1 0 !important; min-height:0 !important; overflow-y:auto !important; }
       .cw-input-area { flex-shrink:0 !important; }
       .cw-action-panel { flex-shrink:0 !important; }
@@ -875,7 +875,7 @@ export class ChatWidget {
     const container = document.createElement('div');
     container.className = 'cw-container';
     container.style.cssText = this.getContainerStyles();
-    container.style.display = 'none';
+    container.style.setProperty('display', 'none', 'important');
 
     container.appendChild(this.createHeader());
     this.messagesEl = this.createMessagesArea();
@@ -1145,10 +1145,10 @@ export class ChatWidget {
     if (this.container) {
       if (state === 'open') {
         if (!this.container.parentNode) document.body.appendChild(this.container);
-        this.container.style.display = 'flex';
+        this.container.style.setProperty('display', 'flex', 'important');
         this.container.style.animation = 'cw-slide-up 0.35s cubic-bezier(0.16,1,0.3,1)';
       } else {
-        this.container.style.display = 'none';
+        this.container.style.setProperty('display', 'none', 'important');
         if (this.container.parentNode) this.container.parentNode.removeChild(this.container);
       }
     }
@@ -1932,9 +1932,9 @@ export class ChatWidget {
       }
     }
     if (this.container) {
-      const currentDisplay = this.container.style.display;
+      const currentDisplay = this.container.style.display || 'none';
       this.container.style.cssText = this.getContainerStyles();
-      if (currentDisplay) this.container.style.display = currentDisplay;
+      this.container.style.setProperty('display', currentDisplay, 'important');
     }
   }
 
