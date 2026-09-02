@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bright Smile Dental — Demo Dental Clinic</title>
+  <meta name="description" content="Bright Smile Dental demo clinic site with an AI receptionist that books appointments, answers insurance questions, and prepares new patients." />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a2333; background: #f7fbf9; }
+    header { background: #0e7a5f; color: #fff; padding: 14px 32px; display: flex; justify-content: space-between; align-items: center; }
+    header .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    header nav a { color: #e6f5ef; margin-left: 22px; text-decoration: none; font-size: 14px; }
+    header nav a:hover { text-decoration: underline; }
+    .book { background: #fff; color: #0e7a5f; padding: 9px 16px; border-radius: 8px; font-weight: 700; font-size: 13px; text-decoration: none; }
+    main { max-width: 1080px; margin: 0 auto; padding: 48px 24px; }
+    .hero { display: flex; gap: 40px; align-items: center; }
+    .hero-text { flex: 1; }
+    .hero-text h1 { font-size: 40px; line-height: 1.12; letter-spacing: -0.03em; }
+    .hero-text h1 span { color: #0e7a5f; }
+    .hero-text p { font-size: 17px; color: #5b6472; margin-top: 14px; line-height: 1.6; }
+    .hero-text .cta-row { margin-top: 24px; display: flex; gap: 12px; }
+    .hero-text .btn { display: inline-block; padding: 12px 22px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; }
+    .btn-primary { background: #0e7a5f; color: #fff; }
+    .btn-ghost { border: 1px solid #d5d9e0; color: #1a2333; }
+    .hero .hours { flex: 1; background: #fff; border: 1px solid #e5e8ee; border-radius: 16px; padding: 24px; }
+    .hero .hours h3 { font-size: 16px; margin-bottom: 12px; }
+    .hero .hours p { font-size: 14px; color: #3b4453; padding: 4px 0; }
+    .services { margin-top: 44px; }
+    .services h2 { font-size: 22px; margin-bottom: 16px; }
+    .service-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
+    .service { background: #fff; border: 1px solid #e5e8ee; border-radius: 14px; padding: 20px; }
+    .service .icon { font-size: 30px; }
+    .service h3 { font-size: 15px; margin-top: 10px; }
+    .service p { font-size: 13px; color: #5b6472; margin-top: 6px; line-height: 1.5; }
+    .service .price { font-size: 14px; font-weight: 700; color: #0e7a5f; margin-top: 10px; }
+    .team { margin-top: 44px; }
+    .team h2 { font-size: 22px; margin-bottom: 16px; }
+    .team-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .member { background: #fff; border: 1px solid #e5e8ee; border-radius: 14px; padding: 18px; text-align: center; }
+    .member .avatar { width: 64px; height: 64px; border-radius: 50%; background: linear-gradient(135deg, #bfe8da, #7fcdb4); margin: 0 auto; display: flex; align-items: center; justify-content: center; font-size: 26px; }
+    .member h3 { font-size: 15px; margin-top: 10px; }
+    .member p { font-size: 13px; color: #5b6472; }
+    .faq { margin-top: 44px; }
+    .faq h2 { font-size: 22px; margin-bottom: 14px; }
+    .faq details { background: #fff; border: 1px solid #e5e8ee; border-radius: 10px; padding: 14px 18px; margin-top: 10px; }
+    .faq summary { font-weight: 600; cursor: pointer; }
+    .faq p { margin-top: 8px; font-size: 14px; color: #5b6472; line-height: 1.6; }
+    footer { border-top: 1px solid #e5e8ee; padding: 22px 32px; text-align: center; font-size: 13px; color: #8a92a0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🦷 Bright Smile Dental</div>
+    <nav>
+      <a href="#services">Services</a>
+      <a href="#team">Our team</a>
+      <a href="#faq">FAQ</a>
+      <a class="book" href="#book">Book appointment</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-text">
+        <h1>Gentle dentistry for the <span>whole family</span></h1>
+        <p>
+          From routine cleanings to smile makeovers — our AI receptionist answers
+          insurance questions, checks availability, and books your visit in seconds,
+          24/7.
+        </p>
+        <div class="cta-row">
+          <a class="btn btn-primary" href="#book">Book an appointment</a>
+          <a class="btn btn-ghost" href="#services">Explore services</a>
+        </div>
+      </div>
+      <div class="hours">
+        <h3>Office hours</h3>
+        <p>Mon – Fri: 8:00 AM – 6:00 PM</p>
+        <p>Saturday: 9:00 AM – 2:00 PM</p>
+        <p>Sunday: Closed</p>
+        <p style="margin-top: 12px; font-weight: 600;">📍 124 Maple Avenue, Suite 210</p>
+        <p>☎ (555) 012-3456</p>
+      </div>
+    </section>
+
+    <section class="services" id="services">
+      <h2>Our services</h2>
+      <div class="service-grid">
+        <div class="service">
+          <div class="icon">🪥</div>
+          <h3>Cleaning &amp; Checkup</h3>
+          <p>Full exam, x-rays, and professional cleaning with a comfort-first approach.</p>
+          <div class="price">$95 · 45 min</div>
+        </div>
+        <div class="service">
+          <div class="icon">✨</div>
+          <h3>Teeth Whitening</h3>
+          <p>In-office whitening — visible results in a single 60-minute visit.</p>
+          <div class="price">$249 · 60 min</div>
+        </div>
+        <div class="service">
+          <div class="icon">🦷</div>
+          <h3>Root Canal Therapy</h3>
+          <p>Painless, single-visit root canals with digital imaging.</p>
+          <div class="price">$680 · 90 min</div>
+        </div>
+        <div class="service">
+          <div class="icon">😁</div>
+          <h3>Invisalign®</h3>
+          <p>Clear aligners with free 3D scan and a custom treatment plan.</p>
+          <div class="price">From $3,900</div>
+        </div>
+        <div class="service">
+          <div class="icon">🦺</div>
+          <h3>Emergency Care</h3>
+          <p>Same-day emergency appointments for severe pain or trauma.</p>
+          <div class="price">$120 · visit</div>
+        </div>
+        <div class="service">
+          <div class="icon">👶</div>
+          <h3>Kids Dentistry</h3>
+          <p>Gentle, fun visits that build healthy habits for life.</p>
+          <div class="price">$85 · 30 min</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="team" id="team">
+      <h2>Meet our team</h2>
+      <div class="team-grid">
+        <div class="member">
+          <div class="avatar">👩‍⚕️</div>
+          <h3>Dr. Sarah Kim, DDS</h3>
+          <p>General &amp; Cosmetic Dentistry · 12 yrs</p>
+        </div>
+        <div class="member">
+          <div class="avatar">👨‍⚕️</div>
+          <h3>Dr. Mark Rivera, DMD</h3>
+          <p>Orthodontics &amp; Invisalign · 9 yrs</p>
+        </div>
+        <div class="member">
+          <div class="avatar">🦷</div>
+          <h3>Dr. Aisha Patel, DDS</h3>
+          <p>Endodontics (Root Canals) · 7 yrs</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <h2>Frequently asked questions</h2>
+      <details open>
+        <summary>Do you accept my insurance?</summary>
+        <p>We work with most major PPO plans (Delta Dental, Cigna, MetLife, Aetna). Ask our chat assistant — it can check your coverage in seconds.</p>
+      </details>
+      <details>
+        <summary>How do I book an appointment?</summary>
+        <p>Use the chat bubble in the corner, call us, or use the Book button above. New patients just need to arrive 10 minutes early for paperwork.</p>
+      </details>
+      <details>
+        <summary>Do you offer payment plans?</summary>
+        <p>Yes — 0% financing for 12 months on treatments over $500, plus CareCredit accepted.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer>&copy; 2026 Bright Smile Dental. Demo dental clinic site.</footer>
+
+  <!--
+    BurFlow chat widget — demo tenant (Bright Smile Dental).
+    Managed from Dashboard → Widget settings (Embed tab).
+  -->
+  <script src="https://bur-flow.vercel.app/widget/widget.js" data-tenant-id="bright-smile-dental-4b7e29" data-primary-color="#0e7a5f" data-position="right"></script>
+</body>
+</html>

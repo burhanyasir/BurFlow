@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BurFlow Store — Demo E-commerce</title>
+  <meta name="description" content="BurFlow Store demo e-commerce site with an AI sales agent that helps visitors find products, compare options, and check out faster." />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1a2333; background: #f7f8fa; }
+    header { background: #111827; color: #fff; padding: 14px 32px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+    header .logo { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+    header .logo span { color: #f59e0b; }
+    header nav a { color: #d1d5db; margin-left: 22px; text-decoration: none; font-size: 14px; }
+    header nav a:hover { color: #fff; }
+    .cart { background: #f59e0b; color: #111827; padding: 8px 14px; border-radius: 8px; font-weight: 700; font-size: 13px; }
+    main { max-width: 1100px; margin: 0 auto; padding: 44px 24px; }
+    .hero { text-align: center; padding: 28px 0 40px; }
+    .hero h1 { font-size: 40px; line-height: 1.12; letter-spacing: -0.03em; }
+    .hero h1 span { color: #f59e0b; }
+    .hero p { font-size: 17px; color: #5b6472; margin-top: 14px; max-width: 600px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+    .search { margin-top: 24px; display: flex; gap: 10px; justify-content: center; }
+    .search input { padding: 12px 16px; border: 1px solid #d5d9e0; border-radius: 10px; width: 380px; font-size: 15px; }
+    .search button { padding: 12px 22px; background: #111827; color: #fff; border: none; border-radius: 10px; font-weight: 600; cursor: pointer; }
+    .section-title { font-size: 22px; margin: 36px 0 18px; }
+    .products { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 18px; }
+    .product { background: #fff; border: 1px solid #e5e8ee; border-radius: 14px; overflow: hidden; }
+    .product .img { height: 150px; background: linear-gradient(135deg, #eef2f7, #dde4ec); display: flex; align-items: center; justify-content: center; font-size: 42px; }
+    .product .info { padding: 16px; }
+    .product h3 { font-size: 15px; }
+    .product .price { font-size: 20px; font-weight: 800; margin-top: 6px; color: #111827; }
+    .product .price small { font-size: 12px; color: #8a92a0; font-weight: 500; }
+    .product button { margin-top: 12px; width: 100%; padding: 10px; background: #111827; color: #fff; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    .product .tag { display: inline-block; margin-top: 10px; font-size: 11px; color: #92400e; background: #fef3c7; padding: 3px 8px; border-radius: 6px; }
+    .faq { margin-top: 44px; }
+    .faq h2 { font-size: 22px; margin-bottom: 14px; }
+    .faq details { background: #fff; border: 1px solid #e5e8ee; border-radius: 10px; padding: 14px 18px; margin-top: 10px; }
+    .faq summary { font-weight: 600; cursor: pointer; }
+    .faq p { margin-top: 8px; font-size: 14px; color: #5b6472; line-height: 1.6; }
+    footer { border-top: 1px solid #e5e8ee; padding: 22px 32px; text-align: center; font-size: 13px; color: #8a92a0; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">BurFlow<span>Store</span></div>
+    <nav>
+      <a href="#new">New arrivals</a>
+      <a href="#best">Best sellers</a>
+      <a href="#faq">Help &amp; FAQ</a>
+      <span class="cart">Cart (0)</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Shop smarter with an <span>AI shopping assistant</span></h1>
+      <p>
+        Every visitor gets a personal sales agent that answers product questions,
+        compares options, checks stock and shipping — and helps them check out in minutes.
+      </p>
+      <div class="search">
+        <input type="text" placeholder="Search products…" />
+        <button>Search</button>
+      </div>
+    </section>
+
+    <h2 class="section-title" id="new">New arrivals</h2>
+    <section class="products">
+      <div class="product">
+        <div class="img">🎧</div>
+        <div class="info">
+          <h3>Aurora Wireless Headphones</h3>
+          <span class="tag">NEW</span>
+          <div class="price">$129 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+      <div class="product">
+        <div class="img">⌚</div>
+        <div class="info">
+          <h3>Pulse Smartwatch S2</h3>
+          <span class="tag">NEW</span>
+          <div class="price">$199 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+      <div class="product">
+        <div class="img">💡</div>
+        <div class="info">
+          <h3>Luma Desk Lamp Pro</h3>
+          <span class="tag">NEW</span>
+          <div class="price">$59 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="section-title" id="best">Best sellers</h2>
+    <section class="products">
+      <div class="product">
+        <div class="img">🎒</div>
+        <div class="info">
+          <h3>Nomad Laptop Backpack</h3>
+          <div class="price">$89 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+      <div class="product">
+        <div class="img">🔌</div>
+        <div class="info">
+          <h3>Volt 65W GaN Charger</h3>
+          <div class="price">$39 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+      <div class="product">
+        <div class="img">🖱️</div>
+        <div class="info">
+          <h3>Drift Ergonomic Mouse</h3>
+          <div class="price">$49 <small>/ free shipping</small></div>
+          <button>Add to cart</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="faq" id="faq">
+      <h2>Frequently asked questions</h2>
+      <details open>
+        <summary>How fast is shipping?</summary>
+        <p>Orders ship within 24 hours. Standard delivery takes 2–4 business days and is free on orders over $50.</p>
+      </details>
+      <details>
+        <summary>What is your return policy?</summary>
+        <p>30-day, no-questions-asked returns. We cover return shipping on all products.</p>
+      </details>
+      <details>
+        <summary>Do you offer discounts for bulk orders?</summary>
+        <p>Yes — teams ordering 10+ units get 15% off. Ask our chat assistant for a quote.</p>
+      </details>
+    </section>
+  </main>
+
+  <footer>&copy; 2026 BurFlow Store. Demo e-commerce site.</footer>
+
+  <!--
+    BurFlow chat widget — demo tenant (BurFlow Store).
+    Managed from Dashboard → Widget settings (Embed tab).
+  -->
+  <script src="https://bur-flow.vercel.app/widget/widget.js" data-tenant-id="burflow-store-212de6" data-primary-color="#111827" data-position="right"></script>
+</body>
+</html>
