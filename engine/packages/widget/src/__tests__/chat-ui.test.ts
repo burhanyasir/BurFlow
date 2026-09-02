@@ -137,7 +137,7 @@ describe('deriveSuggestedActions', () => {
 
   it('uses confidence-based phrasing for trust-sensitive answers', () => {
     const note = buildTrustNote('pricing', 0.83);
-    expect(note).toContain('According to the Pricing page');
+    expect(note).toContain('According to the pricing page');
   });
 
   it('offers a safe fallback when information is not confidently available', () => {

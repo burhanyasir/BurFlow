@@ -1,5 +1,6 @@
 import { WidgetConfig, ChatMessage, ConversationUIState, SmartButton } from './types';
 import { streamChat } from './stream-client';
+import { t } from './i18n';
 
 export interface RecommendationCard {
   type: 'product_recommendation' | 'service_recommendation';
@@ -75,146 +76,145 @@ export function buildSourceAttribution(topic: string, profile: BusinessContextLi
   return { label: `📄 ${kind.charAt(0).toUpperCase() + kind.slice(1)}`, url, kind };
 }
 
-export function buildTrustNote(topic: string, confidence?: number): string {
+export function buildTrustNote(topic: string, confidence?: number, locale?: string): string {
   const normalized = (topic || '').toLowerCase();
-  const label = normalized.includes('pricing') ? 'Pricing page'
-    : normalized.includes('service') || normalized.includes('support') ? 'Services page'
-    : normalized.includes('faq') || normalized.includes('question') ? 'FAQ page'
-    : normalized.includes('about') || normalized.includes('contact') || normalized.includes('trust') ? 'About page'
-    : 'the available information';
+  const key = normalized.includes('pricing') ? 'trust.high_pricing'
+    : normalized.includes('service') || normalized.includes('support') ? 'trust.high_services'
+    : normalized.includes('faq') || normalized.includes('question') ? 'trust.high_faq'
+    : normalized.includes('about') || normalized.includes('contact') || normalized.includes('trust') ? 'trust.high_about'
+    : 'trust.high_default';
 
   if (typeof confidence === 'number' && confidence >= 0.75) {
-    return `According to the ${label}...`;
+    return `${t(key, locale)}...`;
   }
   if (typeof confidence === 'number' && confidence >= 0.45) {
-    return 'Based on the available information...';
+    return `${t('trust.mid', locale)}...`;
   }
-  return "I couldn't confidently determine that from this website.";
+  return t('trust.low', locale);
 }
 
-export function buildUnknownResponseGuide(topic: string, confidence?: number): string {
+export function buildUnknownResponseGuide(topic: string, confidence?: number, locale?: string): string {
   const normalized = (topic || '').toLowerCase();
-  const fallback = normalized.includes('pricing') ? 'pricing details'
-    : normalized.includes('faq') || normalized.includes('question') ? 'faq details'
-    : normalized.includes('service') || normalized.includes('support') ? 'service details'
-    : 'the requested information';
+  const fallbackKey = normalized.includes('pricing') ? 'unknown.fallback_pricing'
+    : normalized.includes('faq') || normalized.includes('question') ? 'unknown.fallback_faq'
+    : normalized.includes('service') || normalized.includes('support') ? 'unknown.fallback_service'
+    : 'unknown.fallback_default';
+  const fallback = t(fallbackKey, locale);
 
   if (typeof confidence === 'number' && confidence < 0.45) {
-    return `I couldn't confidently determine ${fallback} from this website. If you want, I can help by connecting you with a specialist: Contact Sales, Book Demo, or leave a message.`;
+    return t('unknown.low', locale).replace('{topic}', fallback);
   }
 
-  return `I didn't find enough detail on ${fallback} from this website. I can still help you with Contact Sales, Book Demo, or a message.`;
+  return t('unknown.medium', locale).replace('{topic}', fallback);
 }
 
-export function buildContinuityCue(previousMessages: Array<{ role?: string; content?: string }>, newMessage: string): string {
+export function buildContinuityCue(previousMessages: Array<{ role?: string; content?: string }>, newMessage: string, locale?: string): string {
   const prior = previousMessages.filter((message) => message.role === 'user' && typeof message.content === 'string').map((message) => message.content?.toLowerCase() || '').join(' ');
   const normalized = newMessage.toLowerCase();
   if (prior.includes('pricing') && normalized.includes('service')) {
-    return 'Since you were looking at pricing earlier, I can compare that with the available service options.';
+    return t('continuity.pricing_to_service', locale);
   }
   if (prior.includes('service') && normalized.includes('pricing')) {
-    return 'Since you were looking at services earlier, I can connect that to the pricing information.';
+    return t('continuity.service_to_pricing', locale);
   }
   if (prior.includes('faq') && normalized.includes('contact')) {
-    return 'Since you were reviewing FAQs earlier, I can point you to the right contact path next.';
+    return t('continuity.faq_to_contact', locale);
   }
-  return 'I can continue from what you were looking at earlier.';
+  return t('continuity.default', locale);
 }
 
-export function buildBusinessGreeting(profile: BusinessContextLike = {}): string {
+export function buildBusinessGreeting(profile: BusinessContextLike = {}, locale?: string): string {
   const industryLabel = profile.industry || profile.businessType || '';
   if (/restaurant|food|cafe|hotel|hospitality/i.test(industryLabel)) {
-    return `How can I help with ${profile.companyName || 'this business'}?`;
+    return t('greeting.hospitality', locale).replace('{company}', profile.companyName || 'this business');
   }
-  return `Hi! What brings you here today?`;
+  return t('greeting.default', locale);
 }
 
-export function buildRecommendationCardFromMessage(message: string, profile: BusinessContextLike = {}): RecommendationCard | null {
+export function buildRecommendationCardFromMessage(message: string, profile: BusinessContextLike = {}, locale?: string): RecommendationCard | null {
   const normalized = message.toLowerCase();
+  const companyName = profile.companyName || 'this business';
 
   if (normalized.includes('pricing') || normalized.includes('plan') || normalized.includes('compare')) {
     const productName = profile.products?.[0] || 'the main offering';
     const pricingHint = profile.pricingModel || 'simple options';
     return {
       type: 'product_recommendation',
-      title: `Best-fit plan for ${profile.companyName || 'your team'}`,
-      description: `A guided recommendation based on ${productName.toLowerCase()} and the available ${pricingHint.toLowerCase()} structure.`,
+      title: t('card.pricing_title', locale).replace('{company}', companyName),
+      description: t('card.pricing_desc', locale),
       benefits: [
         profile.valuePropositions?.[0] || 'Clear business value',
         profile.targetAudience?.[0] || 'Built for the right audience',
         profile.trustSignals?.[0] || 'Grounded in the website profile',
       ],
-      badge: profile.industry ? `${profile.industry}` : 'Popular',
+      badge: profile.industry ? `${profile.industry}` : t('card.popular_badge', locale),
       icon: '📦',
-      groundingNote: 'Based on the website profile and available offer details.',
+      groundingNote: t('card.grounding_pricing', locale),
       source: buildSourceAttribution('pricing', profile) ?? undefined,
-      trustNote: buildTrustNote('pricing', 0.8),
-      primaryCta: { id: 'card-book-demo', label: 'Book Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary' },
-      secondaryCta: { id: 'card-compare-plans', label: 'Compare Plans', action: 'send_text', payload: 'Compare plans and pricing', variant: 'secondary' },
+      trustNote: buildTrustNote('pricing', 0.8, locale),
+      primaryCta: { id: 'card-book-demo', label: t('cta.book_demo', locale), action: 'send_text', payload: 'I want to book a demo', variant: 'primary' },
+      secondaryCta: { id: 'card-compare-plans', label: t('cta.compare_plans', locale), action: 'send_text', payload: 'Compare plans and pricing', variant: 'secondary' },
     };
   }
 
   if (normalized.includes('product') || normalized.includes('offer') || normalized.includes('service') || normalized.includes('what do you offer')) {
-    const companyName = profile.companyName || 'this business';
     const productName = profile.products?.[0] || profile.services?.[0] || 'the main offering';
     return {
       type: 'service_recommendation',
-      title: `Products for ${companyName}`,
-      description: `A guided overview of ${productName.toLowerCase()} and the best next step for understanding what ${companyName} offers.`,
+      title: t('card.products_title', locale).replace('{company}', companyName),
+      description: t('card.products_desc', locale),
       benefits: [
         productName,
         profile.valuePropositions?.[0] || 'Clear business value',
         profile.trustSignals?.[0] || 'Backed by the website context',
       ],
-      badge: 'Products',
+      badge: t('card.products_badge', locale),
       icon: '📦',
-      groundingNote: 'Grounded in the product and service details available on the website.',
+      groundingNote: t('card.grounding_products', locale),
       source: buildSourceAttribution('services', profile) ?? undefined,
-      trustNote: buildTrustNote('services', 0.7),
-      primaryCta: { id: 'card-book-demo', label: 'Book Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary' },
-      secondaryCta: { id: 'card-contact-sales', label: 'Contact Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' },
+      trustNote: buildTrustNote('services', 0.7, locale),
+      primaryCta: { id: 'card-book-demo', label: t('cta.book_demo', locale), action: 'send_text', payload: 'I want to book a demo', variant: 'primary' },
+      secondaryCta: { id: 'card-contact-sales', label: t('cta.contact_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' },
     };
   }
 
   if (normalized.includes('faq') || normalized.includes('question') || normalized.includes('common')) {
-    const companyName = profile.companyName || 'this business';
     return {
       type: 'service_recommendation',
-      title: `FAQ for ${companyName}`,
-      description: `A concise FAQ-style summary grounded in the details available about ${companyName}.`,
+      title: t('card.faq_title', locale).replace('{company}', companyName),
+      description: t('card.faq_desc', locale),
       benefits: [
         profile.faqs?.[0] || 'Answers to common questions',
         profile.contactDetails?.[0] || 'Direct next-step contact',
         profile.trustSignals?.[0] || 'Backed by the website context',
       ],
-      badge: 'FAQ',
+      badge: t('card.faq_badge', locale),
       icon: '❓',
-      groundingNote: 'Grounded in the FAQ details available on the website.',
+      groundingNote: t('card.grounding_faq', locale),
       source: buildSourceAttribution('faq', profile) ?? undefined,
-      trustNote: buildTrustNote('faq', 0.72),
-      primaryCta: { id: 'card-contact-sales', label: 'Contact Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
-      secondaryCta: { id: 'card-book-demo', label: 'Book Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'secondary' },
+      trustNote: buildTrustNote('faq', 0.72, locale),
+      primaryCta: { id: 'card-contact-sales', label: t('cta.contact_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
+      secondaryCta: { id: 'card-book-demo', label: t('cta.book_demo', locale), action: 'send_text', payload: 'I want to book a demo', variant: 'secondary' },
     };
   }
 
   if (normalized.includes('contact') || normalized.includes('trust') || normalized.includes('about') || normalized.includes('who')) {
-    const companyName = profile.companyName || 'this business';
     return {
       type: 'service_recommendation',
-      title: `About ${companyName}`,
-      description: `A grounded overview that highlights the business context, contact path, and trust signals available on the website.`,
+      title: t('card.about_title', locale).replace('{company}', companyName),
+      description: t('card.about_desc', locale),
       benefits: [
         profile.valuePropositions?.[0] || 'Outcome-focused delivery',
         profile.contactDetails?.[0] || 'Direct next-step contact',
         profile.trustSignals?.[0] || 'Backed by the website context',
       ],
-      badge: 'Contact',
+      badge: t('card.contact_badge', locale),
       icon: '🤝',
-      groundingNote: 'Grounded in the business details available on the website.',
+      groundingNote: t('card.grounding_about', locale),
       source: buildSourceAttribution('about', profile) ?? undefined,
-      trustNote: buildTrustNote('about', 0.68),
-      primaryCta: { id: 'card-talk-sales', label: 'Contact Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
-      secondaryCta: { id: 'card-view-details', label: 'View Details', action: 'send_text', payload: 'Tell me about your services', variant: 'secondary' },
+      trustNote: buildTrustNote('about', 0.68, locale),
+      primaryCta: { id: 'card-talk-sales', label: t('cta.contact_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
+      secondaryCta: { id: 'card-view-details', label: t('cta.view_details', locale), action: 'send_text', payload: 'Tell me about your services', variant: 'secondary' },
     };
   }
 
@@ -222,64 +222,64 @@ export function buildRecommendationCardFromMessage(message: string, profile: Bus
     const serviceName = profile.services?.[0] || 'the main service';
     return {
       type: 'service_recommendation',
-      title: `${serviceName}`,
-      description: `A recommendation aligned to the service information available on the site and the business goals it supports.`,
+      title: t('card.service_title', locale).replace('{service}', serviceName),
+      description: t('card.service_desc', locale),
       benefits: [
         profile.valuePropositions?.[0] || 'Outcome-focused delivery',
         profile.contactDetails?.[0] || 'Direct next-step contact',
         profile.trustSignals?.[0] || 'Backed by the website context',
       ],
-      badge: 'Recommended',
+      badge: t('card.recommended_badge', locale),
       icon: '🧭',
-      groundingNote: 'Grounded in the service details available on the website.',
+      groundingNote: t('card.grounding_service', locale),
       source: buildSourceAttribution('services', profile) ?? undefined,
-      trustNote: buildTrustNote('services', 0.7),
-      primaryCta: { id: 'card-talk-sales', label: 'Contact Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
-      secondaryCta: { id: 'card-view-details', label: 'View Details', action: 'send_text', payload: 'Tell me about your services', variant: 'secondary' },
+      trustNote: buildTrustNote('services', 0.7, locale),
+      primaryCta: { id: 'card-talk-sales', label: t('cta.contact_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
+      secondaryCta: { id: 'card-view-details', label: t('cta.view_details', locale), action: 'send_text', payload: 'Tell me about your services', variant: 'secondary' },
     };
   }
 
   return null;
 }
 
-export function deriveSuggestedActions(message: string, previousActions: SmartButton[] = []): SmartButton[] {
+export function deriveSuggestedActions(message: string, previousActions: SmartButton[] = [], locale?: string): SmartButton[] {
   const normalized = message.toLowerCase();
   const seen = new Set(previousActions.map((action) => action.label.toLowerCase()));
 
   const baseActions: SmartButton[] = [
-    { id: 'compare-plans', label: 'Compare Plans', action: 'send_text', payload: 'Compare plans and pricing', variant: 'primary', category: 'plans' },
-    { id: 'best-solution', label: 'Best Fit', action: 'send_text', payload: 'Recommend the best fit for my needs', variant: 'secondary', category: 'guidance' },
-    { id: 'book-demo', label: 'Book 15-Min Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
-    { id: 'talk-sales', label: 'Talk to Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary', category: 'sales' },
-    { id: 'faq', label: 'Common Questions', action: 'send_text', payload: 'What are the most common questions?', variant: 'secondary', category: 'faq' },
+    { id: 'compare-plans', label: t('suggested.compare_plans', locale), action: 'send_text', payload: 'Compare plans and pricing', variant: 'primary', category: 'plans' },
+    { id: 'best-solution', label: t('suggested.best_fit', locale), action: 'send_text', payload: 'Recommend the best fit for my needs', variant: 'secondary', category: 'guidance' },
+    { id: 'book-demo', label: t('suggested.book_demo', locale), action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
+    { id: 'talk-sales', label: t('suggested.talk_to_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'secondary', category: 'sales' },
+    { id: 'faq', label: t('suggested.common_questions', locale), action: 'send_text', payload: 'What are the most common questions?', variant: 'secondary', category: 'faq' },
   ];
 
   if (normalized.includes('price') || normalized.includes('pricing') || normalized.includes('plan')) {
     const pricingActions = [
-      { id: 'compare-plans', label: 'Compare Plans', action: 'send_text', payload: 'Compare plans and pricing', variant: 'primary', category: 'plans' },
-      { id: 'enterprise-pricing', label: 'Enterprise Pricing', action: 'send_text', payload: 'Show enterprise pricing', variant: 'secondary', category: 'plans' },
-      { id: 'roi-calculator', label: 'ROI Fit', action: 'send_text', payload: 'Help me calculate ROI', variant: 'secondary', category: 'guidance' },
-      { id: 'book-demo', label: 'Book 15-Min Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
+      { id: 'compare-plans', label: t('suggested.compare_plans', locale), action: 'send_text', payload: 'Compare plans and pricing', variant: 'primary', category: 'plans' },
+      { id: 'enterprise-pricing', label: t('suggested.enterprise_pricing', locale), action: 'send_text', payload: 'Show enterprise pricing', variant: 'secondary', category: 'plans' },
+      { id: 'roi-calculator', label: t('suggested.roi_fit', locale), action: 'send_text', payload: 'Help me calculate ROI', variant: 'secondary', category: 'guidance' },
+      { id: 'book-demo', label: t('suggested.book_demo', locale), action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo' },
     ] as SmartButton[];
     return pricingActions.filter((action) => !seen.has(action.label.toLowerCase()));
   }
 
   if (normalized.includes('product') || normalized.includes('service') || normalized.includes('offer')) {
     const offerActions = [
-      { id: 'compare-products', label: 'Compare Products', action: 'send_text', payload: 'Compare the main products', variant: 'secondary' },
-      { id: 'implementation', label: 'Implementation Time', action: 'send_text', payload: 'What is the implementation timeline?', variant: 'secondary' },
-      { id: 'customer-stories', label: 'Customer Stories', action: 'send_text', payload: 'Show customer stories', variant: 'secondary' },
-      { id: 'talk-sales', label: 'Talk to Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' },
+      { id: 'compare-products', label: t('suggested.compare_products', locale), action: 'send_text', payload: 'Compare the main products', variant: 'secondary' },
+      { id: 'implementation', label: t('suggested.implementation_time', locale), action: 'send_text', payload: 'What is the implementation timeline?', variant: 'secondary' },
+      { id: 'customer-stories', label: t('suggested.customer_stories', locale), action: 'send_text', payload: 'Show customer stories', variant: 'secondary' },
+      { id: 'talk-sales', label: t('suggested.talk_to_sales', locale), action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' },
     ] as SmartButton[];
     return offerActions.filter((action) => !seen.has(action.label.toLowerCase()));
   }
 
   if (normalized.includes('demo') || normalized.includes('book') || normalized.includes('schedule')) {
     return [
-      { id: 'schedule-call', label: 'Book 15-Min Demo', action: 'send_text' as const, payload: 'Schedule a call', variant: 'primary' as const, category: 'demo' },
-      { id: 'contact-sales', label: 'Talk to Sales', action: 'send_text' as const, payload: 'Connect me with sales', variant: 'secondary' as const, category: 'sales' },
-      { id: 'faq', label: 'Common Questions', action: 'send_text' as const, payload: 'What are the most common questions?', variant: 'secondary' as const, category: 'faq' },
-      { id: 'compare-plans', label: 'Compare Plans', action: 'send_text' as const, payload: 'Compare plans and pricing', variant: 'secondary' as const, category: 'plans' },
+      { id: 'schedule-call', label: t('suggested.book_demo', locale), action: 'send_text' as const, payload: 'Schedule a call', variant: 'primary' as const, category: 'demo' },
+      { id: 'contact-sales', label: t('suggested.talk_to_sales', locale), action: 'send_text' as const, payload: 'Connect me with sales', variant: 'secondary' as const, category: 'sales' },
+      { id: 'faq', label: t('suggested.common_questions', locale), action: 'send_text' as const, payload: 'What are the most common questions?', variant: 'secondary' as const, category: 'faq' },
+      { id: 'compare-plans', label: t('suggested.compare_plans', locale), action: 'send_text' as const, payload: 'Compare plans and pricing', variant: 'secondary' as const, category: 'plans' },
     ].filter((action) => !seen.has(action.label.toLowerCase())) as SmartButton[];
   }
 
@@ -293,18 +293,18 @@ const DEFAULT_CONFIG: Required<Omit<WidgetConfig, 'tenantId' | 'apiKey' | 'widge
   sessionId: undefined as any,
   widgetToken: undefined as any,
   title: 'Chat Assistant',
-  subtitle: 'AI assistant · Online',
+  subtitle: '',
   primaryColor: '#006248',
   accentColor: '#006248',
   avatarUrl: undefined as any,
-  greeting: 'Hi! What brings you here today?',
+  greeting: '',
   greetingText: undefined as any,
   position: 'bottom-right',
   widgetPosition: undefined as any,
   theme: 'light',
   themeMode: undefined as any,
   companyName: '',
-  launcherText: 'Chat with us',
+  launcherText: '',
   logoUrl: undefined as any,
   autoOpen: false,
   autoOpenDelay: 3,
@@ -366,13 +366,14 @@ export class ChatWidget {
   private lastAgentSeq = 0;
   private get placeholders(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
+    const locale = this.config.locale;
     if (/ecommerce|retail|store|shop|medical|pharma/.test(type)) {
-      return ['What products do you offer?', 'How fast is delivery?', 'What is your return policy?', 'Do you have this in stock?'];
+      return [t('placeholder.ecommerce_0', locale), t('placeholder.ecommerce_1', locale), t('placeholder.ecommerce_2', locale), t('placeholder.ecommerce_3', locale)];
     }
     if (/clinic|dental|healthcare|hospital/.test(type)) {
-      return ['What services do you offer?', 'How do I book an appointment?', 'What are your hours?', 'Do you accept insurance?'];
+      return [t('placeholder.clinic_0', locale), t('placeholder.clinic_1', locale), t('placeholder.clinic_2', locale), t('placeholder.clinic_3', locale)];
     }
-    return ['Ask about pricing...', 'How does it work?', 'Book a demo...', 'What products do you offer?'];
+    return [t('placeholder.default_0', locale), t('placeholder.default_1', locale), t('placeholder.default_2', locale), t('placeholder.default_3', locale)];
   }
   private boundDismissPreOpen = (e: Event) => {
     if (this.preOpenPanelEl && !this.preOpenPanelEl.contains(e.target as Node)) {
@@ -727,7 +728,7 @@ export class ChatWidget {
     const bubble = document.createElement('div');
     bubble.className = 'cw-bubble';
     bubble.setAttribute('role', 'button');
-    bubble.setAttribute('aria-label', 'Open chat');
+    bubble.setAttribute('aria-label', t('bubble.aria', this.config.locale));
     bubble.setAttribute('tabindex', '0');
     bubble.style.cssText = this.getBubbleStyles();
 
@@ -738,7 +739,7 @@ export class ChatWidget {
 
     const label = document.createElement('span');
     label.className = 'cw-bubble-label';
-    label.textContent = 'Chat with us';
+    label.textContent = t('bubble.label', this.config.locale);
     bubble.appendChild(label);
 
     const badge = document.createElement('span');
@@ -776,13 +777,13 @@ export class ChatWidget {
     header.appendChild(brandText);
     const statusDot = document.createElement('span');
     statusDot.style.cssText = 'font-size:10px;color:#6B7280;margin-left:auto;';
-    statusDot.textContent = 'Online now';
+    statusDot.textContent = t('preopen.status', this.config.locale);
     header.appendChild(statusDot);
     panel.appendChild(header);
 
     const questionEl = document.createElement('div');
     questionEl.style.cssText = 'padding:0 14px 8px;font-size:12.5px;color:#374151;line-height:1.5;';
-    questionEl.textContent = 'Not sure where to start? Pick a quick path below.';
+    questionEl.textContent = t('preopen.prompt', this.config.locale);
     panel.appendChild(questionEl);
 
     const optionsWrap = document.createElement('div');
@@ -792,7 +793,7 @@ export class ChatWidget {
     const escapeLink = document.createElement('div');
     const ec = this.config.primaryColor || '#006248';
     escapeLink.style.cssText = `padding:6px 14px 12px;text-align:center;font-size:11.5px;color:${ec};font-weight:600;cursor:pointer;transition:background 0.15s ease;border-radius:0 0 14px 14px;`;
-    escapeLink.textContent = 'Ask something else →';
+    escapeLink.textContent = t('preopen.escape', this.config.locale);
     escapeLink.addEventListener('click', (e) => {
       e.stopPropagation();
       this.dismissPreOpenPanel();
@@ -872,16 +873,17 @@ export class ChatWidget {
 
   private defaultStarterOptions(): string[] {
     const type = (this.businessProfile.businessType || '').toLowerCase();
+    const locale = this.config.locale;
     if (/ecommerce|retail|store|shop/.test(type)) {
-      return ['Find the right product', 'How fast is delivery?', 'What is your return policy?'];
+      return [t('starter.ecommerce_0', locale), t('starter.ecommerce_1', locale), t('starter.ecommerce_2', locale)];
     }
     if (/clinic|dental|healthcare|hospital|medical|pharma/.test(type)) {
-      return ['Book an appointment', 'What services do you offer?', 'What are your hours?'];
+      return [t('starter.clinic_0', locale), t('starter.clinic_1', locale), t('starter.clinic_2', locale)];
     }
     if (/agency|consulting|services/.test(type)) {
-      return ['What services do you offer?', 'How does pricing work?', 'Book a consultation'];
+      return [t('starter.default_0', locale), t('starter.default_1', locale), t('starter.default_2', locale)];
     }
-    return ['How can you help me?', 'What do you offer?', 'Talk to a person'];
+    return [t('starter.default_0', locale), t('starter.default_1', locale), t('starter.default_2', locale)];
   }
 
   private createChatWindow(): void {
@@ -944,7 +946,7 @@ export class ChatWidget {
     textWrap.appendChild(title);
     const subtitle = document.createElement('div');
     subtitle.style.cssText = 'font-size:10.5px;opacity:0.75;margin-top:1px;';
-    subtitle.textContent = this.config.subtitle || 'AI assistant · Online';
+    subtitle.textContent = this.config.subtitle || t('header.subtitle', this.config.locale);
     this.headerSubtitleEl = subtitle;
     textWrap.appendChild(subtitle);
     info.appendChild(textWrap);
@@ -952,7 +954,7 @@ export class ChatWidget {
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'cw-close';
-    closeBtn.setAttribute('aria-label', 'Close chat');
+    closeBtn.setAttribute('aria-label', t('header.close', this.config.locale));
     closeBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:4px;border-radius:4px;font-size:18px;line-height:1;';
     closeBtn.innerHTML = '&times;';
     closeBtn.addEventListener('click', () => this.toggle());
@@ -1010,7 +1012,7 @@ export class ChatWidget {
 
     const sendBtn = document.createElement('button');
     sendBtn.className = 'cw-send';
-    sendBtn.setAttribute('aria-label', 'Send message');
+    sendBtn.setAttribute('aria-label', t('input.send', this.config.locale));
     const sc = this.config.primaryColor || '#006248';
     sendBtn.style.cssText = `background:linear-gradient(135deg,${sc} 0%,${this.darkenHex(sc, 0.2)} 100%);color:#fff;border:none;border-radius:12px;width:40px;height:40px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 16px ${this.hexToRgba(sc, 0.3)};transition:transform 0.15s ease,box-shadow 0.15s ease;`;
     sendBtn.innerHTML = this.getSendIconSvg();
@@ -1023,7 +1025,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:5px 0 8px;text-align:center;';
-    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">Answers from this website · Powered by <b style="color:${this.config.primaryColor || '#006248'};">BurFlow</b></span>`;
+    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">${t('input.footer', this.config.locale).replace(/<b>/g, `<b style="color:${this.config.primaryColor || '#006248'};">`)}</span>`;
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -1044,8 +1046,8 @@ export class ChatWidget {
       <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
         <span style="font-size:14px;flex-shrink:0;">👤</span>
         <div>
-          <p style="margin:0;font-size:12px;font-weight:600;color:${this.config.primaryColor || '#006248'};">Human agent joined</p>
-          <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">A real person is now assisting this conversation. Replies will come from them shortly.</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:${this.config.primaryColor || '#006248'};">${t('takeover.banner_title', this.config.locale)}</p>
+          <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">${t('takeover.banner_desc', this.config.locale)}</p>
         </div>
       </div>`;
   }
@@ -1078,10 +1080,10 @@ export class ChatWidget {
     this.handoffShown = true;
     this.handoffEl.innerHTML = `
       <div style="padding:8px 0;">
-        <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">Leave your email and we'll reach out shortly.</p>
+        <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">${t('handoff.instruction', this.config.locale)}</p>
         <div style="display:flex;gap:8px;">
-          <input type="email" class="cw-handoff-email" placeholder="you@company.com" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
-          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,${this.config.primaryColor || '#006248'} 0%,${this.darkenHex(this.config.primaryColor || '#006248', 0.2)} 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">Send</button>
+          <input type="email" class="cw-handoff-email" placeholder="${t('handoff.email_placeholder', this.config.locale)}" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
+          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,${this.config.primaryColor || '#006248'} 0%,${this.darkenHex(this.config.primaryColor || '#006248', 0.2)} 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">${t('handoff.submit', this.config.locale)}</button>
         </div>
       </div>`;
     this.handoffEl.querySelector('.cw-handoff-submit')?.addEventListener('click', () => this.submitHandoff());
@@ -1105,12 +1107,12 @@ export class ChatWidget {
         body: JSON.stringify({ sessionId: this.config.sessionId, visitorEmail: email, message: 'Visitor requested human assistance' }),
       });
       if (res.ok) {
-        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#059669;padding:8px 0;">✓ Request sent. Someone will email you at ${email} within a few hours.</p>`;
+        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#059669;padding:8px 0;">${t('handoff.success', this.config.locale)}</p>`;
       } else {
-        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">Something went wrong. Please try again.</p>`;
+        this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">${t('handoff.error', this.config.locale)}</p>`;
       }
     } catch {
-      this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">Network error. Please try again.</p>`;
+      this.handoffEl.innerHTML = `<p style="font-size:12px;color:#DC2626;padding:8px 0;">${t('handoff.network_error', this.config.locale)}</p>`;
     }
   }
 
@@ -1225,7 +1227,7 @@ export class ChatWidget {
     if (this.isStreaming) return;
     this.humanTakeoverRequested = true;
 
-    const msg = "I'd like to talk to a human agent, please.";
+    const msg = t('human.request', this.config.locale);
     this.addMessage({ role: 'user', content: msg });
 
     const assistantMsg = this.addMessage({ role: 'assistant', content: '', streaming: true });
@@ -1253,19 +1255,19 @@ export class ChatWidget {
       this.hideTypingIndicator();
 
       if (res.ok) {
-        assistantMsg.content = "A team member has been notified and will join this conversation shortly. Please wait a moment.";
+        assistantMsg.content = t('human.success', this.config.locale);
         assistantMsg.streaming = false;
         this.updateMessageContent(assistantMsg);
       } else {
         console.warn(`[BurFlow Widget] Talk to Human failed: HTTP ${res.status}`);
-        assistantMsg.content = "I wasn't able to reach a human agent right now. Please try again later or email us at support.";
+        assistantMsg.content = t('human.failure', this.config.locale);
         assistantMsg.streaming = false;
         this.updateMessageContent(assistantMsg);
       }
     } catch (err: any) {
       console.warn('[BurFlow Widget] Talk to Human error:', err?.message || err);
       this.hideTypingIndicator();
-      assistantMsg.content = "Connection error. Please try again.";
+      assistantMsg.content = t('human.network_error', this.config.locale);
       assistantMsg.streaming = false;
       this.updateMessageContent(assistantMsg);
     }
@@ -1328,7 +1330,7 @@ export class ChatWidget {
       onError: (error) => {
         console.error('[BurFlow Widget] Chat error:', error);
         assistantMsg.streaming = false;
-        assistantMsg.content = assistantMsg.content || 'I\'m here to help, but the assistant is temporarily unavailable. Please try again in a moment.';
+        assistantMsg.content = assistantMsg.content || t('error.unavailable', this.config.locale);
         this.updateMessageContent(assistantMsg);
         this.hideTypingIndicator();
         this.isStreaming = false;
@@ -1389,7 +1391,7 @@ export class ChatWidget {
     if (isAgent) {
       const label = document.createElement('div');
       label.className = 'cw-agent-label';
-      label.textContent = 'Agent';
+      label.textContent = t('agent.label', this.config.locale);
       label.style.cssText = `font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:${this.config.primaryColor || '#006248'};margin-bottom:4px;`;
       bubble.appendChild(label);
     }
@@ -1526,11 +1528,11 @@ export class ChatWidget {
     sectionHeader.className = 'cw-welcome-section-header';
     const sectionTitle = document.createElement('span');
     sectionTitle.className = 'cw-welcome-section-title';
-    sectionTitle.textContent = 'HOW CAN I HELP?';
+    sectionTitle.textContent = t('welcome.title', this.config.locale);
     sectionHeader.appendChild(sectionTitle);
     const sectionMeta = document.createElement('span');
     sectionMeta.className = 'cw-welcome-section-meta';
-    sectionMeta.textContent = 'Pick a topic or type your question';
+    sectionMeta.textContent = t('welcome.meta', this.config.locale);
     sectionHeader.appendChild(sectionMeta);
     section.appendChild(sectionHeader);
 
@@ -1567,14 +1569,15 @@ export class ChatWidget {
       if (i === 0) {
         const badge = document.createElement('span');
         badge.className = 'cw-welcome-card-badge';
-        badge.textContent = 'Recommended';
+    badge.textContent = t('welcome.recommended', this.config.locale);
+    badge.style.cssText = `font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px;background:${this.hexToRgba(this.config.primaryColor || '#006248', 0.1)};color:${this.config.primaryColor || '#006248'};`;
         body.appendChild(badge);
       }
       const title = document.createElement('b');
       title.textContent = text;
       body.appendChild(title);
       const desc = document.createElement('small');
-      desc.textContent = i === 0 ? '3 quick questions' : i === 1 ? 'A 60-second product tour' : 'Choose a convenient time';
+      desc.textContent = i === 0 ? t('welcome.card_desc_quiz', this.config.locale) : i === 1 ? t('welcome.card_desc_tour', this.config.locale) : t('welcome.card_desc_booking', this.config.locale);
       body.appendChild(desc);
       card.appendChild(body);
 
@@ -1595,7 +1598,7 @@ export class ChatWidget {
     const escapeBtn = document.createElement('button');
     escapeBtn.type = 'button';
     escapeBtn.className = 'cw-welcome-escape';
-    escapeBtn.textContent = 'Already a customer? Get support →';
+    escapeBtn.textContent = t('welcome.escape', this.config.locale);
     escapeBtn.addEventListener('click', () => {
       if (this.inputEl) this.inputEl.focus();
     });
@@ -1643,8 +1646,7 @@ export class ChatWidget {
     titleText.textContent = card.type.replace(/_/g, ' ').replace(/\b\w/g, (chr) => chr.toUpperCase());
     title.appendChild(titleText);
     const badge = document.createElement('span');
-    badge.textContent = 'Recommended';
-    badge.style.cssText = `font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px;background:${this.hexToRgba(this.config.primaryColor || '#006248', 0.1)};color:${this.config.primaryColor || '#006248'};`;
+    badge.textContent = t('welcome.recommended', this.config.locale);
     title.appendChild(badge);
     el.appendChild(title);
 
@@ -1677,7 +1679,7 @@ export class ChatWidget {
 
     const title = document.createElement('div');
     title.style.cssText = 'font-size:13px;font-weight:700;color:#991B1B;';
-    title.textContent = 'I don\'t want to overstate what I know';
+    title.textContent = t('guidance.title', this.config.locale);
     el.appendChild(title);
 
     const body = document.createElement('div');
@@ -1688,9 +1690,9 @@ export class ChatWidget {
     const actions = document.createElement('div');
     actions.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
     const ctas: SmartButton[] = [
-      { id: 'fallback-contact', label: 'Contact Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
-      { id: 'fallback-demo', label: 'Book Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'secondary' },
-      { id: 'fallback-message', label: 'Leave a Message', action: 'send_text', payload: 'Leave a message', variant: 'secondary' },
+      { id: 'fallback-contact', label: t('cta.contact_sales', this.config.locale), action: 'send_text', payload: 'Connect me with sales', variant: 'primary' },
+      { id: 'fallback-demo', label: t('cta.book_demo', this.config.locale), action: 'send_text', payload: 'I want to book a demo', variant: 'secondary' },
+      { id: 'fallback-message', label: t('cta.leave_message', this.config.locale), action: 'send_text', payload: 'Leave a message', variant: 'secondary' },
     ];
     ctas.forEach((cta) => actions.appendChild(this.createActionButton(cta)));
     el.appendChild(actions);
@@ -1702,20 +1704,20 @@ export class ChatWidget {
     if (data.title && typeof data.title === 'string') return data.title;
     if (data.description && typeof data.description === 'string') return data.description;
     if (data.name && typeof data.name === 'string') return data.name;
-    return 'Recommended next step for this conversation.';
+    return t('guidance.default_summary', this.config.locale);
   }
 
   private getCardActions(cardType: string, data: Record<string, unknown>): SmartButton[] {
     const base: SmartButton[] = [];
     if (cardType === 'pricing' || cardType === 'demo_booking') {
-      base.push({ id: 'book-demo', label: 'Book 15-Min Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary' });
-      base.push({ id: 'compare-plans', label: 'Compare Plans', action: 'send_text', payload: 'Compare plans and pricing', variant: 'secondary' });
+      base.push({ id: 'book-demo', label: t('cta.book_15min', this.config.locale), action: 'send_text', payload: 'I want to book a demo', variant: 'primary' });
+      base.push({ id: 'compare-plans', label: t('cta.compare_plans', this.config.locale), action: 'send_text', payload: 'Compare plans and pricing', variant: 'secondary' });
     }
     if (cardType.includes('service') || cardType === 'trust_summary') {
-      base.push({ id: 'talk-sales', label: 'Talk to Sales', action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' });
+      base.push({ id: 'talk-sales', label: t('cta.talk_to_sales', this.config.locale), action: 'send_text', payload: 'Connect me with sales', variant: 'secondary' });
     }
     if (base.length === 0) {
-      base.push({ id: 'best-solution', label: 'Best Solution', action: 'send_text', payload: 'Recommend the best fit for my needs', variant: 'secondary' });
+      base.push({ id: 'best-solution', label: t('cta.best_solution', this.config.locale), action: 'send_text', payload: 'Recommend the best fit for my needs', variant: 'secondary' });
     }
     return base;
   }
@@ -1772,7 +1774,7 @@ export class ChatWidget {
     this.actionPanel.style.display = 'flex';
     const indicator = document.createElement('div');
     indicator.style.cssText = 'display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:999px;background:#F3F4F6;color:#4B5563;font-size:13px;';
-    indicator.innerHTML = '<span style="display:inline-flex;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite 0.15s"></span><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite 0.3s"></span></span> Thinking…';
+    indicator.innerHTML = `<span style="display:inline-flex;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite"></span><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite 0.15s"></span><span style="width:6px;height:6px;border-radius:50%;background:#6B7280;animation: cw-pulse 1s ease-in-out infinite 0.3s"></span></span> ${t('typing.thinking', this.config.locale)}`;
     this.actionPanel.appendChild(indicator);
   }
 
@@ -1897,10 +1899,11 @@ export class ChatWidget {
   }
 
   private getWelcomeMessage(): string {
-    const baseGreeting = buildBusinessGreeting(this.businessProfile);
-    const subtitle = this.messages.length === 0 ? '\n\nChoose a quick path, or ask anything below.' : '';
-    const continuityCue = this.messages.length > 0 ? ` ${buildContinuityCue(this.messages, this.messages[this.messages.length - 1]?.content || '')}` : '';
-    const contextHint = this.messages.length > 0 ? ' Based on what you asked earlier, I can continue from there.' : '';
+    const locale = this.config.locale;
+    const baseGreeting = buildBusinessGreeting(this.businessProfile, locale);
+    const subtitle = this.messages.length === 0 ? t('welcome.choose_path', locale) : '';
+    const continuityCue = this.messages.length > 0 ? ` ${buildContinuityCue(this.messages, this.messages[this.messages.length - 1]?.content || '', locale)}` : '';
+    const contextHint = this.messages.length > 0 ? t('welcome.continue_hint', locale) : '';
     return `${baseGreeting}${subtitle}${contextHint}${continuityCue}`;
   }
 
@@ -1942,6 +1945,9 @@ export class ChatWidget {
       if (this.config.launcherText) {
         this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
         this.bubbleEl.title = this.config.launcherText;
+      } else {
+        this.bubbleEl.setAttribute('aria-label', t('bubble.aria', this.config.locale));
+        this.bubbleEl.title = t('bubble.label', this.config.locale);
       }
     }
     if (this.container) {
@@ -2009,6 +2015,9 @@ export class ChatWidget {
     if (this.config.launcherText && this.bubbleEl) {
       this.bubbleEl.setAttribute('aria-label', this.config.launcherText);
       this.bubbleEl.title = this.config.launcherText;
+    } else if (this.bubbleEl) {
+      this.bubbleEl.setAttribute('aria-label', t('bubble.aria', this.config.locale));
+      this.bubbleEl.title = t('bubble.label', this.config.locale);
     }
 
     if (this.isOpen && this.messages.length === 0 && this.config.greeting) {
