@@ -70,7 +70,6 @@ Odaberite brzi put ili pitajte bilo \u0161to u nastavku.`,"welcome.continue_hint
       .cw-chip-demo, .cw-chip-sales { background-color:var(--cw-primary-color,#006248); color:#fff; border-color:var(--cw-primary-color,#006248); }
       .cw-chip-pricing { background-color:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
       .cw-chip-features, .cw-chip-support { background-color:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
-      .cw-chip-escalation { background-color:#fff7ed; border-color:#fed7aa; color:#c2410c; }
       .cw-chip-qualification { background-color:#fffbeb; border-color:#fde68a; color:#92400e; }
       .cw-chip-competitor { background-color:#faf5ff; border-color:#e9d5ff; color:#6b21a8; }
       .cw-chip-security { background-color:#ecfdf5; border-color:#a7f3d0; color:#065f46; }

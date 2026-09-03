@@ -1,7 +1,8 @@
 export const OUT_OF_KNOWLEDGE_REPLY =
   "I don't have those exact details on hand, but I can connect you directly with our team — what is the best email or phone number to reach you?";
 
-const PLATFORM_OPTION_RE = /burflow|demo ai agent/i;
+const PLATFORM_OPTION_RE = /burflow|demo ai agent|contact team|talk to|talk later/i;
+const HUMAN_CONTACT_RE = /human|person|agent|representative|support team|talk to|contact|talk later/i;
 const PLATFORM_PRICE_TOKENS = ['$29', '$49', '$99'];
 
 export interface TenantIdentity {
@@ -89,8 +90,15 @@ CRITICAL RULES:
 3. Be concise, direct, and natural. Never repeat questions already asked.
 4. Use ONLY the specific business information below — never give generic answers.
 5. If the visitor asks about pricing, services, or products, reference only the actual business details provided.
-6. Only suggest booking or contacting the team if the visitor asks or the business goal calls for it.
+6. Only suggest booking if the visitor asks or the business goal calls for it.
 7. Be warm and helpful, not pushy.
+
+QUICK REPLY OPTIONS RULES:
+- Return exactly 2-3 short, highly relevant quick reply options (2-4 words each).
+- Options MUST be specific to the current conversation context and extracted website knowledge.
+- Focus strictly on value, features, pricing, and automated demos (e.g., "See Workflow Demo", "Calculate Time Saved", "Compare Automation Features").
+- DO NOT generate options to talk to a human, contact support, or reach out to a team.
+- Avoid vague options like "Security documentation" or generic greetings.
 ${goalHint}
 ${offersHint}
 ${localeHint}
@@ -111,7 +119,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
   "responseText": "your response to the visitor",
   "strategy": "one or two words describing your conversational strategy, e.g. educate, qualify, handle_objection, advance_funnel, recommend_plan, close_trial, schedule_demo, build_trust",
   "suggestedTopics": ["1-3 follow-up topics the visitor might care about next"],
-  "suggestedOptions": ["2-3 short clickable follow-up options based on THIS website's offerings, primary CTAs, and services. Each is 2-6 words. Examples: 'Book Appointment', 'View Pricing', 'Contact Team'. Do NOT use generic platform chips like 'Start BurFlow Trial' or 'Demo AI Agent'."],
+  "suggestedOptions": ["2-3 short clickable follow-up options based on THIS website's offerings and services. Each is 2-4 words. Focus on value, features, pricing, and demos. Examples: 'See Workflow Demo', 'Calculate Time Saved', 'Compare Automation Features'. Do NOT include options to talk to a human, contact support, or reach out to a team."],
   "ctaType": "one of: none, book_demo, start_free_trial, contact_sales, pricing, support",
   "funnelStage": "one of: greeting, awareness, interest, consideration, evaluation, purchase_intent, decision, customer, support"
 }`;
@@ -124,6 +132,7 @@ export function sanitizeSuggestedOptions(options: Array<string | null | undefine
     const label = opt.trim();
     if (!label || label.length > 40) continue;
     if (PLATFORM_OPTION_RE.test(label)) continue;
+    if (HUMAN_CONTACT_RE.test(label)) continue;
     if (cleaned.some((existing) => existing.toLowerCase() === label.toLowerCase())) continue;
     cleaned.push(label);
     if (cleaned.length >= 3) break;
@@ -143,10 +152,10 @@ export function fallbackSuggestedOptions(
   for (const offer of rec.top_offers || []) {
     if (typeof offer === 'string' && offer.trim()) candidates.push(offer.trim());
   }
-  candidates.push('View Pricing', 'Contact Team', 'Book Appointment');
+  candidates.push('View Pricing', 'See Features', 'Watch Demo');
   const sanitized = sanitizeSuggestedOptions(candidates);
   if (sanitized.length >= 2) return sanitized.slice(0, 3);
-  const padded = sanitizeSuggestedOptions([...sanitized, 'View Pricing', 'Contact Team']);
+  const padded = sanitizeSuggestedOptions([...sanitized, 'View Pricing', 'See Features', 'Watch Demo']);
   return padded.slice(0, Math.max(2, Math.min(3, padded.length)));
 }
 
