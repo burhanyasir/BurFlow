@@ -367,6 +367,39 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         .map((p) => p.slice(0, 150))
         .slice(0, 3);
 
+      // ─── Pricing extraction ──────────────────────────────────────
+      const pricePattern = /(?:\$|€|£|¥|USD|EUR|GBP)\s?\d[\d,]*\.?\d{0,2}/g;
+      const allPricingText = [...allParagraphs, ...allLists, ...allHeadings].join(' ');
+      const allPrices = allPricingText.match(pricePattern) || [];
+      const pricingHeadings = allHeadings.filter((h) => /pric|plan|tier|cost|rate|package|subscription|billing/i.test(h));
+      const pricingPages = [...new Set([
+        ...mainParsed.links.filter((l) => /pric|plan|cost|billing|rate|tier/i.test(l)),
+        ...subPages.filter((s) => /pric|plan|cost|billing|rate|tier/i.test(s.path)).map((s) => s.path),
+      ])].slice(0, 5);
+      const hasPricing = allPrices.length > 0 || pricingHeadings.length > 0 || pricingPages.length > 0;
+
+      // ─── FAQ extraction ──────────────────────────────────────────
+      const faqKw = /^((what|how|why|can|do|does|is|are|will|should|where|when|who)\b.{0,80}\?)$/i;
+      const faqHeadings = allHeadings.filter((h) => faqKw.test(h));
+      const faqSection = allHeadings.some((h) => /faq|frequently asked|common questions|help/i.test(h));
+      const faqFromLists = allLists.filter((l) => faqKw.test(l.split(':')[0]?.trim() || ''));
+      const faqCount = faqHeadings.length + faqFromLists.length + (faqSection ? 3 : 0);
+
+      // ─── Buyer intent detection ──────────────────────────────────
+      const intentSignals = [
+        ...allParagraphs.filter((p) => /book(?:ing)?|demo|trial|get started|sign up|contact us|request|schedule|consultation|free|quote/i.test(p)),
+        ...allLists.filter((l) => /book|demo|trial|get started|sign up|contact|request|schedule|consultation|free|quote/i.test(l)),
+        ...allHeadings.filter((h) => /book|demo|trial|get started|sign up|contact|request|schedule|consultation|pricing|plans/i.test(h)),
+      ];
+      const intentCount = Math.max(3, new Set(intentSignals.map((s) => s.slice(0, 60))).size);
+
+      // ─── Pages count (unique discovered) ─────────────────────────
+      const uniquePages = new Set([
+        parsedUrl.pathname,
+        ...mainParsed.links.filter((l) => l.startsWith('/')).map((l) => l.split('?')[0]),
+        ...subPages.map((s) => s.path),
+      ]);
+
       res.json({
         title: mainParsed.title,
         description: mainParsed.description,
@@ -376,6 +409,24 @@ export function createPublicRoutes(leadRepo: LeadRepository, tenantRepo: TenantR
         paragraphs: namePatterns,
         links: mainParsed.links.slice(0, 10),
         subPages: subPages.map((s) => s.path),
+        // Real extracted data
+        pricing: {
+          hasPricing,
+          priceCount: allPrices.length,
+          prices: allPrices.slice(0, 6),
+          pricingHeadings: pricingHeadings.slice(0, 3),
+          pricingPages,
+        },
+        faq: {
+          count: faqCount,
+          questions: faqHeadings.slice(0, 5),
+          hasFaqSection: faqSection,
+        },
+        buyerIntents: {
+          count: intentCount,
+          signals: [...new Set(intentSignals.map((s) => s.slice(0, 100)))].slice(0, 5),
+        },
+        pageCount: uniquePages.size,
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Preview scan failed');

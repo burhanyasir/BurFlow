@@ -211,16 +211,19 @@ export default function LandingPageV3() {
   const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
   const [scanReadiness, setScanReadiness] = useState<number>(0);
 
-  /** Compute a readiness score (0-100) from scan results. */
+  /** Compute a readiness score (0-100) from real scan results. */
   const computeReadiness = useCallback((result: ScanResult): number => {
-    let score = 20; // base for having a URL
-    if (result.pages > 1) score += 15;
+    let score = 15; // base for having a URL
+    if (result.pages > 1) score += 10;
     if (result.pages > 3) score += 10;
-    if (result.products > 0) score += 20;
-    if (result.services > 0) score += 15;
+    if (result.pages > 5) score += 5;
+    if (result.products > 0) score += 15;
+    if (result.products > 2) score += 5;
+    if (result.services > 0) score += 10;
+    if (result.services > 2) score += 5;
     if (result.pricing > 0) score += 10;
     if (result.faqs > 0) score += 5;
-    if (result.intents > 5) score += 5;
+    if (result.intents > 3) score += 10;
     return Math.min(score, 98);
   }, []);
 
@@ -235,78 +238,29 @@ export default function LandingPageV3() {
     apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {});
     document.getElementById('scan-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 
-    /** Try fetching a URL through multiple CORS proxies. Returns HTML or throws. */
-    const fetchViaProxy = async (target: string, timeout = 12000): Promise<string> => {
-      const proxies = [
-        { url: `https://api.allorigins.win/raw?url=${encodeURIComponent(target)}` },
-        { url: `https://corsproxy.io/?url=${encodeURIComponent(target)}` },
-        { url: `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(target)}` },
-      ];
-      for (const proxy of proxies) {
-        try {
-          const ctrl = new AbortController();
-          const timer = setTimeout(() => ctrl.abort(), timeout);
-          const resp = await fetch(proxy.url, { signal: ctrl.signal });
-          clearTimeout(timer);
-          if (!resp.ok) continue;
-          const text = await resp.text();
-          if (text.includes('<') && text.length > 200) return text;
-        } catch { /* try next proxy */ }
-      }
-      throw new Error('All CORS proxies failed');
-    };
-
-    /** Regex-based HTML parser. */
-    const parseHtml = (raw: string, base: string) => {
-      const origin = new URL(base).origin;
-      const get = (tag: string) => {
-        const re = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'gi');
-        const r: string[] = [];
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(raw))) r.push(m[1].replace(/<[^>]+>/g, '').trim());
-        return r;
-      };
-      const tm = raw.match(/<title[^>]*>([\\s\\S]*?)<\/title>/i);
-      const dm = raw.match(/<meta[^>]*name=["']description["'][^>]*content=["']([^"']*)["']/i)
-        || raw.match(/<meta[^>]*content=["']([^"']*)["'][^>]*name=["']description["']/i);
-      const attrRe = (tag: string, a: string) => {
-        const re = new RegExp(`<${tag}[^\\>]*\\s${a}=["']([^"']*)["'][^>]*>`, 'gi');
-        const r: string[] = [];
-        let m: RegExpExecArray | null;
-        while ((m = re.exec(raw))) r.push(m[1].trim());
-        return r;
-      };
-      const links = attrRe('a', 'href')
-        .filter((h) => h.startsWith('/') || h.startsWith(origin))
-        .map((h) => { try { return new URL(h, origin).pathname; } catch { return h; } })
-        .filter((p) => p && !p.startsWith('#') && !p.includes('.'));
-      return {
-        title: tm ? tm[1].replace(/<[^>]+>/g, '').trim() : '',
-        description: dm ? dm[1].trim() : '',
-        links: [...new Set(links)].slice(0, 50),
-        headings: [...new Set([...get('h1'), ...get('h2'), ...get('h3')])].slice(0, 20),
-        paragraphs: get('p').filter((t) => t.length > 20 && t.length < 300).slice(0, 30),
-        lists: get('li').filter((t) => t.length > 5 && t.length < 200).slice(0, 30),
-      };
-    };
-
     try {
       setScan((prev) => ({ ...prev, stage: 'Connecting to site…', progress: 10 }));
 
-      // 1) Try server-side endpoint first (no CORS needed). Retry once —
-      //    a cold start or momentary deployment blip shouldn't send the
-      //    visitor straight to flaky CORS proxies.
+      // Server-side scan — fetches the site, discovers sub-pages, extracts
+      // products, services, pricing, FAQs, and buyer intent signals.
       type ScanError = { code: string; message: string };
-      type ScanData = { title?: string; description?: string; headings?: string[]; products?: string[]; services?: string[]; paragraphs?: string[]; links?: string[]; subPages?: string[]; error?: ScanError };
+      type ScanData = {
+        title?: string; description?: string; headings?: string[];
+        products?: string[]; services?: string[]; paragraphs?: string[];
+        links?: string[]; subPages?: string[];
+        error?: ScanError;
+        pricing?: { hasPricing: boolean; priceCount: number; prices: string[]; pricingHeadings: string[]; pricingPages: string[] };
+        faq?: { count: number; questions: string[]; hasFaqSection: boolean };
+        buyerIntents?: { count: number; signals: string[] };
+        pageCount?: number;
+      };
       let data: ScanData | null = null;
       for (let attempt = 0; attempt < 2 && !data; attempt++) {
         try {
           const scanRes = await apiClient.post<ScanData & { data?: ScanData }>('/public/preview-scan', { url });
           const body = scanRes ?? null;
-          // The endpoint returns a flat body ({title, headings, …}); the
-          // {data: …} wrapper only exists in older responses.
           data = body && (body.title || body.headings?.length || body.products?.length || body.error) ? body : (body?.data ?? null);
-        } catch { /* server endpoint unavailable — fall back to client-side fetch */ }
+        } catch { /* server cold start — retry */ }
       }
 
       // The site itself refused the scan — proxies would be blocked too,
@@ -321,38 +275,14 @@ export default function LandingPageV3() {
         return;
       }
 
-      // 2) If server failed, fetch directly via CORS proxies
+      // If server returned no usable data, show error
       if (!data || (!data.title && !data.headings?.length)) {
-        setScan((prev) => ({ ...prev, stage: 'Fetching website via proxy…', progress: 25 }));
-        const mainHtml = await fetchViaProxy(url);
-        const mainParsed = parseHtml(mainHtml, url);
-
-        const subPat = /product|service|pric|plan|about|feature|solution|offer|contact|team/i;
-        const subPaths = mainParsed.links.filter((p) => subPat.test(p)).slice(0, 3);
-        const subPages: Array<{ path: string; headings: string[]; paragraphs: string[]; lists: string[] }> = [];
-        for (const sp of subPaths) {
-          try {
-            const subUrl = new URL(sp, url).href;
-            const subHtml = await fetchViaProxy(subUrl, 8000);
-            const subParsed = parseHtml(subHtml, subUrl);
-            subPages.push({ path: sp, headings: subParsed.headings, paragraphs: subParsed.paragraphs, lists: subParsed.lists });
-          } catch { /* skip */ }
-        }
-
-        const allHeadings = [...mainParsed.headings, ...subPages.flatMap((s) => s.headings)];
-        const allParagraphs = [...mainParsed.paragraphs, ...subPages.flatMap((s) => s.paragraphs)];
-        const pKw = /product|feature|solution|tool|platform|software|app|offer|plan|package/i;
-        const sKw = /service|support|consulting|help|setup|onboard|implementation|maintenance|training|managed/i;
-        data = {
-          title: mainParsed.title,
-          description: mainParsed.description,
-          headings: allHeadings.slice(0, 12),
-          products: allHeadings.filter((h) => pKw.test(h)).slice(0, 8),
-          services: allHeadings.filter((h) => sKw.test(h)).slice(0, 8),
-          paragraphs: allParagraphs.filter((p) => /we offer|our .{0,20}(product|service|solution)/i.test(p)).map((p) => p.slice(0, 150)).slice(0, 3),
-          links: mainParsed.links.slice(0, 10),
-          subPages: subPages.map((s) => s.path),
-        };
+        const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        setScanResult({ pages: 1, products: 0, services: 0, pricing: 0, faqs: 0, intents: 3 });
+        setScanReadiness(20);
+        setScanDetails({ name: domain, description: `Could not scan ${domain} — it may block automated access or require JavaScript. The agent will learn about your business during setup.`, pages: [], products: [], services: [], headings: [] });
+        setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
+        return;
       }
 
       setScan((prev) => ({ ...prev, stage: 'Analyzing content…', progress: 70 }));
@@ -361,12 +291,25 @@ export default function LandingPageV3() {
       setScan((prev) => ({ ...prev, stage: 'Classifying products & services…', progress: 85 }));
       const products = data.products || [];
       const services = data.services || [];
-      const intents = Math.max(5, products.length * 3 + services.length * 2 + 4);
+      const pricingCount = data.pricing?.priceCount || 0;
+      const faqCount = data.faq?.count || 0;
+      const intentCount = data.buyerIntents?.count || Math.max(3, products.length * 2 + services.length + 2);
+      const pageCount = data.pageCount || discoveredPages.length;
 
-      const successResult = { pages: discoveredPages.length, products: products.length || 1, services: services.length || 1, pricing: 1, faqs: 1, intents };
+      const successResult = { pages: pageCount, products: products.length, services: services.length, pricing: pricingCount, faqs: faqCount, intents: intentCount };
       setScanResult(successResult);
       setScanReadiness(computeReadiness(successResult));
-      setScanDetails({ name: data.title || new URL(url).hostname, description: data.description || 'Website scanned successfully.', pages: discoveredPages.slice(0, 8), products, services, headings: (data.headings || []).slice(0, 12) });
+      setScanDetails({
+        name: data.title || new URL(url).hostname,
+        description: data.description || 'Website scanned successfully.',
+        pages: discoveredPages.slice(0, 8),
+        products,
+        services,
+        headings: (data.headings || []).slice(0, 12),
+        pricingPages: data.pricing?.pricingPages || [],
+        faqQuestions: data.faq?.questions || [],
+        buyerSignals: data.buyerIntents?.signals || [],
+      });
 
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
       trackOnce('scan_complete');

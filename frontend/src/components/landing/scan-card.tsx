@@ -18,6 +18,9 @@ export interface ScanDetails {
   products: string[];
   services: string[];
   headings: string[];
+  pricingPages?: string[];
+  faqQuestions?: string[];
+  buyerSignals?: string[];
 }
 
 export interface ScanCardProps {
@@ -33,15 +36,15 @@ export interface ScanCardProps {
 }
 
 const idleStats = [
-  { label: 'Pages scanned', value: '184+' },
-  { label: 'Products found', value: '6' },
-  { label: 'Buyer intents', value: '18' },
+  { label: 'Pages scanned', value: '—' },
+  { label: 'Products found', value: '—' },
+  { label: 'Buyer intents', value: '—' },
 ];
 
 export function ScanCard({ status, stage, progress, url, result, details, onRestart, readiness, signupUrl }: ScanCardProps) {
   const liveStats = result
     ? [
-        { label: 'Pages scanned', value: `${result.pages}+` },
+        { label: 'Pages scanned', value: `${result.pages}` },
         { label: 'Products found', value: `${result.products}` },
         { label: 'Services found', value: `${result.services}` },
         { label: 'Pricing pages', value: `${result.pricing}` },
@@ -146,6 +149,39 @@ export function ScanCard({ status, stage, progress, url, result, details, onRest
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {details.services.slice(0, 6).map((s, i) => (
               <span key={i} className="inline-block rounded-md bg-primary/8 px-2 py-0.5 text-xs text-primary border border-primary/15">{s.slice(0, 50)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.pricingPages && details.pricingPages.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pricing pages</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.pricingPages.slice(0, 4).map((p, i) => (
+              <span key={i} className="inline-block rounded-md bg-accent/10 px-2 py-0.5 text-xs text-accent-foreground border border-accent/20">{p.replace(/^https?:\/\/[^/]+/, '').split('/').filter(Boolean).slice(-2).join('/') || '/'}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.faqQuestions && details.faqQuestions.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">FAQ questions found</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.faqQuestions.slice(0, 4).map((q, i) => (
+              <span key={i} className="inline-block max-w-[200px] truncate rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted-foreground border border-hairline" title={q}>{q.slice(0, 60)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {status === 'done' && details && details.buyerSignals && details.buyerSignals.length > 0 && (
+        <div className="mt-3">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Buyer intent signals</p>
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {details.buyerSignals.slice(0, 4).map((s, i) => (
+              <span key={i} className="inline-block max-w-[200px] truncate rounded-md bg-success/10 px-2 py-0.5 text-xs text-success border border-success/20" title={s}>{s.slice(0, 60)}</span>
             ))}
           </div>
         </div>
