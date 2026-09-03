@@ -72,6 +72,8 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
 
   const decoder = new TextDecoder();
   let buffer = '';
+  let fullContent = '';
+  let lastTurnId = '';
 
   try {
     while (true) {
@@ -90,6 +92,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
 
         const data = trimmed.slice(5).trim();
         if (data === '[DONE]') {
+          onComplete(fullContent, lastTurnId);
           return;
         }
 
@@ -97,10 +100,14 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
           const event: StreamEvent = JSON.parse(data);
           switch (event.type) {
             case 'token':
-              if (event.content) onToken(event.content);
+              if (event.content) {
+                fullContent += event.content;
+                onToken(event.content);
+              }
               break;
             case 'done':
               if (event.finishReason) onDone(event.finishReason);
+              if (event.turnId) lastTurnId = event.turnId;
               if (event.humanTakeover) options.onHumanTakeover?.();
               break;
             case 'complete':

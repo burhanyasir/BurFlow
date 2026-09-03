@@ -2599,6 +2599,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         businessContext,
         businessGoalHint,
         topOffersHint,
+        locale: (input as any).locale || businessProfile?.locale,
       });
 
       const text = await callLLMWithFallback(systemPrompt, messages);
@@ -2829,7 +2830,7 @@ funnelStage: ciResult.funnelStage,
     decisionTimeline: memory.decisionTimeline || legacyMemory.decisionTimeline,
   };
 
-  const validation = validateResponse(responseText, message, memory, ciResult);
+  const validation = validateResponse(enrichedResponse || responseText, message, memory, ciResult);
 
   if (process.env.DEBUG_CONVERSATION) {
     const missingQ = plan.missingQualification.join(', ') || 'none';

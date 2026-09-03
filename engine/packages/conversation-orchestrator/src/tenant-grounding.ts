@@ -58,11 +58,15 @@ export function buildGroundedSystemPrompt(input: {
   businessContext: string;
   businessGoalHint?: string;
   topOffersHint?: string;
+  locale?: string;
 }): string {
   const identity = resolveTenantIdentity(input.businessProfile || undefined);
   const brand = identity.domain ? `${identity.name} (${identity.domain})` : identity.name;
   const goalHint = input.businessGoalHint || '';
   const offersHint = input.topOffersHint || '';
+  const localeHint = input.locale
+    ? `The visitor's language is "${input.locale}". Respond in that same language unless the visitor writes in a different language.`
+    : '';
   
   let systemPromptHint = '';
   if (input.businessProfile && typeof (input.businessProfile as any)._systemPromptHint === 'string') {
@@ -89,6 +93,7 @@ CRITICAL RULES:
 7. Be warm and helpful, not pushy.
 ${goalHint}
 ${offersHint}
+${localeHint}
 
 KNOWLEDGE CONSTRAINT:
 If the visitor's question cannot be answered from the website knowledge base below, respond with exactly:

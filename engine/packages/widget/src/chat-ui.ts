@@ -350,6 +350,7 @@ export class ChatWidget {
   private takeoverShown = false;
   private placeholderInterval: ReturnType<typeof setInterval> | null = null;
   private autoOpenTimer: ReturnType<typeof setTimeout> | null = null;
+  private autoOpenFired = false;
   private headerLogoEl: HTMLImageElement | null = null;
   /** The primaryColor from the embed data-attribute — preserved over remote config. */
   private embedPrimaryColor: string | null = null;
@@ -558,6 +559,8 @@ export class ChatWidget {
     if (typeof window !== 'undefined' && (window as any).__CURRENT_WIDGET === this) {
       (window as any).__CURRENT_WIDGET = null;
     }
+    // Remove document-level click listener added by createPreOpenPanel
+    document.removeEventListener('click', this.boundDismissPreOpen);
   }
 
   /**
@@ -1025,7 +1028,7 @@ export class ChatWidget {
 
     const footer = document.createElement('div');
     footer.style.cssText = 'padding:5px 0 8px;text-align:center;';
-    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">${t('input.footer', this.config.locale).replace(/<b>/g, `<b style="color:${this.config.primaryColor || '#006248'};">`)}</span>`;
+    footer.innerHTML = `<span style="font-size:10px;color:#9CA3AF;letter-spacing:0.02em;">${t('input.footer', this.config.locale).replace(/<b>/g, `<b style="color:${this.sanitizeColor(this.config.primaryColor)};">`)}</span>`;
     wrapper.appendChild(footer);
 
     return wrapper;
@@ -1046,7 +1049,7 @@ export class ChatWidget {
       <div style="display:flex;align-items:flex-start;gap:8px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #E0E7FF;">
         <span style="font-size:14px;flex-shrink:0;">👤</span>
         <div>
-          <p style="margin:0;font-size:12px;font-weight:600;color:${this.config.primaryColor || '#006248'};">${t('takeover.banner_title', this.config.locale)}</p>
+          <p style="margin:0;font-size:12px;font-weight:600;color:${this.sanitizeColor(this.config.primaryColor)};">${t('takeover.banner_title', this.config.locale)}</p>
           <p style="margin:2px 0 0;font-size:12px;color:#6B7280;line-height:1.5;">${t('takeover.banner_desc', this.config.locale)}</p>
         </div>
       </div>`;
@@ -1083,7 +1086,7 @@ export class ChatWidget {
         <p style="font-size:12px;color:#6B7280;margin:0 0 8px;">${t('handoff.instruction', this.config.locale)}</p>
         <div style="display:flex;gap:8px;">
           <input type="email" class="cw-handoff-email" placeholder="${t('handoff.email_placeholder', this.config.locale)}" style="flex:1;border:1.5px solid #E0E4EB;border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;outline:none;background:#F8F9FB;" />
-          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,${this.config.primaryColor || '#006248'} 0%,${this.darkenHex(this.config.primaryColor || '#006248', 0.2)} 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">${t('handoff.submit', this.config.locale)}</button>
+          <button class="cw-handoff-submit" style="background:linear-gradient(135deg,${this.sanitizeColor(this.config.primaryColor)} 0%,${this.darkenHex(this.sanitizeColor(this.config.primaryColor), 0.2)} 100%);color:#fff;border:none;border-radius:10px;padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;">${t('handoff.submit', this.config.locale)}</button>
         </div>
       </div>`;
     this.handoffEl.querySelector('.cw-handoff-submit')?.addEventListener('click', () => this.submitHandoff());
@@ -1225,6 +1228,7 @@ export class ChatWidget {
 
   private async requestHumanAgent(): Promise<void> {
     if (this.isStreaming) return;
+    this.isStreaming = true;
     this.humanTakeoverRequested = true;
 
     const msg = t('human.request', this.config.locale);
@@ -1328,7 +1332,6 @@ export class ChatWidget {
         }
       },
       onError: (error) => {
-        console.error('[BurFlow Widget] Chat error:', error);
         assistantMsg.streaming = false;
         assistantMsg.content = assistantMsg.content || t('error.unavailable', this.config.locale);
         this.updateMessageContent(assistantMsg);
@@ -1337,6 +1340,12 @@ export class ChatWidget {
         this.updateSendButton();
       },
     });
+
+    // Safety net: always reset streaming state even if callbacks are missed
+    if (this.isStreaming) {
+      this.isStreaming = false;
+      this.updateSendButton();
+    }
   }
 
   abort(): void {
@@ -1411,7 +1420,8 @@ export class ChatWidget {
     el.appendChild(bubble);
 
     const ts = document.createElement('div');
-    const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const locale = this.config.locale || navigator.language || 'en';
+    const time = new Date(msg.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     ts.textContent = time;
     ts.style.cssText = `font-size:10px;color:#9CA3AF;margin-top:4px;opacity:0;transition:opacity 0.15s ease;${isUser ? 'text-align:right;padding-right:4px;' : 'text-align:left;padding-left:26px;'}`;
     el.appendChild(ts);
@@ -1752,10 +1762,10 @@ export class ChatWidget {
         }
         break;
       case 'navigate':
-        window.open(button.payload, '_blank');
+        if (this.isSafeUrl(button.payload)) window.open(button.payload, '_blank');
         break;
       case 'open_modal':
-        if (button.payload) {
+        if (button.payload && this.isSafeUrl(button.payload)) {
           window.open(button.payload, '_blank');
         }
         break;
@@ -1816,6 +1826,25 @@ export class ChatWidget {
     } else {
       this.unreadBadge.style.display = 'none';
     }
+  }
+
+  private isSafeUrl(url: string | undefined | null): boolean {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim().toLowerCase();
+    if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) return false;
+    try {
+      const parsed = new URL(url, window.location.href);
+      return ['http:', 'https:', 'mailto:'].includes(parsed.protocol);
+    } catch {
+      return false;
+    }
+  }
+
+  private sanitizeColor(color: string | undefined | null): string {
+    if (!color || typeof color !== 'string') return '#006248';
+    const hex = color.replace('#', '');
+    if (!/^[0-9a-fA-F]{3,8}$/.test(hex)) return '#006248';
+    return '#' + hex.substring(0, 6);
   }
 
   private hexToRgba(hex: string, alpha: number): string {
@@ -2031,7 +2060,8 @@ export class ChatWidget {
       this.renderUiState();
     }
 
-    if (this.config.autoOpen && !this.isOpen && !this.autoOpenTimer) {
+    if (this.config.autoOpen && !this.isOpen && !this.autoOpenTimer && !this.autoOpenFired) {
+      this.autoOpenFired = true;
       const delayMs = Math.max(0, Math.min((this.config.autoOpenDelay ?? 3), 60)) * 1000;
       this.autoOpenTimer = setTimeout(() => {
         this.autoOpenTimer = null;

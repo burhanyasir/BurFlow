@@ -463,15 +463,26 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
 
+      // Resolve the tenant the user is authorized to issue tokens for.
+      // Never trust a body-provided tenantId without verifying ownership.
       if (!req.tenantId) {
-        const bodyTenantId = (req.body as any)?.tenantId;
-        if (bodyTenantId) {
-          req.tenantId = bodyTenantId;
-        } else if (tenantRepo) {
+        if (tenantRepo) {
           const tenants = tenantRepo.findByOwner(req.user.sub);
           if (tenants.length > 0) req.tenantId = tenants[0].id;
         }
       }
+
+      // If a specific tenantId was requested via query or body, verify ownership
+      const requestedTenantId = (req.query.tenantId as string) || (req.body as any)?.tenantId;
+      if (requestedTenantId && tenantRepo) {
+        const userTenants = tenantRepo.findByOwner(req.user.sub);
+        const owns = userTenants.some((t) => t.id === requestedTenantId);
+        if (!owns) {
+          return res.status(403).json({ error: 'You do not have access to this tenant' });
+        }
+        req.tenantId = requestedTenantId;
+      }
+
       if (!req.tenantId) {
         return res.status(400).json({ error: 'Tenant context required' });
       }
@@ -479,7 +490,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       const token = generateWidgetToken(req.tenantId);
       res.json({
         token,
-        expiresIn: 86400,
+        expiresIn: 1800,
         tenantId: req.tenantId,
       });
     } catch (err: any) {
