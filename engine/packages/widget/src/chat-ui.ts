@@ -452,6 +452,21 @@ export class ChatWidget {
       .cw-preopen-panel { border:1.5px solid #E8F5E9 !important; box-shadow:0 20px 60px rgba(0,98,72,0.12),0 4px 20px rgba(0,0,0,0.06) !important; }
       .cw-preopen-pill { background:color-mix(in srgb, var(--cw-primary-color,#006248) 10%, white) !important; color:var(--cw-primary-color,#006248) !important; border:1px solid color-mix(in srgb, var(--cw-primary-color,#006248) 20%, white) !important; }
       .cw-preopen-pill:hover { background:var(--cw-primary-color,#006248) !important; color:#fff !important; }
+      /* Assistant message row — stacked column so chips render below the bubble */
+      .cw-message-assistant { display:flex !important; flex-direction:column !important; align-items:flex-start !important; width:100% !important; margin-bottom:12px; }
+      .cw-message-assistant .cw-message-bubble { max-width:85%; align-self:flex-start; background-color:#f3f4f6; border-radius:12px; padding:10px 14px; }
+      /* Quick Reply Container attached UNDER the message */
+      .cw-message-chips { display:flex !important; flex-wrap:wrap !important; gap:8px !important; margin-top:8px !important; width:100% !important; justify-content:flex-start !important; }
+      /* Individual Chip Styling */
+      .cw-chip { display:inline-flex; align-items:center; padding:6px 12px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid #d1d5db; background-color:#ffffff; transition:all 0.2s ease; }
+      .cw-chip-demo, .cw-chip-sales { background-color:var(--cw-primary-color,#006248); color:#fff; border-color:var(--cw-primary-color,#006248); }
+      .cw-chip-pricing { background-color:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+      .cw-chip-features, .cw-chip-support { background-color:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
+      .cw-chip-escalation { background-color:#fff7ed; border-color:#fed7aa; color:#c2410c; }
+      .cw-chip-qualification { background-color:#fffbeb; border-color:#fde68a; color:#92400e; }
+      .cw-chip-competitor { background-color:#faf5ff; border-color:#e9d5ff; color:#6b21a8; }
+      .cw-chip-security { background-color:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
+      .cw-chip-followup { background-color:#f9fafb; border-color:#e5e7eb; color:#6b7280; }
       /* Welcome action cards */
       .cw-welcome-cards { display:flex; flex-direction:column; gap:6px; padding:2px 0 6px; }
       .cw-welcome-card { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid #E8ECF1; border-radius:12px; background:#fff; cursor:pointer; transition:all 0.2s cubic-bezier(0.16,1,0.3,1); text-align:left; font-family:inherit; width:100%; }
@@ -1191,6 +1206,7 @@ export class ChatWidget {
     const isFirstOpen = this.messages.length === 0;
     if (isFirstOpen) {
       this.addMessage({ role: 'assistant', content: this.getWelcomeMessage() });
+      this.renderInitialActions();
     }
     this.renderUiState();
     this.scrollToBottom();
@@ -1387,7 +1403,9 @@ export class ChatWidget {
     const el = document.createElement('div');
     el.className = `cw-message cw-message-${msg.role}`;
     el.setAttribute('data-message-id', msg.id);
-    el.style.cssText = `display:flex;${msg.role === 'user' ? 'justify-content:flex-end' : 'justify-content:flex-start'};position:relative;`;
+    el.style.cssText = msg.role === 'user'
+      ? 'display:flex;justify-content:flex-end;position:relative;'
+      : 'display:flex;flex-direction:column;align-items:flex-start;width:100%;position:relative;';
 
     const bubble = document.createElement('div');
     bubble.className = 'cw-message-bubble';
@@ -1434,7 +1452,7 @@ export class ChatWidget {
     const locale = this.config.locale || navigator.language || 'en';
     const time = new Date(msg.timestamp).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
     ts.textContent = time;
-    ts.style.cssText = `font-size:10px;color:#9CA3AF;margin-top:4px;opacity:0;transition:opacity 0.15s ease;${isUser ? 'text-align:right;padding-right:4px;' : 'text-align:left;padding-left:26px;'}`;
+    ts.style.cssText = `font-size:10px;color:#9CA3AF;margin-top:4px;opacity:0;transition:opacity 0.15s ease;${isUser ? 'text-align:right;padding-right:4px;' : 'text-align:left;padding-left:0;'}`;
     el.appendChild(ts);
     el.addEventListener('mouseenter', () => { ts.style.opacity = '1'; });
     el.addEventListener('mouseleave', () => { ts.style.opacity = '0'; });
@@ -1448,7 +1466,7 @@ export class ChatWidget {
 
     const container = document.createElement('div');
     container.className = 'cw-message-chips';
-    container.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-left:26px;';
+    container.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;width:100%;justify-content:flex-start;';
 
     const uc = this.config.primaryColor || '#006248';
 
@@ -1539,7 +1557,7 @@ export class ChatWidget {
     const hasButtons = buttonGroup.length > 0;
     const hasSuggestedOptions = this.suggestedOptions.length > 0;
 
-    if (!hasActiveCard && !hasButtons && !hasCta && !hasSuggestedOptions) {
+    if (!hasActiveCard && !hasCta) {
       this.actionPanel.style.display = 'none';
       this.actionPanel.innerHTML = '';
       return;
@@ -1553,36 +1571,8 @@ export class ChatWidget {
       this.actionPanel.appendChild(card);
     }
 
-    if (hasButtons) {
-      const buttonContainer = document.createElement('div');
-      buttonContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;';
-      const visibleButtons = this.getContextualButtons(buttonGroup);
-      visibleButtons.slice(0, 3).forEach((button) => {
-        buttonContainer.appendChild(this.createActionButton(button));
-      });
-      this.actionPanel.appendChild(buttonContainer);
-    }
-
-    if (this.suggestedOptions.length > 0) {
-      const optContainer = document.createElement('div');
-      optContainer.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;';
-      this.suggestedOptions.slice(0, 3).forEach((opt) => {
-        const chip = document.createElement('button');
-        chip.className = 'cw-suggested-option';
-        chip.textContent = opt;
-        chip.style.cssText = 'background:#f0f0f0;border:1px solid #d0d0d0;border-radius:16px;padding:6px 14px;font-size:12px;cursor:pointer;color:#333;white-space:nowrap;transition:background .15s;';
-        chip.addEventListener('mouseenter', () => { chip.style.background = '#e0e0e0'; });
-        chip.addEventListener('mouseleave', () => { chip.style.background = '#f0f0f0'; });
-        chip.addEventListener('click', () => {
-          if (this.isStreaming) return;
-          if (this.inputEl) this.inputEl.value = opt;
-          this.clearUiState();
-          this.send();
-        });
-        optContainer.appendChild(chip);
-      });
-      this.actionPanel.appendChild(optContainer);
-    }
+    // Legacy grey chip buttons and suggested options are now disabled —
+    // Smart Choices renders chips directly below assistant messages.
 
     if (hasCta) {
       const ctaButton = this.createCtaButton(this.cta as Record<string, unknown>);
@@ -1601,105 +1591,25 @@ export class ChatWidget {
       ? this.config.starterOptions
       : this.defaultStarterOptions();
 
-    // --- Welcome icon ---
-    const welcomeIcon = document.createElement('div');
-    welcomeIcon.className = 'cw-welcome-icon';
-    welcomeIcon.innerHTML = '<svg viewBox="0 0 24 24"><path d="m12 3 .8 2.8a5.6 5.6 0 0 0 3.9 3.9l2.8.8-2.8.8a5.6 5.6 0 0 0-3.9 3.9L12 19l-.8-2.8a5.6 5.6 0 0 0-3.9-3.9l-2.8-.8 2.8-.8a5.6 5.6 0 0 0 3.9-3.9L12 3Z"/></svg>';
+    // Find the first assistant message element (the welcome bubble)
+    const firstAssistantEl = this.messagesEl.querySelector('.cw-message-assistant') as HTMLDivElement;
+    if (!firstAssistantEl) return;
 
-    // --- Section: "Choose a quick path" ---
-    const section = document.createElement('div');
-    section.className = 'cw-welcome-section';
-
-    const sectionHeader = document.createElement('div');
-    sectionHeader.className = 'cw-welcome-section-header';
-    const sectionTitle = document.createElement('span');
-    sectionTitle.className = 'cw-welcome-section-title';
-    sectionTitle.textContent = t('welcome.title', this.config.locale);
-    sectionHeader.appendChild(sectionTitle);
-    const sectionMeta = document.createElement('span');
-    sectionMeta.className = 'cw-welcome-section-meta';
-    sectionMeta.textContent = t('welcome.meta', this.config.locale);
-    sectionHeader.appendChild(sectionMeta);
-    section.appendChild(sectionHeader);
-
-    // --- Action cards ---
-    const cardWrap = document.createElement('div');
-    cardWrap.className = 'cw-welcome-cards';
-
-    const cardIcons: Record<string, string> = {
-      plans: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M15 9l4-4M17 3h4v4"/></svg>',
-      guidance: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m9 9 3-3 3 3M9 15l3 3 3-3"/></svg>',
-      demo: '<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>',
-      sales: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-      faq: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>',
-      products: '<svg viewBox="0 0 24 24"><path d="m12 3 .8 2.8a5.6 5.6 0 0 0 3.9 3.9l2.8.8-2.8.8a5.6 5.6 0 0 0-3.9 3.9L12 19l-.8-2.8a5.6 5.6 0 0 0-3.9-3.9l-2.8-.8 2.8-.8a5.6 5.6 0 0 0 3.9-3.9L12 3Z"/></svg>',
-    };
-
-    starters.forEach((text, i) => {
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'cw-welcome-card';
-      card.style.animationDelay = `${i * 0.06}s`;
-
-      // Icon
-      const iconWrap = document.createElement('span');
-      iconWrap.className = 'cw-welcome-card-icon';
+    // Build starter chips as SmartButtons
+    const starterButtons: SmartButton[] = starters.map((text, i) => {
       const category = this.config.suggestedActions?.[i]?.category || (i === 0 ? 'guidance' : i === 1 ? 'demo' : 'plans');
-      iconWrap.innerHTML = cardIcons[category] || cardIcons.guidance;
-      card.appendChild(iconWrap);
-
-      // Body
-      const body = document.createElement('span');
-      body.className = 'cw-welcome-card-body';
-      // Badge on first card
-      if (i === 0) {
-        const badge = document.createElement('span');
-        badge.className = 'cw-welcome-card-badge';
-    badge.textContent = t('welcome.recommended', this.config.locale);
-    badge.style.cssText = `font-size:10px;font-weight:600;padding:3px 7px;border-radius:999px;background:${this.hexToRgba(this.config.primaryColor || '#006248', 0.1)};color:${this.config.primaryColor || '#006248'};`;
-        body.appendChild(badge);
-      }
-      const title = document.createElement('b');
-      title.textContent = text;
-      body.appendChild(title);
-      const desc = document.createElement('small');
-      desc.textContent = i === 0 ? t('welcome.card_desc_quiz', this.config.locale) : i === 1 ? t('welcome.card_desc_tour', this.config.locale) : t('welcome.card_desc_booking', this.config.locale);
-      body.appendChild(desc);
-      card.appendChild(body);
-
-      // Arrow
-      const arrow = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-      arrow.setAttribute('class', 'cw-welcome-card-arrow');
-      arrow.setAttribute('viewBox', '0 0 24 24');
-      arrow.innerHTML = '<path d="m9 18 6-6-6-6"/>';
-      card.appendChild(arrow);
-
-      card.addEventListener('click', () => this.sendStarterPrompt(text));
-      cardWrap.appendChild(card);
+      return {
+        id: `starter-${i}`,
+        label: text,
+        action: 'send_text' as const,
+        payload: text,
+        variant: i === 0 ? 'primary' as const : 'secondary' as const,
+        category,
+      };
     });
 
-    section.appendChild(cardWrap);
-
-    // --- Escape path ---
-    const escapeBtn = document.createElement('button');
-    escapeBtn.type = 'button';
-    escapeBtn.className = 'cw-welcome-escape';
-    escapeBtn.textContent = t('welcome.escape', this.config.locale);
-    escapeBtn.addEventListener('click', () => {
-      if (this.inputEl) this.inputEl.focus();
-    });
-
-    // Insert into the first assistant bubble (after the greeting text)
-    const firstAssistantBubble = this.messagesEl.querySelector('.cw-message-assistant .cw-message-bubble');
-    if (firstAssistantBubble) {
-      firstAssistantBubble.appendChild(welcomeIcon);
-      firstAssistantBubble.appendChild(section);
-      firstAssistantBubble.appendChild(escapeBtn);
-    } else {
-      this.messagesEl.appendChild(welcomeIcon);
-      this.messagesEl.appendChild(section);
-      this.messagesEl.appendChild(escapeBtn);
-    }
+    // Render chips below the welcome bubble
+    this.renderMessageChips(firstAssistantEl, starterButtons, []);
     this.scrollToBottom();
   }
 

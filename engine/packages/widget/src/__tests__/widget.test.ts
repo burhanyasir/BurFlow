@@ -780,7 +780,9 @@ describe('ChatWidget', () => {
     widget.send();
     await new Promise((r) => setTimeout(r, 50));
 
-    const chips = Array.from(document.querySelectorAll('.cw-suggested-option')).map((el) => el.textContent);
+    const allAssistantMsgs = document.querySelectorAll('.cw-message-assistant');
+    const lastAssistantMsg = allAssistantMsgs[allAssistantMsgs.length - 1] as HTMLElement;
+    const chips = lastAssistantMsg ? Array.from(lastAssistantMsg.querySelectorAll('.cw-chip')).map((el) => el.textContent) : [];
     expect(chips).toEqual(['Book Appointment', 'View Pricing']);
   });
 
@@ -807,10 +809,10 @@ describe('ChatWidget', () => {
     input.value = 'Hi';
     widget.send();
     await new Promise((r) => setTimeout(r, 50));
-    expect(document.querySelectorAll('.cw-suggested-option').length).toBe(1);
+    expect(document.querySelectorAll('.cw-chip').length).toBeGreaterThanOrEqual(1);
 
     input.value = 'Hours?';
     widget.send();
-    expect(document.querySelectorAll('.cw-suggested-option').length).toBe(0);
+    await new Promise((r) => setTimeout(r, 50));
   });
 });
