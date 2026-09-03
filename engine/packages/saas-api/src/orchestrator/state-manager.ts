@@ -68,26 +68,58 @@ export function createInitialState(sessionId: string, tenantId: string, policy?:
 
 export class ConversationStateManager {
   private stores = new Map<string, OrchestratorState>();
+  private timestamps = new Map<string, number>();
+  private static readonly TTL_MS = 30 * 60 * 1000; // 30 minutes
+  private static readonly MAX_ENTRIES = 1000;
 
   getOrCreate(sessionId: string, tenantId: string, policy?: Partial<TenantPolicy>): OrchestratorState {
+    this.evictStale();
     let state = this.stores.get(sessionId);
     if (!state) {
+      if (this.stores.size >= ConversationStateManager.MAX_ENTRIES) {
+        this.evictOldest();
+      }
       state = createInitialState(sessionId, tenantId, policy);
       this.stores.set(sessionId, state);
+      this.timestamps.set(sessionId, Date.now());
+    } else {
+      this.timestamps.set(sessionId, Date.now());
     }
     return state;
   }
 
   get(sessionId: string): OrchestratorState | undefined {
+    this.evictStale();
     return this.stores.get(sessionId);
   }
 
   save(sessionId: string, state: OrchestratorState): void {
     this.stores.set(sessionId, state);
+    this.timestamps.set(sessionId, Date.now());
   }
 
   delete(sessionId: string): void {
     this.stores.delete(sessionId);
+    this.timestamps.delete(sessionId);
+  }
+
+  private evictStale(): void {
+    const now = Date.now();
+    for (const [id, ts] of this.timestamps) {
+      if (now - ts > ConversationStateManager.TTL_MS) {
+        this.stores.delete(id);
+        this.timestamps.delete(id);
+      }
+    }
+  }
+
+  private evictOldest(): void {
+    let oldestKey: string | null = null;
+    let oldestTs = Infinity;
+    for (const [id, ts] of this.timestamps) {
+      if (ts < oldestTs) { oldestTs = ts; oldestKey = id; }
+    }
+    if (oldestKey) { this.stores.delete(oldestKey); this.timestamps.delete(oldestKey); }
   }
 
   recordTurn(

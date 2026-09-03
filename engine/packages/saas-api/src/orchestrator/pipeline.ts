@@ -52,9 +52,23 @@ const TRACE_LOG = true;
 
 // Per-session mutex: ensures only one message is processed at a time per session.
 // Prevents race conditions where concurrent messages corrupt conversation state.
+// TTL: 60s — if a lock is held longer than this, evict it to prevent memory leaks.
 const sessionLocks = new Map<string, Promise<void>>();
+const sessionLockTimestamps = new Map<string, number>();
+const SESSION_LOCK_TTL_MS = 60_000;
+
+function evictStaleLocks(): void {
+  const now = Date.now();
+  for (const [id, ts] of sessionLockTimestamps) {
+    if (now - ts > SESSION_LOCK_TTL_MS) {
+      sessionLocks.delete(id);
+      sessionLockTimestamps.delete(id);
+    }
+  }
+}
 
 async function acquireSessionLock(sessionId: string): Promise<() => void> {
+  evictStaleLocks();
   // Wait for any existing lock on this session
   while (sessionLocks.has(sessionId)) {
     await sessionLocks.get(sessionId);
@@ -65,9 +79,11 @@ async function acquireSessionLock(sessionId: string): Promise<() => void> {
     releaseFn = resolve;
   });
   sessionLocks.set(sessionId, lockPromise);
+  sessionLockTimestamps.set(sessionId, Date.now());
   // Return release function
   return () => {
     sessionLocks.delete(sessionId);
+    sessionLockTimestamps.delete(sessionId);
     releaseFn!();
   };
 }

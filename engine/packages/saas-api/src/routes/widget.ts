@@ -574,7 +574,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
     try {
       let tenantId: string | null = tryJwtAuth(req);
       if (!tenantId) {
-        const token = req.query.token as string;
+        const token = (req.query.token as string) || req.get('x-widget-token');
         if (!token) {
           return res.status(400).json({ error: 'Widget token required' });
         }

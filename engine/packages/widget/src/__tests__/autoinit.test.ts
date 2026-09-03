@@ -100,7 +100,7 @@ describe('widget autoInit (tokenless bootstrap)', () => {
     expect(calls.some((u: string) => u.includes('/api/widget/public-token?tenantId=demo-tenant'))).toBe(true);
     // Same-origin config fetch must use a relative URL (empty apiUrl base) and
     // must actually run — the old guard skipped it when apiUrl was empty.
-    expect(calls.some((u: string) => u.startsWith('/api/widget/config?token='))).toBe(true);
+    expect(calls.some((u: string) => u.startsWith('/api/widget/config'))).toBe(true);
     const widget = (window as any).__CURRENT_WIDGET;
     expect(widget.config.companyName).toBe('BrandCo');
     expect(widget.config.launcherText).toBe('Chat with BrandCo');

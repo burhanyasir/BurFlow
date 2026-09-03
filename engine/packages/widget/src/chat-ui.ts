@@ -359,6 +359,7 @@ export class ChatWidget {
   private takeoverEventsController: AbortController | null = null;
   /** Polls GET /api/chat/history for operator messages during a human takeover. */
   private agentPollTimer: ReturnType<typeof setInterval> | null = null;
+  private agentPollController: AbortController | null = null;
   private configPollTimer: ReturnType<typeof setInterval> | null = null;
   /** True only when the visitor explicitly clicked "Talk to a human" + confirmed dialog.
    *  Guards against the backend returning humanTakeover:true on a stale session or
@@ -558,6 +559,8 @@ export class ChatWidget {
     this.abort();
     this.takeoverEventsController?.abort();
     this.takeoverEventsController = null;
+    this.agentPollController?.abort();
+    this.agentPollController = null;
     if (this.placeholderInterval) { clearInterval(this.placeholderInterval); this.placeholderInterval = null; }
     if (this.autoOpenTimer) { clearTimeout(this.autoOpenTimer); this.autoOpenTimer = null; }
     if (this.agentPollTimer) { clearInterval(this.agentPollTimer); this.agentPollTimer = null; }
@@ -586,6 +589,7 @@ export class ChatWidget {
    */
   private startAgentPolling(): void {
     if (this.agentPollTimer) return;
+    this.agentPollController = new AbortController();
     const POLL_INTERVAL_MS = 4000;
     this.agentPollTimer = setInterval(() => { this.pollForAgentMessages(); }, POLL_INTERVAL_MS);
     this.pollForAgentMessages();
@@ -695,7 +699,7 @@ export class ChatWidget {
       if (this.config.widgetToken) headers['x-widget-token'] = this.config.widgetToken;
 
       const url = `${apiUrl}/api/chat/history?sessionId=${encodeURIComponent(sessionId)}&after=${this.lastAgentSeq}`;
-      const res = await fetch(url, { headers, signal: this.abortController?.signal });
+      const res = await fetch(url, { headers, signal: this.agentPollController?.signal });
       if (!res.ok) return;
       const data = await res.json();
       const incoming: Array<{ id: string; content: string; sequenceNumber: number; createdAt: string }> = data?.messages || [];
@@ -1500,7 +1504,7 @@ export class ChatWidget {
       btn.addEventListener('mouseleave', () => { btn.style.transform = ''; btn.style.boxShadow = ''; });
       btn.addEventListener('click', () => {
         if (this.isStreaming) return;
-        if (action === 'navigate' && payload) {
+        if (action === 'navigate' && payload && this.isSafeUrl(payload)) {
           window.open(payload, '_blank');
         } else {
           if (this.inputEl) this.inputEl.value = payload || label;
@@ -1792,7 +1796,7 @@ export class ChatWidget {
     btn.type = 'button';
     btn.textContent = label;
     btn.style.cssText = `width:100%;padding:10px 14px;border:none;border-radius:10px;background:${this.config.primaryColor || '#006248'};color:#fff;font-weight:700;cursor:pointer;font-size:13px;`;
-    btn.addEventListener('click', () => window.open(link, '_blank'));
+    btn.addEventListener('click', () => { if (this.isSafeUrl(link)) window.open(link, '_blank'); });
     wrapper.appendChild(btn);
     return wrapper;
   }
@@ -1989,9 +1993,11 @@ export class ChatWidget {
     if (!this.config.widgetToken) return;
 
     try {
-      const url = `${this.config.apiUrl}/api/widget/config?token=${encodeURIComponent(this.config.widgetToken)}`;
+      const url = `${this.config.apiUrl}/api/widget/config`;
+      const configHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (this.config.widgetToken) configHeaders['x-widget-token'] = this.config.widgetToken;
       const response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json' },
+        headers: configHeaders,
       });
       if (!response.ok) {
         console.warn(`[BurFlow Widget] Config fetch failed: HTTP ${response.status} — tenant-specific options may not load.`);
