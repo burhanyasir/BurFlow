@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { DashboardLayout } from '../../../components/dashboard';
 import { PageHead, DashButton, Panel, StatCard, EmptyState } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
@@ -86,6 +86,8 @@ function scanStatusStyle(status: WebsiteScan['status']) {
 
 export default function KnowledgeDashboard() {
   const navigate = useNavigate(); const { user, tenant, logout } = useAuth(); const { addToast } = useToast();
+  const [searchParams] = useSearchParams();
+  const scanUrlParam = searchParams.get('url') || '';
   const [docs, setDocs] = useState<KnowledgeDoc[]>([]); const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0); const [loading, setLoading] = useState(true);
   const [monitoring, setMonitoring] = useState<MonitoringStats | null>(null);
@@ -94,6 +96,11 @@ export default function KnowledgeDashboard() {
   const [processingExpanded, setProcessingExpanded] = useState(true);
   const [scanModalOpen, setScanModalOpen] = useState(false);
   const [latestScan, setLatestScan] = useState<WebsiteScan | null>(null);
+
+  // Auto-open scanner modal if URL param is present (from landing page scan → signup flow)
+  useEffect(() => {
+    if (scanUrlParam) setScanModalOpen(true);
+  }, [scanUrlParam]);
   const [gaps, setGaps] = useState<UnansweredGap[]>([]);
   const [gapsLoading, setGapsLoading] = useState(false);
   const [convertGap, setConvertGap] = useState<UnansweredGap | null>(null);
@@ -669,7 +676,7 @@ export default function KnowledgeDashboard() {
           </div>
         )}
       </div>
-      <WebsiteScannerModal open={scanModalOpen} onClose={() => setScanModalOpen(false)} onStarted={handleScanStarted} />
+      <WebsiteScannerModal open={scanModalOpen} onClose={() => setScanModalOpen(false)} onStarted={handleScanStarted} defaultUrl={scanUrlParam || undefined} />
       <KbGapConvertModal
         gap={convertGap}
         onClose={() => setConvertGap(null)}

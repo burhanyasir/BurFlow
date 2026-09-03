@@ -1,5 +1,5 @@
 import { useState, useMemo, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { SEO } from '../../components/SEO';
 import { AuthLayout } from './AuthLayout';
 import { useAuth } from '../../lib/auth-context';
@@ -57,12 +57,14 @@ export default function SignupPage() {
   const { signup } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const scannedUrl = searchParams.get('url') || '';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [companyName, setCompanyName] = useState('');
+  const [companyName, setCompanyName] = useState(scannedUrl ? new URL(scannedUrl).hostname.replace(/^www\./, '') : '');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});

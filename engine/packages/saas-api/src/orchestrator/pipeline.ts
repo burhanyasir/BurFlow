@@ -50,9 +50,35 @@ export interface PipelineResult {
 
 const TRACE_LOG = true;
 
+// Per-session mutex: ensures only one message is processed at a time per session.
+// Prevents race conditions where concurrent messages corrupt conversation state.
+const sessionLocks = new Map<string, Promise<void>>();
+
+async function acquireSessionLock(sessionId: string): Promise<() => void> {
+  // Wait for any existing lock on this session
+  while (sessionLocks.has(sessionId)) {
+    await sessionLocks.get(sessionId);
+  }
+  // Create a new lock
+  let releaseFn: () => void;
+  const lockPromise = new Promise<void>((resolve) => {
+    releaseFn = resolve;
+  });
+  sessionLocks.set(sessionId, lockPromise);
+  // Return release function
+  return () => {
+    sessionLocks.delete(sessionId);
+    releaseFn!();
+  };
+}
+
 export async function executePipeline(input: PipelineInput): Promise<PipelineResult> {
   const startTime = Date.now();
   const { message, sessionId, tenantId, brainFunction, policy, knowledgeBaseProvider: kbProvider, businessProfile } = input;
+
+  // Acquire per-session lock to prevent concurrent state corruption
+  const releaseLock = await acquireSessionLock(sessionId);
+  try {
   const traceId = `${sessionId.slice(-8)}-${Date.now() % 10000}`;
 
   // Step 1: Load conversation state
@@ -316,6 +342,9 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     suggestedOptions: brainOutput?.suggestedOptions || [],
     leadCapture: brainOutput?.extractedLead || null,
   };
+  } finally {
+    releaseLock();
+  }
 }
 
 function mapStrategyToStage(strategy: Strategy): ConversationStage {

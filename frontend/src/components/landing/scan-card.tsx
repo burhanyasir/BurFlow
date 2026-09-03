@@ -28,6 +28,8 @@ export interface ScanCardProps {
   result: ScanResult | null;
   details: ScanDetails | null;
   onRestart: () => void;
+  readiness?: number;
+  signupUrl?: string;
 }
 
 const idleStats = [
@@ -36,7 +38,7 @@ const idleStats = [
   { label: 'Buyer intents', value: '18' },
 ];
 
-export function ScanCard({ status, stage, progress, url, result, details, onRestart }: ScanCardProps) {
+export function ScanCard({ status, stage, progress, url, result, details, onRestart, readiness, signupUrl }: ScanCardProps) {
   const liveStats = result
     ? [
         { label: 'Pages scanned', value: `${result.pages}+` },
@@ -47,6 +49,8 @@ export function ScanCard({ status, stage, progress, url, result, details, onRest
         { label: 'Buyer intents', value: `${result.intents}` },
       ]
     : null;
+
+  const score = readiness ?? 97;
 
   return (
     <div className="rounded-2xl border border-hairline bg-surface p-6 shadow-lift md:p-8">
@@ -98,10 +102,10 @@ export function ScanCard({ status, stage, progress, url, result, details, onRest
           <div className="mt-6">
             <div className="flex items-baseline justify-between text-sm">
               <span className="text-muted-foreground">Sales agent readiness</span>
-              <span className="font-display font-bold">97%</span>
+              <span className="font-display font-bold">{score}%</span>
             </div>
             <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
-              <div className="h-full w-[97%] rounded-full bg-primary" />
+              <div className="h-full rounded-full bg-primary transition-all duration-500" style={{ width: `${score}%` }} />
             </div>
           </div>
 
@@ -186,13 +190,23 @@ export function ScanCard({ status, stage, progress, url, result, details, onRest
       </ul>
 
       {status === 'done' && (
-        <button
-          type="button"
-          onClick={onRestart}
-          className="mt-6 inline-flex h-10 items-center rounded-full border border-hairline px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary/30"
-        >
-          Scan another site
-        </button>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {signupUrl && (
+            <a
+              href={signupUrl}
+              className="inline-flex h-10 items-center rounded-full bg-primary px-6 text-sm font-semibold text-primary-foreground transition-all hover:-translate-y-0.5 hover:shadow-glow"
+            >
+              Claim your agent →
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={onRestart}
+            className="inline-flex h-10 items-center rounded-full border border-hairline px-5 text-sm font-semibold text-foreground transition-colors hover:border-primary/30"
+          >
+            Scan another site
+          </button>
+        </div>
       )}
     </div>
   );

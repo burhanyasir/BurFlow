@@ -10,11 +10,12 @@ interface WebsiteScannerModalProps {
   open: boolean;
   onClose: () => void;
   onStarted: (scan: WebsiteScan) => void;
+  defaultUrl?: string;
 }
 
-export function WebsiteScannerModal({ open, onClose, onStarted }: WebsiteScannerModalProps) {
+export function WebsiteScannerModal({ open, onClose, onStarted, defaultUrl }: WebsiteScannerModalProps) {
   const { addToast } = useToast();
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState(defaultUrl || '');
   const [depth, setDepth] = useState(3);
   const [mode, setMode] = useState<'discover' | 'update'>('discover');
   const [submitting, setSubmitting] = useState(false);

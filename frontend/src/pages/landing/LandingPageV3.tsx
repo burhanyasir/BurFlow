@@ -209,6 +209,20 @@ export default function LandingPageV3() {
   });
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
   const [scanDetails, setScanDetails] = useState<ScanDetails | null>(null);
+  const [scanReadiness, setScanReadiness] = useState<number>(0);
+
+  /** Compute a readiness score (0-100) from scan results. */
+  const computeReadiness = useCallback((result: ScanResult): number => {
+    let score = 20; // base for having a URL
+    if (result.pages > 1) score += 15;
+    if (result.pages > 3) score += 10;
+    if (result.products > 0) score += 20;
+    if (result.services > 0) score += 15;
+    if (result.pricing > 0) score += 10;
+    if (result.faqs > 0) score += 5;
+    if (result.intents > 5) score += 5;
+    return Math.min(score, 98);
+  }, []);
 
   const startScan = useCallback(async (raw: string) => {
     let url = raw && raw.trim() && raw.trim() !== 'https://' ? raw.trim() : 'https://yourcompany.com/';
@@ -216,6 +230,7 @@ export default function LandingPageV3() {
     setScan({ status: 'scanning', stage: SCAN_STAGES[0]![1], progress: 2, url });
     setScanResult(null);
     setScanDetails(null);
+    setScanReadiness(0);
     track('scan_submit', { url });
     apiClient.post('/public/leads', { source: 'scan', websiteUrl: url }).catch(() => {});
     document.getElementById('scan-preview')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -298,7 +313,9 @@ export default function LandingPageV3() {
       // so explain instead of falling back.
       if (data?.error && (data.error.code === 'blocked' || data.error.code === 'not_found' || data.error.code === 'server_error')) {
         const host = new URL(url).hostname;
-        setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
+        const errResult = { pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 };
+        setScanResult(errResult);
+        setScanReadiness(computeReadiness(errResult));
         setScanDetails({ name: host, description: `${data.error.message} The agent will learn about your business during setup instead.`, pages: [], products: [], services: [], headings: [] });
         setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
         return;
@@ -346,14 +363,18 @@ export default function LandingPageV3() {
       const services = data.services || [];
       const intents = Math.max(5, products.length * 3 + services.length * 2 + 4);
 
-      setScanResult({ pages: discoveredPages.length, products: products.length || 1, services: services.length || 1, pricing: 1, faqs: 1, intents });
+      const successResult = { pages: discoveredPages.length, products: products.length || 1, services: services.length || 1, pricing: 1, faqs: 1, intents };
+      setScanResult(successResult);
+      setScanReadiness(computeReadiness(successResult));
       setScanDetails({ name: data.title || new URL(url).hostname, description: data.description || 'Website scanned successfully.', pages: discoveredPages.slice(0, 8), products, services, headings: (data.headings || []).slice(0, 12) });
 
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
       trackOnce('scan_complete');
     } catch {
       const domain = url.replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-      setScanResult({ pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 });
+      const fallbackResult = { pages: 1, products: 1, services: 1, pricing: 1, faqs: 1, intents: 5 };
+      setScanResult(fallbackResult);
+      setScanReadiness(computeReadiness(fallbackResult));
       setScanDetails({ name: domain, description: `Could not fully fetch ${domain} — it may block automated scanning or require JavaScript. The agent will learn about your business during setup instead.`, pages: [], products: [], services: [], headings: [] });
       setScan((prev) => ({ ...prev, status: 'done', stage: 'Scan complete', progress: 100 }));
     }
@@ -496,10 +517,13 @@ export default function LandingPageV3() {
                   url={scan.url}
                   result={scanResult}
                   details={scanDetails}
+                  readiness={scanReadiness || undefined}
+                  signupUrl={scan.status === 'done' && scan.url ? `/signup?url=${encodeURIComponent(scan.url)}` : undefined}
                   onRestart={() => {
                     setScan({ status: 'idle', stage: '', progress: 0, url: 'https://yourcompany.com/' });
                     setScanResult(null);
                     setScanDetails(null);
+                    setScanReadiness(0);
                   }}
                 />
               </Reveal>
