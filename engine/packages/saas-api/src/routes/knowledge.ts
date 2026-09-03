@@ -335,6 +335,9 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
     if (!req.user?.tenantId) return res.status(401).json({ error: 'Tenant context required' });
     if (!deps.unansweredRepo) return res.status(404).json({ error: 'Unanswered question tracking is not enabled' });
 
+    const idErr = validateId(req.params.id, 'id');
+    if (idErr) return validationError(res, [idErr]);
+
     const { answer, question: questionOverride } = req.body;
     if (typeof answer !== 'string' || !answer.trim()) {
       return res.status(400).json({ error: 'answer is required and must be a non-empty string' });
@@ -635,9 +638,9 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
       createContextLogger(logger).warn({ err, tenantId, url }, 'Knowledge crawl failed during onboarding flow; continuing with basic widget setup');
       if (!res.headersSent) {
         if (err.message?.includes('exceeds maximum')) {
-          return res.status(413).json({ error: err.message, warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+          return res.status(413).json({ error: 'File too large', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
         }
-        res.status(500).json({ error: err.message || 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
+        res.status(500).json({ error: 'Failed to crawl website', warning: 'Knowledge crawl failed; onboarding will continue with a basic setup.' });
       }
     }
   });
@@ -859,7 +862,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
         });
       }
       res.status(500).json({
-        error: err.message || 'Processing failed',
+        error: 'Processing failed',
         status: updatedStatus?.status || 'failed',
       });
     }

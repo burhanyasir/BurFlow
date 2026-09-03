@@ -4,6 +4,7 @@ import { UserRepository, TenantRepository, ConversationRepository, MessageReposi
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { randomBytes } from 'crypto';
 import { verifyWidgetToken } from '../middleware/auth';
+import { validateUUID } from '../middleware/validate';
 import { dispatchLeadAlerts, LeadNotificationConfig } from '../services/lead-notifier';
 import { takeoverEvents } from '../services/takeover-events';
 
@@ -105,6 +106,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Messages for a conversation ─────────────────────────────
   router.get('/chatbot-conversations/:convId/messages', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.convId, 'convId');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const { messages } = messageRepo.listByConversation(req.params.convId, 1, 100);
       res.json({ messages });
@@ -157,6 +160,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Get ticket messages ─────────────────────────────────────
   router.get('/tickets/:ticketId', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.ticketId, 'ticketId');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const ticket = db.prepare('SELECT * FROM support_tickets WHERE id = ?').get(req.params.ticketId);
       if (!ticket) return res.status(404).json({ error: 'Ticket not found' });
@@ -167,13 +172,15 @@ export function createSupportRoutes(
 
   // ─── OWNER: Send message ────────────────────────────────────────────
   router.post('/tickets/:ticketId/messages', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.ticketId, 'ticketId');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const { content } = req.body;
       if (!content) return res.status(400).json({ error: 'Message required' });
       const now = new Date().toISOString();
       db.prepare(
         'INSERT INTO support_messages (id, ticket_id, sender_type, sender_email, content, created_at) VALUES (?, ?, ?, ?, ?, ?)'
-      ).run(generateId(), req.params.ticketId, 'owner', 'burflow2026@gmail.com', content, now);
+      ).run(generateId(), req.params.ticketId, 'owner', process.env.OWNER_EMAIL || 'support@burflow.com', content, now);
       db.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').run('replied', now, req.params.ticketId);
       res.json({ ok: true });
     } catch (err: any) { res.status(500).json({ error: 'Failed' }); }
@@ -181,6 +188,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Close ticket ────────────────────────────────────────────
   router.post('/tickets/:ticketId/close', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.ticketId, 'ticketId');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       db.prepare('UPDATE support_tickets SET status = ?, updated_at = ? WHERE id = ?').run('closed', new Date().toISOString(), req.params.ticketId);
       res.json({ ok: true });
@@ -203,7 +212,7 @@ export function createSupportRoutes(
       const now = new Date().toISOString();
       db.prepare(
         'INSERT INTO payment_confirmations (id, tenant_id, user_email, requested_plan, billing_period, amount, currency, wallet_account, screenshot_url, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
-      ).run(id, tenant?.id || null, user?.email || payload.email, requestedPlan, billingPeriod || 'monthly', amount || '0', 'PKR', walletAccount || 'PK58SADA0000003007645484', screenshotUrl || null, 'pending', now, now);
+      ).run(id, tenant?.id || null, user?.email || payload.email, requestedPlan, billingPeriod || 'monthly', amount || '0', 'PKR', walletAccount || process.env.DEFAULT_WALLET_ACCOUNT || '', screenshotUrl || null, 'pending', now, now);
 
       createContextLogger(logger).info({ paymentId: id, email: user?.email, plan: requestedPlan }, 'Payment confirmation submitted');
       res.json({ ok: true, paymentId: id });
@@ -227,6 +236,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Approve payment ─────────────────────────────────────────
   router.post('/payments/:id/approve', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const { id } = req.params;
       const row = db.prepare('SELECT * FROM payment_confirmations WHERE id = ?').get(id) as any;
@@ -270,6 +281,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Reject payment ──────────────────────────────────────────
   router.post('/payments/:id/reject', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const now = new Date().toISOString();
       db.prepare(
@@ -400,6 +413,8 @@ export function createSupportRoutes(
 
   // ─── OWNER: Reply to chatbot conversation ──────────────────────────
   router.post('/chatbot-conversations/:convId/reply', ownerOnly, (req: Request, res: Response) => {
+    const err = validateUUID(req.params.convId, 'convId');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
     try {
       const { convId } = req.params;
       const { content } = req.body;

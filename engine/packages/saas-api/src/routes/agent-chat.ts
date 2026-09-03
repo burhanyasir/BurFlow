@@ -4,7 +4,7 @@ import {
   SessionHandoffService, Lead, HandoffRequest,
 } from '@conversation-engine/saas-core';
 import { createLogger } from '@conversation-engine/logger';
-import { MESSAGE_MAX } from '../middleware/validate';
+import { MESSAGE_MAX, validateUUID } from '../middleware/validate';
 import { takeoverEvents, writeSseEvent, openSessionEventStream } from '../services/takeover-events';
 
 const logger = createLogger('saas-api:agent-chat');
@@ -135,6 +135,9 @@ export function createAgentChatRoutes(
 
   // GET /api/sessions/:id/messages — full thread history for a session
   router.get('/:id/messages', (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
+
     const { id } = req.params;
 
     const conversation = conversationRepo.findById(id);
@@ -154,6 +157,9 @@ export function createAgentChatRoutes(
 
   // POST /api/sessions/:id/takeover — take control of a live session
   router.post('/:id/takeover', (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
+
     const { id } = req.params;
     const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as { agentId?: unknown };
     const agentId = typeof body.agentId === 'string' && body.agentId.trim()
@@ -194,6 +200,9 @@ export function createAgentChatRoutes(
 
   // POST /api/sessions/:id/release — hand control back to the AI
   router.post('/:id/release', (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
+
     const { id } = req.params;
 
     const conversation = conversationRepo.findById(id);
@@ -227,6 +236,9 @@ export function createAgentChatRoutes(
 
   // POST /api/sessions/:id/message — agent sends a manual reply to the visitor
   router.post('/:id/message', (req: Request, res: Response) => {
+    const err = validateUUID(req.params.id, 'id');
+    if (err) return res.status(400).json({ error: err.message, field: err.field });
+
     const { id } = req.params;
     const body = (typeof req.body === 'object' && req.body !== null ? req.body : {}) as { content?: unknown };
 

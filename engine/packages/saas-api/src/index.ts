@@ -67,6 +67,7 @@ import { takeoverEvents } from './services/takeover-events';
 import { createTrustRoutes } from './routes/trust';
 import { createLeadRoutes } from './routes/leads';
 import { createHardeningRoutes } from './routes/hardening';
+import { validateUUID } from './middleware/validate';
 import { errorHandler } from './middleware/structured-error';
 import { createQuotaGuard } from './middleware/quota-guard';
 import { setEmailProvider } from './services/email';
@@ -321,6 +322,9 @@ app.use(helmet({
 const publicCors = cors({ origin: true, credentials: false });
 app.use('/api/widget', publicCors);
 app.use('/api/chat', publicCors);
+// Support has both public (user ticket submit) and owner-only (ticket/payment mgmt)
+// endpoints. Owner endpoints require Bearer auth, so CORS reflection is safe here,
+// but we apply a stricter rate limit to reduce abuse surface.
 app.use('/api/support', publicCors);
 app.use('/api/public', publicCors);
 
@@ -433,6 +437,8 @@ app.post('/api/widget/handoff', widgetHandoffAuth, (req: Request, res: Response)
 
 // Get handoff info for a conversation (for owner panel)
 app.get('/api/conversations/:id/handoff', auth, tenantGuard, (req: Request, res: Response) => {
+  const err = validateUUID(req.params.id, 'id');
+  if (err) return res.status(400).json({ error: err.message, field: err.field });
   try {
     const tenantId = req.tenantId!;
     const conv = conversationRepo.findById(req.params.id);
@@ -448,6 +454,8 @@ app.get('/api/conversations/:id/handoff', auth, tenantGuard, (req: Request, res:
 
 // Conversation resolve route (for owner panel)
 app.patch('/api/conversations/:id/resolve', auth, tenantGuard, (req: Request, res: Response) => {
+  const err = validateUUID(req.params.id, 'id');
+  if (err) return res.status(400).json({ error: err.message, field: err.field });
   try {
     const tenantId = req.tenantId!;
     const conv = conversationRepo.findById(req.params.id);
@@ -541,6 +549,7 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), require
 // Paddle is the sole billing provider — there is no Stripe webhook route.
 app.use('/api/webhooks/paddle', createPaddleWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, customerRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
+app.use('/api/billing', createRateLimit({ windowMs: 60_000, max: 60 }));
 app.use('/api/billing', auth, tenantGuard, createBillingRoutes(subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, conversationRepo, usageRepo, docRepo));
 // Dedicated admin limiter: the dashboard polls sessions + analytics every 15s
 // (≈8 req/min per tenant); 300 req/min/IP leaves ample headroom without
@@ -588,6 +597,7 @@ const knowledgeDeps = {
   unansweredRepo,
   widgetConfigRepo,
 };
+app.use('/api/knowledge', createRateLimit({ windowMs: 60_000, max: 30 }));
 app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps));
 
 // ─── KB Crawl Job Status ──────────────────────────────────────────
@@ -595,6 +605,8 @@ app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps
 // signup.  Returns the same shape whether the job is pending, running,
 // completed, or failed.
 app.get('/api/knowledge/crawl-jobs/:jobId', auth, (req: Request, res: Response) => {
+  const err = validateUUID(req.params.jobId, 'jobId');
+  if (err) return res.status(400).json({ error: err.message, field: err.field });
   const job = kbJobQueue.getById(req.params.jobId);
   if (!job || job.tenantId !== req.user?.tenantId) {
     return res.status(404).json({ error: 'Job not found' });

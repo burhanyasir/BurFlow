@@ -5,7 +5,7 @@ import {
   TeamRole, Invitation,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
-import { requireJsonObject, validateRequiredString, validateRequiredEnum, validateEmail, validationError, LABEL_MAX } from '../middleware/validate';
+import { requireJsonObject, validateRequiredString, validateRequiredEnum, validateEmail, validationError, validateUUID, LABEL_MAX } from '../middleware/validate';
 
 const VALID_TEAM_ROLES = ['owner', 'admin', 'support_agent', 'viewer'];
 const logger = createLogger('saas-api:team');
@@ -119,6 +119,9 @@ export function createTeamRoutes(
 
   router.delete('/invitations/:id', ownerOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
+
       const tenantId = req.tenantId!;
       const cancelled = invitationRepo.cancel(req.params.id, tenantId);
       if (!cancelled) return res.status(404).json({ error: 'Invitation not found' });
@@ -171,6 +174,9 @@ export function createTeamRoutes(
 
   router.delete('/members/:id', ownerOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
+
       const tenantId = req.tenantId!;
       const member = teamRepo.findById(req.params.id);
       if (!member || member.tenantId !== tenantId) return res.status(404).json({ error: 'Member not found' });
@@ -198,6 +204,9 @@ export function createTeamRoutes(
 
   router.put('/members/:id/role', requireJsonObject, ownerOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
+
       const tenantId = req.tenantId!;
       const { role } = req.body;
 

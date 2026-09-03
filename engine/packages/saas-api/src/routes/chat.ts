@@ -511,9 +511,7 @@ export function createChatRoutes(
         suggestedOptions,
       });
     } catch (err: any) {
-      console.log(`[TRACE:${traceId}] UNHANDLED EXCEPTION: ${err.message}`);
-      console.log(`[TRACE:${traceId}] Stack: ${err.stack}`);
-      createContextLogger(logger).error({ err }, 'Chat failed');
+      createContextLogger(logger).error({ err, traceId }, 'Chat failed');
 
       if (err instanceof PayloadValidationError) {
         return res.status(400).json({ error: err.message, code: err.code });

@@ -4,7 +4,7 @@ import {
   Lead, QualificationStatus, BuyingIntentLevel,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
-import { requireJsonObject, validationError } from '../middleware/validate';
+import { requireJsonObject, validationError, validateUUID } from '../middleware/validate';
 import { dispatchLeadWebhook } from '../services/webhook-dispatcher';
 import { toCsv } from '../utils/csv-formatter';
 
@@ -128,6 +128,9 @@ export function createLeadRoutes(
 
   router.patch('/:id', requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
+
       const lead = leadRepo.findById(req.params.id);
       if (!lead || lead.tenantId !== req.tenantId) {
         return res.status(404).json({ error: 'Lead not found' });
@@ -186,6 +189,9 @@ export function createLeadRoutes(
 
   router.get('/:id', (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
+
       const lead = leadRepo.findById(req.params.id);
       if (!lead || lead.tenantId !== req.tenantId) {
         return res.status(404).json({ error: 'Lead not found' });

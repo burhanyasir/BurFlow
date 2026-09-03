@@ -7,7 +7,7 @@ import {
   SessionNote,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
-import { parsePagination, requireJsonObject, validationError, validateRequiredString, validateRequiredEnum } from '../middleware/validate';
+import { parsePagination, requireJsonObject, validationError, validateRequiredString, validateRequiredEnum, validateUUID } from '../middleware/validate';
 import { createTtlCache } from '../utils/ttl-cache';
 import { buildSessionSummary, aggregateAnalytics, computeConversationIntel, buildLeadSummary } from '../services/conversation-intel';
 
@@ -310,6 +310,8 @@ export function createAdminRoutes(
 
   router.delete('/knowledge/documents/:documentId', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.documentId, 'documentId');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const { documentId } = req.params;
       docRepo.updateStatus(documentId, 'deleted' as any);
       res.json({ status: 'deleted' });
@@ -321,6 +323,8 @@ export function createAdminRoutes(
 
   router.post('/knowledge/documents/:documentId/retry', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.documentId, 'documentId');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const { documentId } = req.params;
       docRepo.updateStatus(documentId, 'queued' as any);
       res.json({ status: 'queued' });
@@ -361,6 +365,8 @@ export function createAdminRoutes(
 
   router.get('/sessions/:id', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = conversationRepo.findById(req.params.id);
       if (!conversation || conversation.tenantId !== req.tenantId) {
         return res.status(404).json({ error: 'Session not found' });
@@ -457,6 +463,8 @@ export function createAdminRoutes(
 
   router.put('/sessions/:id/status', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const statusError = validateRequiredEnum(req.body.status, 'status', VALID_SESSION_STATUSES);
@@ -471,6 +479,8 @@ export function createAdminRoutes(
 
   router.put('/sessions/:id/owner', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const ownerId = req.body.ownerId;
@@ -487,6 +497,8 @@ export function createAdminRoutes(
 
   router.put('/sessions/:id/flag', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const flagged = req.body.flagged;
@@ -501,6 +513,8 @@ export function createAdminRoutes(
 
   router.put('/sessions/:id/archive', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const archived = req.body.archived;
@@ -515,6 +529,8 @@ export function createAdminRoutes(
 
   router.post('/sessions/:id/notes', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const error = validateRequiredString(req.body.content, 'content', { maxLength: 4000 });
@@ -537,6 +553,8 @@ export function createAdminRoutes(
 
   router.get('/sessions/:id/notes', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       res.json({ notes: conversation.notes || [], sessionId: conversation.id });
@@ -548,6 +566,8 @@ export function createAdminRoutes(
 
   router.put('/sessions/:id/tags', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const { tags } = req.body;
@@ -564,6 +584,8 @@ export function createAdminRoutes(
 
   router.get('/sessions/:id/tags', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       res.json({ tags: conversation.tags || [], sessionId: conversation.id });
@@ -575,6 +597,8 @@ export function createAdminRoutes(
 
   router.get('/sessions/:id/timeline', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const conversation = requireSession(req, res);
       if (!conversation) return;
       const messages = (messageRepo.listByConversation(conversation.id, 1, 500).messages || []);

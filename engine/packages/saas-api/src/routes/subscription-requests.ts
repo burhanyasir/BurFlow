@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { UserRepository, TenantRepository, SubscriptionRepository, type SqlDatabase } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { randomBytes } from 'crypto';
+import { validateUUID } from '../middleware/validate';
 
 const logger = createLogger('saas-api:subscription-requests');
 
@@ -129,6 +130,9 @@ export function createSubscriptionRequestRoutes(
   // ─── OWNER: Approve a request → activate plan ───────────────────────
   router.post('/:id/approve', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.id, 'id');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { id } = req.params;
       const row = db.prepare('SELECT * FROM subscription_requests WHERE id = ?').get(id) as any;
       if (!row) return res.status(404).json({ error: 'Request not found' });
@@ -167,6 +171,9 @@ export function createSubscriptionRequestRoutes(
   // ─── OWNER: Reject a request ─────────────────────────────────────────
   router.post('/:id/reject', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.id, 'id');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { id } = req.params;
       const now = new Date().toISOString();
       db.prepare('UPDATE subscription_requests SET status = ?, owner_notes = ?, updated_at = ? WHERE id = ?')

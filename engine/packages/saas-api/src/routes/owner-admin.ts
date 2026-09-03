@@ -8,6 +8,7 @@ import {
   TeamMemberRepository,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
+import { validateUUID } from '../middleware/validate';
 
 const logger = createLogger('saas-api:owner-admin');
 
@@ -32,7 +33,7 @@ export function createOwnerAdminRoutes(
 ): Router {
   const router = Router();
 
-  const OWNER_EMAIL = 'burhanyasir82@gmail.com';
+  const OWNER_EMAIL = process.env.OWNER_EMAIL || 'burhanyasir82@gmail.com';
 
   const ownerOnly = (req: Request, res: Response, next: Function) => {
     const authHeader = req.headers.authorization;
@@ -107,6 +108,9 @@ export function createOwnerAdminRoutes(
   // ─── TENANT DETAIL ───────────────────────────────────────────────────
   router.get('/tenants/:tenantId', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const tenant = tenantRepo.findById(tenantId);
       if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
@@ -182,6 +186,9 @@ export function createOwnerAdminRoutes(
   // ─── UPDATE PLAN ─────────────────────────────────────────────────────
   router.post('/tenants/:tenantId/plan', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const { plan, periodEnd } = req.body;
 
@@ -217,6 +224,9 @@ export function createOwnerAdminRoutes(
   // ─── UPDATE SUBSCRIPTION STATUS ──────────────────────────────────────
   router.post('/tenants/:tenantId/status', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const { status } = req.body;
 
@@ -238,6 +248,9 @@ export function createOwnerAdminRoutes(
   // ─── EXTEND PERIOD ──────────────────────────────────────────────────
   router.post('/tenants/:tenantId/extend', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const { days } = req.body;
       const addDays = Math.max(1, Math.min(365, Number(days) || 30));
@@ -260,6 +273,9 @@ export function createOwnerAdminRoutes(
   // ─── CANCEL SUBSCRIPTION ─────────────────────────────────────────────
   router.post('/tenants/:tenantId/cancel', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const now = new Date().toISOString();
 
@@ -277,6 +293,9 @@ export function createOwnerAdminRoutes(
   // ─── REACTIVATE ─────────────────────────────────────────────────────
   router.post('/tenants/:tenantId/reactivate', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const now = new Date().toISOString();
       const end = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -298,6 +317,9 @@ export function createOwnerAdminRoutes(
   // ─── DELETE TENANT ──────────────────────────────────────────────────
   router.delete('/tenants/:tenantId', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const deleted = tenantRepo.delete(tenantId);
       if (!deleted) return res.status(404).json({ error: 'Tenant not found' });
@@ -313,6 +335,9 @@ export function createOwnerAdminRoutes(
   // ─── RENAME TENANT ──────────────────────────────────────────────────
   router.post('/tenants/:tenantId/rename', ownerOnly, (req: Request, res: Response) => {
     try {
+      const uuidErr = validateUUID(req.params.tenantId, 'tenantId');
+      if (uuidErr) return res.status(400).json({ error: uuidErr.message, field: uuidErr.field });
+
       const { tenantId } = req.params;
       const { name } = req.body;
       if (!name || name.trim().length < 2) {
@@ -364,7 +389,7 @@ export function createOwnerAdminRoutes(
         tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
         user: { id: user.id, email: user.email, name: user.name },
         plan: normalizedPlan,
-        tempPassword: password,
+        message: 'Tenant created successfully. Credentials should be shared via a secure channel.',
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Owner create tenant failed');

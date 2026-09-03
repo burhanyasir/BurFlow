@@ -5,6 +5,7 @@ import {
   SecurityStatusType, IncidentSeverity,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
+import { validateUUID } from '../middleware/validate';
 
 const logger = createLogger('saas-api:trust');
 
@@ -100,6 +101,8 @@ export function createTrustRoutes(
   });
 
   router.put('/incidents/:id/status', adminOnly, (req: Request, res: Response) => {
+    const idErr = validateUUID(req.params.id, 'id');
+    if (idErr) return res.status(400).json({ error: idErr.message, field: idErr.field });
     try {
       const { status } = req.body as { status: string };
       const updated = incidentRepo.updateStatus(req.params.id, status as any);
@@ -171,6 +174,8 @@ export function createTrustRoutes(
   });
 
   router.put('/subprocessors/:id', adminOnly, (req: Request, res: Response) => {
+    const idErr = validateUUID(req.params.id, 'id');
+    if (idErr) return res.status(400).json({ error: idErr.message, field: idErr.field });
     try {
       const { name, purpose, location, dataProcessed, status } = req.body as { name?: string; purpose?: string; location?: string; dataProcessed?: string; status?: 'active' | 'retired' };
       const updated = subRepo.update(req.params.id, req.tenantId!, { name, purpose, location, dataProcessed, status });
@@ -183,6 +188,8 @@ export function createTrustRoutes(
   });
 
   router.delete('/subprocessors/:id', adminOnly, (req: Request, res: Response) => {
+    const idErr = validateUUID(req.params.id, 'id');
+    if (idErr) return res.status(400).json({ error: idErr.message, field: idErr.field });
     try {
       const deleted = subRepo.delete(req.params.id, req.tenantId!);
       if (!deleted) return res.status(404).json({ error: 'Subprocessor not found' });

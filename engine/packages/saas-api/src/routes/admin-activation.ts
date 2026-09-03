@@ -7,6 +7,7 @@ import {
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { computeInsightOverview, computeInsightTrends } from '../services/conversation-intel';
+import { validateUUID } from '../middleware/validate';
 
 const logger = createLogger('saas-api:activation');
 
@@ -94,6 +95,8 @@ export function createActivationRoutes(
 
   router.put('/unanswered/:id/resolve', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       unansweredRepo.resolve(req.params.id);
       res.json({ success: true });
     } catch (err: any) {
@@ -127,6 +130,8 @@ export function createActivationRoutes(
 
   router.put('/knowledge/suggestions/:id/dismiss', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       suggestionRepo.dismiss(req.params.id);
       res.json({ success: true });
     } catch (err: any) {
@@ -137,6 +142,8 @@ export function createActivationRoutes(
 
   router.put('/knowledge/suggestions/:id/apply', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       suggestionRepo.apply(req.params.id);
       res.json({ success: true });
     } catch (err: any) {

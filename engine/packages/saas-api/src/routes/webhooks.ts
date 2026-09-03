@@ -4,7 +4,7 @@ import {
   WebhookEvent,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
-import { requireJsonObject, validateRequiredString, validationError } from '../middleware/validate';
+import { requireJsonObject, validateRequiredString, validateUUID, validationError } from '../middleware/validate';
 import crypto from 'crypto';
 
 const VALID_WEBHOOK_EVENTS: WebhookEvent[] = ['conversation.created', 'conversation.completed', 'escalation.created', 'unanswered.created', 'feedback.received', 'lead.captured', 'lead.qualified'];
@@ -57,6 +57,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.get('/:id', (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const webhook = webhookRepo.findById(req.params.id);
       if (!webhook || webhook.tenantId !== req.tenantId) return res.status(404).json({ error: 'Webhook not found' });
       res.json({ id: webhook.id, url: webhook.url, events: webhook.events, isActive: webhook.isActive, lastSuccessAt: webhook.lastSuccessAt, lastFailureAt: webhook.lastFailureAt, consecutiveFailures: webhook.consecutiveFailures, createdAt: webhook.createdAt, updatedAt: webhook.updatedAt });
@@ -68,6 +70,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.put('/:id', adminOnly, requireJsonObject, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const webhook = webhookRepo.findById(req.params.id);
       if (!webhook || webhook.tenantId !== req.tenantId) return res.status(404).json({ error: 'Webhook not found' });
       const { url, events, isActive } = req.body;
@@ -85,6 +89,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.delete('/:id', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const deleted = webhookRepo.delete(req.params.id, req.tenantId!);
       if (!deleted) return res.status(404).json({ error: 'Webhook not found' });
       auditRepo.record(req.tenantId!, { userId: req.user!.sub, userName: req.user!.name, eventType: 'webhook.deleted', resourceType: 'webhook', resourceId: req.params.id, details: 'Webhook deleted' });
@@ -97,6 +103,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.post('/:id/regenerate-secret', adminOnly, (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const webhook = webhookRepo.findById(req.params.id);
       if (!webhook || webhook.tenantId !== req.tenantId) return res.status(404).json({ error: 'Webhook not found' });
       const newSecret = crypto.randomBytes(32).toString('hex');
@@ -111,6 +119,8 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.get('/:id/deliveries', (req: Request, res: Response) => {
     try {
+      const err = validateUUID(req.params.id, 'id');
+      if (err) return res.status(400).json({ error: err.message, field: err.field });
       const webhook = webhookRepo.findById(req.params.id);
       if (!webhook || webhook.tenantId !== req.tenantId) return res.status(404).json({ error: 'Webhook not found' });
       const page = parseInt(req.query.page as string) || 1;
@@ -125,6 +135,10 @@ export function createWebhookRoutes(webhookRepo: WebhookRepository, deliveryRepo
 
   router.post('/:id/deliveries/:deliveryId/replay', adminOnly, (req: Request, res: Response) => {
     try {
+      const errId = validateUUID(req.params.id, 'id');
+      if (errId) return res.status(400).json({ error: errId.message, field: errId.field });
+      const errDelivery = validateUUID(req.params.deliveryId, 'deliveryId');
+      if (errDelivery) return res.status(400).json({ error: errDelivery.message, field: errDelivery.field });
       const delivery = deliveryRepo.replay(req.params.deliveryId);
       res.status(201).json(delivery);
     } catch (err: any) {
