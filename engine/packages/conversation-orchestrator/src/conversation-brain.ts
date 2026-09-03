@@ -2658,7 +2658,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         businessContext,
         businessGoalHint,
         topOffersHint,
-        locale: (input as any).locale || businessProfile?.locale,
+        locale: (input as any).locale || (businessProfile as any)?.locale,
       });
 
       const text = await callLLMWithFallback(systemPrompt, messages);
