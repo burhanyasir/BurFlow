@@ -1465,7 +1465,7 @@ export class ChatWidget {
 
     const container = document.createElement('div');
     container.className = 'cw-message-chips';
-      container.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;width:100%;justify-content:flex-start;';
+    container.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;width:100%;justify-content:flex-start;';
 
     const uc = this.config.primaryColor || '#006248';
 

@@ -414,7 +414,10 @@ const BANNED_QUICK_REPLY_KEYWORDS = ['human', 'person', 'contact', 'support', 't
 function sanitizeQuickReplies(replies: any[]): any[] {
   return replies.filter(reply => {
     const text = (typeof reply === 'string' ? reply : (reply.label || reply.text || '')).toLowerCase();
-    return !BANNED_QUICK_REPLY_KEYWORDS.some(keyword => text.includes(keyword));
+    return !BANNED_QUICK_REPLY_KEYWORDS.some(keyword => {
+      const kw = keyword.includes(' ') ? keyword : `\\b${keyword}\\b`;
+      return new RegExp(kw, 'i').test(text);
+    });
   });
 }
 

@@ -66,7 +66,7 @@ describe('fallbackSuggestedOptions', () => {
       button_catalog: [{ id: '1', label: 'View Pricing', payload: 'pricing' }],
     });
     expect(opts.length).toBeGreaterThanOrEqual(2);
-    expect(opts.length).toBeLessThanOrEqual(3);
+    expect(opts.length).toBeLessThanOrEqual(5);
     expect(opts.join(' ')).not.toMatch(/BurFlow|Demo AI Agent/i);
     expect(opts).toContain('Book Appointment');
   });

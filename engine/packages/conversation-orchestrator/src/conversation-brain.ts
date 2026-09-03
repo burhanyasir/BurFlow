@@ -2892,7 +2892,7 @@ funnelStage: ciResult.funnelStage,
   const groundedSuggestedOptions = sanitizeSuggestedOptions([
     ...llmSuggestedOptions,
     ...fallbackSuggestedOptions(businessProfile),
-  ]).slice(0, 3);
+  ]).slice(0, 5);
 
   return {
     responseText: enrichedResponse,

@@ -135,7 +135,7 @@ export function sanitizeSuggestedOptions(options: Array<string | null | undefine
     if (HUMAN_CONTACT_RE.test(label)) continue;
     if (cleaned.some((existing) => existing.toLowerCase() === label.toLowerCase())) continue;
     cleaned.push(label);
-    if (cleaned.length >= 3) break;
+    if (cleaned.length >= 5) break;
   }
   return cleaned;
 }
@@ -154,9 +154,9 @@ export function fallbackSuggestedOptions(
   }
   candidates.push('View Pricing', 'See Features', 'Watch Demo');
   const sanitized = sanitizeSuggestedOptions(candidates);
-  if (sanitized.length >= 2) return sanitized.slice(0, 3);
+  if (sanitized.length >= 2) return sanitized.slice(0, 5);
   const padded = sanitizeSuggestedOptions([...sanitized, 'View Pricing', 'See Features', 'Watch Demo']);
-  return padded.slice(0, Math.max(2, Math.min(3, padded.length)));
+  return padded.slice(0, Math.max(2, Math.min(5, padded.length)));
 }
 
 export function replaceUngroundedPlatformSpeech(reply: string, knowledge: string): string {
