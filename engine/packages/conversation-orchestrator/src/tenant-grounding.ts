@@ -94,7 +94,7 @@ CRITICAL RULES:
 7. Be warm and helpful, not pushy.
 
 QUICK REPLY OPTIONS RULES:
-- Return exactly 2-3 short, highly relevant quick reply options (2-4 words each).
+- Return exactly 5 short, highly relevant quick reply options (2-4 words each).
 - Options MUST be specific to the current conversation context and extracted website knowledge.
 - Focus strictly on value, features, pricing, and automated demos (e.g., "See Workflow Demo", "Calculate Time Saved", "Compare Automation Features").
 - DO NOT generate options to talk to a human, contact support, or reach out to a team.
@@ -119,7 +119,7 @@ Respond with ONLY a JSON object — no markdown, no explanation, using exactly t
   "responseText": "your response to the visitor",
   "strategy": "one or two words describing your conversational strategy, e.g. educate, qualify, handle_objection, advance_funnel, recommend_plan, close_trial, schedule_demo, build_trust",
   "suggestedTopics": ["1-3 follow-up topics the visitor might care about next"],
-  "suggestedOptions": ["2-3 short clickable follow-up options based on THIS website's offerings and services. Each is 2-4 words. Focus on value, features, pricing, and demos. Examples: 'See Workflow Demo', 'Calculate Time Saved', 'Compare Automation Features'. Do NOT include options to talk to a human, contact support, or reach out to a team."],
+  "suggestedOptions": ["5 short clickable follow-up options based on THIS website's business model and offerings. Each is 2-4 words. Tailor to the detected business category: E-COMMERCE ('Buy Product', 'Best Selling', 'Check Shipping', 'View Catalog', 'Current Discounts'), SAAS/B2B ('Book a Demo', 'Start Free Trial', 'View Pricing Plans', 'Explore Automations', 'How It Works'), APPOINTMENT/SERVICE ('Book Appointment', 'View Services', 'Pricing Options', 'Service Coverage', 'Schedule Call'). STRICTLY FORBIDDEN: Do NOT generate options to talk to a human, person, team, or support agent."],
   "ctaType": "one of: none, book_demo, start_free_trial, contact_sales, pricing, support",
   "funnelStage": "one of: greeting, awareness, interest, consideration, evaluation, purchase_intent, decision, customer, support"
 }`;

@@ -409,7 +409,7 @@ export function getState(sessionId: string): OrchestratorState | undefined {
   return stateManager.get(sessionId);
 }
 
-const BANNED_QUICK_REPLY_KEYWORDS = ['human', 'person', 'contact', 'support', 'talk', 'representative', 'agent', 'team', 'help'];
+const BANNED_QUICK_REPLY_KEYWORDS = ['human', 'person', 'contact', 'support', 'talk', 'representative', 'agent', 'team', 'help', 'speak to', 'call us', 'reach out', 'talk later'];
 
 function sanitizeQuickReplies(replies: any[]): any[] {
   return replies.filter(reply => {
@@ -421,34 +421,46 @@ function sanitizeQuickReplies(replies: any[]): any[] {
 function generateStageFallbackQuickReplies(strategy: string, state: any): any[] {
   const stageChips: Record<string, Array<{id: string; label: string; action: string; payload: string; variant: string; category: string; score: number}>> = {
     greeting: [
-      { id: 'fb_features', label: 'See BurFlow Features', action: 'send_text', payload: 'What features does BurFlow offer?', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_features', label: 'See Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'info', score: 50 },
       { id: 'fb_pricing', label: 'View Pricing Plans', action: 'send_text', payload: 'What are the pricing plans?', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_demo', label: 'Watch Workflow Demo', action: 'send_text', payload: 'Show me how the workflow automation works', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'Show me a demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_how', label: 'How It Works', action: 'send_text', payload: 'How does this work?', variant: 'secondary', category: 'info', score: 42 },
     ],
     discovery: [
       { id: 'fb_pricing', label: 'View Pricing Plans', action: 'send_text', payload: 'Tell me about pricing', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_automations', label: 'Explore Automations', action: 'send_text', payload: 'What automations can I set up?', variant: 'primary', category: 'demo', score: 55 },
-      { id: 'fb_integration', label: 'See Integration List', action: 'send_text', payload: 'What integrations are available?', variant: 'secondary', category: 'info', score: 40 },
+      { id: 'fb_features', label: 'Explore Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_how', label: 'How It Works', action: 'send_text', payload: 'How does this work?', variant: 'secondary', category: 'info', score: 42 },
     ],
     qualification: [
-      { id: 'fb_features', label: 'See BurFlow Features', action: 'send_text', payload: 'Show me the key features', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_features', label: 'See Features', action: 'send_text', payload: 'Show me the key features', variant: 'secondary', category: 'info', score: 50 },
       { id: 'fb_pricing', label: 'View Pricing Plans', action: 'send_text', payload: 'What are the pricing plans?', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_automations', label: 'Explore Automations', action: 'send_text', payload: 'What automations can I set up?', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_compare', label: 'Compare Plans', action: 'send_text', payload: 'Compare the different plan options', variant: 'secondary', category: 'pricing', score: 43 },
     ],
     booking: [
-      { id: 'fb_demo', label: 'View Live Product Demo', action: 'send_text', payload: 'Show me a live product demo', variant: 'primary', category: 'demo', score: 60 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo', score: 60 },
       { id: 'fb_pricing', label: 'See Pricing Details', action: 'send_text', payload: 'What are the pricing details?', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_how', label: 'How Automation Works', action: 'send_text', payload: 'How does the automation work?', variant: 'secondary', category: 'info', score: 40 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_features', label: 'View Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_how', label: 'How It Works', action: 'send_text', payload: 'How does this work?', variant: 'secondary', category: 'info', score: 42 },
     ],
     consultation: [
-      { id: 'fb_calculate', label: 'Calculate Saved Time', action: 'send_text', payload: 'How much time can I save with automation?', variant: 'primary', category: 'action', score: 55 },
-      { id: 'fb_plans', label: 'Compare Plan Options', action: 'send_text', payload: 'Compare the different plan options', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_integration', label: 'See Integration List', action: 'send_text', payload: 'What integrations are available?', variant: 'secondary', category: 'info', score: 40 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_pricing', label: 'Compare Plan Options', action: 'send_text', payload: 'Compare the different plan options', variant: 'secondary', category: 'pricing', score: 45 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_features', label: 'See Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_how', label: 'How It Works', action: 'send_text', payload: 'How does this work?', variant: 'secondary', category: 'info', score: 42 },
     ],
     general: [
-      { id: 'fb_what', label: 'What is BurFlow?', action: 'send_text', payload: 'What is BurFlow and what does it do?', variant: 'secondary', category: 'info', score: 50 },
-      { id: 'fb_pricing', label: 'See Pricing Plans', action: 'send_text', payload: 'What are the pricing plans?', variant: 'secondary', category: 'pricing', score: 45 },
-      { id: 'fb_demo', label: 'Watch Workflow Demo', action: 'send_text', payload: 'Show me a workflow demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'send_text', payload: 'I want to book a demo', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_pricing', label: 'See Pricing', action: 'send_text', payload: 'What are the pricing plans?', variant: 'secondary', category: 'pricing', score: 45 },
+      { id: 'fb_trial', label: 'Start Free Trial', action: 'send_text', payload: 'How do I start a free trial?', variant: 'primary', category: 'action', score: 52 },
+      { id: 'fb_features', label: 'View Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'info', score: 50 },
+      { id: 'fb_how', label: 'How It Works', action: 'send_text', payload: 'How does this work?', variant: 'secondary', category: 'info', score: 42 },
     ],
   };
   return sanitizeQuickReplies(stageChips[strategy] || stageChips.general);

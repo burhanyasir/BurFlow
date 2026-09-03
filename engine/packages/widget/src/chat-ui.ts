@@ -456,9 +456,9 @@ export class ChatWidget {
       .cw-message-assistant { display:flex !important; flex-direction:column !important; align-items:flex-start !important; width:100% !important; margin-bottom:12px; }
       .cw-message-assistant .cw-message-bubble { max-width:85%; align-self:flex-start; background-color:#f3f4f6; border-radius:12px; padding:10px 14px; }
       /* Quick Reply Container attached UNDER the message */
-      .cw-message-chips { display:flex !important; flex-wrap:wrap !important; gap:8px !important; margin-top:8px !important; width:100% !important; justify-content:flex-start !important; }
+      .cw-message-chips { display:flex !important; flex-wrap:wrap !important; gap:6px !important; margin-top:8px !important; width:100% !important; justify-content:flex-start !important; }
       /* Individual Chip Styling */
-      .cw-chip { display:inline-flex; align-items:center; padding:6px 12px; border-radius:16px; font-size:12px; font-weight:500; cursor:pointer; border:1px solid #d1d5db; background-color:#ffffff; transition:all 0.2s ease; }
+      .cw-chip { display:inline-flex; align-items:center; padding:5px 10px; border-radius:14px; font-size:11px; font-weight:500; cursor:pointer; white-space:nowrap; border:1px solid #d1d5db; background-color:#ffffff; transition:all 0.2s ease; }
       .cw-chip-demo, .cw-chip-sales { background-color:var(--cw-primary-color,#006248); color:#fff; border-color:var(--cw-primary-color,#006248); }
       .cw-chip-pricing { background-color:#ecfdf5; border-color:#a7f3d0; color:#065f46; }
       .cw-chip-features, .cw-chip-support { background-color:#eff6ff; border-color:#bfdbfe; color:#1e40af; }
@@ -1465,7 +1465,7 @@ export class ChatWidget {
 
     const container = document.createElement('div');
     container.className = 'cw-message-chips';
-    container.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;width:100%;justify-content:flex-start;';
+      container.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;width:100%;justify-content:flex-start;';
 
     const uc = this.config.primaryColor || '#006248';
 
@@ -1511,12 +1511,12 @@ export class ChatWidget {
       container.appendChild(btn);
     };
 
-    chips.slice(0, 3).forEach((chip: any) => {
+    chips.slice(0, 5).forEach((chip: any) => {
       renderBtn(chip.label, chip.category || '', chip.variant || 'secondary', chip.payload || chip.label, chip.action || 'send_text');
     });
 
     if (chips.length === 0) {
-      options.slice(0, 3).forEach((opt) => {
+      options.slice(0, 5).forEach((opt) => {
         renderBtn(opt, 'followup', 'secondary', opt, 'send_text');
       });
     }

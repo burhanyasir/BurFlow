@@ -597,41 +597,67 @@ function getContextPrefix(_memory: ConversationMemoryData, _relevantFacts: Relev
 
 const QUICK_REPLIES_BY_GOAL: Record<ConversationGoal, QRDef[]> = {
   build_trust: [
-    { id: 'qr_how_works', label: 'How It Works', payload: 'How does the grounding engine work?', variant: 'secondary' },
-    { id: 'qr_customers', label: 'Customer Stories', payload: 'Tell me about your customers', variant: 'outline' },
+    { id: 'qr_how_works', label: 'How It Works', payload: 'How does this work?', variant: 'secondary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+    { id: 'qr_customers', label: 'Customer Stories', payload: 'Tell me about customer stories', variant: 'outline' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
     { id: 'qr_security', label: 'Security & Trust', payload: 'Tell me about security', variant: 'outline' },
   ],
   answer_question: [
     { id: 'qr_deeper', label: 'Tell Me More', payload: 'Can you elaborate on that?', variant: 'secondary' },
     { id: 'qr_related', label: 'Related Features', payload: 'What related features do you have?', variant: 'outline' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_how_works', label: 'How It Works', payload: 'How does this work?', variant: 'secondary' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
   ],
   handle_objection: [
     { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
     { id: 'qr_case_study', label: 'See Case Studies', payload: 'Show me customer success stories', variant: 'secondary' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
   ],
   qualify: [
     { id: 'qr_help_choose', label: 'Help Me Choose', payload: 'Help me find the right plan', variant: 'primary' },
     { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
   ],
   advance_funnel: [
     { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
-    { id: 'qr_demo', label: 'Watch Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+    { id: 'qr_compare', label: 'Compare Plans', payload: 'Compare all plan features', variant: 'secondary' },
   ],
   recommend_plan: [
     { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
     { id: 'qr_compare', label: 'Compare Plans', payload: 'Compare all plan features', variant: 'secondary' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
   ],
   close_trial: [
     { id: 'qr_signup', label: 'Start 14-Day Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
-    { id: 'qr_contact', label: 'Talk to Sales', payload: 'I want to talk to sales', variant: 'secondary' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_compare', label: 'Compare Plans', payload: 'Compare all plan features', variant: 'secondary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
   ],
   schedule_demo: [
-    { id: 'qr_book_demo', label: 'Book 15-Min Demo', payload: '/contact', variant: 'primary', action: 'navigate' },
-    { id: 'qr_contact_sales', label: 'Contact Sales', payload: 'Connect me with sales', variant: 'secondary' },
+    { id: 'qr_book_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
+    { id: 'qr_compare', label: 'Compare Plans', payload: 'Compare all plan features', variant: 'secondary' },
   ],
   recover_abandonment: [
     { id: 'qr_special', label: 'See Current Offers', payload: 'Tell me about current promotions', variant: 'primary' },
-    { id: 'qr_quick_demo', label: 'Quick Overview', payload: 'Give me a quick overview', variant: 'secondary' },
+    { id: 'qr_demo', label: 'Book a Demo', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_trial', label: 'Start Free Trial', payload: '/signup', variant: 'primary', action: 'navigate' },
+    { id: 'qr_pricing', label: 'See Pricing', payload: 'What are your pricing tiers?', variant: 'secondary' },
+    { id: 'qr_features', label: 'View Features', payload: 'What features do you offer?', variant: 'secondary' },
   ],
   finish_conversation: [],
   none: [],
@@ -1364,7 +1390,7 @@ const BUTTON_CATALOG: ButtonCandidate[] = [
   { id: 'btn_help_choose', label: 'Help me choose', payload: 'Help me choose the right plan', action: 'send_text', variant: 'primary', category: 'qualification', defaultScore: 45, icon: 'lightbulb', locale: 'en-US', tags: ['help', 'choose', 'plan'] },
   { id: 'btn_compare_plans', label: 'Compare plans', payload: 'Compare plans', action: 'send_text', variant: 'secondary', category: 'competitor', defaultScore: 35, icon: 'compare', locale: 'en-US', tags: ['compare', 'plans', 'pricing'] },
   { id: 'btn_free_trial', label: 'Free trial', payload: '/signup', action: 'navigate', variant: 'primary', category: 'trial', defaultScore: 50, icon: 'gift', locale: 'en-US', tags: ['trial', 'signup'] },
-  { id: 'btn_talk_to_sales', label: 'Talk to sales', payload: '/contact', action: 'navigate', variant: 'outline', category: 'sales', defaultScore: 45, icon: 'phone', locale: 'en-US', tags: ['sales', 'contact'] },
+  // btn_talk_to_sales removed — human contact options are banned from quick replies
   { id: 'btn_monthly_plans', label: 'Monthly plans', payload: 'Tell me about monthly pricing', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 40, icon: 'calendar-month', locale: 'en-US', tags: ['monthly', 'pricing'] },
   { id: 'btn_annual_discount', label: 'Annual discount', payload: 'Tell me about annual discounts', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 38, icon: 'discount', locale: 'en-US', tags: ['annual', 'pricing', 'discount'] },
   { id: 'btn_enterprise_pricing', label: 'Enterprise pricing', payload: 'What does enterprise pricing look like?', action: 'send_text', variant: 'secondary', category: 'pricing', defaultScore: 42, icon: 'shield-check', locale: 'en-US', tags: ['enterprise', 'pricing'] },
@@ -1404,8 +1430,8 @@ const BUTTON_CATALOG: ButtonCandidate[] = [
 
 // Escalation buttons removed — human contact options are no longer injected as quick replies.
 
-const MAX_QUICK_REPLIES = 4;
-const MIN_QUICK_REPLIES = 3;
+const MAX_QUICK_REPLIES = 5;
+const MIN_QUICK_REPLIES = 5;
 
 function extractMessageTags(message: string): Set<string> {
   const tags = new Set<string>();

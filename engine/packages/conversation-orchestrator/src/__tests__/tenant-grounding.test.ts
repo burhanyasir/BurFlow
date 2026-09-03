@@ -41,7 +41,7 @@ describe('buildGroundedSystemPrompt', () => {
     expect(prompt).not.toMatch(/BurFlow sales representative/i);
     expect(prompt).not.toMatch(/workflow automation platform/i);
     expect(prompt).toMatch(/suggestedOptions/);
-    expect(prompt).toMatch(/See Workflow Demo|Calculate Time Saved|Compare Automation Features/);
+    expect(prompt).toMatch(/See Workflow Demo|Calculate Time Saved|Compare Automation Features|Buy Product|Best Selling|Book Appointment|View Services/);
     expect(prompt).not.toMatch(/Start BurFlow Trial|Demo AI Agent/);
   });
 });
