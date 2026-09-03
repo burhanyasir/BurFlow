@@ -336,7 +336,7 @@ export async function executePipeline(input: PipelineInput): Promise<PipelineRes
     isFallback: !!(brainOutput?.ciResult?.isFallback || brainOutput?.orchestratorResult?.isFallback),
     traceId,
     latencyMs,
-    quickReplies: brainOutput?.quickReplies || [],
+    quickReplies: brainOutput?.quickReplies?.length ? brainOutput.quickReplies : generateStageFallbackQuickReplies(policyDecision.strategy, state),
     uiState: brainOutput?.uiState || { buttons: [], suggestedActions: [] },
     cta: brainOutput?.cta || null,
     suggestedOptions: brainOutput?.suggestedOptions || [],
@@ -407,4 +407,23 @@ function logBrainTrace(traceId: string, output: any): void {
 
 export function getState(sessionId: string): OrchestratorState | undefined {
   return stateManager.get(sessionId);
+}
+
+function generateStageFallbackQuickReplies(strategy: string, state: any): any[] {
+  const stageChips: Record<string, Array<{id: string; label: string; action: string; payload: string; variant: string; category: string; score: number}>> = {
+    greeting: [
+      { id: 'fb_pricing', label: 'View Pricing', action: 'send_text', payload: 'What are your pricing plans?', variant: 'secondary', category: 'pricing', score: 45 },
+      { id: 'fb_features', label: 'Key Features', action: 'send_text', payload: 'What features do you offer?', variant: 'secondary', category: 'features', score: 40 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'navigate', payload: '/signup', variant: 'primary', category: 'demo', score: 55 },
+    ],
+    discovery: [
+      { id: 'fb_pricing', label: 'View Pricing', action: 'send_text', payload: 'Tell me about pricing', variant: 'secondary', category: 'pricing', score: 45 },
+      { id: 'fb_demo', label: 'Book a Demo', action: 'navigate', payload: '/signup', variant: 'primary', category: 'demo', score: 55 },
+    ],
+    qualification: [
+      { id: 'fb_book', label: 'Book Appointment', action: 'navigate', payload: '/contact', variant: 'primary', category: 'demo', score: 55 },
+      { id: 'fb_pricing', label: 'View Pricing', action: 'send_text', payload: 'What are the pricing options?', variant: 'secondary', category: 'pricing', score: 45 },
+    ],
+  };
+  return stageChips[strategy] || stageChips.discovery;
 }

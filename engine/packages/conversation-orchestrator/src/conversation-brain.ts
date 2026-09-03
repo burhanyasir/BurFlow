@@ -1402,6 +1402,12 @@ const BUTTON_CATALOG: ButtonCandidate[] = [
   { id: 'btn_contact_support', label: 'Contact support', payload: '/support', action: 'navigate', variant: 'secondary', category: 'support', defaultScore: 40, icon: 'life-ring', locale: 'en-US', tags: ['support'] },
 ];
 
+const ESCALATION_BUTTONS: ButtonCandidate[] = [
+  { id: 'btn_talk_human', label: 'Talk to a human', payload: '/contact', action: 'navigate', variant: 'outline', category: 'escalation', defaultScore: 80, icon: 'user', locale: 'en-US', tags: ['human', 'agent', 'frustrated'] },
+  { id: 'btn_book_now', label: 'Book now', payload: '/booking', action: 'navigate', variant: 'primary', category: 'escalation', defaultScore: 85, icon: 'calendar', locale: 'en-US', tags: ['book', 'urgent', 'hot'] },
+  { id: 'btn_need_help', label: 'I need help', payload: 'I need help with something specific', action: 'send_text', variant: 'outline', category: 'escalation', defaultScore: 75, icon: 'life-ring', locale: 'en-US', tags: ['help', 'stuck'] },
+];
+
 const MAX_QUICK_REPLIES = 4;
 const MIN_QUICK_REPLIES = 3;
 
@@ -1560,6 +1566,37 @@ function recordShownButtons(memory: ConversationMemoryData, buttons: SmartButton
   }
 }
 
+function detectEscalationSignals(
+  message: string,
+  ciResult: ConversationIntelligenceResult,
+  memory: ConversationMemoryData,
+): { isEscalated: boolean; reason: string } {
+  const msg = message.toLowerCase();
+
+  // Frustration keywords
+  if (/frustrat|angry|annoyed|waste|terrible|awful|worst|hate|ridiculous|unacceptable|furious|livid|disgusted/i.test(msg)) {
+    return { isEscalated: true, reason: 'frustration' };
+  }
+
+  // Repetition frustration
+  if (ciResult.repetition.count >= 3) {
+    return { isEscalated: true, reason: 'repetition' };
+  }
+
+  // Explicit human request
+  if (/talk to (a )?human|speak to (a )?(human|person|someone|agent)|real person|actual person/i.test(msg)) {
+    return { isEscalated: true, reason: 'human_request' };
+  }
+
+  // High buying intent + urgency
+  const buyingIntentScore = ciResult.buyingIntent?.confidence ?? (ciResult.buyingIntent?.hasBuyingIntent ? 1 : 0);
+  if (buyingIntentScore >= 0.7 && /now|today|immediately|asap|urgent|right away/i.test(msg)) {
+    return { isEscalated: true, reason: 'hot_lead' };
+  }
+
+  return { isEscalated: false, reason: '' };
+}
+
 function buildDynamicQuickReplies(
   message: string,
   plan: { goal: ConversationGoal; funnelStage: FunnelStageExtended; customerIntent: CustomerIntent },
@@ -1614,6 +1651,26 @@ function buildDynamicQuickReplies(
   ).slice(0, MAX_QUICK_REPLIES);
 
   const replies = [...topButtons];
+
+  // Check for escalation signals
+  const escalation = detectEscalationSignals(message, ciResult, memory);
+  if (escalation.isEscalated) {
+    const recentEscLabels = new Set(memory.buttonsShown.filter(b => b.turnNumber >= memory.turnCount - 2).map(b => b.label.toLowerCase()));
+    const escalationButtons = ESCALATION_BUTTONS
+      .filter(btn => !recentEscLabels.has(btn.label.toLowerCase()))
+      .slice(0, 2)
+      .map(btn => ({
+        ...btn,
+        score: 100,
+        reason: `Escalation: ${escalation.reason}`,
+      }));
+    // Record and return escalation buttons prepended to normal replies
+    recordShownButtons(memory, escalationButtons);
+    for (const btn of escalationButtons) {
+      buttonTelemetry.recordShown(btn.id, btn.label, btn.category, undefined, memory.turnCount + 1);
+    }
+    return [...escalationButtons, ...replies].slice(0, MAX_QUICK_REPLIES);
+  }
 
   if (replies.length < MIN_QUICK_REPLIES) {
     const fallback = catalog.filter(button => !recentLabels.has(button.label.toLowerCase()) && button.category !== 'qualification').slice(0, MIN_QUICK_REPLIES - replies.length);

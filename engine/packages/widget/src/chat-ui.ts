@@ -339,6 +339,7 @@ export class ChatWidget {
   private uiState: ConversationUIState | null = null;
   private cta: Record<string, unknown> | null = null;
   private suggestedOptions: string[] = [];
+  private quickReplies: any[] = [];
   private unreadBadge: HTMLSpanElement | null = null;
   private preOpenPanelEl: HTMLDivElement | null = null;
   private configLoadPromise: Promise<void> | null = null;
@@ -1303,11 +1304,14 @@ export class ChatWidget {
         this.scrollToBottom();
       },
       onDone: () => {},
-      onUiState: (uiState, cta, suggestedOptions) => {
+      onUiState: (uiState, cta, suggestedOptions, quickReplies) => {
         this.uiState = uiState || this.uiState || null;
         this.cta = cta || this.cta || null;
         if (Array.isArray(suggestedOptions)) {
           this.suggestedOptions = suggestedOptions;
+        }
+        if (Array.isArray(quickReplies) && quickReplies.length > 0) {
+          this.quickReplies = quickReplies;
         }
         this.renderUiState();
       },
@@ -1325,7 +1329,14 @@ export class ChatWidget {
         this.isStreaming = false;
         this.updateSendButton();
         this.scrollToBottom();
-        if (this.suggestedOptions.length > 0 || this.uiState || this.cta) {
+
+        // Render chips directly on the assistant message
+        const msgEl = this.messagesEl?.querySelector(`[data-message-id="${assistantMsg.id}"]`) as HTMLDivElement;
+        if (msgEl) {
+          this.renderMessageChips(msgEl, this.quickReplies, this.suggestedOptions);
+        }
+
+        if (this.suggestedOptions.length > 0 || this.quickReplies.length > 0 || this.uiState || this.cta) {
           this.renderUiState();
         } else {
           this.clearUiState();
@@ -1429,6 +1440,71 @@ export class ChatWidget {
     el.addEventListener('mouseleave', () => { ts.style.opacity = '0'; });
 
     this.messagesEl.appendChild(el);
+  }
+
+  private renderMessageChips(msgEl: HTMLDivElement, chips: any[], options: string[]): void {
+    msgEl.querySelectorAll('.cw-message-chips').forEach(el => el.remove());
+    if (chips.length === 0 && options.length === 0) return;
+
+    const container = document.createElement('div');
+    container.className = 'cw-message-chips';
+    container.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-left:26px;';
+
+    const uc = this.config.primaryColor || '#006248';
+
+    const getChipStyle = (category: string, variant: string): string => {
+      const base = 'border-radius:16px;padding:6px 14px;font-size:12px;cursor:pointer;white-space:nowrap;transition:all .15s;font-weight:500;border:1px solid;display:inline-flex;align-items:center;gap:4px;';
+      const catStyles: Record<string, string> = {
+        demo: `background:${uc};color:#fff;border-color:${uc};`,
+        pricing: 'background:#f0fdf4;color:#166534;border-color:#bbf7d0;',
+        features: 'background:#f0f4ff;color:#374151;border-color:#d0d7e8;',
+        escalation: 'background:#fef2f2;color:#991b1b;border-color:#fecaca;',
+        qualification: 'background:#fffbeb;color:#92400e;border-color:#fde68a;',
+        sales: `background:${uc};color:#fff;border-color:${uc};`,
+        support: 'background:#f0f4ff;color:#374151;border-color:#d0d7e8;',
+        competitor: 'background:#faf5ff;color:#6b21a8;border-color:#e9d5ff;',
+        security: 'background:#f0fdf4;color:#166534;border-color:#bbf7d0;',
+        followup: 'background:#f9fafb;color:#6b7280;border-color:#e5e7eb;',
+      };
+      const varStyles: Record<string, string> = {
+        primary: `background:${uc};color:#fff;border-color:${uc};`,
+        secondary: 'background:#f0f4ff;color:#374151;border-color:#d0d7e8;',
+        outline: `background:transparent;color:${uc};border-color:${uc};`,
+      };
+      return base + (catStyles[category] || varStyles[variant] || varStyles.secondary);
+    };
+
+    const renderBtn = (label: string, category: string, variant: string, payload: string, action: string) => {
+      const btn = document.createElement('button');
+      btn.className = `cw-chip cw-chip-${category || 'default'}`;
+      btn.textContent = label;
+      btn.style.cssText = getChipStyle(category, variant);
+      btn.addEventListener('mouseenter', () => { btn.style.transform = 'translateY(-1px)'; btn.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)'; });
+      btn.addEventListener('mouseleave', () => { btn.style.transform = ''; btn.style.boxShadow = ''; });
+      btn.addEventListener('click', () => {
+        if (this.isStreaming) return;
+        if (action === 'navigate' && payload) {
+          window.open(payload, '_blank');
+        } else {
+          if (this.inputEl) this.inputEl.value = payload || label;
+          this.clearUiState();
+          this.send();
+        }
+      });
+      container.appendChild(btn);
+    };
+
+    chips.slice(0, 3).forEach((chip: any) => {
+      renderBtn(chip.label, chip.category || '', chip.variant || 'secondary', chip.payload || chip.label, chip.action || 'send_text');
+    });
+
+    if (chips.length === 0) {
+      options.slice(0, 3).forEach((opt) => {
+        renderBtn(opt, 'followup', 'secondary', opt, 'send_text');
+      });
+    }
+
+    msgEl.appendChild(container);
   }
 
   private updateMessageContent(msg: ChatMessage): void {
@@ -1639,6 +1715,7 @@ export class ChatWidget {
     this.uiState = null;
     this.cta = null;
     this.suggestedOptions = [];
+    this.quickReplies = [];
     if (this.actionPanel) {
       this.actionPanel.style.display = 'none';
       this.actionPanel.innerHTML = '';
