@@ -1041,13 +1041,14 @@ export class SubscriptionRepository {
     if (data.paddleSubscriptionId) { sets.push('paddle_subscription_id = ?'); vals.push(data.paddleSubscriptionId); }
     if (data.paddlePriceId) { sets.push('paddle_price_id = ?'); vals.push(data.paddlePriceId); }
     if (data.paddleProductId) { sets.push('paddle_product_id = ?'); vals.push(data.paddleProductId); }
-    if (data.scheduledChangeAction !== undefined) { sets.push('scheduled_change_action = ?'); vals.push(data.scheduledChangeAction); }
-    if (data.scheduledChangeAt !== undefined) { sets.push('scheduled_change_at = ?'); vals.push(data.scheduledChangeAt); }
+    if (data.scheduledChangeAction !== undefined) { sets.push('scheduled_change_action = ?'); vals.push(data.scheduledChangeAction ?? null); }
+    if (data.scheduledChangeAt !== undefined) { sets.push('scheduled_change_at = ?'); vals.push(data.scheduledChangeAt ?? null); }
     if (data.stripePriceId) { sets.push('stripe_price_id = ?'); vals.push(data.stripePriceId); }
     if (data.currentPeriodStart) { sets.push('current_period_start = ?'); vals.push(data.currentPeriodStart); }
     if (data.currentPeriodEnd) { sets.push('current_period_end = ?'); vals.push(data.currentPeriodEnd); }
     if (data.trialEnd) { sets.push('trial_end = ?'); vals.push(data.trialEnd); }
-    if (data.cancelledAt !== undefined) { sets.push('cancelled_at = ?'); vals.push(data.cancelledAt); }
+    // cancelledAt: use null to explicitly clear the field (resume), or string to set it (cancel)
+    if (data.cancelledAt !== undefined) { sets.push('cancelled_at = ?'); vals.push(data.cancelledAt ?? null); }
     vals.push(tenantId);
     this.db.prepare(`UPDATE subscriptions SET ${sets.join(', ')} WHERE tenant_id = ?`).run(...vals);
     return this.findByTenant(tenantId);

@@ -41,7 +41,13 @@ export function createQuotaGuard(opts: QuotaGuardOptions): RequestHandler {
       }
       next();
     } catch (err) {
-      next();
+      // Fail closed — reject if we can't verify quota
+      console.error(`[QuotaGuard] DB error checking quota for tenant ${tenantId}:`, err);
+      return res.status(503).json({
+        error: 'Unable to verify conversation quota',
+        code: 'QUOTA_CHECK_FAILED',
+        message: 'The service is temporarily unable to verify your plan limits. Please try again shortly.',
+      });
     }
   };
 }

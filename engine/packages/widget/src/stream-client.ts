@@ -12,7 +12,7 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
+    'Accept': 'text/event-stream',
   };
   if (tenantId) headers['x-tenant-id'] = tenantId;
   if (apiKey) headers['x-api-key'] = apiKey;
@@ -129,6 +129,12 @@ export async function streamChat(options: StreamClientOptions): Promise<void> {
           }
         } catch {}
       }
+    }
+    // Fallback: if stream ended without [DONE] sentinel, fire onComplete with
+    // whatever content was accumulated so the UI can finalize the message.
+    if (!completeCalled && fullContent) {
+      completeCalled = true;
+      onComplete(fullContent, lastTurnId);
     }
   } catch (err: any) {
     if (err.name !== 'AbortError') {

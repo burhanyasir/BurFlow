@@ -33,6 +33,8 @@ export interface KnowledgeRouteDeps {
   embeddingDimension?: number;
   /** Optional repo for the unanswered-questions gap detector. When present, enables POST /unanswered/:id/convert. */
   unansweredRepo?: UnansweredQuestionRepository;
+  /** Widget config repo — used to update starterOptions and businessProfile after crawl. */
+  widgetConfigRepo?: WidgetConfigRepository;
 }
 
 const VALID_SOURCE_TYPES = new Set<string>(['pdf', 'docx', 'text', 'markdown', 'html', 'faq', 'url']);
@@ -556,8 +558,8 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
           const starterOptions = await generateStarterOptionsWithLLM(docs, tenantId);
 
           try {
-            const { WidgetConfigRepository } = await import('@conversation-engine/saas-core');
-            const widgetConfigRepo = new WidgetConfigRepository(deps.db);
+            const wcr = deps.widgetConfigRepo;
+            if (!wcr) continue;
 
             // Extract brand intelligence (primaryGoal, businessType, topOffers) from crawled content
             let brandProfileUpdate: Record<string, unknown> | undefined;
@@ -566,7 +568,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
               const sample = docs.slice(0, 8).map(d => d.content || '').join('\n').slice(0, 8000);
               if (sample.length > 50) {
                 const intelligence = await brandExtractor.extract(sample);
-                const existingProfile = widgetConfigRepo.get(tenantId)?.businessProfile || {};
+                const existingProfile = wcr.get(tenantId)?.businessProfile || {};
                 const existingConfidence = (existingProfile as any)._confidenceScore as number || 0;
                 if (intelligence.confidenceScore > existingConfidence) {
                   brandProfileUpdate = {};
@@ -604,17 +606,22 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
               }
             }
 
-            const updatePayload: any = { starterOptions };
-            if (companyNameUpdate) updatePayload.companyName = companyNameUpdate;
-            if (greetingUpdate) updatePayload.greeting = greetingUpdate;
+            const updatePayload: any = {};
+            // Only set starterOptions if user hasn't configured them yet
+            const existingConfig = wcr.get(tenantId);
+            if (!existingConfig?.starterOptions || existingConfig.starterOptions.length === 0) {
+              updatePayload.starterOptions = starterOptions;
+            }
+            if (companyNameUpdate && !existingConfig?.companyName) updatePayload.companyName = companyNameUpdate;
+            if (greetingUpdate && !existingConfig?.greeting) updatePayload.greeting = greetingUpdate;
             if (brandProfileUpdate) {
-              const existing = widgetConfigRepo.get(tenantId)?.businessProfile || {};
+              const existing = wcr.get(tenantId)?.businessProfile || {};
               updatePayload.businessProfile = { ...existing, ...brandProfileUpdate };
             }
-            widgetConfigRepo.upsert(tenantId, updatePayload);
+            wcr.upsert(tenantId, updatePayload);
 
             // Apply full brand adaptation (colors, logo, greeting, system prompt hint)
-            await applyBrandAdaptation(tenantId, docs, widgetConfigRepo);
+            await applyBrandAdaptation(tenantId, docs, wcr);
           } catch { /* ignore — starterOptions are best-effort */ }
 
           setTimeout(() => clearCrawlProgress(tenantId), 30000);

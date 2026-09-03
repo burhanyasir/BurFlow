@@ -251,9 +251,12 @@ export async function applyBrandAdaptation(
     if (brandSignals.ogDescription) businessProfile.description = brandSignals.ogDescription.slice(0, 500);
 
     const updatePayload: Record<string, unknown> = {
-      starterOptions,
       businessProfile,
     };
+    // Only set starterOptions if user hasn't configured them yet
+    if (!existingConfig.starterOptions || (existingConfig.starterOptions as string[]).length === 0) {
+      updatePayload.starterOptions = starterOptions;
+    }
     if (companyName && !(existingConfig as any).companyName) updatePayload.companyName = companyName;
     if (greeting && !(existingConfig as any).greeting) updatePayload.greeting = greeting;
     if (primaryColor && !(existingConfig as any).primaryColor) updatePayload.primaryColor = primaryColor;

@@ -733,7 +733,15 @@ export class ChatWidget {
     document.documentElement.setAttribute('data-cw-theme', theme);
 
     let style = document.getElementById('cw-widget-custom') as HTMLStyleElement | null;
-    const css = this.config.customCss || '';
+    const rawCss = this.config.customCss || '';
+    // Sanitize CSS: strip dangerous patterns that could exfiltrate data or inject content
+    const css = rawCss
+      .replace(/url\s*\([^)]*\)/gi, 'url()')           // Block url() — data exfiltration vector
+      .replace(/expression\s*\([^)]*\)/gi, '')           // Block IE expression()
+      .replace(/@import\b[^;{]*/gi, '')                  // Block @import
+      .replace(/behavior\s*:/gi, '')                      // Block IE behavior
+      .replace(/javascript\s*:/gi, '')                    // Block javascript:
+      .replace(/-moz-binding\s*:/gi, '');                 // Block Firefox XBL binding
     if (css.trim()) {
       if (!style) {
         style = document.createElement('style');
@@ -1898,8 +1906,21 @@ export class ChatWidget {
     try {
       const stored = window.localStorage.getItem(key);
       if (stored) {
-        this.config.sessionId = stored;
-        return;
+        // Support both plain string (legacy) and JSON with expiry
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.sessionId && parsed.expiresAt && Date.now() < parsed.expiresAt) {
+            this.config.sessionId = parsed.sessionId;
+            return;
+          }
+          // Expired — generate new session
+        } catch {
+          // Legacy plain string — accept but set expiry going forward
+          this.config.sessionId = stored;
+          const wrapped = JSON.stringify({ sessionId: stored, expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
+          window.localStorage.setItem(key, wrapped);
+          return;
+        }
       }
     } catch {
       // localStorage unavailable
@@ -1907,7 +1928,8 @@ export class ChatWidget {
 
     this.config.sessionId = `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     try {
-      window.localStorage.setItem(key, this.config.sessionId);
+      const wrapped = JSON.stringify({ sessionId: this.config.sessionId, expiresAt: Date.now() + 24 * 60 * 60 * 1000 });
+      window.localStorage.setItem(key, wrapped);
     } catch {
       // ignore write failures
     }
@@ -2017,9 +2039,9 @@ export class ChatWidget {
     const prevPrimaryColor = this.config.primaryColor;
     const prevAccentColor = (this.config as any).accentColor;
     this.config = { ...this.config, ...merged };
-    // Embed primaryColor always wins — the site owner explicitly set it
-    // in their embed code and it should not be overridden by server defaults.
-    if (this.embedPrimaryColor) {
+    // Server config takes priority — user configured it in the Widget Dashboard.
+    // Only use embedPrimaryColor as initial default when server has no color set.
+    if (this.embedPrimaryColor && !merged.primaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
     this.businessProfile = this.deriveBusinessProfileFromConfig();

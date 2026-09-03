@@ -14,11 +14,6 @@ export interface PaddleEnvConfig {
   environment: 'sandbox' | 'production';
 }
 
-const PRODUCTION_DEFAULTS: PaddleEnvConfig = {
-  token: 'live_85c8ed200ee09917485aa27b728',
-  environment: 'production',
-};
-
 export function getPaddleEnv(): PaddleEnvConfig {
   const token = (import.meta.env.VITE_PADDLE_CLIENT_TOKEN as string | undefined) || '';
   const environment = (import.meta.env.VITE_PADDLE_ENV as string | undefined) || 'sandbox';
@@ -26,9 +21,6 @@ export function getPaddleEnv(): PaddleEnvConfig {
     throw new Error(`Invalid VITE_PADDLE_ENV "${environment}" — must be "sandbox" or "production".`);
   }
   const cfg: PaddleEnvConfig = { token: token.trim(), environment };
-  if (!cfg.token && cfg.environment === 'production') {
-    return PRODUCTION_DEFAULTS;
-  }
   return cfg;
 }
 

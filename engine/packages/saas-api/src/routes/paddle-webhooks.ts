@@ -38,7 +38,10 @@ const SUBSCRIPTION_EVENTS = new Set([
 
 export function createPaddleWebhookRoutes(deps: PaddleWebhookDeps, opts: PaddleWebhookOptions = {}): Router {
   const router = Router();
-  const secret = opts.webhookSecret || process.env.PADDLE_WEBHOOK_SECRET || '';
+  const secret = opts.webhookSecret || process.env.PADDLE_WEBHOOK_SECRET;
+  if (!secret) {
+    console.error('[Paddle Webhooks] PADDLE_WEBHOOK_SECRET is not set — webhook verification is DISABLED. Refusing all webhook requests.');
+  }
   const paddle = opts.client || new PaddleClient();
 
   function resolveTenantId(input: { customerId?: string | null; subscriptionId?: string | null; customData?: any }): string | null {
@@ -208,6 +211,9 @@ export function createPaddleWebhookRoutes(deps: PaddleWebhookDeps, opts: PaddleW
   }
 
   router.post('/', async (req: Request, res: Response) => {
+    if (!secret) {
+      return res.status(503).json({ error: 'Webhook secret not configured' });
+    }
     const signature = req.headers['paddle-signature'] as string;
     if (!signature) {
       createContextLogger(logger).warn('Missing paddle-signature header');

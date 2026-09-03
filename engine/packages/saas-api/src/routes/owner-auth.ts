@@ -13,8 +13,11 @@ export function createOwnerAuthRoutes(
 ): Router {
   const router = Router();
 
-  const OWNER_PASSWORD = process.env.OWNER_PASSWORD || 'burflow-owner-2026';
-  const OWNER_EMAIL = 'burhanyasir82@gmail.com';
+  const OWNER_PASSWORD = process.env.OWNER_PASSWORD;
+  if (!OWNER_PASSWORD) {
+    throw new Error('OWNER_PASSWORD environment variable is required for owner authentication');
+  }
+  const OWNER_EMAIL = process.env.OWNER_EMAIL || 'burhanyasir82@gmail.com';
 
   router.post('/login', (req: Request, res: Response) => {
     try {
@@ -29,26 +32,21 @@ export function createOwnerAuthRoutes(
       }
 
       const user = userRepo.findByEmail(email);
-      const isOwnerPassword = password === OWNER_PASSWORD;
-
-      let loginUserId: string;
-      let loginUserName: string;
-
-      if (user) {
-        const isUserPassword = comparePassword(password, user.passwordHash);
-        if (!isOwnerPassword && !isUserPassword) {
-          createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
-          return res.status(401).json({ error: 'Invalid credentials' });
-        }
-        loginUserId = user.id;
-        loginUserName = user.name;
-      } else if (isOwnerPassword) {
-        loginUserId = 'owner-' + email;
-        loginUserName = email.split('@')[0];
-      } else {
+      if (!user) {
         createContextLogger(logger).info({ email }, 'Owner login failed - unknown email');
         return res.status(401).json({ error: 'Invalid credentials' });
       }
+
+      // Check owner password (bcrypt) or user's own password
+      const isOwnerPassword = comparePassword(password, OWNER_PASSWORD);
+      const isUserPassword = comparePassword(password, user.passwordHash);
+      if (!isOwnerPassword && !isUserPassword) {
+        createContextLogger(logger).info({ email }, 'Owner login failed - wrong password');
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+
+      const loginUserId = user.id;
+      const loginUserName = user.name;
 
       const token = jwt.sign(
         {

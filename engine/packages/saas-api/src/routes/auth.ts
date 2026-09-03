@@ -43,7 +43,7 @@ function syncConfigToPipeline(tenantId: string): void {
 function generateRefreshToken(): { token: string; hash: string; expiresAt: string } {
   const token = `ref_${randomBytes(40).toString('base64url')}`;
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 86400000).toISOString();
-  return { token, hash: token, expiresAt };
+  return { token, hash: hashToken(token), expiresAt };
 }
 
 export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository, kbJobQueue?: KbJobQueue): Router {

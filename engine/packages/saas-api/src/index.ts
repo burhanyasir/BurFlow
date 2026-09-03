@@ -586,6 +586,7 @@ const knowledgeDeps = {
   embeddingApiKey: process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY,
     embeddingDimension: parseInt(process.env.EMBEDDING_DIMENSION || '512', 10),
   unansweredRepo,
+  widgetConfigRepo,
 };
 app.use('/api/knowledge', auth, tenantGuard, createKnowledgeRoutes(knowledgeDeps));
 

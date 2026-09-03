@@ -87,7 +87,12 @@ export function createAdminRoutes(
   const router = Router();
 
   const adminOnly = (req: Request, res: Response, next: Function) => {
-    if (!req.user?.role || !['admin', 'owner'].includes(req.user.role)) {
+    // Verify the user is the actual owner of this tenant, not just any user with role='owner'
+    if (!req.user?.sub || !req.tenantId) {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const tenant = tenantRepo.findById(req.tenantId);
+    if (!tenant || tenant.ownerId !== req.user.sub) {
       return res.status(403).json({ error: 'Admin access required' });
     }
     next();

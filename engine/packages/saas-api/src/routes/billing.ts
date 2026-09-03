@@ -86,7 +86,7 @@ export function createBillingRoutes(
       const daysLeftInTrial = sub?.trialEnd
         ? Math.max(0, Math.ceil((new Date(sub.trialEnd).getTime() - Date.now()) / 86400000))
         : null;
-      const conversationsUsed = conversationRepo.listByTenant(req.tenantId!, 1, 1).total;
+      const conversationsUsed = conversationRepo.getCurrentMonthConversations(req.tenantId!);
       const documentsUsed = docRepo.countByStatus(req.tenantId!).total;
       res.json({
         planId,
@@ -166,6 +166,11 @@ export function createBillingRoutes(
       const sub = subRepo.findByTenant(req.tenantId!);
       if (!sub) return res.status(404).json({ error: 'No active subscription' });
 
+      // Only allow plan changes on active or trialing subscriptions
+      if (sub.status !== 'active' && sub.status !== 'trialing') {
+        return res.status(409).json({ error: `Cannot change plan while subscription is ${sub.status}` });
+      }
+
       const newPlan = plan as SubscriptionPlan;
       const tier = getTierById(newPlan);
       const priceId = tier?.monthly.paddlePriceId || '';
@@ -212,9 +217,10 @@ export function createBillingRoutes(
 
       subRepo.update(req.tenantId!, {
         status: 'cancelled',
+        plan: 'free',
         cancelledAt: new Date().toISOString(),
       });
-      tenantRepo.update(req.tenantId!, { subscriptionStatus: 'cancelled' });
+      tenantRepo.update(req.tenantId!, { plan: 'free', subscriptionStatus: 'cancelled' });
 
       res.json({ message: 'Subscription cancelled' });
     } catch (err: any) {

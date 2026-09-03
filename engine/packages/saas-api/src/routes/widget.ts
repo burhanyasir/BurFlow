@@ -262,7 +262,21 @@ function sanitizeWidgetConfig(body: unknown): SanitizeResult {
     if (!raw.businessProfile || typeof raw.businessProfile !== 'object' || Array.isArray(raw.businessProfile)) {
       return { ok: false, error: 'businessProfile must be an object' };
     }
-    data.businessProfile = raw.businessProfile;
+    // Whitelist allowed fields — block systemPromptHint and other internal fields
+    // that could enable prompt injection if set by users.
+    const ALLOWED_BUSINESS_PROFILE_KEYS = new Set([
+      'business_type', 'businessType', 'company_name', 'companyName',
+      'description', 'domain', 'locale', 'ctaTexts',
+      'industry', 'products', 'services', 'pricing',
+      'hours', 'location', 'phone', 'email',
+    ]);
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw.businessProfile as Record<string, unknown>)) {
+      if (ALLOWED_BUSINESS_PROFILE_KEYS.has(key) && typeof value === 'string') {
+        sanitized[key] = value.slice(0, 500);
+      }
+    }
+    data.businessProfile = sanitized;
   }
 
   for (const key of Object.keys(data)) {
@@ -518,17 +532,18 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       const origin = (req.headers.origin as string) || (req.headers.referer as string)?.split('/').slice(0, 3).join('/') || '';
 
       let resolvedTenantId = tenantId;
-      if (tenantRepo) {
-        const tenant = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
-        if (tenant) {
-          resolvedTenantId = tenant.id;
-        } else if (!DEMO_TENANT_IDS.has(tenantId)) {
-          return res.status(404).json({ error: 'Tenant not found' });
-        }
-        // Known demo tenants (e.g. `burflow-saas` on a fresh database before
-        // the seed script has run) fall through and mint a token carrying the
-        // requested demo tenant id instead of failing the bootstrap.
+      if (!tenantRepo) {
+        return res.status(503).json({ error: 'Tenant repository not available' });
       }
+      const tenant = tenantRepo.findById(tenantId) || tenantRepo.findBySlug(tenantId);
+      if (tenant) {
+        resolvedTenantId = tenant.id;
+      } else if (!DEMO_TENANT_IDS.has(tenantId)) {
+        return res.status(404).json({ error: 'Tenant not found' });
+      }
+      // Known demo tenants (e.g. `burflow-saas` on a fresh database before
+      // the seed script has run) fall through and mint a token carrying the
+      // requested demo tenant id instead of failing the bootstrap.
 
       // Domain allowlist: fail closed if configured and origin doesn't match
       if (widgetConfigRepo && origin) {
@@ -723,12 +738,9 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       if (!req.user?.role || !allowed.includes(req.user.role)) {
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
-      // Owner JWTs may not carry tenantId. Resolve from body or first owned tenant.
+      // Owner JWTs may not carry tenantId. Resolve from first owned tenant — never from request body.
       if (!req.tenantId) {
-        const bodyTenantId = (req.body as any)?.tenantId;
-        if (bodyTenantId) {
-          req.tenantId = bodyTenantId;
-        } else if (tenantRepo) {
+        if (tenantRepo) {
           const tenants = tenantRepo.findByOwner(req.user.sub);
           if (tenants.length > 0) req.tenantId = tenants[0].id;
         }
@@ -757,10 +769,8 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         return res.status(403).json({ error: 'Insufficient permissions' });
       }
       if (!req.tenantId) {
-        const bodyTenantId = (req.body as any)?.tenantId;
-        if (bodyTenantId) {
-          req.tenantId = bodyTenantId;
-        } else if (tenantRepo) {
+        // Only resolve from DB — never accept tenantId from request body
+        if (tenantRepo) {
           const tenants = tenantRepo.findByOwner(req.user.sub);
           if (tenants.length > 0) req.tenantId = tenants[0].id;
         }
@@ -800,12 +810,14 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
       // exchanges it for a fresh token at runtime via /api/widget/public-token,
       // so an expiring JWT is never hardcoded into the customer's site.
       const apiUrl = (process.env.APP_URL || '').replace(/\/+$/, '');
+      // Escape tenantId for safe interpolation in JS string literal
+      const safeTenantId = tenantId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
       const snippet = `<!-- BurFlow Chatbot -->
 <script>
 (function() {
   var t=document.createElement('script');t.type='text/javascript';t.async=true;
   t.src='${apiUrl}/widget/widget.js';
-  t.setAttribute('data-tenant-id', '${tenantId}');
+  t.setAttribute('data-tenant-id', '${safeTenantId}');
   t.setAttribute('data-api-url', '${apiUrl}');
   var s=document.getElementsByTagName('script')[0];s.parentNode.insertBefore(t,s);
 })();

@@ -35,10 +35,7 @@ const RATE_LIMIT_MESSAGE = 'Rate limit exceeded. Please wait a moment before sen
 const chatClientLimiter = createRateLimit({
   windowMs: RATE_LIMIT_WINDOW_MS,
   max: MAX_MESSAGES_PER_IP_OR_SESSION,
-  keyFn: (req) => {
-    const sessionId = (req.body as { sessionId?: string } | undefined)?.sessionId;
-    return sessionId ? `session:${sessionId}` : `ip:${req.ip || 'unknown'}`;
-  },
+  keyFn: (req) => `ip:${req.ip || 'unknown'}`,
   message: RATE_LIMIT_MESSAGE,
 });
 
@@ -217,15 +214,19 @@ export function createChatRoutes(
 
       // S1: Atomic quota reserve + message insert — prevents race-condition over-quota
       const period = new Date().toISOString().slice(0, 7);
-      const SPEND_CAP_USD = 50;
+      // Per-plan spend caps in USD
+      const SPEND_CAPS: Record<string, number> = { free: 10, starter: 50, professional: 200, advanced: 500, pro: 200 };
+      const planId = sub?.plan || 'free';
+      const SPEND_CAP_USD = SPEND_CAPS[planId] || 50;
       const usage = usageRepo.getOrCreate(tenantId!, period);
 
       // Check quota atomically — if over limit, reject before processing
       const currentCost = usageRepo.getCostUsd(tenantId!, period);
       if (currentCost >= SPEND_CAP_USD) {
-        console.warn(`[Chat] SPEND CAP REACHED — tenant=${tenantId} cost=$${currentCost.toFixed(2)}`);
-        return res.json({
-          response: "I want to make sure I give you an accurate answer. Let me connect you with our team who can help with that right away.",
+        console.warn(`[Chat] SPEND CAP REACHED — tenant=${tenantId} cost=$${currentCost.toFixed(2)} cap=$${SPEND_CAP_USD}`);
+        return res.status(429).json({
+          error: 'Monthly spend limit reached',
+          response: "I've reached my response limit for this month. Please contact our support team for assistance.",
           sessionId: convSessionId,
           conversationId: conversation.id,
         });
@@ -435,7 +436,6 @@ export function createChatRoutes(
       });
 
       conversationRepo.incrementMessageCount(conversation.id);
-      conversationRepo.incrementMessageCount(conversation.id);
 
       // C6: Per-message cost tracking — estimate from response length
       // Rough: ~4 chars per token, GPT-4 class ~$0.03/1K input + $0.06/1K output
@@ -478,12 +478,18 @@ export function createChatRoutes(
         res.setHeader('X-Accel-Buffering', 'no');
         res.flushHeaders?.();
 
-        for (const chunk of chunkText(finalResponse)) {
-          writeSseEvent(res, { type: 'token', content: chunk });
+        try {
+          for (const chunk of chunkText(finalResponse)) {
+            writeSseEvent(res, { type: 'token', content: chunk });
+          }
+          writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta, suggestedOptions });
+          writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId, suggestedOptions });
+          writeSseEvent(res, { type: 'done', finishReason: 'stop' });
+        } catch (writeErr: any) {
+          if (writeErr.code !== 'ERR_STREAM_WRITE_AFTER_END' && writeErr.name !== 'AbortError') {
+            createContextLogger(logger).warn({ err: writeErr }, 'SSE write failed (client likely disconnected)');
+          }
         }
-        writeSseEvent(res, { type: 'ui_state', composition, policy, quickReplies, uiState, cta, suggestedOptions });
-        writeSseEvent(res, { type: 'complete', fullContent: finalResponse, turnId: convSessionId, suggestedOptions });
-        writeSseEvent(res, { type: 'done', finishReason: 'stop' });
         return res.end();
       }
 

@@ -103,7 +103,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(user, tenant);
   }, [setUser]);
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    // Notify server to revoke refresh tokens — fire-and-forget, don't block UI
+    try {
+      const token = storage.getToken();
+      if (token) {
+        fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }).catch(() => {});
+      }
+    } catch {}
     storage.removeToken();
     setUser(null);
   }, [setUser]);
