@@ -105,6 +105,13 @@ if (typeof window !== 'undefined') {
 
       const tenantId = script.getAttribute('data-tenant-id');
       if (tenantId) {
+        // MOUNT IMMEDIATELY — the bubble appears instantly using embed
+        // attributes (color, position, title) without waiting for a network
+        // round-trip. The token is fetched in the background; once it arrives
+        // the widget fetches remote config and upgrades to full functionality.
+        const widget = initChatWidget({ apiUrl, primaryColor, position, title, locale: lang });
+
+        // Background token exchange — runs after the bubble is already visible.
         fetch(`${apiUrl}/api/widget/public-token?tenantId=${encodeURIComponent(tenantId)}`)
           .then((res) => {
             if (!res.ok) throw new Error(`public-token request failed (${res.status})`);
@@ -112,19 +119,12 @@ if (typeof window !== 'undefined') {
           })
           .then((data) => {
             if (data && data.token) {
-              initChatWidget({ widgetToken: data.token, apiUrl, primaryColor, position, title, tenantId: data.tenantId || tenantId, locale: lang });
-            } else {
-              // Token exchange returned no token — render with local defaults
-              // so the bubble still appears (never fully dormant).
-              initChatWidget({ apiUrl, primaryColor, position, title, locale: lang });
+              // Apply the token and fetch remote config (branding, greeting, etc.)
+              (widget as any).fetchTokenInBackground(data.token, data.tenantId || tenantId);
             }
           })
           .catch(() => {
-            // Backend unreachable or tenant unknown — render the bubble with
-            // local default config instead of staying dormant. This preserves
-            // the pre-tokenless behavior where a failed config fetch still
-            // showed the launcher with mock content.
-            initChatWidget({ apiUrl, primaryColor, position, title, locale: lang });
+            // Backend unreachable — bubble already visible in degraded mode.
           });
       }
     } catch {}

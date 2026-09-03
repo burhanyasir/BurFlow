@@ -1986,6 +1986,19 @@ export class ChatWidget {
     }
   }
 
+  /**
+   * Called by autoInit after the bubble is already visible. Applies the
+   * background-fetched token and triggers remote config fetch so the widget
+   * upgrades from embed-only styling to full server-driven configuration
+   * (branding, greeting, starter options, theme, etc.).
+   */
+  fetchTokenInBackground(token: string, tenantId?: string): void {
+    this.config.widgetToken = token;
+    if (tenantId) this.config.tenantId = tenantId;
+    // Fetch remote config now that we have a valid token.
+    this.fetchRemoteConfig();
+  }
+
   private async fetchRemoteConfig(): Promise<void> {
     if (!this.config.widgetToken) return;
 
