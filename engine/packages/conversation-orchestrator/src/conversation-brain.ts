@@ -337,6 +337,8 @@ export interface TenantCtaProfile {
   domain?: string;
   website?: string;
   websiteUrl?: string;
+  /** Locale string for the tenant, e.g. 'en-US'. */
+  locale?: string;
   /** Primary business goal, e.g. 'book_demo' | 'direct_checkout' | 'product_recommendation' | 'appointment_booking'. */
   primary_goal?: string;
   /** Current promotions or offers to mention when relevant. */
