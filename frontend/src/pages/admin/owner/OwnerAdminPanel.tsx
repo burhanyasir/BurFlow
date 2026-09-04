@@ -652,6 +652,12 @@ function AdminPanelView({ user, onLogout }: { user: OwnerUser; onLogout: () => v
             >
               <Inbox className="size-3.5" /> Inbox
             </button>
+            <a
+              href="/owner/signups"
+              className="flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"
+            >
+              <Users className="size-3.5" /> Signups
+            </a>
             <button
               onClick={toggleTheme}
               className="flex items-center gap-1.5 rounded-xl border border-hairline bg-surface px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-surface-2 hover:text-foreground"

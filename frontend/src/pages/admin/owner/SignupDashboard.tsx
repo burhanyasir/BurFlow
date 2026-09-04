@@ -3,9 +3,19 @@ import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '../../../components/dashboard';
 import { PageHead, Panel, StatCard } from '../../../components/dash/ui';
 import { useAuth } from '../../../lib/auth-context';
-import { apiClient } from '../../../lib/api-client';
 import { useToast } from '../../../components/ui/Toast';
 import { Users, Calendar, Globe, TrendingUp, Search, ChevronLeft, ChevronRight, RefreshCw, ExternalLink, Scan } from 'lucide-react';
+
+function ownerFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('owner_token');
+  return fetch(`/api/owner${path}`, {
+    ...init,
+    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...init?.headers },
+  }).then(async (res) => {
+    if (!res.ok) { const body = await res.json().catch(() => ({})); throw new Error(body.error || `Failed (${res.status})`); }
+    return res.json();
+  });
+}
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard' },
@@ -74,7 +84,7 @@ export default function SignupDashboard() {
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const data = await apiClient.get<SignupStats>('/api/owner/signups/stats');
+      const data = await ownerFetch<SignupStats>('/signups/stats');
       setStats(data);
     } catch {
       addToast('Failed to load signup stats', 'error');
@@ -88,7 +98,7 @@ export default function SignupDashboard() {
     try {
       const params = new URLSearchParams({ page: String(page), limit: '20' });
       if (search) params.set('search', search);
-      const data = await apiClient.get<SignupPage>(`/api/owner/signups?${params}`);
+      const data = await ownerFetch<SignupPage>(`/signups?${params}`);
       setPageData(data);
     } catch {
       addToast('Failed to load signups', 'error');
@@ -111,7 +121,7 @@ export default function SignupDashboard() {
 
   const handleRescan = async (signupId: string) => {
     try {
-      await apiClient.post(`/api/owner/signups/${signupId}/rescan`);
+      await ownerFetch(`/signups/${signupId}/rescan`, { method: 'POST' });
       addToast('Rescan initiated', 'success');
       loadSignups();
     } catch {
