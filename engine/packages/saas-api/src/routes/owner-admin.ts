@@ -453,7 +453,10 @@ export function createOwnerAdminRoutes(
     try {
       const total = signupEventRepo.getTotalCount();
       const today = signupEventRepo.getTodayCount();
-      const scannedWebsites = (db.prepare("SELECT COUNT(*) as c FROM widget_configs WHERE detected_primary_color IS NOT NULL").get() as any).c;
+      let scannedWebsites = 0;
+      try {
+        scannedWebsites = (db.prepare("SELECT COUNT(*) as c FROM widget_configs WHERE detected_primary_color IS NOT NULL").get() as any).c || 0;
+      } catch {}
       res.json({ total, today, scannedWebsites, conversionRate: total > 0 ? Math.round((scannedWebsites / total) * 100) : 0 });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to fetch signup stats' });

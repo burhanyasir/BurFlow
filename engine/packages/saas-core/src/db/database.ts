@@ -493,6 +493,13 @@ function migrate(db: Database.Database): void {
   // Branding column (additive, safe to re-run)
   try { db.exec(`ALTER TABLE widget_configs ADD COLUMN avatar_url TEXT;`); } catch {}
 
+  // Theme detection columns (Part 1 — additive, safe to re-run)
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN detected_primary_color TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN detected_header_bg TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN custom_primary_color TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN custom_header_bg TEXT;`); } catch {}
+  try { db.exec(`ALTER TABLE widget_configs ADD COLUMN auto_detect_theme INTEGER DEFAULT 1;`); } catch {}
+
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_invoices_tenant ON invoices(tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_payments_tenant ON payments(tenant_id);`); } catch {}
   try { db.exec(`CREATE INDEX IF NOT EXISTS idx_billing_events_paddle ON billing_events(paddle_event_id);`); } catch {}
@@ -951,13 +958,12 @@ function migrate(db: Database.Database): void {
         company_name TEXT,
         website_url TEXT,
         plan TEXT DEFAULT 'free',
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id)
+        created_at TEXT NOT NULL
       );
-      CREATE INDEX IF NOT EXISTS idx_signup_events_email ON signup_events(email);
-      CREATE INDEX IF NOT EXISTS idx_signup_events_created ON signup_events(created_at);
     `);
   } catch (err: any) {
-    console.warn(`[db] signup_events schema skipped: ${err?.message || err}`);
+    console.warn(`[db] signup_events table creation skipped: ${err?.message || err}`);
   }
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_signup_events_email ON signup_events(email);`); } catch {}
+  try { db.exec(`CREATE INDEX IF NOT EXISTS idx_signup_events_created ON signup_events(created_at);`); } catch {}
 }
