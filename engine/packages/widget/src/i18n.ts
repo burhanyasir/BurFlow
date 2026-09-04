@@ -225,7 +225,7 @@ const en: Record<string, string> = {
   'starter.clinic_2': 'What are your hours?',
   'starter.default_0': 'How can you help me?',
   'starter.default_1': 'What do you offer?',
-  'starter.default_2': 'Talk to a person',
+  'starter.default_2': 'View pricing',
   'suggested.compare_plans': 'Compare Plans',
   'suggested.best_fit': 'Best Fit',
   'suggested.book_demo': 'Book 15-Min Demo',

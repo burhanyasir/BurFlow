@@ -435,9 +435,9 @@ export class ChatWidget {
       @keyframes cw-slide-up { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
       @keyframes cw-slide-in { from{opacity:0;transform:translateX(20px) scale(0.95)} to{opacity:1;transform:translateX(0) scale(1)} }
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
-      .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
-      .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%) !important; }
-      .cw-header { background:linear-gradient(135deg,color-mix(in srgb, var(--cw-primary-color,#006248) 70%, black) 0%,var(--cw-primary-color,#006248) 60%,color-mix(in srgb, var(--cw-primary-color,#006248) 80%, white) 100%) !important; }
+      .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%); }
+      .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%); }
+      .cw-header { background:linear-gradient(135deg,color-mix(in srgb, var(--cw-primary-color,#006248) 70%, black) 0%,var(--cw-primary-color,#006248) 60%,color-mix(in srgb, var(--cw-primary-color,#006248) 80%, white) 100%); }
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px color-mix(in srgb, var(--cw-primary-color,#006248) 55%, transparent) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
@@ -1001,21 +1001,26 @@ export class ChatWidget {
     info.appendChild(textWrap);
     header.appendChild(info);
 
+    const btnGroup = document.createElement('div');
+    btnGroup.style.cssText = 'display:flex;align-items:center;gap:2px;flex-shrink:0;';
+
+    const restartBtn = document.createElement('button');
+    restartBtn.className = 'cw-restart';
+    restartBtn.setAttribute('aria-label', 'Restart conversation');
+    restartBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:4px;border-radius:4px;font-size:16px;line-height:1;';
+    restartBtn.innerHTML = '&#x21BB;';
+    restartBtn.addEventListener('click', () => this.resetConversation());
+    btnGroup.appendChild(restartBtn);
+
     const closeBtn = document.createElement('button');
     closeBtn.className = 'cw-close';
     closeBtn.setAttribute('aria-label', t('header.close', this.config.locale));
     closeBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:4px;border-radius:4px;font-size:18px;line-height:1;';
     closeBtn.innerHTML = '&times;';
     closeBtn.addEventListener('click', () => this.toggle());
-    header.appendChild(closeBtn);
+    btnGroup.appendChild(closeBtn);
 
-    const restartBtn = document.createElement('button');
-    restartBtn.className = 'cw-restart';
-    restartBtn.setAttribute('aria-label', 'Restart conversation');
-    restartBtn.style.cssText = 'background:none;border:none;color:#fff;cursor:pointer;padding:4px;border-radius:4px;font-size:16px;line-height:1;margin-right:4px;';
-    restartBtn.innerHTML = '&#x21BB;';
-    restartBtn.addEventListener('click', () => this.resetConversation());
-    header.appendChild(restartBtn);
+    header.appendChild(btnGroup);
 
     return header;
   }

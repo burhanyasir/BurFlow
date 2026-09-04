@@ -405,7 +405,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         allowedDomains: [],
         autoOpen: false,
         autoOpenDelay: 3,
-        starterOptions: ['How can you help me?', 'What do you offer?', 'Talk to a person'],
+        starterOptions: ['How can you help me?', 'What do you offer?', 'View pricing'],
         suggestedActions: [],
       },
       'burflow-saas': {
@@ -419,7 +419,7 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         allowedDomains: [],
         autoOpen: false,
         autoOpenDelay: 3,
-        starterOptions: ['How can you help me?', 'What do you offer?', 'Talk to a person'],
+        starterOptions: ['How can you help me?', 'What do you offer?', 'View pricing'],
         suggestedActions: [],
         notificationEmail: 'burflow2026@gmail.com',
         slackWebhookUrl: undefined,

@@ -226,14 +226,14 @@ function buildQuickReplies(stage: FunnelStage, abandonment: AbandonmentRisk, rep
   const replies: SmartButton[] = [];
 
   if (abandonment.level === 'high') {
-    replies.push({ id: 'qr_human', label: '👋 Talk to a Human', action: 'send_text', payload: 'I would like to speak with a human agent', variant: 'primary' });
-    replies.push({ id: 'qr_demo', label: '📅 Book a Quick Demo', action: 'navigate', payload: '/demo', variant: 'secondary' });
+    replies.push({ id: 'qr_demo', label: '📅 Book a Quick Demo', action: 'navigate', payload: '/demo', variant: 'primary' });
+    replies.push({ id: 'qr_help', label: '💡 How does this work?', action: 'send_text', payload: 'How does this work?', variant: 'secondary' });
     return replies;
   }
 
   if (repetition.hasRepetition) {
-    replies.push({ id: 'qr_human', label: '👋 Talk to a Human', action: 'send_text', payload: 'I would like to speak with a human agent', variant: 'primary' });
-    replies.push({ id: 'qr_retry', label: '🔁 Try a Different Approach', action: 'send_text', payload: 'Let me rephrase my question', variant: 'secondary' });
+    replies.push({ id: 'qr_retry', label: '🔁 Try a Different Approach', action: 'send_text', payload: 'Let me rephrase my question', variant: 'primary' });
+    replies.push({ id: 'qr_demo', label: '📅 Book a Quick Demo', action: 'navigate', payload: '/demo', variant: 'secondary' });
     return replies;
   }
 
