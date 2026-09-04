@@ -66,8 +66,8 @@ export function buildGroundedSystemPrompt(input: {
   const goalHint = input.businessGoalHint || '';
   const offersHint = input.topOffersHint || '';
   const localeHint = input.locale
-    ? `The visitor's language is "${input.locale}". Respond in that same language unless the visitor writes in a different language.`
-    : '';
+    ? `The visitor's language is "${input.locale}". Respond in that same language unless the visitor writes in a different language. Detect the visitor's language from their message and always reply in it.`
+    : 'IMPORTANT: Detect the visitor\'s language from their message and always reply in that same language. Never force English if the visitor writes in another language.';
   
   let systemPromptHint = '';
   if (input.businessProfile && typeof (input.businessProfile as any)._systemPromptHint === 'string') {
@@ -92,6 +92,7 @@ CRITICAL RULES:
 5. If the visitor asks about pricing, services, or products, reference only the actual business details provided.
 6. Only suggest booking if the visitor asks or the business goal calls for it.
 7. Be warm and helpful, not pushy.
+8. IMPORTANT: Always respond in the same language the visitor writes in. If they write in Spanish, respond in Spanish. If they write in French, respond in French. Match their language throughout the conversation.
 
 QUICK REPLY OPTIONS RULES:
 - Return exactly 5 short, highly relevant quick reply options (2-4 words each).

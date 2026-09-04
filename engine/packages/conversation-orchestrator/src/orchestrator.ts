@@ -17,6 +17,7 @@ import { generateConversationUI } from './conversation-ui-engine';
 export interface OrchestratorInput {
   message: string;
   history?: string[];
+  companyName?: string;
   sessionMemory?: {
     persona?: PersonaType;
     funnelStage?: FunnelStage;
@@ -25,7 +26,7 @@ export interface OrchestratorInput {
 }
 
 export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResult {
-  const { message, history = [], sessionMemory } = input;
+  const { message, history = [], companyName, sessionMemory } = input;
 
   // 1. Domain Routing
   const routing = routeQuery(message);
@@ -61,7 +62,7 @@ export function orchestrateTurn(input: OrchestratorInput): OrchestratedTurnResul
   const qualResult = processQualification(message, currentQual);
 
   // 7. Greeting Check
-  const greetingResponse = handleGreeting(message, persona.persona);
+  const greetingResponse = handleGreeting(message, persona.persona, companyName);
 
   // Determine Response Text & Sources
   let responseText = '';

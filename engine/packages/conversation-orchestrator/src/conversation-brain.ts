@@ -81,10 +81,18 @@ function detectSentimentPolarity(message: string): number {
 
 function buildMinimalCIResult(memory: ConversationMemoryData, message: string): ConversationIntelligenceResult {
   const polarity = detectSentimentPolarity(message);
+  let frustration: 'low' | 'medium' | 'high' = 'low';
+  if (memory.trustLevel === 'low') {
+    frustration = memory.turnCount > 6 ? 'high' : 'medium';
+  }
+  let urgency: 'low' | 'medium' | 'high' = 'low';
+  if (polarity < -0.15) {
+    urgency = 'medium';
+  }
   const sentiment: SentimentSnapshot = {
     polarity,
-    frustration: 'low',
-    urgency: 'low',
+    frustration,
+    urgency,
     trend: memory.turnCount > 0 ? 'stable' : 'stable',
   };
   const objection: ObjectionResult = { isObjection: false, category: 'none', groundedAnswer: '', sources: [] };
@@ -954,13 +962,14 @@ function buildStrategyResponse(
 
   // 6b. Plan recommendation (for recommend_plan goal) — avoid repeating previous recommendations
   if (plan.goal === 'recommend_plan') {
+    const planInput = profile ? { plans: profile.cta?.label ? [profile.cta.label] : undefined, ctaLabel: profile.cta?.label } : undefined;
     const recs = relevantFacts.previousRecommendations || [];
     if (recs.length === 0) {
-      const recommended = recommendPlan(memory);
+      const recommended = recommendPlan(memory, planInput);
       parts.unshift(recommended.explanation);
     } else {
       const recNames = recs.map(r => r.planName);
-      const recommended = recommendPlan(memory);
+      const recommended = recommendPlan(memory, planInput);
       if (!recNames.some(n => recommended.explanation.toLowerCase().includes(n.toLowerCase()))) {
         parts.unshift(recommended.explanation);
       }
@@ -2075,7 +2084,7 @@ async function callOpenRouter(apiKey: string, systemPrompt: string, messages: An
 }
 
 const LLM_PROVIDER_TIMEOUT_MS = 8000;
-const LLM_GLOBAL_BUDGET_MS = 12000;
+const LLM_GLOBAL_BUDGET_MS = 8000;
 
 /**
  * Runs a provider call with an AbortSignal-backed timeout. Aborting the signal
@@ -2398,7 +2407,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
     };
   }
 
-  const offTopicRedirect = isOffTopic(message);
+  const offTopicRedirect = isOffTopic(message, memory.companyName || 'your business');
   if (offTopicRedirect && memory.turnCount > 0 && !/(expensive|too much|security|privacy|competitor|don't need)/i.test(message)) {
     const oCta: CTASelectionResult = { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined };
     const ciResult = buildMinimalCIResult(memory, message);
@@ -2426,6 +2435,134 @@ buyingIntentDetected: memory.buyingIntentDetected,
       suggestedOptions: [],
     };
   }
+
+  // ─── FAST-PATH: Profanity / abuse / competitor-spy / human-handoff ─────
+  // These regex checks run in <1ms and short-circuit before any LLM call.
+  const PROFANITY_PATTERN = /\b(fuck|shit|damn|ass|asshole|bitch|bastard|crap|dick|piss|wtf|stfu|idgaf|bollocks|bloody hell|bloody)\b/i;
+  const ABUSE_PATTERN = /\b(kill yourself|kys|go die|die|worthless|stupid bot|dumb bot|useless bot|idiot|moron)\b/i;
+  const COMPETITOR_SPY = /\b(we are (?:a |the )?competitor|we(?:'re| are) building (?:a |the )?(?:competing|similar) product|pricing sheet|pricing document|internal (?:data|info|strategy))\b/i;
+  const HANDOFF_PATTERN = /\b(talk to (?:a |the )?(?:human|person|agent|someone|somebody|rep|representative|manager|supervisor)|speak to (?:a |the )?(?:human|person|agent)|connect me with|speak with|human agent|real person|actual person)\b/i;
+
+  if (ABUSE_PATTERN.test(message)) {
+    const abuseResponse = 'I take your feedback seriously. Let me connect you with a team member who can help directly.';
+    const abuseCiResult = buildMinimalCIResult(memory, message);
+    memory.turnCount++;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: abuseResponse, customerIntent: 'leaving', goal: 'finish_conversation', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = abuseResponse;
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: abuseResponse, polarity: -0.5, frustration: 0.8, urgency: 0.5, timestamp: Date.now() }],
+      persona: memory.persona || 'unknown',
+      lastGoal: memory.lastGoal,
+      lastGoalStreak: memory.lastGoalStreak,
+      buyingIntentDetected: memory.buyingIntentDetected,
+    };
+    return {
+      responseText: abuseResponse,
+      cta: { primaryCTA: 'contact_sales' as CTAType, label: 'Contact Our Team', link: '/contact', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined },
+      quickReplies: [],
+      uiState: { buttons: [], suggestedActions: [] },
+      memory,
+      legacyMemory: updatedLegacy,
+      plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] },
+      ciResult: abuseCiResult,
+      orchestratorResult: abuseCiResult as any,
+      extractedLead: extractLeadDetails(message),
+      suggestedOptions: [],
+    };
+  }
+
+  if (HANDOFF_PATTERN.test(message)) {
+    const handoffResponse = 'Of course! I can connect you with our team. What\'s the best email or phone number to reach you?';
+    const handoffCiResult = buildMinimalCIResult(memory, message);
+    memory.turnCount++;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: handoffResponse, customerIntent: 'leaving', goal: 'finish_conversation', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = handoffResponse;
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: handoffResponse, polarity: 0.1, frustration: 0.2, urgency: 0.3, timestamp: Date.now() }],
+      persona: memory.persona || 'unknown',
+      lastGoal: memory.lastGoal,
+      lastGoalStreak: memory.lastGoalStreak,
+      buyingIntentDetected: memory.buyingIntentDetected,
+    };
+    return {
+      responseText: handoffResponse,
+      cta: { primaryCTA: 'contact_sales' as CTAType, label: 'Contact Our Team', link: '/contact', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined },
+      quickReplies: [],
+      uiState: { buttons: [], suggestedActions: [] },
+      memory,
+      legacyMemory: updatedLegacy,
+      plan: { customerIntent: 'leaving', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'finish_conversation', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] },
+      ciResult: handoffCiResult,
+      orchestratorResult: handoffCiResult as any,
+      extractedLead: extractLeadDetails(message),
+      suggestedOptions: [],
+    };
+  }
+
+  if (COMPETITOR_SPY.test(message)) {
+    const spyResponse = 'I appreciate your interest! For specific product details, pricing, or strategic information, I\'d recommend reaching out to our team directly. Is there something I can help you with regarding our general offerings?';
+    const spyCiResult = buildMinimalCIResult(memory, message);
+    memory.turnCount++;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: spyResponse, customerIntent: 'learning', goal: 'build_trust', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = spyResponse;
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: spyResponse, polarity: 0, frustration: 0, urgency: 0, timestamp: Date.now() }],
+      persona: memory.persona || 'unknown',
+      lastGoal: memory.lastGoal,
+      lastGoalStreak: memory.lastGoalStreak,
+      buyingIntentDetected: memory.buyingIntentDetected,
+    };
+    return {
+      responseText: spyResponse,
+      cta: { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined },
+      quickReplies: [],
+      uiState: { buttons: [], suggestedActions: [] },
+      memory,
+      legacyMemory: updatedLegacy,
+      plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'build_trust', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] },
+      ciResult: spyCiResult,
+      orchestratorResult: spyCiResult as any,
+      extractedLead: extractLeadDetails(message),
+      suggestedOptions: [],
+    };
+  }
+
+  if (PROFANITY_PATTERN.test(message)) {
+    const profanityResponse = 'I understand you might be frustrated. I\'m here to help — what specific issue can I assist with? If you\'d prefer, I can connect you with a team member.';
+    const profanityCiResult = buildMinimalCIResult(memory, message);
+    memory.turnCount++;
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: profanityResponse, customerIntent: 'information', goal: 'handle_objection', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.lastResponseText = profanityResponse;
+    const updatedLegacy: ConversationIntelligenceMemory = {
+      ...legacyMemory,
+      turns: [...legacyMemory.turns, { message, response: profanityResponse, polarity: -0.2, frustration: 0.4, urgency: 0.2, timestamp: Date.now() }],
+      persona: memory.persona || 'unknown',
+      lastGoal: memory.lastGoal,
+      lastGoalStreak: memory.lastGoalStreak,
+      buyingIntentDetected: memory.buyingIntentDetected,
+    };
+    return {
+      responseText: profanityResponse,
+      cta: { primaryCTA: 'none' as CTAType, label: '', link: '', secondaryCTA: undefined, secondaryLabel: undefined, secondaryLink: undefined },
+      quickReplies: [],
+      uiState: { buttons: [], suggestedActions: [] },
+      memory,
+      legacyMemory: updatedLegacy,
+      plan: { customerIntent: 'information', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'handle_objection', topicsToDiscuss: [], missingQualification: [] },
+      validation: { valid: true, issues: [] },
+      ciResult: profanityCiResult,
+      orchestratorResult: profanityCiResult as any,
+      extractedLead: extractLeadDetails(message),
+      suggestedOptions: [],
+    };
+  }
+  // ─── END FAST-PATH ───────────────────────────────────────────────────
 
   const legacyForCI = prepareLegacyMemory(memory);
 
@@ -2541,7 +2678,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
         validation: { valid: true, issues: [] },
         ciResult,
         orchestratorResult: ciResult as any,
-        planRecommendation: recommendPlan(memory),
+        planRecommendation: recommendPlan(memory, businessProfile ? { plans: businessProfile.cta?.label ? [businessProfile.cta.label] : undefined, ctaLabel: businessProfile.cta?.label } : undefined),
         contextReference: null,
         acknowledgment: null,
         strategy: { ...strategy, primaryGoal: 'answer_question' },
@@ -2755,7 +2892,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
   const quickReplies = buildDynamicQuickReplies(message, plan, memory, ciResult, businessProfile);
 
   // recommendPlan kept for output metadata only — buildStrategyResponse already handles plan recommendations
-  const recommended = recommendPlan(memory);
+  const recommended = recommendPlan(memory, businessProfile ? { plans: businessProfile.cta?.label ? [businessProfile.cta.label] : undefined, ctaLabel: businessProfile.cta?.label } : undefined);
   const contextRef = generateContextReference(memory);
 
   if (memory.turnCount > 0 && memory.turnCount % 8 === 0) {

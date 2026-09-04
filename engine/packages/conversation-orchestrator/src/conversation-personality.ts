@@ -132,17 +132,19 @@ const EMOTIONAL_DIRECT_ACK: Array<{ pattern: RegExp; response: string }> = [
   { pattern: /^alright$/i, response: 'What is next?' },
 ];
 
-const OFF_TOPIC_REDIRECTS: Record<string, string> = {
-  football: "I would not be much help there. What challenge are you trying to solve with AI-powered support?",
-  soccer: "I would not be much help there. What challenge are you trying to solve with AI-powered support?",
-  sports: "I am not much of a sports analyst. Mind if we get back to your support setup?",
-  weather: "I wish I could control the weather. What can I help you with on the support side?",
-  politics: "I stay out of that one. How can I help with your support workflow?",
-  quantum: "I will leave that to the physicists. What support challenges are you looking at?",
-  'quantum computing': "I will leave that to the physicists. What support challenges are you looking at?",
-  cooking: "I am better with code than cooking. What can I help you with?",
-  music: "I am more of a text-based person. What can I help you explore?",
-};
+function buildOffTopicRedirects(companyName: string): Record<string, string> {
+  return {
+    football: `I would not be much help there. What challenge are you trying to solve with ${companyName}?`,
+    soccer: `I would not be much help there. What challenge are you trying to solve with ${companyName}?`,
+    sports: `I am not much of a sports analyst. Mind if we get back to your ${companyName} setup?`,
+    weather: `I wish I could control the weather. What can I help you with on the ${companyName} side?`,
+    politics: `I stay out of that one. How can I help with your ${companyName} workflow?`,
+    quantum: `I will leave that to the physicists. What challenges are you looking at with ${companyName}?`,
+    'quantum computing': `I will leave that to the physicists. What challenges are you looking at with ${companyName}?`,
+    cooking: `I am better with code than cooking. What can I help you with?`,
+    music: `I am more of a text-based person. What can I help you explore?`,
+  };
+}
 
 const BETTER_ENDINGS: Record<string, { response: string; finalCTA?: string }> = {
   'all the information i need': { response: 'Glad that covered everything. The trial is open whenever you are ready.', finalCTA: 'start_free_trial' },
@@ -158,78 +160,93 @@ const BETTER_ENDINGS: Record<string, { response: string; finalCTA?: string }> = 
   'not interested': { response: 'Understood. If you ever want to revisit the conversation, I will be here.', finalCTA: undefined },
 };
 
-const PLAN_RECOMMENDATIONS: Record<PersonaType, (mem: ConversationMemoryData) => { plan: string; explanation: string }> = {
-  enterprise: (mem) => {
+export interface PlanRecommendationInput {
+  plans?: string[];
+  ctaLabel?: string;
+}
+
+const PLAN_RECOMMENDATIONS: Record<PersonaType, (mem: ConversationMemoryData, input?: PlanRecommendationInput) => { plan: string; explanation: string }> = {
+  enterprise: (mem, input) => {
     const details: string[] = [];
     if (mem.companySize && parseInt(mem.companySize) > 1000) details.push(`a team of ${mem.companySize}`);
     if (mem.industry) details.push(`your ${mem.industry}`);
     if (mem.monthlyConversations && parseInt(mem.monthlyConversations) > 10000) details.push('your volume');
     if (mem.currentHelpdesk) details.push(`your ${mem.currentHelpdesk} setup`);
     const prefix = details.length > 0 ? `With ${details.join(', ')}` : 'From what you have shared';
-    return { plan: 'Enterprise', explanation: `${prefix}, Enterprise makes the most sense.` };
+    const plan = input?.plans?.[input.plans.length - 1] || 'Enterprise';
+    return { plan, explanation: `${prefix}, ${plan} makes the most sense.` };
   },
-  developer: (mem) => {
+  developer: (mem, input) => {
     const details: string[] = [];
     if (mem.useCase) details.push(`your ${mem.useCase} use case`);
     if (mem.industry) details.push(`${mem.industry}`);
     if (mem.currentHelpdesk) details.push(`your ${mem.currentHelpdesk} setup`);
     const prefix = details.length > 0 ? `Given ${details.join(', ')}` : 'Based on what you described';
-    return { plan: 'Professional', explanation: `${prefix}, Professional would be a good fit.` };
+    const plan = input?.plans?.[1] || 'Professional';
+    return { plan, explanation: `${prefix}, ${plan} would be a good fit.` };
   },
-  agency: (mem) => {
+  agency: (mem, input) => {
     const details: string[] = [];
     if (mem.companySize) details.push(`a team of ${mem.companySize}`);
     if (mem.industry) details.push(`${mem.industry} focus`);
     const prefix = details.length > 0 ? `For ${details.join(', ')}` : 'For agency needs';
-    return { plan: 'Agency Partner', explanation: `${prefix}, our Partner Program is the way to go.` };
+    const plan = input?.plans?.[1] || 'Agency Partner';
+    return { plan, explanation: `${prefix}, our ${plan} is the way to go.` };
   },
-  ecommerce: (mem) => {
+  ecommerce: (mem, input) => {
     const details: string[] = [];
     if (mem.companySize) details.push(`${mem.companySize} people on the team`);
     if (mem.industry) details.push(`${mem.industry}`);
     if (mem.monthlyConversations) details.push(`handling ${mem.monthlyConversations} conversations a month`);
     const prefix = details.length > 0 ? `With ${details.join(', ')}` : 'For ecommerce';
-    return { plan: 'Professional', explanation: `${prefix}, Professional should work well.` };
+    const plan = input?.plans?.[1] || 'Professional';
+    return { plan, explanation: `${prefix}, ${plan} should work well.` };
   },
-  support_manager: (mem) => {
+  support_manager: (mem, input) => {
     const details: string[] = [];
     if (mem.monthlyConversations && parseInt(mem.monthlyConversations) > 10000) {
       if (mem.industry) details.push(`${mem.industry} volume of ${mem.monthlyConversations}`);
-      return { plan: 'Enterprise', explanation: `At that volume${details.length > 0 ? ' with ' + details.join(', ') : ''}, Enterprise gives you the best value.` };
+      const plan = input?.plans?.[input.plans.length - 1] || 'Enterprise';
+      return { plan, explanation: `At that volume${details.length > 0 ? ' with ' + details.join(', ') : ''}, ${plan} gives you the best value.` };
     }
     if (mem.companySize) details.push(`a team of ${mem.companySize}`);
     if (mem.currentHelpdesk) details.push(`${mem.currentHelpdesk}`);
     const prefix = details.length > 0 ? `For ${details.join(', ')}` : 'Based on your needs';
-    return { plan: 'Professional', explanation: `${prefix}, Professional is a solid choice.` };
+    const plan = input?.plans?.[1] || 'Professional';
+    return { plan, explanation: `${prefix}, ${plan} is a solid choice.` };
   },
-  startup: (mem) => {
+  startup: (mem, input) => {
     const details: string[] = [];
     if (mem.useCase) details.push(`your ${mem.useCase} needs`);
     if (mem.industry) details.push(`${mem.industry}`);
     const prefix = details.length > 0 ? `For ${details.join(', ')}` : 'At your stage';
-    return { plan: 'Starter', explanation: `${prefix}, Starter is a great way to get going.` };
+    const plan = input?.plans?.[0] || 'Starter';
+    return { plan, explanation: `${prefix}, ${plan} is a great way to get going.` };
   },
-  small_business: (mem) => {
+  small_business: (mem, input) => {
     const details: string[] = [];
     if (mem.industry) details.push(`a ${mem.industry} business`);
     if (mem.useCase) details.push(`your ${mem.useCase} needs`);
     const prefix = details.length > 0 ? `For ${details.join(', ')}` : 'Based on your situation';
-    return { plan: 'Professional', explanation: `${prefix}, Professional seems right.` };
+    const plan = input?.plans?.[1] || 'Professional';
+    return { plan, explanation: `${prefix}, ${plan} seems right.` };
   },
-  existing_customer: (mem) => {
+  existing_customer: (mem, input) => {
     const details: string[] = [];
     if (mem.companySize && parseInt(mem.companySize) > 500) details.push(`a growing team of ${mem.companySize}`);
     if (mem.industry) details.push(`${mem.industry} expansion`);
     const prefix = details.length > 0 ? `With ${details.join(', ')}` : 'As you grow';
-    return { plan: 'Enterprise', explanation: `${prefix}, upgrading to Enterprise unlocks more value.` };
+    const plan = input?.plans?.[input.plans.length - 1] || 'Enterprise';
+    return { plan, explanation: `${prefix}, upgrading to ${plan} unlocks more value.` };
   },
-  unknown: (mem) => {
+  unknown: (mem, input) => {
     const details: string[] = [];
     if (mem.companySize) details.push(`a team of ${mem.companySize}`);
     if (mem.industry) details.push(`in ${mem.industry}`);
     if (mem.monthlyConversations) details.push(`${mem.monthlyConversations} conversations`);
     const prefix = details.length > 0 ? `With ${details.join(', ')}` : 'Based on what you have shared';
-    return { plan: 'Professional', explanation: `${prefix}, Professional is probably the best start.` };
+    const plan = input?.plans?.[1] || 'Professional';
+    return { plan, explanation: `${prefix}, ${plan} is probably the best start.` };
   },
 };
 
@@ -350,9 +367,10 @@ export function handleShortReply(message: string): string | null {
   return null;
 }
 
-export function isOffTopic(message: string): string | null {
+export function isOffTopic(message: string, companyName: string = 'your business'): string | null {
   const lower = message.toLowerCase().trim();
-  for (const [key, redirect] of Object.entries(OFF_TOPIC_REDIRECTS)) {
+  const redirects = buildOffTopicRedirects(companyName);
+  for (const [key, redirect] of Object.entries(redirects)) {
     if (lower.includes(key)) return redirect;
   }
 
@@ -362,7 +380,7 @@ export function isOffTopic(message: string): string | null {
   ];
   for (const pat of offTopicPatterns) {
     if (pat.test(message)) {
-      return "Interesting topic. To get back on track, what challenge are you trying to solve with AI support?";
+      return `Interesting topic. To get back on track, what challenge are you trying to solve with ${companyName}?`;
     }
   }
 
@@ -423,9 +441,9 @@ export function buildContextSummary(memory: ConversationMemoryData, ci: Conversa
   };
 }
 
-export function recommendPlan(memory: ConversationMemoryData): { plan: string; explanation: string } {
+export function recommendPlan(memory: ConversationMemoryData, input?: PlanRecommendationInput): { plan: string; explanation: string } {
   const recommender = PLAN_RECOMMENDATIONS[memory.persona] || PLAN_RECOMMENDATIONS.unknown;
-  return recommender(memory);
+  return recommender(memory, input);
 }
 
 export function enforceContinuity(response: string, memory: ConversationMemoryData, newTopics: DiscernedTopic[]): string {
@@ -447,22 +465,6 @@ export function enforceContinuity(response: string, memory: ConversationMemoryDa
     }
   }
   return response;
-}
-
-export function getPersonalityPrefix(tone: 'casual' | 'professional' | 'empathic' | 'urgent', goal: ConversationGoal): string {
-  if (goal === 'finish_conversation') return '';
-  if (goal === 'handle_objection' && tone === 'empathic') return '';
-  if (goal === 'build_trust') return '';
-
-  const prefixes: Record<string, string[]> = {
-    professional: ['', ''],
-    casual: ['', ''],
-    empathic: ['', ''],
-    urgent: ['', ''],
-  };
-
-  const pool = prefixes[tone] || [''];
-  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 export function generateContextReference(memory: ConversationMemoryData): string | null {
@@ -601,29 +603,29 @@ export function contextualizeShortReply(message: string, memory: ConversationMem
   const lastTopic = memory.currentTopic;
   const topicDeepens: Record<string, string[]> = {
     pricing: [
-      'The plans are structured to scale with your team — the per-agent pricing comes down quite a bit at higher volumes.',
-      'The main difference between tiers is the advanced analytics and custom roles.',
-      'Most teams find that Professional hits the sweet spot between features and cost.',
+      'The plans are structured to scale with your team — the per-user pricing comes down quite a bit at higher volumes.',
+      'The main difference between tiers is the level of support and the number of users included.',
+      'Most teams find that the mid-tier hits the sweet spot between features and cost.',
     ],
     features: [
-      'One capability that makes the biggest difference is the workflow automation engine.',
-      'Where teams get the most value is the real-time analytics — seeing exactly where tickets slow down.',
+      'One capability that makes the biggest difference is the ability to automate your core workflows.',
+      'Where teams get the most value is the visibility into how their operations are performing.',
       'The integration side is worth a closer look — it connects directly to your existing tools.',
     ],
     security: [
-      'The SOC 2 audit covers more than just encryption — it looks at access controls, incident response, and vendor management.',
-      'For most teams, the RBAC and audit logging are the features that come up most in security reviews.',
-      'Enterprise deployments usually want to go deeper on data residency and VPC deployment options.',
+      'The compliance framework covers more than just encryption — it looks at access controls, incident response, and vendor management.',
+      'For most teams, the role-based access and audit logging are the features that come up most in security reviews.',
+      'Larger deployments usually want to go deeper on data residency and deployment options.',
     ],
     integrations: [
       'The bi-directional sync is what makes it different from a one-way integration.',
-      'Most teams start with Slack and their CRM — the rest come as needs grow.',
+      'Most teams start with their primary communication tool and CRM — the rest come as needs grow.',
       'Custom webhooks give you the flexibility to connect almost anything.',
     ],
     api: [
-      'The GraphQL endpoint is worth a look if you are building custom dashboards.',
-      'Rate limits are generous — 1000 requests per minute on Professional.',
-      'SDKs are available for JavaScript, Python, Go, and Ruby.',
+      'The API is worth a look if you are building custom dashboards or internal tools.',
+      'Rate limits are generous for most use cases — enough to handle typical integration traffic.',
+      'SDKs are available for the most common languages and frameworks.',
     ],
   };
 

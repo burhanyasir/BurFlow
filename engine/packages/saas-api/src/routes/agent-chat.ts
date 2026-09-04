@@ -9,6 +9,26 @@ import { takeoverEvents, writeSseEvent, openSessionEventStream } from '../servic
 
 const logger = createLogger('saas-api:agent-chat');
 
+const AGENT_DISCONNECT_GRACE_MS = 30_000;
+
+/** Timers for sessions pending release after an agent disconnects. Keyed by sessionId. */
+const pendingReleaseTimers = new Map<string, NodeJS.Timeout>();
+
+function cancelPendingRelease(sessionId: string): void {
+  const timer = pendingReleaseTimers.get(sessionId);
+  if (timer) {
+    clearTimeout(timer);
+    pendingReleaseTimers.delete(sessionId);
+  }
+}
+
+function cancelAllPendingReleases(agentId: string): void {
+  for (const [sessionId, timer] of pendingReleaseTimers) {
+    clearTimeout(timer);
+    pendingReleaseTimers.delete(sessionId);
+  }
+}
+
 export const AGENT_MESSAGE_MAX = MESSAGE_MAX;
 
 /** Lead score at or above which a session is flagged for proactive takeover. */
@@ -82,6 +102,9 @@ export function createAgentChatRoutes(
     const tenantId = req.tenantId!;
     const agentId = req.user?.sub || 'agent';
 
+    // If this agent reconnects within the grace period, cancel pending releases.
+    cancelAllPendingReleases(agentId);
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -100,8 +123,8 @@ export function createAgentChatRoutes(
 
     const onClose = () => {
       clearInterval(heartbeat);
-      // Handback: release every session this agent still holds, so the AI
-      // resumes driving the conversation the moment the agent leaves.
+      // Grace period: release each held session after AGENT_DISCONNECT_GRACE_MS
+      // unless the agent reconnects in time (cancelAllPendingReleases will clear these timers).
       const heldIds = new Set<string>([
         ...takeoverEvents.getAgentSessions(agentId),
         ...conversationRepo.listTakeoversByAgent(tenantId, agentId).map((c) => c.id),
@@ -109,19 +132,25 @@ export function createAgentChatRoutes(
       for (const conversationId of heldIds) {
         const conversation = conversationRepo.findById(conversationId);
         if (!conversation || conversation.tenantId !== tenantId) continue;
-        const released = handoff.releaseTakeover(tenantId, conversation.sessionId);
-        if (!released) continue;
-        takeoverEvents.untrackAgentSession(agentId, conversationId);
-        takeoverEvents.emit({
-          type: 'TAKEOVER_ENDED',
-          tenantId,
-          sessionId: conversation.sessionId,
-          conversationId: conversation.id,
-          payload: { reason: 'agent_disconnected' },
-        });
-        logger.info({ tenantId, sessionId: conversation.sessionId, agentId }, 'Agent disconnected — takeover released, AI resumed');
+        // Skip if already queued for release
+        if (pendingReleaseTimers.has(conversation.sessionId)) continue;
+        const timer = setTimeout(() => {
+          pendingReleaseTimers.delete(conversation.sessionId);
+          const released = handoff.releaseTakeover(tenantId, conversation.sessionId);
+          if (!released) return;
+          takeoverEvents.untrackAgentSession(agentId, conversationId);
+          takeoverEvents.emit({
+            type: 'TAKEOVER_ENDED',
+            tenantId,
+            sessionId: conversation.sessionId,
+            conversationId: conversation.id,
+            payload: { reason: 'agent_disconnected' },
+          });
+          logger.info({ tenantId, sessionId: conversation.sessionId, agentId }, 'Agent grace period expired — takeover released, AI resumed');
+        }, AGENT_DISCONNECT_GRACE_MS);
+        if (timer.unref) timer.unref();
+        pendingReleaseTimers.set(conversation.sessionId, timer);
       }
-      takeoverEvents.clearAgent(agentId);
       try {
         res.end();
       } catch {
@@ -188,13 +217,29 @@ export function createAgentChatRoutes(
       payload: { agentId },
     });
 
+    const lead = leadRepo?.findBySession(req.tenantId!, conversation.sessionId) ?? null;
+    const { messages: recentMessages } = messageRepo.listByConversation(updated.id, 1, 5);
+
+    const summary = {
+      lastMessages: recentMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        createdAt: m.createdAt,
+      })),
+      customerEmail: lead?.email ?? null,
+      persona: lead?.qualificationStatus ?? null,
+      buyingIntent: lead?.buyingIntent ?? null,
+    };
+
     logger.info({ tenantId: req.tenantId, sessionId: conversation.sessionId, agentId }, 'Human takeover initiated');
     return res.status(200).json({
+      success: true,
       sessionId: conversation.sessionId,
       conversationId: updated.id,
       sessionState: updated.sessionState,
       assignedAgentId: updated.assignedAgentId,
       takeoverAt: updated.takeoverAt,
+      summary,
     });
   });
 
@@ -253,6 +298,11 @@ export function createAgentChatRoutes(
     }
     if (conversation.sessionState === 'closed' || conversation.status === 'ended') {
       return res.status(409).json({ error: 'Session is closed and can no longer receive messages' });
+    }
+
+    const agentId = req.user?.sub || 'agent';
+    if (conversation.sessionState !== 'human_takeover' || conversation.assignedAgentId !== agentId) {
+      return res.status(403).json({ error: 'You are not assigned to this session or it is not in human takeover' });
     }
 
     const message = messageRepo.create({

@@ -6,6 +6,7 @@ import {
   extractContactDetails, mapScoreToBuyingIntent, hasContactInfo,
   UnansweredQuestionRepository,
   WidgetConfigRepository,
+  SubscriptionRepository,
   Lead,
 } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
@@ -79,6 +80,7 @@ export function createChatRoutes(
   handoff?: SessionHandoffService,
   unansweredRepo?: UnansweredQuestionRepository,
   widgetConfigRepo?: WidgetConfigRepository,
+  subRepo?: SubscriptionRepository,
 ): Router {
   const kb = kbProvider || new DefaultKnowledgeBaseProvider();
   const router = Router();
@@ -170,7 +172,7 @@ export function createChatRoutes(
 
       if (message === undefined || message === null || message === '') {
         console.log(`[TRACE:${traceId}] Validation failed: message is required`);
-        return res.status(400).json({ error: 'message is required', code: 'REQUIRED' });
+        return res.status(400).json({ error: 'message is required', code: 'REQUIRED', traceId });
       }
 
       // Strict runtime payload validation. Rejects non-string messages, oversized
@@ -185,7 +187,7 @@ export function createChatRoutes(
       } catch (validationErr: unknown) {
         if (validationErr instanceof PayloadValidationError) {
           console.log(`[TRACE:${traceId}] Payload validation failed: ${validationErr.message}`);
-          return res.status(400).json({ error: validationErr.message, code: validationErr.code });
+          return res.status(400).json({ error: validationErr.message, code: validationErr.code, traceId });
         }
         throw validationErr;
       }
@@ -216,6 +218,7 @@ export function createChatRoutes(
       const period = new Date().toISOString().slice(0, 7);
       // Per-plan spend caps in USD
       const SPEND_CAPS: Record<string, number> = { free: 10, starter: 50, professional: 200, advanced: 500, pro: 200 };
+      const sub = subRepo?.findByTenant(tenantId!) || null;
       const planId = sub?.plan || 'free';
       const SPEND_CAP_USD = SPEND_CAPS[planId] || 50;
       const usage = usageRepo.getOrCreate(tenantId!, period);
@@ -489,6 +492,9 @@ export function createChatRoutes(
           if (writeErr.code !== 'ERR_STREAM_WRITE_AFTER_END' && writeErr.name !== 'AbortError') {
             createContextLogger(logger).warn({ err: writeErr }, 'SSE write failed (client likely disconnected)');
           }
+          try {
+            writeSseEvent(res, { type: 'error', error: 'Stream write failed', traceId });
+          } catch {}
         }
         return res.end();
       }
@@ -514,12 +520,12 @@ export function createChatRoutes(
       createContextLogger(logger).error({ err, traceId }, 'Chat failed');
 
       if (err instanceof PayloadValidationError) {
-        return res.status(400).json({ error: err.message, code: err.code });
+        return res.status(400).json({ error: err.message, code: err.code, traceId });
       }
       if (err instanceof UpstreamLLMError) {
-        return res.status(502).json({ error: 'Upstream LLM service unavailable. Please try again in a moment.', code: err.code });
+        return res.status(502).json({ error: 'Upstream LLM service unavailable. Please try again in a moment.', code: err.code, traceId });
       }
-      return res.status(500).json({ error: 'Failed to process message' });
+      return res.status(500).json({ error: 'Failed to process message', traceId });
     }
   };
 
