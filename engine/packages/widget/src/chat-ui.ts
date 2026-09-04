@@ -2306,9 +2306,9 @@ export class ChatWidget {
     if (this.embedPrimaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
-    // Apply resolved theme colors from API
-    const effectivePrimary = (remote as any).effectivePrimary || (remote as any).customPrimaryColor || merged.primaryColor || '#006248';
-    const effectiveHeaderBg = (remote as any).effectiveHeaderBg || (remote as any).customHeaderBg || (remote as any).detectedHeaderBg || effectivePrimary;
+    // Apply resolved theme colors from API — but embed color always wins
+    const effectivePrimary = this.embedPrimaryColor || (remote as any).effectivePrimary || (remote as any).customPrimaryColor || merged.primaryColor || '#006248';
+    const effectiveHeaderBg = this.embedPrimaryColor || (remote as any).effectiveHeaderBg || (remote as any).customHeaderBg || (remote as any).detectedHeaderBg || effectivePrimary;
     // Store for use in CSS
     this.config.primaryColor = effectivePrimary;
     (this.config as any).effectiveHeaderBg = effectiveHeaderBg;
