@@ -334,6 +334,7 @@ export class ChatWidget {
   private bubbleEl: HTMLDivElement | null = null;
   private headerTitleEl: HTMLDivElement | null = null;
   private headerSubtitleEl: HTMLDivElement | null = null;
+  private headerEl: HTMLDivElement | null = null;
   private unreadCount = 0;
   private actionPanel: HTMLDivElement | null = null;
   private uiState: ConversationUIState | null = null;
@@ -967,6 +968,7 @@ export class ChatWidget {
   private createHeader(): HTMLDivElement {
     const header = document.createElement('div');
     header.className = 'cw-header';
+    this.headerEl = header;
     const c = this.config.primaryColor || '#006248';
     const cLight = this.lightenHex(c, 0.2);
     const cDark = this.darkenHex(c, 0.3);
@@ -2199,6 +2201,12 @@ export class ChatWidget {
   }
 
   private updateHeaderText(): void {
+    if (this.headerEl) {
+      const c = this.config.primaryColor || '#006248';
+      const cLight = this.lightenHex(c, 0.2);
+      const cDark = this.darkenHex(c, 0.3);
+      this.headerEl.style.background = `linear-gradient(135deg,${cDark} 0%,${c} 60%,${cLight} 100%)`;
+    }
     if (this.headerTitleEl) {
       this.headerTitleEl.textContent = this.config.title || this.config.companyName || '';
     }
@@ -2289,9 +2297,9 @@ export class ChatWidget {
     const prevPrimaryColor = this.config.primaryColor;
     const prevAccentColor = (this.config as any).accentColor;
     this.config = { ...this.config, ...merged };
-    // Server config takes priority — user configured it in the Widget Dashboard.
-    // Only use embedPrimaryColor as initial default when server has no color set.
-    if (this.embedPrimaryColor && !merged.primaryColor) {
+    // Embed primaryColor takes priority — it's the explicit developer choice via data-primary-color attribute.
+    // Server config is a fallback when no embed color is set.
+    if (this.embedPrimaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
     this.businessProfile = this.deriveBusinessProfileFromConfig();
