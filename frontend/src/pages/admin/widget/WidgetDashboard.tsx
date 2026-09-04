@@ -84,7 +84,7 @@ export default function WidgetDashboard() {
         setAgentId(slug);
         const tokenRes = await apiClient.post<{ token: string }>('/widget/token');
         if (tokenRes.token) {
-          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; starterOptions?: string[]; autoOpen?: boolean; autoOpenDelay?: number; businessProfile?: Record<string, unknown> }>(`/widget/config?token=${tokenRes.token}`);
+          const widgetRes = await apiClient.get<{ theme?: any; position?: string; primaryColor?: string; greeting?: string; launcherText?: string; starterOptions?: string[]; autoOpen?: boolean; autoOpenDelay?: number; businessProfile?: Record<string, unknown>; customPrimaryColor?: string; customHeaderBg?: string; detectedPrimaryColor?: string; detectedHeaderBg?: string; autoDetectTheme?: boolean }>(`/widget/config?token=${tokenRes.token}`);
           if (widgetRes.primaryColor) setPrimaryColor(widgetRes.primaryColor);
           if (widgetRes.position) {
             const normalized = widgetRes.position === 'bottom-right' ? 'right' : widgetRes.position === 'bottom-left' ? 'left' : widgetRes.position;
