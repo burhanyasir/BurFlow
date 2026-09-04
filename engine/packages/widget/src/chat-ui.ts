@@ -1182,7 +1182,8 @@ export class ChatWidget {
       if ((e as KeyboardEvent).key === 'Enter') this.submitHandoff();
     });
     this.handoffEl.querySelector('.cw-handoff-message')?.addEventListener('keydown', (e) => {
-      if ((e as KeyboardEvent).key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.submitHandoff(); }
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'Enter' && !ke.shiftKey) { e.preventDefault(); this.submitHandoff(); }
     });
   }
 
