@@ -445,22 +445,22 @@ export function createOwnerAdminRoutes(
       const result = signupEventRepo.list({ page, limit, search });
       res.json(result);
     } catch (err: any) {
-      res.status(500).json({ error: 'Failed to fetch signups' });
+      // Table may not exist yet on PostgreSQL — return empty result instead of 500
+      const page = parseInt(req.query.page as string) || 1;
+      res.json({ items: [], total: 0, page, totalPages: 0 });
     }
   });
 
   router.get('/signups/stats', ownerOnly, (req: Request, res: Response) => {
+    let total = 0;
+    let today = 0;
+    try { total = signupEventRepo.getTotalCount(); } catch {}
+    try { today = signupEventRepo.getTodayCount(); } catch {}
+    let scannedWebsites = 0;
     try {
-      const total = signupEventRepo.getTotalCount();
-      const today = signupEventRepo.getTodayCount();
-      let scannedWebsites = 0;
-      try {
-        scannedWebsites = (db.prepare("SELECT COUNT(*) as c FROM widget_configs WHERE detected_primary_color IS NOT NULL").get() as any).c || 0;
-      } catch {}
-      res.json({ total, today, scannedWebsites, conversionRate: total > 0 ? Math.round((scannedWebsites / total) * 100) : 0 });
-    } catch (err: any) {
-      res.status(500).json({ error: 'Failed to fetch signup stats' });
-    }
+      scannedWebsites = (db.prepare("SELECT COUNT(*) as c FROM widget_configs WHERE detected_primary_color IS NOT NULL").get() as any).c || 0;
+    } catch {}
+    res.json({ total, today, scannedWebsites, conversionRate: total > 0 ? Math.round((scannedWebsites / total) * 100) : 0 });
   });
 
   return router;
