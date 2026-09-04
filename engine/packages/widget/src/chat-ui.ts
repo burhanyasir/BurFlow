@@ -790,7 +790,7 @@ export class ChatWidget {
 
     const badge = document.createElement('span');
     badge.className = 'cw-bubble-badge';
-    badge.style.cssText = 'display:none;position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;border-radius:50%;width:20px;height:20px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:600;';
+    badge.style.cssText = 'display:none;position:absolute;top:-4px;right:-4px;background:#EF4444;color:#fff;border-radius:50%;min-width:20px;height:20px;padding:0 4px;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:600;';
     bubble.appendChild(badge);
     this.unreadBadge = badge;
 
@@ -978,7 +978,7 @@ export class ChatWidget {
     if (logoUrl) {
       const logo = document.createElement('img');
       logo.className = 'cw-logo';
-      logo.alt = '';
+      logo.alt = this.config.companyName || 'Logo';
       logo.style.cssText = 'width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff;border:1px solid rgba(255,255,255,0.25);';
       logo.src = logoUrl;
       info.appendChild(logo);
@@ -1977,7 +1977,7 @@ export class ChatWidget {
   private updateBadge(): void {
     if (!this.unreadBadge) return;
     if (this.unreadCount > 0) {
-      this.unreadBadge.textContent = String(this.unreadCount);
+      this.unreadBadge.textContent = this.unreadCount > 9 ? '9+' : String(this.unreadCount);
       this.unreadBadge.style.display = 'flex';
     } else {
       this.unreadBadge.style.display = 'none';
@@ -2207,7 +2207,7 @@ export class ChatWidget {
         if (info) {
           const logo = document.createElement('img');
           logo.className = 'cw-logo';
-          logo.alt = '';
+          logo.alt = this.config.companyName || 'Logo';
           logo.style.cssText = 'width:30px;height:30px;border-radius:50%;object-fit:cover;flex-shrink:0;background:#fff;border:1px solid rgba(255,255,255,0.25);';
           info.insertBefore(logo, info.firstChild);
           this.headerLogoEl = logo;
