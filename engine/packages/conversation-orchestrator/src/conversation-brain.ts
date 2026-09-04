@@ -2537,7 +2537,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
     const profanityResponse = 'I understand you might be frustrated. I\'m here to help — what specific issue can I assist with? If you\'d prefer, I can connect you with a team member.';
     const profanityCiResult = buildMinimalCIResult(memory, message);
     memory.turnCount++;
-    memory.turns.push({ turnNumber: memory.turnCount, message, response: profanityResponse, customerIntent: 'information', goal: 'handle_objection', funnelStage: memory.funnelStage, timestamp: Date.now() });
+    memory.turns.push({ turnNumber: memory.turnCount, message, response: profanityResponse, customerIntent: 'learning', goal: 'handle_objection', funnelStage: memory.funnelStage, timestamp: Date.now() });
     memory.lastResponseText = profanityResponse;
     const updatedLegacy: ConversationIntelligenceMemory = {
       ...legacyMemory,
@@ -2554,7 +2554,7 @@ buyingIntentDetected: memory.buyingIntentDetected,
       uiState: { buttons: [], suggestedActions: [] },
       memory,
       legacyMemory: updatedLegacy,
-      plan: { customerIntent: 'information', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'handle_objection', topicsToDiscuss: [], missingQualification: [] },
+      plan: { customerIntent: 'learning', funnelStage: memory.funnelStage, conversationStage: memory.currentStage || 'greeting', buyerRole: memory.buyerRole || 'unknown', goal: 'handle_objection', topicsToDiscuss: [], missingQualification: [] },
       validation: { valid: true, issues: [] },
       ciResult: profanityCiResult,
       orchestratorResult: profanityCiResult as any,
@@ -3103,7 +3103,7 @@ function buildTimeoutFallback(input: BrainInput): BrainOutput {
     memory,
     legacyMemory: updatedLegacy,
     plan: {
-      customerIntent: 'information' as CustomerIntent,
+      customerIntent: 'learning' as CustomerIntent,
       funnelStage: memory.funnelStage,
       conversationStage: memory.currentStage || 'greeting',
       buyerRole: memory.buyerRole || 'unknown',
