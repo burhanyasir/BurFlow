@@ -12,7 +12,7 @@ import {
 import { SourceType, ParsedDocument } from '@conversation-engine/knowledge-pipeline';
 import { createLogger, createContextLogger } from '@conversation-engine/logger';
 import { validateId, validationError, validateRequiredString, LABEL_MAX } from '../middleware/validate';
-import { UnansweredQuestionRepository, BrandExtractor } from '@conversation-engine/saas-core';
+import { UnansweredQuestionRepository, BrandExtractor, WidgetConfigRepository } from '@conversation-engine/saas-core';
 import Groq from 'groq-sdk';
 import { applyBrandAdaptation } from '../services/scan-brand-adapter';
 
@@ -562,7 +562,7 @@ export function createKnowledgeRoutes(deps: KnowledgeRouteDeps): Router {
 
           try {
             const wcr = deps.widgetConfigRepo;
-            if (!wcr) continue;
+            if (!wcr) return;
 
             // Extract brand intelligence (primaryGoal, businessType, topOffers) from crawled content
             let brandProfileUpdate: Record<string, unknown> | undefined;

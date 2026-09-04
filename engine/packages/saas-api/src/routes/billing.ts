@@ -86,7 +86,7 @@ export function createBillingRoutes(
       const daysLeftInTrial = sub?.trialEnd
         ? Math.max(0, Math.ceil((new Date(sub.trialEnd).getTime() - Date.now()) / 86400000))
         : null;
-      const conversationsUsed = conversationRepo.getCurrentMonthConversations(req.tenantId!);
+      const conversationsUsed = usageRepo.getCurrentMonthConversations(req.tenantId!);
       const documentsUsed = docRepo.countByStatus(req.tenantId!).total;
       res.json({
         planId,

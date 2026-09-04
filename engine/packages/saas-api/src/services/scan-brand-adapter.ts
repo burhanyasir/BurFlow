@@ -327,7 +327,7 @@ export async function applyBrandAdaptation(
       businessProfile,
     };
     // Only set starterOptions if user hasn't configured them yet
-    if (!existingConfig.starterOptions || (existingConfig.starterOptions as string[]).length === 0) {
+    if (!(existingConfig as any).starterOptions || ((existingConfig as any).starterOptions as string[]).length === 0) {
       updatePayload.starterOptions = starterOptions;
     }
     if (companyName && !(existingConfig as any).companyName) updatePayload.companyName = companyName;
