@@ -438,7 +438,7 @@ export class ChatWidget {
       @keyframes cw-bubble-pulse { 0%,100%{box-shadow:0 8px 32px rgba(0,98,72,0.45),0 2px 8px rgba(0,0,0,0.1)} 50%{box-shadow:0 8px 40px rgba(0,98,72,0.6),0 2px 12px rgba(0,0,0,0.15)} }
       .cw-bubble { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%); }
       .cw-send { background:linear-gradient(135deg,var(--cw-primary-color,#006248) 0%,var(--cw-primary-color,#004d38) 100%); }
-      .cw-header { background:linear-gradient(135deg,color-mix(in srgb, var(--cw-primary-color,#006248) 70%, black) 0%,var(--cw-primary-color,#006248) 60%,color-mix(in srgb, var(--cw-primary-color,#006248) 80%, white) 100%); }
+      .cw-header { background: var(--burflow-header-bg, var(--cw-primary-color, #006248)) !important; }
       .cw-bubble:hover { transform:scale(1.05) !important; box-shadow:0 12px 40px color-mix(in srgb, var(--cw-primary-color,#006248) 55%, transparent) !important; }
       .cw-send:hover { transform:scale(1.05) !important; box-shadow:0 6px 24px color-mix(in srgb, var(--cw-primary-color,#006248) 40%, transparent) !important; }
       .cw-action-button:active { transform:scale(0.96) !important; box-shadow:none !important; }
@@ -738,8 +738,11 @@ export class ChatWidget {
     if (typeof document === 'undefined') return;
     const primary = this.config.primaryColor || '#006248';
     const accent = (this.config as any).accentColor || primary;
+    const headerBg = (this.config as any).effectiveHeaderBg || primary;
     document.documentElement.style.setProperty('--cw-primary-color', primary);
     document.documentElement.style.setProperty('--cw-accent-color', accent);
+    document.documentElement.style.setProperty('--burflow-primary', primary);
+    document.documentElement.style.setProperty('--burflow-header-bg', headerBg);
 
     let theme = this.config.theme || 'light';
     if (theme === 'auto') {
@@ -2132,9 +2135,9 @@ export class ChatWidget {
   private getContainerStyles(): string {
     const pos = this.config.position === 'bottom-left' ? 'left:20px;' : 'right:20px;';
     if (typeof window !== 'undefined' && window.innerWidth < 640) {
-      return `position:fixed;left:10px;right:10px;bottom:10px;width:auto;height:min(70dvh, 600px);background:#FAFBFC;z-index:999998;flex-direction:column;overflow:hidden;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.25),0 0 0 1px rgba(0,0,0,0.04);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px);`;
+      return `position:fixed;left:10px;right:10px;bottom:10px;width:auto;height:min(70dvh, 600px);background:var(--cw-bg-color,#FAFBFC);z-index:999998;flex-direction:column;overflow:hidden;border-radius:20px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.25),0 0 0 1px rgba(0,0,0,0.04);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px);`;
     }
-    return `position:fixed;bottom:20px;${pos}width:380px;max-width:min(calc(100vw - 24px), 380px);height:min(640px, calc(100vh - 80px));background:#FAFBFC;border-radius:18px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px);`;
+    return `position:fixed;bottom:20px;${pos}width:380px;max-width:min(calc(100vw - 24px), 380px);height:min(640px, calc(100vh - 80px));background:var(--cw-bg-color,#FAFBFC);border-radius:18px;box-shadow:0 24px 80px rgba(15, 23, 42, 0.22),0 0 0 1px rgba(0,0,0,0.04);z-index:999998;flex-direction:column;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding-bottom:env(safe-area-inset-bottom,0px);`;
   }
 
   private getChatIconSvg(): string {
@@ -2302,6 +2305,12 @@ export class ChatWidget {
     if (this.embedPrimaryColor) {
       this.config.primaryColor = this.embedPrimaryColor;
     }
+    // Apply resolved theme colors from API
+    const effectivePrimary = (remote as any).effectivePrimary || (remote as any).customPrimaryColor || merged.primaryColor || '#006248';
+    const effectiveHeaderBg = (remote as any).effectiveHeaderBg || (remote as any).customHeaderBg || (remote as any).detectedHeaderBg || effectivePrimary;
+    // Store for use in CSS
+    this.config.primaryColor = effectivePrimary;
+    (this.config as any).effectiveHeaderBg = effectiveHeaderBg;
     this.businessProfile = this.deriveBusinessProfileFromConfig();
     if (this.inputEl && this.placeholders.length) {
       this.inputEl.placeholder = this.placeholders[0];

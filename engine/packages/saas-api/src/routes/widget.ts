@@ -608,6 +608,9 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         }
         return res.status(404).json({ error: 'Widget not configured' });
       }
+      // Resolve effective theme colors: custom > detected > default
+      const effectivePrimary = config.customPrimaryColor || config.primaryColor || config.detectedPrimaryColor || '#006248';
+      const effectiveHeaderBg = config.customHeaderBg || config.detectedHeaderBg || effectivePrimary;
       // Site-adaptive defaults: whenever the tenant has not configured explicit
       // options, derive them from their published knowledge base so the widget
       // always speaks their business instead of generic SaaS prompts.
@@ -663,6 +666,13 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
         locale: config.locale,
+        effectivePrimary,
+        effectiveHeaderBg,
+        detectedPrimaryColor: config.detectedPrimaryColor,
+        detectedHeaderBg: config.detectedHeaderBg,
+        customPrimaryColor: config.customPrimaryColor,
+        customHeaderBg: config.customHeaderBg,
+        autoDetectTheme: config.autoDetectTheme,
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Widget config fetch failed');
@@ -682,6 +692,9 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         }
         return res.status(404).json({ error: 'Widget not configured' });
       }
+      // Resolve effective theme colors: custom > detected > default
+      const effectivePrimary = config.customPrimaryColor || config.primaryColor || config.detectedPrimaryColor || '#006248';
+      const effectiveHeaderBg = config.customHeaderBg || config.detectedHeaderBg || effectivePrimary;
 
       const origin = req.get('Origin') || req.get('Referer') || '';
       if (config.allowedDomains.length > 0 && origin) {
@@ -725,6 +738,13 @@ export function createWidgetRoutes(widgetConfigRepo: WidgetConfigRepository, jwt
         autoOpen: config.autoOpen,
         autoOpenDelay: config.autoOpenDelay,
         locale: config.locale,
+        effectivePrimary,
+        effectiveHeaderBg,
+        detectedPrimaryColor: config.detectedPrimaryColor,
+        detectedHeaderBg: config.detectedHeaderBg,
+        customPrimaryColor: config.customPrimaryColor,
+        customHeaderBg: config.customHeaderBg,
+        autoDetectTheme: config.autoDetectTheme,
       });
     } catch (err: any) {
       createContextLogger(logger).error({ err }, 'Failed to fetch public widget config');

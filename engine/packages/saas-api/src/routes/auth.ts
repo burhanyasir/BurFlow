@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { UserRepository, TenantRepository, RefreshTokenRepository, WidgetConfigRepository, generateToken, comparePassword, hashPassword, generateVerificationToken, hashToken } from '@conversation-engine/saas-core';
+import { UserRepository, TenantRepository, RefreshTokenRepository, WidgetConfigRepository, generateToken, comparePassword, hashPassword, generateVerificationToken, hashToken, SignupEventRepository } from '@conversation-engine/saas-core';
 import { createLogger, createContextLogger, logAuditEvent } from '@conversation-engine/logger';
 import { authMiddleware } from '../middleware/auth';
 import {
@@ -46,7 +46,7 @@ function generateRefreshToken(): { token: string; hash: string; expiresAt: strin
   return { token, hash: hashToken(token), expiresAt };
 }
 
-export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository, kbJobQueue?: KbJobQueue): Router {
+export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRepository, refreshTokenRepo: RefreshTokenRepository, jwtSecret: string, widgetConfigRepo?: WidgetConfigRepository, kbJobQueue?: KbJobQueue, signupEventRepo?: SignupEventRepository): Router {
   const router = Router();
   const auth = authMiddleware(jwtSecret);
 
@@ -83,6 +83,15 @@ export function createAuthRoutes(userRepo: UserRepository, tenantRepo: TenantRep
         starterOptions: [],
         autoOpen: false,
         autoOpenDelay: 3,
+      });
+
+      // Log signup event for analytics
+      signupEventRepo?.create({
+        userId: user.id,
+        email,
+        name,
+        companyName,
+        websiteUrl,
       });
 
       syncConfigToPipeline(tenant.id);

@@ -878,6 +878,11 @@ export class WidgetConfigRepository {
     if (data.alertEmails) { cols.push('alert_emails'); vals.push(data.alertEmails); }
     if (data.notifyThreshold !== undefined) { cols.push('notify_threshold'); vals.push(data.notifyThreshold); }
     if (data.locale !== undefined) { cols.push('locale'); vals.push(data.locale); }
+    if ((data as any).detectedPrimaryColor) { cols.push('detected_primary_color'); vals.push((data as any).detectedPrimaryColor); }
+    if ((data as any).detectedHeaderBg) { cols.push('detected_header_bg'); vals.push((data as any).detectedHeaderBg); }
+    if ((data as any).customPrimaryColor) { cols.push('custom_primary_color'); vals.push((data as any).customPrimaryColor); }
+    if ((data as any).customHeaderBg) { cols.push('custom_header_bg'); vals.push((data as any).customHeaderBg); }
+    if ((data as any).autoDetectTheme !== undefined) { cols.push('auto_detect_theme'); vals.push((data as any).autoDetectTheme ? 1 : 0); }
     this.db.prepare(`INSERT INTO widget_configs (${cols.join(', ')}) VALUES (${vals.map(() => '?').join(', ')})`).run(...vals);
     return this.get(tenantId)!;
   }
@@ -902,6 +907,11 @@ export class WidgetConfigRepository {
       alertEmails: row.alert_emails || undefined,
       notifyThreshold: row.notify_threshold || 'all',
       locale: row.locale || undefined,
+      detectedPrimaryColor: row.detected_primary_color || undefined,
+      detectedHeaderBg: row.detected_header_bg || undefined,
+      customPrimaryColor: row.custom_primary_color || undefined,
+      customHeaderBg: row.custom_header_bg || undefined,
+      autoDetectTheme: row.auto_detect_theme === 1,
       createdAt: row.created_at, updatedAt: row.updated_at,
     };
   }
@@ -2730,5 +2740,44 @@ export class KbChunkRepository {
   countByDocument(documentId: string): number {
     const row = this.db.prepare('SELECT COUNT(*) as c FROM kb_chunks WHERE document_id = ?').get(documentId) as any;
     return row?.c || 0;
+  }
+}
+
+export class SignupEventRepository {
+  constructor(private db: SqlDatabase) {}
+
+  create(data: { userId?: string; email: string; name?: string; companyName?: string; websiteUrl?: string; plan?: string }): void {
+    const id = generateId();
+    const now = new Date().toISOString();
+    this.db.prepare(
+      'INSERT INTO signup_events (id, user_id, email, name, company_name, website_url, plan, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(id, data.userId || null, data.email, data.name || null, data.companyName || null, data.websiteUrl || null, data.plan || 'free', now);
+  }
+
+  list(opts: { page?: number; limit?: number; search?: string } = {}): { items: any[]; total: number; page: number; totalPages: number } {
+    const page = opts.page || 1;
+    const limit = Math.min(opts.limit || 20, 100);
+    const offset = (page - 1) * limit;
+    const search = opts.search ? `%${opts.search}%` : null;
+
+    let where = '';
+    let params: any[] = [];
+    if (search) {
+      where = 'WHERE email LIKE ? OR name LIKE ? OR company_name LIKE ? OR website_url LIKE ?';
+      params = [search, search, search, search];
+    }
+
+    const total = (this.db.prepare(`SELECT COUNT(*) as c FROM signup_events ${where}`).get(...params) as any).c;
+    const items = this.db.prepare(`SELECT * FROM signup_events ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+    return { items, total, page, totalPages: Math.ceil(total / limit) };
+  }
+
+  getTodayCount(): number {
+    const today = new Date().toISOString().slice(0, 10);
+    return (this.db.prepare("SELECT COUNT(*) as c FROM signup_events WHERE created_at >= ?").get(today + 'T00:00:00.000Z') as any).c;
+  }
+
+  getTotalCount(): number {
+    return (this.db.prepare('SELECT COUNT(*) as c FROM signup_events').get() as any).c;
   }
 }

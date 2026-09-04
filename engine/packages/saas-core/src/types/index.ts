@@ -276,6 +276,11 @@ export interface WidgetConfig {
   alertEmails?: string;
   notifyThreshold?: 'all' | 'sales_qualified_only';
   locale?: string;
+  detectedPrimaryColor?: string;
+  detectedHeaderBg?: string;
+  customPrimaryColor?: string;
+  customHeaderBg?: string;
+  autoDetectTheme?: boolean;
   createdAt: string;
   updatedAt: string;
 }

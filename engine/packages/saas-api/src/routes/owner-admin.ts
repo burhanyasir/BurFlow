@@ -30,6 +30,8 @@ export function createOwnerAdminRoutes(
   handoffReqRepo: HandoffRequestRepository,
   teamMemberRepo: TeamMemberRepository,
   jwtSecret: string,
+  signupEventRepo: any,
+  db: any,
 ): Router {
   const router = Router();
 
@@ -431,6 +433,30 @@ export function createOwnerAdminRoutes(
       });
     } catch (err: any) {
       res.status(500).json({ error: 'Failed to get stats' });
+    }
+  });
+
+  // ─── SIGNUP MONITORING ─────────────────────────────────────────
+  router.get('/signups', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
+      const search = (req.query.search as string) || undefined;
+      const result = signupEventRepo.list({ page, limit, search });
+      res.json(result);
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch signups' });
+    }
+  });
+
+  router.get('/signups/stats', ownerOnly, (req: Request, res: Response) => {
+    try {
+      const total = signupEventRepo.getTotalCount();
+      const today = signupEventRepo.getTodayCount();
+      const scannedWebsites = (db.prepare("SELECT COUNT(*) as c FROM widget_configs WHERE detected_primary_color IS NOT NULL").get() as any).c;
+      res.json({ total, today, scannedWebsites, conversionRate: total > 0 ? Math.round((scannedWebsites / total) * 100) : 0 });
+    } catch (err: any) {
+      res.status(500).json({ error: 'Failed to fetch signup stats' });
     }
   });
 

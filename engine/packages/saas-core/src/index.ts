@@ -30,6 +30,7 @@ export {
   HandoffRequestRepository,
   LeadRepository,
   WebsiteScanRepository, ScannedPageRepository, KbChunkRepository,
+  SignupEventRepository,
 } from './db/repositories';
 export {
   hashPassword, comparePassword, generateToken, verifyToken,

@@ -30,6 +30,7 @@ import {
   WebsiteScanRepository, ScannedPageRepository, KbChunkRepository,
   WebsiteScannerService, BrandExtractor,
   MailerService, Lead,
+  SignupEventRepository,
 } from '@conversation-engine/saas-core';
 import { createLogger, generateRequestId, runWithContext, RequestContext, createContextLogger, metrics } from '@conversation-engine/logger';
 import { authMiddleware, publicChatAuth, requireAllowedOrigin } from './middleware/auth';
@@ -277,6 +278,7 @@ const leadRepo = new LeadRepository(db);
 const scanRepo = new WebsiteScanRepository(db);
 const scannedPageRepo = new ScannedPageRepository(db);
 const kbChunkRepo = new KbChunkRepository(db);
+const signupEventRepo = new SignupEventRepository(db);
 const websiteScanner = new WebsiteScannerService({
   scanRepo,
   pageRepo: scannedPageRepo,
@@ -391,7 +393,7 @@ app.use('/api/auth/signup', createRateLimit({ windowMs: 900000, max: 10 }));
 app.use('/api/auth/forgot-password', createRateLimit({ windowMs: 900000, max: 5 }));
 
 // Public routes
-app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo, kbJobQueue));
+app.use('/api/auth', createAuthRoutes(userRepo, tenantRepo, refreshTokenRepo, JWT_SECRET, widgetConfigRepo, kbJobQueue, signupEventRepo));
 app.use('/api/auth', createPasswordResetRoutes(userRepo));
 app.use('/api/auth', createVerifyRoutes(userRepo, JWT_SECRET));
 
@@ -545,7 +547,7 @@ app.use('/api/chat', publicChatAuth(JWT_SECRET, apiKeyRepo, tenantRepo), require
   },
   analyticsRepo,
   getStarterOptions: (tenantId) => widgetConfigRepo.get(tenantId)?.starterOptions,
-}, sessionHandoff, unansweredRepo, widgetConfigRepo));
+}, sessionHandoff, unansweredRepo, widgetConfigRepo, subRepo));
 // Paddle is the sole billing provider — there is no Stripe webhook route.
 app.use('/api/webhooks/paddle', createPaddleWebhookRoutes({ subRepo, tenantRepo, invoiceRepo, paymentRepo, eventRepo, customerRepo }));
 app.use('/api/sessions', auth, tenantGuard, createAgentChatRoutes(conversationRepo, messageRepo, sessionHandoff, leadRepo, handoffRepo));
@@ -560,7 +562,7 @@ app.use('/api/admin', auth, tenantGuard, createAdminRoutes(userRepo, tenantRepo,
 // Owner-only admin panel — full control over tenants, plans, subscriptions
 app.use('/api/owner', createRateLimit({ windowMs: 60_000, max: 300 }));
 app.use('/api/owner/auth', createOwnerAuthRoutes(userRepo, tenantRepo, JWT_SECRET));
-app.use('/api/owner', createOwnerAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo, teamMemberRepo, JWT_SECRET));
+app.use('/api/owner', createOwnerAdminRoutes(userRepo, tenantRepo, conversationRepo, usageRepo, kbRepo, docRepo, apiKeyRepo, analyticsRepo, subRepo, messageRepo, leadRepo, handoffRepo, teamMemberRepo, JWT_SECRET, signupEventRepo, db));
 
 // Subscription request routes — users request plans, owner approves
 app.use('/api/billing/requests', createSubscriptionRequestRoutes(userRepo, tenantRepo, subRepo, JWT_SECRET, db));

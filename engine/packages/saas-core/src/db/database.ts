@@ -939,4 +939,25 @@ function migrate(db: Database.Database): void {
   // S1: Idempotency — prevent duplicate messages from retries
   try { db.exec(`ALTER TABLE messages ADD COLUMN idempotency_key TEXT;`); } catch {}
   try { db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_idempotency ON messages(conversation_id, idempotency_key) WHERE idempotency_key IS NOT NULL;`); } catch {}
+
+  // Signup event tracking
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS signup_events (
+        id TEXT PRIMARY KEY,
+        user_id TEXT,
+        email TEXT NOT NULL,
+        name TEXT,
+        company_name TEXT,
+        website_url TEXT,
+        plan TEXT DEFAULT 'free',
+        created_at TEXT NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_signup_events_email ON signup_events(email);
+      CREATE INDEX IF NOT EXISTS idx_signup_events_created ON signup_events(created_at);
+    `);
+  } catch (err: any) {
+    console.warn(`[db] signup_events schema skipped: ${err?.message || err}`);
+  }
 }

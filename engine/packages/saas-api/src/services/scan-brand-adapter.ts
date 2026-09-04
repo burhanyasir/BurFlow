@@ -34,6 +34,75 @@ export interface AdaptedWidgetConfig {
   businessProfile?: Record<string, unknown>;
 }
 
+function isValidHexColor(color: string): boolean {
+  return /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(color);
+}
+
+function extractThemeColors(docs: ParsedDocument[]): {
+  detectedPrimaryColor: string | null;
+  detectedHeaderBg: string | null;
+} {
+  const colorCounts = new Map<string, number>();
+  let headerBgCandidate: string | null = null;
+
+  const incrementColor = (hex: string) => {
+    const normalized = hex.toLowerCase();
+    colorCounts.set(normalized, (colorCounts.get(normalized) || 0) + 1);
+  };
+
+  for (const doc of docs) {
+    const content = doc.content || '';
+
+    // 1. <meta name="theme-color" content="...">
+    const themeMetaRe = /<meta\s+[^>]*name=["']theme-color["'][^>]*content=["']([^"']+)["']/gi;
+    for (const match of content.matchAll(themeMetaRe)) {
+      const val = match[1].trim();
+      if (isValidHexColor(val)) incrementColor(val);
+    }
+
+    // Also match reversed attribute order: content before name
+    const themeMetaRe2 = /<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']theme-color["']/gi;
+    for (const match of content.matchAll(themeMetaRe2)) {
+      const val = match[1].trim();
+      if (isValidHexColor(val)) incrementColor(val);
+    }
+
+    // 2. CSS custom properties: --primary-color, --brand-color, etc.
+    const cssVarRe = /--(?:primary|brand|accent|main)-color\s*:\s*([^;}\n]+)/gi;
+    for (const match of content.matchAll(cssVarRe)) {
+      const val = match[1].trim();
+      if (isValidHexColor(val)) incrementColor(val);
+    }
+
+    // 3. background-color in header / nav elements
+    const headerSectionRe = /<(?:header|nav)[^>]*>([\s\S]*?)<\/(?:header|nav)>/gi;
+    for (const match of content.matchAll(headerSectionRe)) {
+      const section = match[1];
+      const bgRe = /background(?:-color)?\s*:\s*([^;}\n]+)/gi;
+      for (const bgMatch of section.matchAll(bgRe)) {
+        const val = bgMatch[1].trim();
+        if (isValidHexColor(val)) {
+          incrementColor(val);
+          if (!headerBgCandidate) headerBgCandidate = val.toLowerCase();
+        }
+      }
+    }
+  }
+
+  let detectedPrimaryColor: string | null = null;
+  if (colorCounts.size > 0) {
+    let maxCount = 0;
+    for (const [color, count] of colorCounts) {
+      if (count > maxCount) {
+        maxCount = count;
+        detectedPrimaryColor = color;
+      }
+    }
+  }
+
+  return { detectedPrimaryColor, detectedHeaderBg: headerBgCandidate };
+}
+
 /** Business type detection from crawled content. */
 function detectBusinessType(docs: ParsedDocument[]): string {
   const allText = docs.map(d => d.content || '').join(' ').toLowerCase();
@@ -209,13 +278,17 @@ export async function applyBrandAdaptation(
       if (greeting.length > 200) greeting = `Hi! Welcome to ${companyName}. How can we help you today?`;
     }
 
+    // Extract theme colors from crawled HTML/CSS
+    const { detectedPrimaryColor, detectedHeaderBg } = extractThemeColors(docs);
+
     // Derive color
     let primaryColor: string | undefined =
       brandSignals.themeColor ||
       brandSignals.primaryColor ||
+      detectedPrimaryColor ||
       undefined;
     // Only accept valid hex colors
-    if (primaryColor && !/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/.test(primaryColor)) {
+    if (primaryColor && !isValidHexColor(primaryColor)) {
       primaryColor = undefined;
     }
 
@@ -261,6 +334,8 @@ export async function applyBrandAdaptation(
     if (greeting && !(existingConfig as any).greeting) updatePayload.greeting = greeting;
     if (primaryColor && !(existingConfig as any).primaryColor) updatePayload.primaryColor = primaryColor;
     if (logoUrl && !(existingConfig as any).logoUrl) updatePayload.logoUrl = logoUrl;
+    if (detectedPrimaryColor && !(existingConfig as any).detectedPrimaryColor) updatePayload.detectedPrimaryColor = detectedPrimaryColor;
+    if (detectedHeaderBg && !(existingConfig as any).detectedHeaderBg) updatePayload.detectedHeaderBg = detectedHeaderBg;
 
     widgetConfigRepo.upsert(tenantId, updatePayload);
     ctxLogger.info({ tenantId, businessType, companyName }, 'Brand adaptation applied after scan');

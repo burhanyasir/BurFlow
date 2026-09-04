@@ -105,6 +105,7 @@ const AnalyticsDashboard = lazy(() => import('./pages/admin/analytics/AnalyticsD
 const BillingDashboard = lazy(() => import('./pages/admin/billing/BillingDashboard'));
 const AdminManualBilling = lazy(() => import('./pages/admin/billing/AdminManualBilling'));
 const OwnerAdminPanel = lazy(() => import('./pages/admin/owner/OwnerAdminPanel'));
+const SignupDashboard = lazy(() => import('./pages/admin/owner/SignupDashboard'));
 const CitationDashboard = lazy(() => import('./pages/admin/citations/CitationDashboard'));
 const ConversationDashboard = lazy(() => import('./pages/admin/conversations/ConversationDashboard'));
 const ConversationDetailPage = lazy(() => import('./pages/admin/conversations/ConversationDetailPage'));
@@ -271,6 +272,7 @@ function RoutesWithAnimation() {
         <Route path="/dashboard/billing" element={<ProtectedRoute><BillingDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/billing/manual" element={<ProtectedRoute><AdminManualBilling /></ProtectedRoute>} />
         <Route path="/owner" element={<OwnerAdminPanel />} />
+        <Route path="/owner/signups" element={<SignupDashboard />} />
         <Route path="/dashboard/widget" element={<ProtectedRoute><WidgetDashboard /></ProtectedRoute>} />
         <Route path="/dashboard/unanswered" element={<ProtectedRoute><AdminRoute><UnansweredDashboard /></AdminRoute></ProtectedRoute>} />
         <Route path="/dashboard/citations" element={<ProtectedRoute><AdminRoute><CitationDashboard /></AdminRoute></ProtectedRoute>} />

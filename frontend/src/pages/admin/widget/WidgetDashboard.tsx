@@ -67,6 +67,11 @@ export default function WidgetDashboard() {
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
   const [businessProfile, setBusinessProfile] = useState<Record<string, unknown> | null>(null);
+  const [customPrimaryColor, setCustomPrimaryColor] = useState('#006248');
+  const [customHeaderBg, setCustomHeaderBg] = useState('#006248');
+  const [autoDetectTheme, setAutoDetectTheme] = useState(true);
+  const [detectedPrimaryColor, setDetectedPrimaryColor] = useState<string | null>(null);
+  const [detectedHeaderBg, setDetectedHeaderBg] = useState<string | null>(null);
   const snippet = agentId ? buildSnippet(activeTab, agentId, primaryColor, position) : DEFAULT_SNIPPET;
 
   const loadConfig = useCallback(async () => {
@@ -91,6 +96,11 @@ export default function WidgetDashboard() {
           if (typeof widgetRes.autoOpen === 'boolean') setAutoOpen(widgetRes.autoOpen);
           if (typeof widgetRes.autoOpenDelay === 'number') setAutoOpenDelay(widgetRes.autoOpenDelay);
           if (widgetRes.businessProfile) setBusinessProfile(widgetRes.businessProfile);
+          setCustomPrimaryColor(widgetRes.customPrimaryColor || widgetRes.primaryColor || '#006248');
+          setCustomHeaderBg(widgetRes.customHeaderBg || widgetRes.detectedHeaderBg || widgetRes.primaryColor || '#006248');
+          setAutoDetectTheme(widgetRes.autoDetectTheme !== false);
+          setDetectedPrimaryColor(widgetRes.detectedPrimaryColor || null);
+          setDetectedHeaderBg(widgetRes.detectedHeaderBg || null);
         }
       }
     } catch { addToast('Failed to load widget config', 'error'); } finally { setConfigLoaded(true); }
@@ -111,6 +121,9 @@ export default function WidgetDashboard() {
         autoOpenDelay,
         companyName: workspaceName,
         businessProfile: businessProfile || undefined,
+        customPrimaryColor,
+        customHeaderBg,
+        autoDetectTheme,
       });
       addToast('Widget settings saved', 'success');
     } catch { addToast('Failed to save widget settings', 'error'); } finally { setSaving(false); }
@@ -222,6 +235,86 @@ export default function WidgetDashboard() {
                     <option value="right">Right</option><option value="left">Left</option>
                   </select>
                 </div>
+              </div>
+            </Panel>
+
+            <Panel>
+              <h2 className="text-lg font-bold tracking-tight">Widget theme & branding</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Control how the widget matches your website's brand colors.</p>
+              <div className="mt-6 space-y-5">
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-hairline bg-surface-2/60 p-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">Auto-detect theme from my website</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">Extract primary and header colors automatically from your site.</p>
+                  </div>
+                  <button
+                    role="switch"
+                    aria-checked={autoDetectTheme}
+                    aria-label="Auto-detect theme"
+                    onClick={() => setAutoDetectTheme(v => !v)}
+                    className={cn('relative h-7 w-12 shrink-0 rounded-full transition-colors', autoDetectTheme ? 'bg-primary' : 'bg-surface-2 border border-hairline')}
+                  >
+                    <span className={cn('absolute top-1/2 size-5 -translate-y-1/2 rounded-full bg-white shadow-soft transition-all', autoDetectTheme ? 'left-[calc(100%-1.375rem)]' : 'left-0.5')} />
+                  </button>
+                </div>
+
+                {autoDetectTheme && detectedPrimaryColor && (
+                  <div className="rounded-2xl border border-hairline bg-surface-2/60 p-4">
+                    <p className="mb-2 text-xs font-semibold text-muted-foreground">Detected from your website</p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1 text-xs font-medium">
+                        <span className="size-3 rounded-full" style={{ backgroundColor: detectedPrimaryColor }} /> Primary: {detectedPrimaryColor}
+                      </span>
+                      {detectedHeaderBg && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-surface px-3 py-1 text-xs font-medium">
+                          <span className="size-3 rounded-full" style={{ backgroundColor: detectedHeaderBg }} /> Header: {detectedHeaderBg}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Custom primary color</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={rgbToHex(hexToRgb(customPrimaryColor).r, hexToRgb(customPrimaryColor).g, hexToRgb(customPrimaryColor).b)}
+                      onChange={e => setCustomPrimaryColor(e.target.value)}
+                      className="h-10 w-14 shrink-0 cursor-pointer rounded-full border border-hairline bg-transparent p-1"
+                      aria-label="Custom primary color"
+                    />
+                    <input
+                      value={customPrimaryColor}
+                      onChange={e => setCustomPrimaryColor(e.target.value)}
+                      className="h-10 flex-1 rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
+                      aria-label="Custom primary color hex"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs uppercase tracking-wider text-muted-foreground">Custom header background</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={rgbToHex(hexToRgb(customHeaderBg).r, hexToRgb(customHeaderBg).g, hexToRgb(customHeaderBg).b)}
+                      onChange={e => setCustomHeaderBg(e.target.value)}
+                      className="h-10 w-14 shrink-0 cursor-pointer rounded-full border border-hairline bg-transparent p-1"
+                      aria-label="Custom header background"
+                    />
+                    <input
+                      value={customHeaderBg}
+                      onChange={e => setCustomHeaderBg(e.target.value)}
+                      className="h-10 flex-1 rounded-full border border-hairline bg-surface px-4 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary/40"
+                      aria-label="Custom header background hex"
+                    />
+                  </div>
+                </div>
+
+                <p className="rounded-2xl border border-hairline bg-surface-2/60 p-3 text-xs text-muted-foreground">
+                  When auto-detect is on, colors are extracted from your website. Custom colors always override detected values.
+                </p>
               </div>
             </Panel>
 
