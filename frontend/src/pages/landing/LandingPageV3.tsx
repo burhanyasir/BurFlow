@@ -383,7 +383,7 @@ export default function LandingPageV3() {
                 </span>
               </span>
               <h1 className="mt-5 text-5xl font-bold leading-[0.95] md:text-6xl lg:text-7xl">
-                Your website is
+                Your website has
                 <br />
                 already your best
                 <br />
