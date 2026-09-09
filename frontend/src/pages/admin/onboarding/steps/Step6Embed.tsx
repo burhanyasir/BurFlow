@@ -6,6 +6,7 @@ interface Props {
   agentId: string;
   widgetToken: string | null;
   snippet: string | null;
+  primaryColor: string;
   onGenerateToken: () => Promise<string>;
   onUpdateConfig: () => Promise<void>;
   onGetSnippet: () => Promise<string>;
@@ -24,12 +25,12 @@ const TABS = [
 // override it via VITE_WIDGET_CDN_URL. The loader reaches the API at the same
 // origin through the /api proxy, so no expiring JWT is embedded — the widget
 // exchanges the tenant id at runtime (tokenless bootstrap).
-const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://burflow.onrender.com/widget/widget.js';
+const WIDGET_CDN = import.meta.env.VITE_WIDGET_CDN_URL || 'https://bur-flow.vercel.app/widget/widget.js';
 const WIDGET_API_URL = import.meta.env.VITE_WIDGET_API_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
-function buildSnippet(tabId: string, agentId: string, token: string): string {
+function buildSnippet(tabId: string, agentId: string, token: string, primaryColor: string): string {
   const base = WIDGET_CDN;
-  const attr = `data-tenant-id="${agentId}" data-api-url="${WIDGET_API_URL}" data-primary-color="#A8244B" data-position="right"`;
+  const attr = `data-tenant-id="${agentId}" data-api-url="${WIDGET_API_URL}" data-primary-color="${primaryColor}" data-position="right"`;
   switch (tabId) {
     case 'vanilla':
       return `<!-- BurFlow Chatbot -->\n<script src="${base}" ${attr}></script>`;
@@ -46,7 +47,7 @@ function buildSnippet(tabId: string, agentId: string, token: string): string {
   }
 }
 
-export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onUpdateConfig, onGetSnippet }: Props) {
+export function Step6Embed({ agentId, widgetToken, snippet, primaryColor, onGenerateToken, onUpdateConfig, onGetSnippet }: Props) {
   const [activeTab, setActiveTab] = useState('vanilla');
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -90,7 +91,7 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
       const widget = new Ctor({
         widgetToken: token,
         apiUrl: WIDGET_API_URL,
-        primaryColor: '#A8244B',
+        primaryColor,
         position: 'right',
       });
       widget.mount();
@@ -129,7 +130,7 @@ export function Step6Embed({ agentId, widgetToken, snippet, onGenerateToken, onU
     }
   };
 
-  const displaySnippet = snippet || buildSnippet(activeTab, agentId, widgetToken || 'YOUR_TOKEN');
+  const displaySnippet = snippet || buildSnippet(activeTab, agentId, widgetToken || 'YOUR_TOKEN', primaryColor);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(displaySnippet);

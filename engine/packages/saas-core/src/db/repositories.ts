@@ -743,7 +743,8 @@ export class OnboardingProgressRepository {
     const progress = this.get(tenantId);
     if (!progress) return this.init(tenantId);
     const completed = progress.completedSteps.includes(step) ? progress.completedSteps : [...progress.completedSteps, step];
-    const pct = Math.round((completed.length / 7) * 100);
+    const TOTAL_ONBOARDING_STEPS = 9;
+    const pct = Math.round((completed.length / TOTAL_ONBOARDING_STEPS) * 100);
     const status: OnboardingStatus = pct >= 100 ? 'completed' : 'in_progress';
     return this.update(tenantId, { completedSteps: completed, completionPercentage: pct, onboardingStatus: status });
   }

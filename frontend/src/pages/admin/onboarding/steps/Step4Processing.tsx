@@ -65,7 +65,7 @@ export function Step4Processing({ knowledge, processing, onCheckStatus }: Props)
   const allReady = (() => {
     const vals = Object.values(processing.statuses);
     if (vals.length === 0) return false;
-    const doneCount = vals.filter(s => s === 'ready' || s === 'published' || s === 'failed').length;
+    const doneCount = vals.filter(s => s === 'ready' || s === 'published').length;
     return doneCount === vals.length;
   })();
 

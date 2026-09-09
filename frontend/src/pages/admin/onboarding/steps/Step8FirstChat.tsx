@@ -22,6 +22,7 @@ const SUGGESTIONS = [
 export function Step8FirstChat({ agentId, messages, businessProfile, onSend }: Props) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const suggestions = useMemo(() => {
@@ -40,9 +41,12 @@ export function Step8FirstChat({ agentId, messages, businessProfile, onSend }: P
     if (!msg || sending) return;
     setInput('');
     setSending(true);
+    setChatError(null);
     try {
       await onSend(msg);
-    } catch {}
+    } catch (err: any) {
+      setChatError(err?.message || 'Failed to send message. Please try again.');
+    }
     setSending(false);
   };
 
@@ -121,6 +125,11 @@ export function Step8FirstChat({ agentId, messages, businessProfile, onSend }: P
         </div>
 
         <div className="p-3 border-t border-[var(--color-neutral-100)]">
+          {chatError && (
+            <div className="mb-2 p-2 rounded-lg bg-[var(--color-error-50)] border border-[var(--color-error-100)] text-xs text-[var(--color-error-700)]">
+              {chatError}
+            </div>
+          )}
           <div className="flex gap-2">
             <input
               className="flex-1 text-sm px-4 py-2.5 rounded-xl border border-[var(--color-neutral-200)] focus:outline-none focus:border-[var(--color-accent-500)] focus:ring-1 focus:ring-[var(--color-accent-500)]"

@@ -54,6 +54,7 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
   const [completing, setCompleting] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [seedDone, setSeedDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const businessProfile = useMemo(() => deriveBusinessIntelligenceSnapshot({
     businessName: data.workspace.name || 'your business',
@@ -65,19 +66,25 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
 
   const handleComplete = async () => {
     setCompleting(true);
+    setError(null);
     try {
       await onComplete();
       navigate('/dashboard');
-    } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save. Please try again.');
+    }
     setCompleting(false);
   };
 
   const handleSeedDemo = async () => {
     setSeeding(true);
+    setError(null);
     try {
       await onSeedDemo();
       setSeedDone(true);
-    } catch {}
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load demo data. Please try again.');
+    }
     setSeeding(false);
   };
 
@@ -142,6 +149,12 @@ export function Step9Success({ data, onComplete, onSeedDemo, onReset }: Props) {
           <Button size="sm" variant="secondary" onClick={handleSeedDemo} disabled={seeding}>
             {seeding ? 'Loading…' : 'Load Demo Data'}
           </Button>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 p-3 rounded-lg bg-[var(--color-error-50)] border border-[var(--color-error-100)] text-sm text-[var(--color-error-700)]">
+          {error}
         </div>
       )}
 

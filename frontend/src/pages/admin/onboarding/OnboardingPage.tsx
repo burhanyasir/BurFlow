@@ -81,6 +81,7 @@ export function OnboardingPage() {
         agentId={state.data.embed.agentId}
         widgetToken={state.data.embed.widgetToken}
         snippet={state.data.embed.snippet}
+        primaryColor={state.data.custom.primaryColor}
         onGenerateToken={state.generateWidgetToken}
         onUpdateConfig={state.updateWidgetConfig}
         onGetSnippet={state.getWidgetSnippet}

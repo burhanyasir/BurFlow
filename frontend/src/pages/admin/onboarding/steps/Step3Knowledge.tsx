@@ -31,6 +31,7 @@ export function Step3Knowledge({
   const [scanError, setScanError] = useState<string | null>(null);
   const [crawlSuccess, setCrawlSuccess] = useState<string | null>(null);
   const [crawlProgress, setCrawlProgress] = useState<{ pages: number; remaining: number; maxPages: number } | null>(null);
+  const [faqError, setFaqError] = useState<string | null>(null);
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -43,18 +44,29 @@ export function Step3Knowledge({
 
   const handleAddWebsite = () => {
     const url = websiteInput.trim();
-    if (url && !data.websites.includes(url)) {
+    if (!url) return;
+    try {
+      new URL(url);
+    } catch {
+      setScanError('Please enter a valid URL (e.g., https://example.com)');
+      return;
+    }
+    if (!data.websites.includes(url)) {
       onAddWebsite(url);
       setWebsiteInput('');
+      setScanError(null);
     }
   };
 
   const handleSubmitFaqs = async () => {
     if (!data.faqs.trim()) return;
     setSubmitting(true);
+    setFaqError(null);
     try {
       await onSubmitFaqs();
-    } catch {}
+    } catch (err: any) {
+      setFaqError(err?.message || 'Failed to save FAQs. Please try again.');
+    }
     setSubmitting(false);
   };
 
@@ -209,6 +221,11 @@ export function Step3Knowledge({
               {submitting ? 'Saving…' : 'Save FAQs'}
             </Button>
           </div>
+          {faqError && (
+            <div className="mt-2 p-3 rounded-lg bg-[var(--color-error-50)] border border-[var(--color-error-100)] text-sm text-[var(--color-error-700)]">
+              {faqError}
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
